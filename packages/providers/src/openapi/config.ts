@@ -161,18 +161,21 @@ export const OPENAPI_DEFAULT_CONFIG: OpenApiConfig = {
  * Conta solo i servizi verificati: quelli non confermati non vengono chiamati.
  */
 export function costoAnalisi(
-  livello: 'base' | 'esteso' | 'completo',
+  livello: 'base' | 'esteso' | 'completo' | 'profondito',
   config: OpenApiConfig = OPENAPI_DEFAULT_CONFIG,
 ): number {
   const s = config.services;
   if (livello === 'base') return s.anagraficaBase.costoCentesimi;
   if (livello === 'esteso') return s.anagraficaEstesa.costoCentesimi;
 
-  return (
+  const completo =
     s.anagraficaEstesa.costoCentesimi +
     (s.eventiNegativi.verificato ? s.eventiNegativi.costoCentesimi : 0) +
-    (s.bilancioDettagliato.verificato ? s.bilancioDettagliato.costoCentesimi : 0)
-  );
+    (s.bilancioDettagliato.verificato ? s.bilancioDettagliato.costoCentesimi : 0);
+
+  // L'approfondimento **si somma**: il profilo completo non contiene i bilanci sintetici
+  // decennali, quindi non sostituisce l'anagrafica estesa, la affianca.
+  return livello === 'profondito' ? completo + s.profiloCompleto.costoCentesimi : completo;
 }
 
 /** Servizi il cui percorso o autorizzazione non è ancora confermato. */

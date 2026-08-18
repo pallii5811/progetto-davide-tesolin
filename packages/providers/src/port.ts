@@ -21,7 +21,17 @@ export type FetchLevel =
   /** Anagrafica completa, assetti proprietari, unità locali. */
   | 'esteso'
   /** Tutto il precedente più bilanci ed eventi negativi. È il livello dell'analisi completa. */
-  | 'completo';
+  | 'completo'
+  /**
+   * Aggiunge cariche, sedi operative e struttura del gruppo.
+   *
+   * **Non sostituisce** il livello completo, lo affianca: il servizio che porta cariche e
+   * sedi non contiene i bilanci sintetici decennali su cui si calcolano crescita e
+   * tendenze, e viceversa. Sono due dataset distinti e si pagano entrambi — motivo per cui
+   * questo livello è una scelta esplicita dell'intermediario, non il valore predefinito:
+   * su un prospect da qualificare è denaro sprecato, su un cliente da assicurare è nulla.
+   */
+  | 'profondito';
 
 export interface CompanySearchResult {
   readonly partitaIva: PartitaIva | null;

@@ -28,7 +28,7 @@ import {
 } from '@aegis/providers';
 import type { CostEvent } from '@aegis/providers';
 import { RegistroPerRichiesta, conCostiDellaRichiesta, costoDegliEventi } from './costi-richiesta.js';
-import type { CompanyDataProvider } from '@aegis/providers';
+import type { CompanyDataProvider, FetchLevel } from '@aegis/providers';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
@@ -678,6 +678,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       datiDichiarati?: Partial<DatiDichiarati> | undefined;
       polizze?: PolizzaInEssere[] | undefined;
       asOf?: Date | undefined;
+      /**
+       * Livello di acquisizione. Predefinito `completo`: l'approfondimento costa quasi
+       * cinque volte tanto e va chiesto, non subito.
+       */
+      livello?: 'completo' | 'profondito' | undefined;
     } = {},
   ) => {
     const contesto = contestoDi(request);
@@ -691,7 +696,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const profilo = await caricaProfilo(provider, identificativo, 'completo');
+    const profilo = await caricaProfilo(provider, identificativo, opzioni.livello ?? 'completo');
     if (profilo === null) return null;
 
     const dossier = await contesto.dossier.get(identificativo);
@@ -746,6 +751,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           : { datiDichiarati: toDatiDichiarati(parsed.data.datiDichiarati) }),
         ...(parsed.data.polizze === undefined ? {} : { polizze: parsed.data.polizze.map(toPolizza) }),
         ...(parsed.data.asOf === undefined ? {} : { asOf: parsed.data.asOf }),
+        // L'approfondimento si chiede esplicitamente: costa quasi cinque volte l'analisi
+        // ordinaria, e nessuno deve trovarselo addebitato per una svista.
+        ...(parsed.data.approfondita === true ? { livello: 'profondito' as const } : {}),
       }),
     );
 
@@ -1229,7 +1237,7 @@ async function risolviSessione(db: unknown, token: string): Promise<Sessione | n
 async function caricaProfilo(
   provider: CompanyDataProvider,
   identificativo: string,
-  livello: 'base' | 'esteso' | 'completo',
+  livello: FetchLevel,
 ): Promise<CompanyProfile | null> {
   try {
     return await provider.fetchProfile(identificativo, livello);

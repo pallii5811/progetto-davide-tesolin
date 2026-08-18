@@ -8,6 +8,7 @@
  */
 
 import { DATI_DICHIARATI_VUOTI, parsePartitaIva } from '@aegis/core';
+import { fromProvider } from '@aegis/core';
 import type { Bilancio, CompanyProfile, EventiNegativi, PartitaIva, Sourced } from '@aegis/core';
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger } from '../http.js';
@@ -24,6 +25,7 @@ import { OPENAPI_DEFAULT_CONFIG, baseUrlPer, baseUrlRischioPer } from './config.
 import type { AmbienteOpenApi, OpenApiConfig, ServiceConfig } from './config.js';
 import {
   atecoDi,
+  mappaProfiloCompleto,
   mappaAnagrafica,
   mappaAssetti,
   mappaBilanciSintetici,
@@ -31,6 +33,7 @@ import {
   normalizzaStatoAttivita,
   sedeDi,
 } from './mapper.js';
+import type { ProfiloCompleto } from './mapper.js';
 import { mappaNegativita } from './negativita.js';
 import { asArray, bool, num, partitaIvaOf, pick, str } from './parse.js';
 
@@ -258,6 +261,7 @@ export class OpenApiProvider implements CompanyDataProvider {
     const services = this.#config.services;
 
     const anagraficaService = level === 'base' ? services.anagraficaBase : services.anagraficaEstesa;
+    const approfondito = level === 'profondito';
     const rawAnagrafica = this.#unwrap(await this.#get(anagraficaService, identifier));
 
     const servizio = level === 'base' ? 'IT-start' : 'IT-advanced';
@@ -315,23 +319,56 @@ export class OpenApiProvider implements CompanyDataProvider {
 
     // Livello completo: si acquistano i servizi aggiuntivi, ma solo quelli verificati.
     // Un percorso non confermato produrrebbe una chiamata a vuoto — pagata comunque.
-    const [bilanci, eventiNegativi] = await Promise.all([
+    const [bilanci, eventiNegativi, profilo] = await Promise.all([
       services.bilancioDettagliato.verificato ? this.#fetchBilanci(identifier) : Promise.resolve([]),
       services.eventiNegativi.verificato
         ? this.#fetchEventiNegativi(identifier, osservatoIl)
         : Promise.resolve(null),
+      approfondito ? this.#fetchProfiloCompleto(identifier) : Promise.resolve(null),
     ]);
+
+    /*
+      Le cariche arrivano solo dal profilo completo, e vanno unite ai soci che vengono
+      dall'anagrafica estesa: sono due metà dello stesso assetto societario. Sostituire
+      l'una con l'altra perderebbe metà dell'informazione pagata.
+    */
+    const assettiCompleti =
+      profilo === null
+        ? assetti
+        : {
+            ...assetti,
+            value: { ...assetti.value, cariche: profilo.cariche },
+          };
 
     return {
       identity,
       anagrafica,
-      assetti,
+      assetti: assettiCompleti,
       bilanci,
       bilanciSintetici,
       eventiNegativi,
-      unitaLocali: null,
+      unitaLocali:
+        profilo === null || profilo.unitaLocali.length === 0
+          ? null
+          : fromProvider(profilo.unitaLocali, this.name, 'IT-full', osservatoIl),
       datiDichiarati: DATI_DICHIARATI_VUOTI,
     };
+  }
+
+  /**
+   * Profilo completo: cariche, sedi e gruppo.
+   *
+   * Il fallimento non fa cadere l'analisi. Chi ha chiesto l'approfondimento ha già pagato
+   * l'anagrafica estesa: restituire un errore invece di un'analisi un po' meno ricca
+   * significherebbe fargli perdere anche quella.
+   */
+  async #fetchProfiloCompleto(identifier: string): Promise<ProfiloCompleto | null> {
+    try {
+      const raw = this.#unwrap(await this.#get(this.#config.services.profiloCompleto, identifier));
+      return mappaProfiloCompleto(raw);
+    } catch {
+      return null;
+    }
   }
 
   // ── Interni ────────────────────────────────────────────────────────────────

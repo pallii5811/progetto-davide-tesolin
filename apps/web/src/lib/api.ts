@@ -538,10 +538,17 @@ export async function leggiStudio(): Promise<DatiStudio | { errore: string }> {
   return chiama('/api/studio');
 }
 
-export async function analizzaAzienda(identificativo: string): Promise<AnalisiDto> {
+/**
+ * @param approfondita Aggiunge cariche, sedi operative e struttura del gruppo. Costa quasi
+ *   cinque volte l'analisi ordinaria: si chiede, non si dà per scontato.
+ */
+export async function analizzaAzienda(
+  identificativo: string,
+  opzioni: { approfondita?: boolean } = {},
+): Promise<AnalisiDto> {
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/analisi`, {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(opzioni.approfondita === true ? { approfondita: true } : {}),
   });
 }
 

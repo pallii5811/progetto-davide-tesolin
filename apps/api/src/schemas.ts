@@ -18,7 +18,9 @@ export const searchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
-export const fetchLevelSchema = z.enum(['base', 'esteso', 'completo']).default('completo');
+export const fetchLevelSchema = z
+  .enum(['base', 'esteso', 'completo', 'profondito'])
+  .default('completo');
 
 const indirizzoSchema = z.object({
   via: z.string(),
@@ -120,6 +122,13 @@ export const analisiRequestSchema = z.object({
   polizze: z.array(polizzaSchema).optional(),
   /** Data di riferimento dell'analisi. Utile per riprodurre una valutazione passata. */
   asOf: z.coerce.date().optional(),
+  /**
+   * Analisi approfondita: aggiunge cariche, sedi operative e struttura del gruppo.
+   *
+   * Predefinito `false`. Costa quasi cinque volte l'analisi ordinaria e va chiesto:
+   * nessuno deve trovarselo addebitato per una svista.
+   */
+  approfondita: z.boolean().optional(),
 });
 
 export type AnalisiRequest = z.infer<typeof analisiRequestSchema>;

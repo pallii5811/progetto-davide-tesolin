@@ -103,11 +103,33 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
     Si compone quindi dai pezzi, che il fornitore restituisce separati, e si ricade sul
     campo già composto solo quando i pezzi mancano.
   */
-  const via =
-    componiVia(str(source, 'toponym', 'toponimo'), str(source, 'street', 'via', 'indirizzo')) ??
-    str(source, 'streetName');
+  const daPezzi = componiVia(
+    str(source, 'toponym', 'toponimo'),
+    str(source, 'street', 'via', 'indirizzo'),
+  );
+
+  /*
+    Il profilo completo restituisce la via in un pezzo solo, con il civico dopo la virgola:
+    «VIALE FILIPPO TOMMASO MARINETTI, 221». Lasciarlo dentro il nome della via impedisce di
+    riconoscere lo stesso indirizzo quando arriva dall'altro servizio — dove via e civico
+    sono separati — e la stessa sede finirebbe contata due volte.
+  */
+  const composta = str(source, 'streetName');
+  const separata = daPezzi === null && composta !== null ? separaCivico(composta) : null;
+
+  const via = daPezzi ?? separata?.via ?? composta;
   const comune = str(source, 'town', 'comune', 'city');
-  const provincia = str(source, 'province', 'provincia', 'siglaProvincia', 'sigla');
+
+  /*
+    La provincia è una stringa in `IT-start` e `IT-advanced`, un oggetto `{ code, description }`
+    nel profilo completo. Letta con il solo lettore di stringhe resta vuota, e un'ubicazione
+    senza provincia perde la classificazione sismica e idraulica: cioè proprio ciò per cui
+    la si è comprata.
+  */
+  const provincia =
+    str(source, 'province', 'provincia', 'siglaProvincia', 'sigla') ??
+    str(pick(source, 'province', 'provincia'), 'code', 'codice');
+
   if (via === null && comune === null) return null;
 
   // La regione arriva come oggetto `{ code, description }`, non come stringa.
@@ -117,7 +139,7 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
 
   return {
     via: via ?? '',
-    civico: str(source, 'streetNumber', 'civico', 'numero'),
+    civico: str(source, 'streetNumber', 'civico', 'numero') ?? separata?.civico ?? null,
     cap: str(source, 'zipCode', 'cap', 'postalCode') ?? '',
     comune: comune ?? '',
     provincia: (provincia ?? '').toUpperCase().slice(0, 2),
@@ -125,6 +147,20 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
     latitudine: coordinate.latitudine,
     longitudine: coordinate.longitudine,
   };
+}
+
+/**
+ * Separa il civico da una via scritta in un pezzo solo.
+ *
+ * Il taglio avviene sull'**ultima** virgola seguita da un numero civico: «PIAZZA SAN
+ * GIOVANNI DECOLLATO, 6» ha una virgola sola, ma «VIA ROMA, 12, SCALA B» ne ha due, e il
+ * civico è quello attaccato alla prima parte. Se dopo la virgola non c'è un numero non si
+ * taglia niente: «VIA DEI MILLE, FRAZIONE SANTA MARIA» resta intera.
+ */
+function separaCivico(composta: string): { via: string; civico: string | null } {
+  const corrispondenza = /^(.*?),\s*(\d+[a-zA-Z/-]*)\s*$/.exec(composta.trim());
+  if (corrispondenza === null) return { via: composta.trim(), civico: null };
+  return { via: corrispondenza[1]!.trim(), civico: corrispondenza[2]!.trim() };
 }
 
 function componiVia(toponimo: string | null, nome: string | null): string | null {
@@ -532,3 +568,89 @@ function classificaPregiudizievole(descrizione: string): Pregiudizievole['tipo']
 }
 
 export const EVENTI_NEGATIVI_ASSENTI = NESSUN_EVENTO_NEGATIVO;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profilo completo (IT-full)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Sezioni che solo il profilo completo porta.
+ *
+ * Non sostituisce l'anagrafica estesa, la **completa**: `IT-full` non contiene i bilanci
+ * sintetici decennali su cui si calcolano crescita e tendenze, e l'anagrafica estesa non
+ * contiene né le cariche né le sedi. Sono due dataset diversi, e chi li considera
+ * alternativi compra il servizio caro e perde comunque metà del dato.
+ */
+export interface ProfiloCompleto {
+  readonly cariche: readonly Carica[];
+  readonly unitaLocali: readonly UnitaLocale[];
+  readonly gruppo: {
+    readonly appartieneAGruppo: boolean;
+    readonly denominazioneGruppo: string | null;
+    /** Chi sta al vertice: può essere una persona fisica, e per la D&O è ciò che conta. */
+    readonly capogruppo: string | null;
+    readonly controllateTotali: number | null;
+    readonly controllantiEstere: boolean;
+  } | null;
+}
+
+/** `SSL` è la sede legale e amministrativa; gli altri codici sono unità operative. */
+function tipoUnitaDaCodice(codice: string | null, descrizione: string | null): TipoUnitaLocale {
+  if (codice === 'SSL') return 'sede-legale';
+  return normalizzaTipoUnitaLocale(descrizione);
+}
+
+export function mappaProfiloCompleto(raw: unknown): ProfiloCompleto {
+  // ── Cariche ───────────────────────────────────────────────────────────────
+  const cariche: Carica[] = asArray(pick(raw, 'managers')).map((m) => {
+    // Fra le cariche compaiono anche le persone giuridiche — il socio unico, per esempio.
+    // Vanno tenute: la carica di una società in un'altra società è esattamente ciò che
+    // la D&O di gruppo deve coprire.
+    const nome = str(m, 'name');
+    const cognome = str(m, 'surname');
+    const persona = [cognome, nome].filter((p): p is string => p !== null).join(' ');
+    const ruoli = asArray(pick(m, 'roles'));
+    const primoRuolo = ruoli[0];
+
+    return {
+      nominativo: persona !== '' ? persona : (str(m, 'companyName') ?? 'Non specificato'),
+      codiceFiscale: str(m, 'taxCode'),
+      ruolo: str(pick(primoRuolo, 'role'), 'description', 'descrizione') ?? 'Non specificata',
+      dataNomina: date(primoRuolo, 'roleStartDate'),
+      isRappresentanteLegale: bool(m, 'isLegalRepresentative') ?? false,
+    };
+  });
+
+  // ── Sedi ──────────────────────────────────────────────────────────────────
+  const unitaLocali: UnitaLocale[] = asArray(pick(raw, 'allOffices'))
+    .map((o): UnitaLocale | null => {
+      const indirizzo = mappaIndirizzo(pick(o, 'address') ?? o);
+      if (indirizzo === null) return null;
+
+      const dettagli = pick(o, 'companyDetails');
+      const tipo = pick(dettagli, 'officeType');
+
+      return {
+        tipo: tipoUnitaDaCodice(str(tipo, 'code'), str(tipo, 'description')),
+        indirizzo,
+        attivita: str(tipo, 'description'),
+        addetti: num(o, 'employees'),
+      };
+    })
+    .filter((u): u is UnitaLocale => u !== null);
+
+  // ── Gruppo ────────────────────────────────────────────────────────────────
+  const gruppoRaw = pick(raw, 'corporateGroups');
+  const gruppo =
+    gruppoRaw === undefined
+      ? null
+      : {
+          appartieneAGruppo: bool(gruppoRaw, 'belongsToGroup') ?? false,
+          denominazioneGruppo: str(gruppoRaw, 'groupName'),
+          capogruppo: str(gruppoRaw, 'holdingCompanyName'),
+          controllateTotali: num(gruppoRaw, 'totalGroupSubsidiaries'),
+          controllantiEstere: bool(gruppoRaw, 'hasForeignParents') ?? false,
+        };
+
+  return { cariche, unitaLocali, gruppo };
+}

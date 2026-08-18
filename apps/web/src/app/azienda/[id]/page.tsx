@@ -21,13 +21,26 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export default async function PaginaAzienda({ params }: { params: Promise<{ id: string }> }) {
+export default async function PaginaAzienda({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ approfondita?: string }>;
+}) {
   await richiediSessione();
   const { id } = await params;
 
+  /*
+    L'approfondimento è una scelta esplicita, e passa dall'indirizzo perché sia
+    **visibile**: chi arriva su questa pagina da un collegamento sa, guardando la barra
+    del browser, se sta per spendere dieci centesimi o cinquantotto.
+  */
+  const approfondita = (await searchParams).approfondita === '1';
+
   let analisi: AnalisiDto;
   try {
-    analisi = await analizzaAzienda(id);
+    analisi = await analizzaAzienda(id, { approfondita });
   } catch (errore) {
     return (
       <Avviso tono="critico" titolo="Analisi non disponibile">
@@ -56,7 +69,7 @@ export default async function PaginaAzienda({ params }: { params: Promise<{ id: 
 
   return (
     <>
-      <Intestazione analisi={analisi} identificativo={id} />
+      <Intestazione analisi={analisi} identificativo={id} approfondita={approfondita} />
 
       {/* ── Completezza: l'invito ad agire, non un semplice avviso ────────── */}
       {analisi.completezza.percentuale < 0.65 && (
@@ -869,7 +882,15 @@ function NavigazioneSezioni() {
   );
 }
 
-function Intestazione({ analisi, identificativo }: { analisi: AnalisiDto; identificativo: string }) {
+function Intestazione({
+  analisi,
+  identificativo,
+  approfondita,
+}: {
+  analisi: AnalisiDto;
+  identificativo: string;
+  approfondita: boolean;
+}) {
   const { azienda, sintesi } = analisi;
   return (
     <div className="mb-6">
@@ -881,6 +902,19 @@ function Intestazione({ analisi, identificativo }: { analisi: AnalisiDto; identi
         <h1 className="text-2xl font-bold tracking-tight">{azienda.denominazione}</h1>
 
         <div className="flex flex-wrap gap-2">
+          {/*
+            L'approfondimento è una scelta economica dichiarata: cariche, sedi operative e
+            gruppo costano 48 centesimi in più, e su un prospect da scartare sono denaro
+            buttato. Il prezzo sta scritto sul pulsante, non in una nota a piè di pagina.
+          */}
+          {!approfondita && (
+            <Link
+              href={`/azienda/${identificativo}?approfondita=1`}
+              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            >
+              Analisi approfondita <span className="text-testo-debole">+0,48 €</span>
+            </Link>
+          )}
           <Link
             href={`/azienda/${identificativo}/dati`}
             className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"

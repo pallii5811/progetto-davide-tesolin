@@ -24,8 +24,21 @@ export default defineConfig({
   retries: process.env['CI'] === undefined ? 0 : 1,
 
   reporter: [['list']],
-  timeout: 60_000,
-  expect: { timeout: 15_000 },
+  /*
+    Tempi tarati sul caso peggiore, non su quello medio.
+
+    Questi collaudi girano contro il **server di sviluppo** di Next, che compila le rotte
+    alla prima richiesta e ricompila a ogni modifica: la durata di un'attesa dipende da
+    quanto è carica la macchina, non da quanto è corretto il software. Con quindici secondi
+    la stessa suite passava in sei minuti e falliva in dieci, sempre su collaudi diversi —
+    un rosso intermittente che insegna a non fidarsi della suite, che è il danno peggiore
+    che un collaudo possa fare.
+
+    Alzarli non nasconde nulla: un'asserzione che passa, passa nello stesso tempo di prima.
+    Cambia solo quanto si attende prima di dichiarare un fallimento.
+  */
+  timeout: 90_000,
+  expect: { timeout: 30_000 },
 
   use: {
     baseURL: INDIRIZZO_WEB,
