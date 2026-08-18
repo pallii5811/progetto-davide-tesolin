@@ -390,3 +390,31 @@ describe('Costo di una ricerca seguita da analisi', () => {
     expect(ledger.totaleCentesimi()).toBe(10);
   });
 });
+
+/**
+ * L'indirizzo, che si legge sul documento consegnato al cliente.
+ *
+ * `streetName` arriva **già composto** con toponimo e civico. Usarlo come nome della via
+ * e affiancargli `streetNumber` stampa il civico due volte su ogni indirizzo reale:
+ * «VIALE FILIPPO TOMMASO MARINETTI 221 221». Non è un errore di calcolo, è un errore che
+ * si vede — e finisce sul fascicolo di adeguatezza.
+ */
+describe('Indirizzo dalla risposta reale', () => {
+  const anagrafica = mappaAnagrafica(RISPOSTA_REALE.data[0], 'IT-advanced', OSSERVATO);
+
+  it('separa il nome della via dal civico', () => {
+    expect(anagrafica.value.sedeLegale?.via).toBe('VIALE FILIPPO TOMMASO MARINETTI');
+    expect(anagrafica.value.sedeLegale?.civico).toBe('221');
+  });
+
+  it('non ripete il civico dentro il nome della via', () => {
+    const via = anagrafica.value.sedeLegale?.via ?? '';
+    const civico = anagrafica.value.sedeLegale?.civico ?? '';
+    expect(via.endsWith(civico)).toBe(false);
+  });
+
+  it('conserva le coordinate, che servono a misurare la contiguità fra le sedi', () => {
+    expect(anagrafica.value.sedeLegale?.latitudine).toBeCloseTo(41.8071, 3);
+    expect(anagrafica.value.sedeLegale?.longitudine).toBeCloseTo(12.47843, 3);
+  });
+});

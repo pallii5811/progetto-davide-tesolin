@@ -282,3 +282,78 @@ export async function revocaSessioniUtente(db: Database, utenteId: string): Prom
 export async function purgaSessioniScadute(db: Database, adesso: Date): Promise<void> {
   await db.delete(schema.sessioni).where(lt(schema.sessioni.scadeIl, adesso));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Anagrafica dello studio
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DatiStudio {
+  readonly denominazione: string;
+  readonly numeroRui: string | null;
+  readonly partitaIva: string | null;
+  readonly indirizzo: string | null;
+  readonly email: string | null;
+  readonly telefono: string | null;
+}
+
+/**
+ * Chi ha redatto il documento.
+ *
+ * Serve al report consegnato al contraente: il Reg. IVASS 40/2018 vuole che l'analisi
+ * dichiari l'intermediario che l'ha prodotta, con il suo numero di iscrizione al RUI.
+ * È insieme un requisito e ciò che rende il documento **dello studio** e non dell'attrezzo
+ * con cui è stato scritto.
+ */
+export async function leggiStudio(db: Database, tenantId: string): Promise<DatiStudio | null> {
+  const righe = await db
+    .select({
+      denominazione: schema.tenants.denominazione,
+      numeroRui: schema.tenants.numeroRui,
+      partitaIva: schema.tenants.partitaIva,
+      indirizzo: schema.tenants.indirizzo,
+      email: schema.tenants.email,
+      telefono: schema.tenants.telefono,
+    })
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, tenantId))
+    .limit(1);
+
+  return righe[0] ?? null;
+}
+
+/**
+ * Aggiornamento parziale dell'anagrafica.
+ *
+ * I campi sono dichiarati esplicitamente opzionali **e** ammessi a `undefined`: con
+ * `exactOptionalPropertyTypes` le due cose sono diverse, e un campo semplicemente non
+ * inviato dal modulo deve poter arrivare fin qui senza forzature di tipo.
+ */
+export interface ModificheStudio {
+  readonly denominazione?: string | undefined;
+  readonly numeroRui?: string | null | undefined;
+  readonly partitaIva?: string | null | undefined;
+  readonly indirizzo?: string | null | undefined;
+  readonly email?: string | null | undefined;
+  readonly telefono?: string | null | undefined;
+}
+
+export async function aggiornaStudio(
+  db: Database,
+  tenantId: string,
+  dati: ModificheStudio,
+): Promise<void> {
+  // Solo i campi effettivamente inviati: un aggiornamento parziale non deve cancellare
+  // i recapiti che il modulo non ha toccato.
+  const modifiche: Record<string, string | null> = {};
+  if (dati.denominazione !== undefined && dati.denominazione.trim() !== '') {
+    modifiche['denominazione'] = dati.denominazione.trim();
+  }
+  for (const chiave of ['numeroRui', 'partitaIva', 'indirizzo', 'email', 'telefono'] as const) {
+    const valore = dati[chiave];
+    if (valore === undefined) continue;
+    modifiche[chiave] = valore === null || valore.trim() === '' ? null : valore.trim();
+  }
+
+  if (Object.keys(modifiche).length === 0) return;
+  await db.update(schema.tenants).set(modifiche).where(eq(schema.tenants.id, tenantId));
+}

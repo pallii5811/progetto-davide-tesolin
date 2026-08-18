@@ -1,7 +1,13 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
 import { analizzaAzienda, collegamentiDiAzienda } from '@/lib/api';
-import type { AnalisiDto, CollegamentoSocietario, GapDto, RischioDto } from '@/lib/api';
+import type {
+  AnalisiDto,
+  CollegamentoSocietario,
+  GapDto,
+  LivelloRischio,
+  RischioDto,
+} from '@/lib/api';
 import {
   Avviso,
   BadgeConfidenza,
@@ -35,7 +41,7 @@ export default async function PaginaAzienda({ params }: { params: Promise<{ id: 
     );
   }
 
-  const { azienda, sintesi, catNat, gap, assetto } = analisi;
+  const { azienda, sintesi, catNat, gap, assetto, ubicazioni } = analisi;
 
   // I collegamenti dipendono dal resto del portafoglio, non da questa azienda: se la
   // rotta non risponde l'analisi resta leggibile, e questa sezione semplicemente manca.
@@ -164,6 +170,122 @@ export default async function PaginaAzienda({ params }: { params: Promise<{ id: 
           </Avviso>
         </div>
       )}
+
+      {/* ── Ubicazioni e rischio territoriale ─────────────────────────────── */}
+      <Sezione
+        id="ubicazioni"
+        titolo="Ubicazioni e rischio territoriale"
+        sottotitolo={`${ubicazioni.elenco.length} ${
+          ubicazioni.elenco.length === 1 ? 'ubicazione' : 'ubicazioni'
+        } · ${ubicazioni.comuni.length} ${ubicazioni.comuni.length === 1 ? 'comune' : 'comuni'}${
+          ubicazioni.distanzaMassimaKm === null
+            ? ''
+            : ` · fino a ${ubicazioni.distanzaMassimaKm} km di distanza`
+        }`}
+      >
+        {ubicazioni.elenco.length === 0 ? (
+          <Scheda>
+            <p className="text-sm text-testo-tenue">
+              Nessuna ubicazione risulta dai dati disponibili.
+            </p>
+          </Scheda>
+        ) : (
+          <>
+            <div className="overflow-hidden rounded-lg border border-bordo">
+              <table className="w-full text-sm">
+                <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Ubicazione</th>
+                    <th className="px-4 py-2.5 font-medium">Superficie</th>
+                    <th className="px-4 py-2.5 font-medium">Sisma</th>
+                    <th className="px-4 py-2.5 font-medium">Acqua</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ubicazioni.elenco.map((u) => (
+                    <tr key={u.id} className="border-t border-bordo bg-superficie align-top">
+                      <td className="px-4 py-3">
+                        <span className="font-medium">
+                          {u.via}
+                          {u.civico === null ? '' : ` ${u.civico}`}
+                        </span>
+                        <span className="block text-xs text-testo-tenue">
+                          {u.cap} {u.comune} ({u.provincia})
+                          {u.origini.includes('sede-legale') && ' · sede legale'}
+                          {u.origini.includes('unita-locale') && ' · unità locale'}
+                          {u.origini.includes('immobile-rilevato') && ' · rilevato in intervista'}
+                          {/*
+                            Senza coordinate l'ubicazione non entra nel calcolo della
+                            contiguità: dirlo evita che l'assenza passi per una misura.
+                          */}
+                          {!u.haCoordinate && ' · senza coordinate'}
+                        </span>
+                        {u.piuEsposta && ubicazioni.elenco.length > 1 && (
+                          <span className="mt-1 inline-block rounded bg-attenzione/15 px-1.5 py-0.5 text-xs font-medium text-attenzione">
+                            la più esposta
+                          </span>
+                        )}
+                      </td>
+                      <td className="tabular px-4 py-3 text-testo-tenue">
+                        {u.superficieMq === null ? 'da rilevare' : `${u.superficieMq} m²`}
+                      </td>
+                      <td className="px-4 py-3">
+                        <BadgeRischio livello={livelloTerritoriale(u.sismica)} testo={u.sismica} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <BadgeRischio livello={livelloTerritoriale(u.idraulica)} testo={u.idraulica} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/*
+              Due aggregazioni distinte perché due eventi diversi colpiscono in modo
+              diverso: l'incendio si propaga per contiguità, il sisma prende il territorio.
+              È la differenza fra sommare i capitali e non sommarli.
+            */}
+            {ubicazioni.elenco.length > 1 && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <Scheda>
+                  <h3 className="mb-2 text-sm font-semibold">Un solo incendio, cosa raggiunge</h3>
+                  <ul className="space-y-2 text-sm text-testo-tenue">
+                    {ubicazioni.complessiIncendio.map((c) => (
+                      <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
+                    ))}
+                  </ul>
+                </Scheda>
+                <Scheda>
+                  <h3 className="mb-2 text-sm font-semibold">Un solo sisma o alluvione, cosa raggiunge</h3>
+                  <ul className="space-y-2 text-sm text-testo-tenue">
+                    {ubicazioni.aggregatiTerritoriali.map((c) => (
+                      <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
+                    ))}
+                  </ul>
+                </Scheda>
+              </div>
+            )}
+
+            {ubicazioni.domande.length > 0 && (
+              <Scheda className="mt-4">
+                <h3 className="mb-2 text-sm font-semibold">Da chiedere al cliente</h3>
+                <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-testo-tenue">
+                  {ubicazioni.domande.map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              </Scheda>
+            )}
+
+            <ul className="mt-3 space-y-1 text-xs text-testo-debole">
+              {ubicazioni.note.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Sezione>
 
       {/* ── Assetto proprietario e gruppo ─────────────────────────────────── */}
       <Sezione
@@ -701,8 +823,20 @@ export default async function PaginaAzienda({ params }: { params: Promise<{ id: 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Navigazione fra le sezioni: la pagina è lunga, e scorrere alla cieca è un difetto. */
+/**
+ * L'esposizione territoriale sulla scala dei livelli di rischio.
+ *
+ * Le due scale sono distinte nel dominio — «alta/media/bassa» descrive un territorio,
+ * «critico/alto/…» descrive un rischio valutato — e la conversione avviene qui, al
+ * momento di disegnarle, invece di confonderle nel motore.
+ */
+function livelloTerritoriale(livello: 'alta' | 'media' | 'bassa'): LivelloRischio {
+  return livello === 'alta' ? 'alto' : livello === 'media' ? 'moderato' : 'basso';
+}
+
 function NavigazioneSezioni() {
   const sezioni = [
+    { id: 'ubicazioni', testo: 'Ubicazioni' },
     { id: 'assetto', testo: 'Assetto e gruppo' },
     { id: 'piano', testo: 'Piano d’azione' },
     { id: 'rischi', testo: 'Rischi' },

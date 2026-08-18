@@ -49,6 +49,8 @@ import type { CatNatAssessment } from '../coverage/catnat.js';
 import { analyzeGaps } from '../coverage/gap.js';
 import type { GapAnalysis } from '../coverage/gap.js';
 import type { PolizzaInEssere } from '../coverage/policy.js';
+import { analizzaUbicazioni } from '../company/ubicazioni.js';
+import type { AnalisiUbicazioni } from '../company/ubicazioni.js';
 import { analizzaAssetto } from '../governance/assetto.js';
 import type { AssettoProprietario } from '../governance/assetto.js';
 
@@ -110,6 +112,15 @@ export interface CompanyAnalysis {
    * all'imprenditore e non all'azienda.
    */
   readonly assetto: AssettoProprietario;
+  /**
+   * Dove l'impresa sta davvero.
+   *
+   * Un'analisi condotta sul solo indirizzo di sede legale attribuisce a tutta l'azienda il
+   * rischio territoriale del capoluogo, e tratta come un unico sinistro valori che possono
+   * stare a centinaia di chilometri. Qui le ubicazioni sono raccolte da tutte le fonti e
+   * raggruppate per ciò che un evento può colpire insieme.
+   */
+  readonly ubicazioni: AnalisiUbicazioni;
 
   /** Quanto è affidabile questa analisi e cosa manca per renderla migliore. */
   readonly completezza: Completezza;
@@ -252,10 +263,19 @@ export function analyzeCompany(
       undefined,
   });
 
+  // Le ubicazioni prima del danno massimo: è la contiguità misurata a dire se i valori
+  // stiano in un unico complesso, e da quella dipende la maggiorazione della quota.
+  const ubicazioni = analizzaUbicazioni({
+    sedeLegale: profile.anagrafica.value.sedeLegale,
+    unitaLocali: profile.unitaLocali?.value ?? [],
+    immobili: profile.datiDichiarati.immobili,
+  });
+
   const dannoMassimo = stimaDannoMassimo(
     sommeAssicurande.patrimonioEsposto.value,
     facts,
     profile.datiDichiarati.immobili,
+    ubicazioni,
   );
 
   const prevenzione = raccomandaPrevenzione(rischi.risks, facts);
@@ -301,7 +321,8 @@ export function analyzeCompany(
     catNat,
     gap,
     assetto,
-    completezza: valutaCompletezza(profile.datiDichiarati),
+    ubicazioni,
+    completezza: valutaCompletezza(profile.datiDichiarati, facts),
     livelloDatiEconomici: livelloDati,
     arricchimentiPossibili: arricchimentiPer(livelloDati, profile.eventiNegativi !== null),
     sintesi: componiSintesi(profile, creditScore, creditLimit, rischi, sommeAssicurande, catNat, gap),

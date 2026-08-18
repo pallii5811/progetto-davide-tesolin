@@ -11,6 +11,7 @@
  */
 
 import type { DatiDichiarati } from './profile.js';
+import type { CompanyFacts } from './facts.js';
 
 export type AreaAnalisi = 'somme-assicurande' | 'identificazione-rischi' | 'massimali' | 'conformita';
 
@@ -30,6 +31,63 @@ export interface CampoIntervista {
   /** Cosa migliora concretamente compilandolo. È il testo che convince a chiederlo. */
   readonly beneficio: string;
   readonly compilato: (dati: DatiDichiarati) => boolean;
+  /**
+   * Se la domanda ha senso per **questa** impresa.
+   *
+   * Chiedere a uno studio di architettura se trasporta merci proprie non è solo inutile:
+   * abbassa la completezza per una risposta che non cambierebbe nulla, e allunga
+   * un'intervista che il cliente concede una volta sola. Assente significa «vale per
+   * tutti», che è il caso della maggior parte delle domande.
+   */
+  readonly pertinente?: (facts: CompanyFacts) => boolean;
+}
+
+/**
+ * Divisione ATECO come numero. `null` quando il codice non è noto: in quel caso la
+ * domanda va posta comunque, perché escluderla sarebbe una decisione presa al buio.
+ */
+function divisione(facts: CompanyFacts): number | null {
+  if (facts.atecoDivisione === null) return null;
+  const n = Number.parseInt(facts.atecoDivisione, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Chi immette prodotti finiti sul mercato o li commercia: risponde del prodotto. */
+function immetteProdotti(facts: CompanyFacts): boolean {
+  const d = divisione(facts);
+  if (d === null) return true;
+  // Manifatturiero e agricoltura trasformano, il commercio rivende. I servizi no, e la
+  // domanda sulla RC Prodotti non ha oggetto.
+  return facts.atecoSezione === 'C' || facts.atecoSezione === 'A' || d === 46 || d === 47;
+}
+
+/**
+ * Attività che si svolgono, per loro natura, anche presso il cliente o in cantiere.
+ *
+ * La soglia è tenuta **bassa di proposito**: l'errore di escludere non è simmetrico a
+ * quello di includere. Una domanda in più costa venti secondi di intervista; una domanda
+ * tolta a torto nasconde un'esposizione RCT che nessuno rileverà più — e il manifatturiero
+ * installa e ripara dal cliente quasi quanto chi costruisce.
+ */
+function operaPressoTerzi(facts: CompanyFacts): boolean {
+  const d = divisione(facts);
+  if (d === null) return true;
+  // Restano fuori solo i settori che lavorano esclusivamente nella propria sede:
+  // commercio al dettaglio, ricettività, finanza, immobiliare.
+  const soloInSede = d === 47 || d === 55 || d === 56 || (d >= 64 && d <= 68);
+  return !soloInSede;
+}
+
+/** Chi movimenta merci proprie: senza merci, la domanda non ha oggetto. */
+function movimentaMerci(facts: CompanyFacts): boolean {
+  const d = divisione(facts);
+  if (d === null) return true;
+  return (
+    facts.atecoSezione === 'C' ||
+    facts.atecoSezione === 'A' ||
+    facts.atecoSezione === 'F' ||
+    (d >= 45 && d <= 53)
+  );
 }
 
 const CAMPI: readonly CampoIntervista[] = [
@@ -146,6 +204,7 @@ const CAMPI: readonly CampoIntervista[] = [
   },
   {
     chiave: 'cantiere',
+    pertinente: operaPressoTerzi,
     etichetta: 'Lavorazioni presso cantieri o sedi di terzi',
     peso: 6,
     area: 'massimali',
@@ -154,6 +213,7 @@ const CAMPI: readonly CampoIntervista[] = [
   },
   {
     chiave: 'prodotti',
+    pertinente: immetteProdotti,
     etichetta: 'Immissione di prodotti finiti sul mercato',
     peso: 5,
     area: 'identificazione-rischi',
@@ -162,6 +222,7 @@ const CAMPI: readonly CampoIntervista[] = [
   },
   {
     chiave: 'trasporti',
+    pertinente: movimentaMerci,
     etichetta: 'Trasporto di merci proprie',
     peso: 3,
     area: 'identificazione-rischi',
@@ -225,14 +286,24 @@ export interface Completezza {
   readonly livello: 'insufficiente' | 'parziale' | 'buona' | 'completa';
 }
 
-export function valutaCompletezza(dati: DatiDichiarati): Completezza {
-  const punteggioMassimo = CAMPI.reduce((sum, campo) => sum + campo.peso, 0);
+/**
+ * @param facts Se presenti, il questionario si restringe alle domande che hanno senso per
+ *   questa impresa: le altre escono anche dal denominatore, altrimenti un'azienda che non
+ *   può rispondere resterebbe per sempre sotto il cento per cento.
+ */
+export function valutaCompletezza(dati: DatiDichiarati, facts?: CompanyFacts): Completezza {
+  const campi =
+    facts === undefined
+      ? CAMPI
+      : CAMPI.filter((campo) => campo.pertinente === undefined || campo.pertinente(facts));
+
+  const punteggioMassimo = campi.reduce((sum, campo) => sum + campo.peso, 0);
 
   const compilati: string[] = [];
   const mancanti: CampoMancante[] = [];
   let punteggio = 0;
 
-  for (const campo of CAMPI) {
+  for (const campo of campi) {
     if (safeCheck(campo, dati)) {
       punteggio += campo.peso;
       compilati.push(campo.chiave);

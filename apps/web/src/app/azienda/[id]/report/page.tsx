@@ -1,7 +1,7 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
-import { analizzaAzienda } from '@/lib/api';
-import type { AnalisiDto, GapDto } from '@/lib/api';
+import { analizzaAzienda, leggiStudio } from '@/lib/api';
+import type { AnalisiDto, DatiStudio, GapDto } from '@/lib/api';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 
@@ -30,7 +30,20 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
     );
   }
 
-  const { azienda, sintesi, catNat, gap, rischi, assetto } = analisi;
+  const { azienda, sintesi, catNat, gap, rischi, assetto, ubicazioni } = analisi;
+
+  /*
+    Chi ha redatto il documento.
+
+    Il Reg. IVASS 40/2018 chiede che i documenti consegnati al contraente identifichino
+    l'intermediario e il suo numero di iscrizione al RUI. Se l'anagrafica non è ancora
+    stata compilata il report resta valido — l'intestazione semplicemente non compare —
+    perché un documento senza logo è un documento incompleto, uno che non si apre è un
+    lavoro perso.
+  */
+  const studio: DatiStudio | null = await leggiStudio()
+    .then((s) => ('errore' in s ? null : s))
+    .catch(() => null);
   const dataAnalisi = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(
     new Date(analisi.asOf),
   );
@@ -49,6 +62,21 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
       <article className="mx-auto max-w-[52rem] leading-relaxed">
         {/* ── Frontespizio ───────────────────────────────────────────────── */}
         <header className="print-keep mb-8 border-b-2 border-testo pb-5">
+          {studio !== null && (
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-bordo pb-3">
+              <p className="text-sm font-bold tracking-tight">{studio.denominazione}</p>
+              <p className="text-xs text-testo-tenue">
+                {[
+                  studio.numeroRui === null ? null : `RUI n. ${studio.numeroRui}`,
+                  studio.indirizzo,
+                  studio.telefono,
+                  studio.email,
+                ]
+                  .filter((v): v is string => v !== null && v !== '')
+                  .join(' · ')}
+              </p>
+            </div>
+          )}
           <p className="text-xs font-semibold uppercase tracking-widest text-testo-tenue">
             Analisi dei rischi e verifica delle coperture assicurative
           </p>
@@ -138,6 +166,71 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           )}
 
           <TabellaSintesi analisi={analisi} />
+
+          {/*
+            Le ubicazioni prima dell'assetto: sono l'oggetto materiale della copertura, e
+            il documento deve dire su quali beni e su quali indirizzi è stata condotta
+            l'analisi. Un fascicolo che non dichiara le sedi esaminate non consente, tre
+            anni dopo, di stabilire se il capannone sinistrato ne facesse parte.
+          */}
+          {ubicazioni.elenco.length > 0 && (
+            <div className="mt-5">
+              <h3 className="mb-2 font-semibold">Ubicazioni esaminate</h3>
+              <table className="mb-2 w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-testo text-left">
+                    <th className="py-2 pr-3 font-semibold">Indirizzo</th>
+                    <th className="py-2 pr-3 font-semibold">Superficie</th>
+                    <th className="py-2 pr-3 font-semibold">Sisma</th>
+                    <th className="py-2 font-semibold">Acqua</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ubicazioni.elenco.map((u) => (
+                    <tr key={u.id} className="border-b border-bordo align-top">
+                      <td className="py-2 pr-3">
+                        {u.via}
+                        {u.civico === null ? '' : ` ${u.civico}`}, {u.cap} {u.comune} ({u.provincia})
+                      </td>
+                      <td className="tabular py-2 pr-3">
+                        {u.superficieMq === null ? 'da rilevare' : `${u.superficieMq} m²`}
+                      </td>
+                      <td className="py-2 pr-3 capitalize">{u.sismica}</td>
+                      <td className="py-2 capitalize">{u.idraulica}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {ubicazioni.elenco.length > 1 && (
+                <p className="mb-2">
+                  {ubicazioni.unicoComplesso ? (
+                    <>
+                      Le ubicazioni esaminate costituiscono un <strong>unico complesso</strong>: un
+                      singolo evento può raggiungerle tutte, e i capitali sono stati considerati
+                      cumulativamente.
+                    </>
+                  ) : (
+                    <>
+                      Le ubicazioni esaminate costituiscono{' '}
+                      <strong>{ubicazioni.complessiIncendio.length} complessi distinti</strong>
+                      {ubicazioni.distanzaMassimaKm !== null && (
+                        <> , fino a {ubicazioni.distanzaMassimaKm} km di distanza</>
+                      )}
+                      : il danno massimo è stato stimato sul complesso più esposto e non sulla
+                      somma dei capitali.
+                    </>
+                  )}
+                </p>
+              )}
+
+              {ubicazioni.note.map((n) => (
+                <p key={n} className="text-testo-tenue">
+                  {n}
+                </p>
+              ))}
+            </div>
+          )}
 
           {/*
             L'assetto proprietario nel capitolo di sintesi, non in appendice: da chi

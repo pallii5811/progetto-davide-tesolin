@@ -280,6 +280,36 @@ export interface AnalisiDto {
     conseguenzeInadempimento: string[];
     spiegazione: ExplanationDto;
   };
+  /** Dove l'impresa sta davvero: una scheda per ubicazione, non solo la sede legale. */
+  ubicazioni: {
+    elenco: {
+      id: string;
+      etichetta: string;
+      origini: ('sede-legale' | 'unita-locale' | 'immobile-rilevato')[];
+      tipo: string | null;
+      comune: string;
+      provincia: string;
+      via: string;
+      civico: string | null;
+      cap: string;
+      superficieMq: number | null;
+      addetti: number | null;
+      haCoordinate: boolean;
+      sismica: 'alta' | 'media' | 'bassa';
+      idraulica: 'alta' | 'media' | 'bassa';
+      piuEsposta: boolean;
+    }[];
+    complessiIncendio: { ubicazioni: string[]; motivo: string }[];
+    aggregatiTerritoriali: { ubicazioni: string[]; motivo: string }[];
+    unicoComplesso: boolean;
+    distanzaMassimaKm: number | null;
+    province: string[];
+    comuni: string[];
+    domande: string[];
+    note: string[];
+    confidenza: string;
+  };
+
   /** Chi possiede e chi risponde: presupposto di D&O e key man. */
   assetto: {
     tipoControllo:
@@ -429,6 +459,20 @@ export async function collegamentiDiAzienda(
   identificativo: string,
 ): Promise<{ collegamenti: CollegamentoSocietario[] }> {
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/collegamenti`);
+}
+
+export interface DatiStudio {
+  denominazione: string;
+  numeroRui: string | null;
+  partitaIva: string | null;
+  indirizzo: string | null;
+  email: string | null;
+  telefono: string | null;
+}
+
+/** Anagrafica dell'intermediario: intesta i documenti consegnati al contraente. */
+export async function leggiStudio(): Promise<DatiStudio | { errore: string }> {
+  return chiama('/api/studio');
 }
 
 export async function analizzaAzienda(identificativo: string): Promise<AnalisiDto> {

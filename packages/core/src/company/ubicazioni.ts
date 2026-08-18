@@ -1,0 +1,364 @@
+/**
+ * Le ubicazioni dell'impresa, una per una.
+ *
+ * Un'analisi che riduce l'azienda al suo indirizzo di sede legale sbaglia due volte: dice
+ * che il rischio territoriale è quello del capoluogo — mentre lo stabilimento sta in un
+ * comune diverso — e tratta come un unico sinistro valori che stanno a duecento chilometri.
+ *
+ * Qui le ubicazioni vengono **raccolte da tutte le fonti** (sede legale camerale, unità
+ * locali, immobili rilevati in intervista), deduplicate, e raggruppate in due modi diversi
+ * perché due eventi diversi le colpiscono in modo diverso:
+ *
+ *  - **l'incendio** si propaga per contiguità. Fabbricati entro poche centinaia di metri
+ *    sono un unico complesso: il danno massimo si calcola sulla loro somma. Oltre, sono
+ *    rischi separati e sommarli gonfia il capitale da assicurare;
+ *  - **il terremoto e l'alluvione** colpiscono un territorio. Due capannoni ai lati opposti
+ *    dello stesso comune cadono insieme, anche se fra loro non c'è propagazione possibile.
+ *
+ * È la distinzione che un sottoscrittore fa a mano da sempre, e che una piattaforma che
+ * guarda solo la sede legale non può nemmeno porsi.
+ */
+
+import type { Indirizzo, ImmobileDichiarato, TipoUnitaLocale, UnitaLocale } from './profile.js';
+import { territorialExposure } from '../risk/geo.js';
+import type { TerritorialExposure } from '../risk/geo.js';
+import type { Confidence } from '../shared/provenance.js';
+
+/**
+ * Raggio entro cui due fabbricati fanno parte dello stesso complesso ai fini incendio.
+ *
+ * Duecento metri è la convenzione prudenziale della pratica assicurativa property: sotto
+ * questa distanza la propagazione — diretta, per irraggiamento o per intervento dei
+ * soccorsi sull'intera area — è considerata possibile, e i valori si sommano. Non è una
+ * norma: è un'ipotesi di lavoro, ed è dichiarata come tale nel risultato perché chi
+ * sottoscrive possa sostituirla con la propria.
+ */
+export const RAGGIO_COMPLESSO_METRI = 200;
+
+export type OrigineUbicazione = 'sede-legale' | 'unita-locale' | 'immobile-rilevato';
+
+export interface Ubicazione {
+  /** Chiave stabile ricavata dall'indirizzo normalizzato: serve a deduplicare e a fare da `key`. */
+  readonly id: string;
+  readonly etichetta: string;
+  readonly origini: readonly OrigineUbicazione[];
+  readonly tipo: TipoUnitaLocale | null;
+  readonly indirizzo: Indirizzo;
+  readonly superficieMq: number | null;
+  readonly addetti: number | null;
+  /** Esposizione territoriale. Oggi risolta a livello provinciale: vedi nota nel risultato. */
+  readonly esposizione: TerritorialExposure;
+  readonly haCoordinate: boolean;
+}
+
+/** Un gruppo di ubicazioni che un singolo evento può colpire insieme. */
+export interface Aggregato {
+  readonly ubicazioni: readonly Ubicazione[];
+  readonly motivo: string;
+}
+
+export interface AnalisiUbicazioni {
+  readonly ubicazioni: readonly Ubicazione[];
+  /** Gruppi ai fini incendio: contiguità fisica misurata sulle coordinate. */
+  readonly complessiIncendio: readonly Aggregato[];
+  /** Gruppi ai fini catastrofale: stesso comune, quindi stesso evento. */
+  readonly aggregatiTerritoriali: readonly Aggregato[];
+  /** `true` se tutti i valori stanno in un solo complesso: nessuna parte è al riparo. */
+  readonly unicoComplesso: boolean;
+  readonly esposizionePeggiore: TerritorialExposure | null;
+  readonly ubicazionePeggiore: Ubicazione | null;
+  /** Distanza fra le due ubicazioni più lontane, in chilometri. `null` senza coordinate. */
+  readonly distanzaMassimaKm: number | null;
+  readonly province: readonly string[];
+  readonly comuni: readonly string[];
+  readonly domande: readonly string[];
+  readonly note: readonly string[];
+  readonly confidenza: Confidence;
+}
+
+/** Chiave di deduplicazione: stesso indirizzo scritto in modi diversi resta un'ubicazione sola. */
+function chiaveDi(indirizzo: Indirizzo): string {
+  const normalizza = (t: string): string =>
+    t
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\b(via|viale|piazza|corso|strada|largo|vicolo|v\.le|p\.zza)\b/g, '')
+      .replace(/[^a-z0-9]/g, '');
+
+  return [normalizza(indirizzo.comune), normalizza(indirizzo.via), normalizza(indirizzo.civico ?? '')]
+    .filter((p) => p !== '')
+    .join('|');
+}
+
+function etichettaDi(indirizzo: Indirizzo, origini: readonly OrigineUbicazione[]): string {
+  const prefisso = origini.includes('sede-legale')
+    ? 'Sede legale'
+    : origini.includes('unita-locale')
+      ? 'Unità locale'
+      : 'Immobile rilevato';
+  const civico = indirizzo.civico === null ? '' : ` ${indirizzo.civico}`;
+  return `${prefisso} — ${indirizzo.via}${civico}, ${indirizzo.comune} (${indirizzo.provincia})`;
+}
+
+/**
+ * Distanza in metri fra due punti (formula dell'emisenoverso).
+ *
+ * Su distanze di qualche chilometro l'approssimazione sferica sbaglia di pochi metri:
+ * irrilevante rispetto alla soglia dei duecento metri, e molto meno costoso di una
+ * proiezione geodetica esatta.
+ */
+export function distanzaMetri(
+  a: { latitudine: number; longitudine: number },
+  b: { latitudine: number; longitudine: number },
+): number {
+  const RAGGIO_TERRESTRE_M = 6_371_000;
+  const rad = (g: number): number => (g * Math.PI) / 180;
+
+  const dLat = rad(b.latitudine - a.latitudine);
+  const dLon = rad(b.longitudine - a.longitudine);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.latitudine)) * Math.cos(rad(b.latitudine)) * Math.sin(dLon / 2) ** 2;
+
+  return 2 * RAGGIO_TERRESTRE_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+interface Sorgente {
+  readonly indirizzo: Indirizzo;
+  readonly origine: OrigineUbicazione;
+  readonly tipo?: TipoUnitaLocale | undefined;
+  readonly superficieMq?: number | null | undefined;
+  readonly addetti?: number | null | undefined;
+}
+
+export function analizzaUbicazioni(input: {
+  readonly sedeLegale: Indirizzo | null;
+  readonly unitaLocali: readonly UnitaLocale[];
+  readonly immobili: readonly ImmobileDichiarato[];
+}): AnalisiUbicazioni {
+  const sorgenti: Sorgente[] = [];
+
+  if (input.sedeLegale !== null) {
+    sorgenti.push({ indirizzo: input.sedeLegale, origine: 'sede-legale', tipo: 'sede-legale' });
+  }
+  for (const u of input.unitaLocali) {
+    sorgenti.push({
+      indirizzo: u.indirizzo,
+      origine: 'unita-locale',
+      tipo: u.tipo,
+      addetti: u.addetti,
+    });
+  }
+  for (const i of input.immobili) {
+    if (i.indirizzo === null) continue;
+    sorgenti.push({
+      indirizzo: i.indirizzo,
+      origine: 'immobile-rilevato',
+      superficieMq: i.superficieMq,
+    });
+  }
+
+  // Deduplicazione: lo stesso stabilimento arriva spesso da due fonti — la visura e
+  // l'intervista — e contarlo due volte raddoppierebbe il capitale da assicurare.
+  const perChiave = new Map<string, Ubicazione>();
+  for (const s of sorgenti) {
+    const id = chiaveDi(s.indirizzo);
+    if (id === '') continue;
+
+    const esistente = perChiave.get(id);
+    const origini = esistente === undefined ? [s.origine] : [...new Set([...esistente.origini, s.origine])];
+
+    perChiave.set(id, {
+      id,
+      etichetta: etichettaDi(s.indirizzo, origini),
+      origini,
+      // Il tipo dichiarato dalla visura prevale su quello assente dell'intervista.
+      tipo: s.tipo ?? esistente?.tipo ?? null,
+      // Fra due scritture dello stesso indirizzo si tiene quella con le coordinate.
+      indirizzo:
+        esistente !== undefined && esistente.haCoordinate ? esistente.indirizzo : s.indirizzo,
+      superficieMq: s.superficieMq ?? esistente?.superficieMq ?? null,
+      addetti: s.addetti ?? esistente?.addetti ?? null,
+      esposizione: territorialExposure(s.indirizzo.provincia),
+      haCoordinate:
+        (esistente?.haCoordinate ?? false) ||
+        (s.indirizzo.latitudine !== null && s.indirizzo.longitudine !== null),
+    });
+  }
+
+  const ubicazioni = [...perChiave.values()];
+
+  return {
+    ubicazioni,
+    complessiIncendio: raggruppaPerContiguita(ubicazioni),
+    aggregatiTerritoriali: raggruppaPerComune(ubicazioni),
+    unicoComplesso: raggruppaPerContiguita(ubicazioni).length <= 1,
+    ...peggiore(ubicazioni),
+    distanzaMassimaKm: distanzaMassima(ubicazioni),
+    province: [...new Set(ubicazioni.map((u) => u.indirizzo.provincia.toUpperCase()))],
+    comuni: [...new Set(ubicazioni.map((u) => u.indirizzo.comune))],
+    domande: domande(ubicazioni),
+    note: note(ubicazioni),
+    confidenza: ubicazioni.length === 0 ? 'bassa' : ubicazioni.every((u) => u.haCoordinate) ? 'alta' : 'media',
+  };
+}
+
+/**
+ * Raggruppa per contiguità fisica, con propagazione transitiva.
+ *
+ * A dista 150 m da B, B dista 150 m da C: A e C sono nello stesso complesso anche se fra
+ * loro ce ne sono 300. È così che si propaga un incendio, e un raggruppamento che
+ * confrontasse solo le coppie spezzerebbe in due un capannone lungo.
+ */
+function raggruppaPerContiguita(ubicazioni: readonly Ubicazione[]): readonly Aggregato[] {
+  if (ubicazioni.length === 0) return [];
+
+  const conCoordinate = ubicazioni.filter((u) => u.haCoordinate);
+  const senzaCoordinate = ubicazioni.filter((u) => !u.haCoordinate);
+
+  const gruppi: Ubicazione[][] = [];
+  const assegnate = new Set<string>();
+
+  for (const u of conCoordinate) {
+    if (assegnate.has(u.id)) continue;
+
+    const gruppo: Ubicazione[] = [u];
+    assegnate.add(u.id);
+
+    // Coda: ogni nuova ubicazione aggiunta può a sua volta attirarne altre.
+    for (let i = 0; i < gruppo.length; i++) {
+      const corrente = gruppo[i]!;
+      for (const altra of conCoordinate) {
+        if (assegnate.has(altra.id)) continue;
+        if (vicine(corrente, altra)) {
+          gruppo.push(altra);
+          assegnate.add(altra.id);
+        }
+      }
+    }
+    gruppi.push(gruppo);
+  }
+
+  // Senza coordinate non si può dire se sia vicina: resta un complesso a sé, che è
+  // l'ipotesi prudente per il conteggio dei complessi ma va dichiarata.
+  for (const u of senzaCoordinate) gruppi.push([u]);
+
+  return gruppi.map((g) => ({
+    ubicazioni: g,
+    motivo:
+      g.length === 1
+        ? 'Ubicazione isolata rispetto alle altre note.'
+        : `${g.length} ubicazioni entro ${RAGGIO_COMPLESSO_METRI} m: un incendio può interessarle tutte.`,
+  }));
+}
+
+function vicine(a: Ubicazione, b: Ubicazione): boolean {
+  const pa = puntoDi(a);
+  const pb = puntoDi(b);
+  if (pa === null || pb === null) return false;
+  return distanzaMetri(pa, pb) <= RAGGIO_COMPLESSO_METRI;
+}
+
+function puntoDi(u: Ubicazione): { latitudine: number; longitudine: number } | null {
+  const { latitudine, longitudine } = u.indirizzo;
+  return latitudine === null || longitudine === null ? null : { latitudine, longitudine };
+}
+
+/** Stesso comune, stesso evento catastrofale: qui la contiguità non c'entra. */
+function raggruppaPerComune(ubicazioni: readonly Ubicazione[]): readonly Aggregato[] {
+  const perComune = new Map<string, Ubicazione[]>();
+  for (const u of ubicazioni) {
+    const chiave = `${u.indirizzo.comune.toLowerCase()}|${u.indirizzo.provincia.toUpperCase()}`;
+    perComune.set(chiave, [...(perComune.get(chiave) ?? []), u]);
+  }
+
+  return [...perComune.values()].map((g) => ({
+    ubicazioni: g,
+    motivo:
+      g.length === 1
+        ? `Unica ubicazione nel comune di ${g[0]!.indirizzo.comune}.`
+        : `${g.length} ubicazioni nel comune di ${g[0]!.indirizzo.comune}: un sisma o un'alluvione le colpisce insieme.`,
+  }));
+}
+
+function peggiore(ubicazioni: readonly Ubicazione[]): {
+  esposizionePeggiore: TerritorialExposure | null;
+  ubicazionePeggiore: Ubicazione | null;
+} {
+  const rango = (u: Ubicazione): number => {
+    const punti = (l: 'alta' | 'media' | 'bassa'): number => (l === 'alta' ? 2 : l === 'media' ? 1 : 0);
+    return punti(u.esposizione.sismica) + punti(u.esposizione.idraulica);
+  };
+
+  let scelta: Ubicazione | null = null;
+  for (const u of ubicazioni) {
+    if (scelta === null || rango(u) > rango(scelta)) scelta = u;
+  }
+
+  return {
+    esposizionePeggiore: scelta?.esposizione ?? null,
+    ubicazionePeggiore: scelta,
+  };
+}
+
+function distanzaMassima(ubicazioni: readonly Ubicazione[]): number | null {
+  const punti = ubicazioni.map(puntoDi).filter((p): p is { latitudine: number; longitudine: number } => p !== null);
+  if (punti.length < 2) return null;
+
+  let massima = 0;
+  for (let i = 0; i < punti.length; i++) {
+    for (let j = i + 1; j < punti.length; j++) {
+      massima = Math.max(massima, distanzaMetri(punti[i]!, punti[j]!));
+    }
+  }
+  return Math.round(massima / 100) / 10;
+}
+
+function domande(ubicazioni: readonly Ubicazione[]): readonly string[] {
+  const elenco: string[] = [];
+
+  if (ubicazioni.length === 0) {
+    elenco.push('Dove si svolge l’attività? Nessuna ubicazione risulta dai dati disponibili.');
+    return elenco;
+  }
+
+  const senzaSuperficie = ubicazioni.filter((u) => u.superficieMq === null);
+  if (senzaSuperficie.length > 0) {
+    elenco.push(
+      `Qual è la superficie di ${senzaSuperficie.length === 1 ? 'questa ubicazione' : `queste ${senzaSuperficie.length} ubicazioni`}? Senza i metri quadri il capitale fabbricati resta da rilevare.`,
+    );
+  }
+
+  const senzaCoordinate = ubicazioni.filter((u) => !u.haCoordinate);
+  if (senzaCoordinate.length > 0) {
+    elenco.push(
+      'Le ubicazioni prive di coordinate sono state considerate separate dalle altre: confermare se sorgono nello stesso sito.',
+    );
+  }
+
+  if (ubicazioni.length === 1) {
+    elenco.push(
+      'Esistono depositi, magazzini o cantieri non registrati alla camera di commercio? Un valore fuori dalle ubicazioni note resta scoperto.',
+    );
+  }
+
+  return elenco;
+}
+
+function note(ubicazioni: readonly Ubicazione[]): readonly string[] {
+  const elenco: string[] = [
+    // Dichiarare il limite è parte del risultato: chi legge deve sapere quanto è fine la
+    // maglia con cui si è misurato, altrimenti attribuisce alla stima una precisione che
+    // non ha.
+    'La classificazione sismica e idraulica è risolta su base provinciale. La zonazione sismica di legge è comunale: per le imprese in province disomogenee la verifica sul singolo comune resta necessaria.',
+  ];
+
+  if (ubicazioni.some((u) => u.haCoordinate)) {
+    elenco.push(
+      `Le ubicazioni con coordinate note sono state raggruppate per contiguità entro ${RAGGIO_COMPLESSO_METRI} m.`,
+    );
+  }
+
+  return elenco;
+}

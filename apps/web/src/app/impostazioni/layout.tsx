@@ -24,6 +24,7 @@ export default async function LayoutImpostazioni({ children }: { children: React
 
       <nav aria-label="Impostazioni" className="mb-8 flex gap-1 border-b border-bordo">
         <Scheda href="/impostazioni">Il tuo accesso</Scheda>
+        {amministratore && <Scheda href="/impostazioni/studio">Anagrafica studio</Scheda>}
         {amministratore && <Scheda href="/impostazioni/utenti">Utenti dello studio</Scheda>}
       </nav>
 

@@ -207,6 +207,9 @@ const DDL: readonly string[] = [
     denominazione text NOT NULL,
     numero_rui text,
     partita_iva text,
+    indirizzo text,
+    email text,
+    telefono text,
     budget_dati_mensile_centesimi bigint,
     creato_il timestamptz NOT NULL DEFAULT now(),
     attivo boolean NOT NULL DEFAULT true

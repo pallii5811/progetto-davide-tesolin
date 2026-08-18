@@ -154,6 +154,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     prevenzione: analisi.prevenzione,
     catNat: presentCatNat(analisi),
     assetto: presentAssetto(analisi),
+    ubicazioni: presentUbicazioni(analisi),
     gap: {
       voci: analisi.gap.gaps.map(presentGap),
       coperturaAssente: analisi.gap.coperturaAssente,
@@ -189,6 +190,89 @@ function presentAssetto(analisi: CompanyAnalysis) {
     implicazioni: a.implicazioni,
     domande: a.domande,
     confidenza: a.confidenza,
+  };
+}
+
+/**
+ * Ubicazioni.
+ *
+ * I gruppi vengono esposti per identificativo e non annidati: l'interfaccia mostra
+ * l'elenco delle sedi una volta sola e vi appoggia sopra l'appartenenza al complesso,
+ * invece di ripetere le stesse sedi in due strutture che possono divergere.
+ */
+interface UbicazioneDto {
+  readonly id: string;
+  readonly etichetta: string;
+  readonly origini: readonly string[];
+  readonly tipo: string | null;
+  readonly comune: string;
+  readonly provincia: string;
+  readonly via: string;
+  readonly civico: string | null;
+  readonly cap: string;
+  readonly superficieMq: number | null;
+  readonly addetti: number | null;
+  readonly haCoordinate: boolean;
+  readonly sismica: string;
+  readonly idraulica: string;
+  readonly piuEsposta: boolean;
+}
+
+interface GruppoDto {
+  readonly ubicazioni: readonly string[];
+  readonly motivo: string;
+}
+
+interface UbicazioniDto {
+  readonly elenco: readonly UbicazioneDto[];
+  readonly complessiIncendio: readonly GruppoDto[];
+  readonly aggregatiTerritoriali: readonly GruppoDto[];
+  readonly unicoComplesso: boolean;
+  readonly distanzaMassimaKm: number | null;
+  readonly province: readonly string[];
+  readonly comuni: readonly string[];
+  readonly domande: readonly string[];
+  readonly note: readonly string[];
+  readonly confidenza: string;
+}
+
+// Il tipo è dichiarato e non dedotto: senza, l'inferenza trascina nel DTO i tipi del
+// dominio, e la firma pubblica dell'API finirebbe per dipendere dai percorsi interni
+// del pacchetto core.
+function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
+  const u = analisi.ubicazioni;
+  const gruppo = (
+    aggregati: readonly { ubicazioni: readonly { id: string }[]; motivo: string }[],
+  ): { ubicazioni: string[]; motivo: string }[] =>
+    aggregati.map((a) => ({ ubicazioni: a.ubicazioni.map((x) => x.id), motivo: a.motivo }));
+
+  return {
+    elenco: u.ubicazioni.map((x) => ({
+      id: x.id,
+      etichetta: x.etichetta,
+      origini: x.origini,
+      tipo: x.tipo,
+      comune: x.indirizzo.comune,
+      provincia: x.indirizzo.provincia,
+      via: x.indirizzo.via,
+      civico: x.indirizzo.civico,
+      cap: x.indirizzo.cap,
+      superficieMq: x.superficieMq,
+      addetti: x.addetti,
+      haCoordinate: x.haCoordinate,
+      sismica: x.esposizione.sismica,
+      idraulica: x.esposizione.idraulica,
+      piuEsposta: x.id === u.ubicazionePeggiore?.id,
+    })),
+    complessiIncendio: gruppo(u.complessiIncendio),
+    aggregatiTerritoriali: gruppo(u.aggregatiTerritoriali),
+    unicoComplesso: u.unicoComplesso,
+    distanzaMassimaKm: u.distanzaMassimaKm,
+    province: u.province,
+    comuni: u.comuni,
+    domande: u.domande,
+    note: u.note,
+    confidenza: u.confidenza,
   };
 }
 

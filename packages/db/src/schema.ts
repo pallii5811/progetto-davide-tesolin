@@ -102,6 +102,17 @@ export const tenants = pgTable('tenants', {
   /** Numero di iscrizione al RUI: identifica l'intermediario presso IVASS. */
   numeroRui: text('numero_rui'),
   partitaIva: text('partita_iva'),
+  /*
+    Recapiti dell'intermediario.
+
+    Non sono decorazione: il Reg. IVASS 40/2018 impone che i documenti consegnati al
+    contraente identifichino chi li ha redatti — denominazione, numero di iscrizione al
+    RUI, recapiti. Un'analisi di adeguatezza senza intestazione non è un documento
+    dell'intermediario, è un foglio.
+  */
+  indirizzo: text('indirizzo'),
+  email: text('email'),
+  telefono: text('telefono'),
   /** Tetto di spesa mensile sui dati, in centesimi. Oltre, l'acquisizione si blocca. */
   budgetDatiMensileCentesimi: denaro('budget_dati_mensile_centesimi'),
   creatoIl: timestamp('creato_il', { withTimezone: true }).notNull().defaultNow(),

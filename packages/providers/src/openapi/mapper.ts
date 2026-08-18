@@ -95,10 +95,17 @@ function normalizzaProcedura(valore: string | null): TipoProcedura {
 }
 
 function mappaIndirizzo(source: unknown): Indirizzo | null {
-  // `streetName` è la via già composta con toponimo e civico; `street` è il solo nome.
+  /*
+    `streetName` è la via **già composta** con toponimo e civico: «VIALE FILIPPO TOMMASO
+    MARINETTI 221». Usarla come nome della via e poi affiancarle `streetNumber` stampa il
+    civico due volte — «MARINETTI 221 221» — su ogni indirizzo reale.
+
+    Si compone quindi dai pezzi, che il fornitore restituisce separati, e si ricade sul
+    campo già composto solo quando i pezzi mancano.
+  */
   const via =
-    str(source, 'streetName') ??
-    componiVia(str(source, 'toponym', 'toponimo'), str(source, 'street', 'via', 'indirizzo'));
+    componiVia(str(source, 'toponym', 'toponimo'), str(source, 'street', 'via', 'indirizzo')) ??
+    str(source, 'streetName');
   const comune = str(source, 'town', 'comune', 'city');
   const provincia = str(source, 'province', 'provincia', 'siglaProvincia', 'sigla');
   if (via === null && comune === null) return null;

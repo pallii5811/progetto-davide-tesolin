@@ -348,6 +348,41 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     return sessione;
   };
 
+  /**
+   * Anagrafica dello studio.
+   *
+   * In lettura è aperta a chiunque abbia una sessione: serve a intestare il report, e
+   * ogni collaboratore ne produce. In scrittura è dell'amministratore, perché il numero
+   * di iscrizione al RUI che finisce sui documenti non è un campo qualsiasi.
+   */
+  app.get('/api/studio', async (request, reply) => {
+    if (persistenza === undefined) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile in modalità senza persistenza' });
+    }
+    const tenant = contestoDi(request).tenant;
+    if (tenant === null) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile in modalità senza persistenza' });
+    }
+    return (await tenant.studio.leggi()) ?? { errore: 'Studio non trovato' };
+  });
+
+  app.put('/api/studio', async (request, reply) => {
+    const sessione = soloAmministratore(request, reply);
+    if (sessione === null || persistenza === undefined) return reply;
+
+    const parsed = datiStudioSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi', dettagli: parsed.error.issues });
+    }
+
+    const tenant = contestoDi(request).tenant;
+    if (tenant === null) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile in modalità senza persistenza' });
+    }
+    await tenant.studio.aggiorna(parsed.data);
+    return tenant.studio.leggi();
+  });
+
   app.get('/api/utenti', async (request, reply) => {
     const sessione = soloAmministratore(request, reply);
     if (sessione === null || persistenza === undefined) return reply;
@@ -1021,6 +1056,22 @@ const importazioneSchema = z.object({
 });
 
 const RUOLI = ['amministratore', 'broker', 'assistente', 'sola-lettura'] as const;
+
+/**
+ * Anagrafica dello studio.
+ *
+ * I campi facoltativi accettano la stringa vuota e non solo `null`: un modulo HTML che
+ * svuota un campo invia `''`, e rifiutarlo impedirebbe di **cancellare** un recapito
+ * sbagliato — che è esattamente ciò che si vuole poter fare.
+ */
+const datiStudioSchema = z.object({
+  denominazione: z.string().trim().min(2).max(200).optional(),
+  numeroRui: z.string().trim().max(40).nullable().optional(),
+  partitaIva: z.string().trim().max(20).nullable().optional(),
+  indirizzo: z.string().trim().max(200).nullable().optional(),
+  email: z.string().trim().max(200).nullable().optional(),
+  telefono: z.string().trim().max(40).nullable().optional(),
+});
 
 const nuovoUtenteSchema = z.object({
   email: z.string().trim().email().max(200),

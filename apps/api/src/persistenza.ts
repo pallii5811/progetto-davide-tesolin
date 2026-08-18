@@ -22,14 +22,16 @@ import {
   registraAudit,
   registraCosto,
   riepilogoCosti,
+  aggiornaStudio,
   collegamentiSocietari,
+  leggiStudio,
   salvaAnalisi,
   salvaDatiDichiarati,
   salvaPartecipazioni,
   salvaSnapshot,
   sostituisciPolizze,
 } from '@aegis/db';
-import type { Connessione, Database, RigaPolizza } from '@aegis/db';
+import type { Connessione, DatiStudio, Database, ModificheStudio, RigaPolizza } from '@aegis/db';
 import type {
   DossierAzienda,
   DossierStore,
@@ -51,6 +53,11 @@ export interface ContestoTenant {
   readonly tenantId: string;
   readonly dossier: DossierStore;
   readonly portafoglio: PortafoglioStore;
+  /** Chi ha redatto i documenti: intesta il report e adempie al Reg. IVASS 40/2018. */
+  readonly studio: {
+    leggi(): Promise<DatiStudio | null>;
+    aggiorna(dati: ModificheStudio): Promise<void>;
+  };
   registraAnalisi(identificativo: string, analisi: CompanyAnalysis, provider: string): Promise<void>;
   registraCostiDati(
     eventi: readonly {
@@ -244,10 +251,16 @@ function creaContesto(db: Database, tenantId: string): ContestoTenant {
     },
   };
 
+  const studio = {
+    leggi: () => leggiStudio(db, tenantId),
+    aggiorna: (dati: ModificheStudio) => aggiornaStudio(db, tenantId, dati),
+  };
+
   return {
     tenantId,
     dossier,
     portafoglio,
+    studio,
 
     async registraAnalisi(identificativo, analisi, provider): Promise<void> {
       const chiave = normalizza(identificativo);

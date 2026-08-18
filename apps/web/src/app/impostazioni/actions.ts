@@ -24,7 +24,7 @@ export interface Esito {
  */
 async function chiamaApi(
   percorso: string,
-  init: { metodo: 'POST' | 'PATCH'; corpo?: unknown },
+  init: { metodo: 'POST' | 'PUT' | 'PATCH'; corpo?: unknown },
 ): Promise<{ risposta: Response; corpo: { errore?: string; passwordIniziale?: string } }> {
   const risposta = await chiamaApiConSessione(percorso, {
     metodo: init.metodo,
@@ -180,4 +180,44 @@ export async function cambiaPasswordAzione(_precedente: Esito | null, modulo: Fo
     ok: true,
     messaggio: 'Password aggiornata. Gli altri dispositivi collegati sono stati scollegati.',
   };
+}
+
+// ── Anagrafica dello studio ──────────────────────────────────────────────────
+
+/**
+ * I dati che intestano i documenti consegnati al contraente.
+ *
+ * I campi vuoti vengono inviati come stringa vuota e non omessi: è così che si **cancella**
+ * un recapito sbagliato. Ometterli significherebbe «non toccare», e un numero RUI errato
+ * resterebbe sui report per sempre.
+ */
+export async function salvaStudioAzione(_precedente: Esito | null, modulo: FormData): Promise<Esito> {
+  const denominazione = campoTestuale(modulo, 'denominazione').trim();
+  if (denominazione.length < 2) {
+    return { ok: false, messaggio: 'Indicare la denominazione dello studio.' };
+  }
+
+  const corpo = {
+    denominazione,
+    numeroRui: campoTestuale(modulo, 'numeroRui').trim(),
+    partitaIva: campoTestuale(modulo, 'partitaIva').trim(),
+    indirizzo: campoTestuale(modulo, 'indirizzo').trim(),
+    email: campoTestuale(modulo, 'email').trim(),
+    telefono: campoTestuale(modulo, 'telefono').trim(),
+  };
+
+  let esito: Awaited<ReturnType<typeof chiamaApi>>;
+  try {
+    esito = await chiamaApi('/api/studio', { metodo: 'PUT', corpo });
+  } catch {
+    return { ok: false, messaggio: 'Servizio non raggiungibile.' };
+  }
+
+  if (!esito.risposta.ok) {
+    return { ok: false, messaggio: esito.corpo.errore ?? 'Salvataggio non riuscito.' };
+  }
+
+  // Il report è la ragione per cui questi dati esistono: va ricalcolato subito.
+  revalidatePath('/impostazioni/studio');
+  return { ok: true, messaggio: 'Anagrafica aggiornata: comparirà in testa ai report.' };
 }
