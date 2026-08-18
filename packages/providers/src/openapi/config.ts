@@ -35,6 +35,7 @@ export interface OpenApiConfig {
   readonly baseUrlCompany: string;
   readonly baseUrlRisk: string;
   readonly services: {
+    readonly prospezione: ServiceConfig;
     readonly ricerca: ServiceConfig;
     readonly anagraficaBase: ServiceConfig;
     readonly anagraficaEstesa: ServiceConfig;
@@ -67,6 +68,20 @@ export const OPENAPI_DEFAULT_CONFIG: OpenApiConfig = {
   baseUrlRisk: 'https://risk.openapi.com',
   percorsoStatoRichiesta: '/IT-request/{id}',
   services: {
+    /**
+     * Ricerca per insiemi: territorio, settore, dimensione.
+     *
+     * Un centesimo a chiamata — verificato sul servizio reale — e **gratuita** in modalità
+     * di solo conteggio, che è il modo in cui va usata finché i filtri non sono giusti.
+     */
+    prospezione: {
+      path: '/IT-search',
+      ttlSeconds: GIORNO,
+      costoCentesimi: 1,
+      descrizione: 'Ricerca per provincia, settore, addetti e fatturato',
+      verificato: true,
+      scope: 'company / IT',
+    },
     ricerca: {
       path: '/IT-start',
       ttlSeconds: 7 * GIORNO,

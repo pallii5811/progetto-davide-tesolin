@@ -18,11 +18,13 @@ test('le rotte sono compilate e pronte', async ({ page }) => {
 
   for (const percorso of [
     '/',
+    '/prospect',
     '/portafoglio',
     '/portafoglio/importa',
     '/catalogo',
     '/impostazioni',
     '/impostazioni/utenti',
+    '/impostazioni/studio',
     '/monitoraggio',
     `/azienda/${AZIENDA_DI_PROVA}`,
     `/azienda/${AZIENDA_DI_PROVA}/dati`,

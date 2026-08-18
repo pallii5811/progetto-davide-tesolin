@@ -116,6 +116,17 @@ export interface RequestOptions {
   readonly cacheTtlSeconds: number;
   /** Costo stimato della chiamata, in centesimi di euro. */
   readonly costoCentesimi: number;
+  /**
+   * Costo **effettivo**, letto dalla risposta.
+   *
+   * Alcuni servizi si pagano a record e dichiarano nella risposta quanto è costata la
+   * chiamata. Registrare la stima fatta prima significherebbe scrivere nel registro un
+   * numero che non corrisponde all'addebito: chiedendo un lotto di venticinque aziende e
+   * ricevendone tre si pagano tre, non venticinque.
+   *
+   * Restituire `null` lascia in vigore la stima.
+   */
+  readonly costoDallaRisposta?: ((payload: unknown) => number | null) | undefined;
 }
 
 /**
@@ -171,7 +182,7 @@ export class HttpProviderClient {
         expiresAt: Date.now() + options.cacheTtlSeconds * 1_000,
       });
     }
-    this.#record(options, false);
+    this.#record(options, false, options.costoDallaRisposta?.(payload) ?? null);
     return payload;
   }
 
@@ -288,11 +299,11 @@ export class HttpProviderClient {
     return url.toString();
   }
 
-  #record(options: RequestOptions, cacheHit: boolean): void {
+  #record(options: RequestOptions, cacheHit: boolean, costoEffettivo: number | null = null): void {
     this.#options.ledger?.record({
       provider: this.#options.provider,
       service: options.service,
-      costoStimatoCentesimi: options.costoCentesimi,
+      costoStimatoCentesimi: costoEffettivo ?? options.costoCentesimi,
       cacheHit,
       timestamp: new Date(),
       riferimento: null,

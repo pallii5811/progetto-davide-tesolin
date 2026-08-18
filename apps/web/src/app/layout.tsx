@@ -40,6 +40,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     Ricerca
                   </Link>
                   <Link
+                    href="/prospect"
+                    className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+                  >
+                    Nuovi clienti
+                  </Link>
+                  <Link
                     href="/portafoglio"
                     className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
                   >

@@ -67,7 +67,17 @@ export async function anteprimaImportazione(
     return { ok: false, messaggio: corpo.errore ?? 'Lettura non riuscita.' };
   }
 
-  const anteprima = (await risposta.json()) as AnteprimaDto;
+  /*
+    Una risposta 200 con corpo troncato esiste: sotto carico, o su una connessione che
+    cade a metà, `json()` solleva «Unexpected end of JSON input» — un errore di analisi
+    sintattica che arriva all'utente come una schermata rotta, mentre il fatto è
+    semplicemente che la risposta non è arrivata intera. Va detto in italiano.
+  */
+  const anteprima = await leggiJson<AnteprimaDto>(risposta);
+  if (anteprima === null) {
+    return { ok: false, messaggio: 'Risposta incompleta dal servizio: riprovare.' };
+  }
+
   return { ok: true, messaggio: '', anteprima, contenuto };
 }
 
@@ -93,12 +103,23 @@ export async function eseguiImportazione(
     return { ok: false, messaggio: corpo.errore ?? 'Importazione non riuscita.' };
   }
 
-  const esito = (await risposta.json()) as {
+  const esito = await leggiJson<{
     acquisite: number;
     fallite: { partitaIva: string; motivo: string }[];
     costoEffettivoCentesimi: number;
     giaPresenti: number;
-  };
+  }>(risposta);
+
+  if (esito === null) {
+    // Qui l'ambiguità è seria: l'importazione può essere andata a buon fine sul
+    // servizio e aver perso solo la risposta. Si dice all'utente di controllare invece
+    // di dichiarare un fallimento che potrebbe non esserci stato.
+    return {
+      ok: false,
+      messaggio:
+        'Risposta incompleta dal servizio. Controllare il portafoglio prima di ripetere l’importazione: le aziende potrebbero essere già state acquisite.',
+    };
+  }
 
   revalidatePath('/portafoglio');
 
@@ -123,4 +144,18 @@ function campoTestuale(modulo: FormData, nome: string): string {
 
 function formattaEuro(centesimi: number): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(centesimi / 100);
+}
+
+/**
+ * Legge il corpo JSON di una risposta riuscita, tollerando che non arrivi intero.
+ *
+ * Restituisce `null` invece di sollevare: il chiamante sa cosa stava facendo e può
+ * scrivere un messaggio che significhi qualcosa per chi lo legge.
+ */
+async function leggiJson<T>(risposta: Response): Promise<T | null> {
+  try {
+    return (await risposta.json()) as T;
+  } catch {
+    return null;
+  }
 }

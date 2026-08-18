@@ -461,6 +461,47 @@ export async function collegamentiDiAzienda(
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/collegamenti`);
 }
 
+export interface CriteriProspezione {
+  denominazione?: string;
+  provincia?: string;
+  ateco?: string;
+  addettiMin?: string;
+  addettiMax?: string;
+  fatturatoMinEuro?: string;
+  fatturatoMaxEuro?: string;
+  socioCodiceFiscale?: string;
+  limite?: string;
+}
+
+export interface RisultatoProspezione {
+  totale: number;
+  /** Quante se ne scaricano: il prezzo è a record, non a ricerca. */
+  lotto: number;
+  costoElencoCentesimi: number;
+  aziende: RisultatoRicerca[];
+  soloConteggio: boolean;
+  provider: string;
+}
+
+/**
+ * Ricerca di prospect.
+ *
+ * `soloConteggio` è gratuito e non scarica nulla: è la modalità con cui si compongono
+ * i filtri prima di decidere se pagare l'elenco.
+ */
+export async function cercaProspect(
+  criteri: CriteriProspezione,
+  opzioni: { soloConteggio?: boolean } = {},
+): Promise<RisultatoProspezione> {
+  const query = new URLSearchParams();
+  for (const [chiave, valore] of Object.entries(criteri) as [string, string | undefined][]) {
+    if (valore !== undefined && valore.trim() !== '') query.set(chiave, valore.trim());
+  }
+  if (opzioni.soloConteggio === true) query.set('soloConteggio', '1');
+
+  return chiama(`/api/prospect?${query.toString()}`);
+}
+
 export interface DatiStudio {
   denominazione: string;
   numeroRui: string | null;

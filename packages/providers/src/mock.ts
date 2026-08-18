@@ -12,7 +12,14 @@
 import { DATI_DICHIARATI_VUOTI, demoCompanyProfile, parsePartitaIva } from '@aegis/core';
 import type { AtecoCode, CompanyProfile } from '@aegis/core';
 import { ProviderError } from './port.js';
-import type { CompanyDataProvider, CompanySearchResult, FetchLevel, SearchCriteria } from './port.js';
+import type {
+  CompanyDataProvider,
+  CompanySearchResult,
+  CriteriProspezione,
+  FetchLevel,
+  RisultatoProspezione,
+  SearchCriteria,
+} from './port.js';
 
 interface Variante {
   readonly denominazione: string;
@@ -99,6 +106,56 @@ export class MockCompanyProvider implements CompanyDataProvider {
         providerId: v.partitaIva,
       })),
     );
+  }
+
+  /**
+   * Prospezione dimostrativa.
+   *
+   * Filtra il piccolo catalogo di varianti con gli stessi criteri del servizio reale.
+   * Il conteggio resta gratuito anche qui: la modalità dimostrativa deve insegnare il
+   * gesto giusto — guarda quante sono, poi decidi se pagarle — non un gesto diverso da
+   * quello che si farà sui dati veri.
+   */
+  cercaProspect(
+    criteri: CriteriProspezione,
+    opzioni: { readonly soloConteggio?: boolean | undefined } = {},
+  ): Promise<RisultatoProspezione> {
+    const soloConteggio = opzioni.soloConteggio ?? false;
+    const ateco = criteri.ateco?.replace(/[^0-9]/g, '') ?? '';
+    const termine = (criteri.denominazione ?? '').trim().toLowerCase();
+
+    const corrispondenti = VARIANTI.filter((v) => {
+      if (criteri.provincia !== undefined && v.provincia !== criteri.provincia.toUpperCase()) {
+        return false;
+      }
+      // Come il fornitore reale: il confronto è sul codice senza punti, dall'inizio.
+      if (ateco !== '' && !v.ateco.replace(/[^0-9]/g, '').startsWith(ateco)) return false;
+      if (termine !== '' && !v.denominazione.toLowerCase().includes(termine)) return false;
+      return true;
+    });
+
+    const lotto = Math.min(criteri.limite ?? 25, corrispondenti.length);
+
+    return Promise.resolve({
+      totale: corrispondenti.length,
+      lotto,
+      // Cinque centesimi ad azienda, come il servizio reale: la modalità dimostrativa
+      // deve insegnare anche l'ordine di grandezza della spesa, non solo i gesti.
+      costoElencoCentesimi: lotto * 5,
+      soloConteggio,
+      aziende: soloConteggio
+        ? []
+        : corrispondenti.slice(0, criteri.limite ?? 50).map((v) => ({
+            partitaIva: parsePartitaIva(v.partitaIva),
+            denominazione: v.denominazione,
+            comune: v.comune,
+            provincia: v.provincia,
+            ateco: v.ateco,
+            attiva: true,
+            statoAttivita: 'attiva' as const,
+            providerId: v.partitaIva,
+          })),
+    });
   }
 
   fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile> {

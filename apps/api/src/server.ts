@@ -19,6 +19,8 @@ import {
 } from '@aegis/core';
 import type { CompanyProfile, DatiDichiarati, PolizzaInEssere } from '@aegis/core';
 import { MemoryCache, MemoryCostLedger, ProviderError, createCompanyProvider } from '@aegis/providers';
+import type { CostEvent } from '@aegis/providers';
+import { RegistroPerRichiesta, conCostiDellaRichiesta, costoDegliEventi } from './costi-richiesta.js';
 import type { CompanyDataProvider } from '@aegis/providers';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -74,12 +76,19 @@ export interface BuildServerOptions {
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   const ledger = options.ledger ?? new MemoryCostLedger();
+  /*
+    Il provider scrive su un registro che, oltre ad alimentare le statistiche globali,
+    deposita ogni evento nel contenitore della richiesta in corso. Senza, le spese si
+    imputano guardando quanto è cresciuto un elenco condiviso — e con due richieste in
+    volo insieme si addebitano all'intermediario sbagliato.
+  */
+  const registro = new RegistroPerRichiesta(ledger);
   const provider =
     options.provider ??
     createCompanyProvider({
       openApiToken: process.env['OPENAPI_TOKEN'],
       cache: new MemoryCache(),
-      ledger,
+      ledger: registro,
     });
   const persistenza = options.persistenza;
 
@@ -121,6 +130,22 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   );
 
   /** Risolve il contesto dati della richiesta corrente. */
+  /**
+   * Imputa all'intermediario della richiesta le spese che la richiesta ha prodotto.
+   *
+   * Senza persistenza non c'è dove scriverle: la modalità in memoria serve ai test e alla
+   * dimostrazione, dove il credito non esiste.
+   */
+  const registraSpese = async (
+    request: FastifyRequest,
+    eventi: readonly CostEvent[],
+  ): Promise<void> => {
+    if (eventi.length === 0 || persistenza === undefined) return;
+    const sessione = request.sessione;
+    if (sessione === undefined) return;
+    await persistenza.perTenant(sessione.tenantId).registraCostiDati(eventi);
+  };
+
   const contestoDi = (
     request: FastifyRequest,
   ): { dossier: DossierStore; portafoglio: PortafoglioStore; tenant: ContestoTenant | null } => {
@@ -560,6 +585,39 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     return { risultati, provider: provider.name };
   });
 
+  /**
+   * Ricerca di prospect.
+   *
+   * Con `soloConteggio` non scarica e non addebita: risponde quante aziende
+   * corrispondono e quanto costerebbe l'elenco. È la modalità con cui si compongono i
+   * filtri, e l'interfaccia la usa a ogni modifica: senza, comporre una ricerca per
+   * tentativi costerebbe un centesimo a tentativo — poco, ma sufficiente a far smettere
+   * di provare, che è il modo peggiore di risparmiare.
+   */
+  app.get('/api/prospect', async (request, reply) => {
+    const parsed = prospezioneSchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Filtri non validi', dettagli: parsed.error.issues });
+    }
+
+    const { soloConteggio, ...criteri } = parsed.data;
+    const haFiltri = Object.values(criteri).some((v) => v !== undefined && v !== '');
+    if (!haFiltri) {
+      return reply.status(400).send({ errore: 'Indicare almeno un criterio di ricerca' });
+    }
+
+    const { risultato, eventi } = await conCostiDellaRichiesta(() =>
+      provider.cercaProspect(criteri, { soloConteggio }),
+    );
+
+    // Anche qui: la spesa va nel registro **subito**, non alla prossima analisi. Un
+    // elenco di prospect costa quanto un'analisi, e non comparire nel consuntivo lo
+    // renderebbe invisibile a chi controlla il credito residuo.
+    await registraSpese(request, eventi);
+
+    return { ...risultato, provider: provider.name };
+  });
+
   // ── Profilo grezzo ─────────────────────────────────────────────────────────
   app.get<{ Params: { id: string } }>('/api/aziende/:id/profilo', async (request, reply) => {
     const livello = fetchLevelSchema.parse(
@@ -620,7 +678,6 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     // prodotta: senza, fra tre anni sarebbe impossibile dimostrare su cosa si fondava.
     if (contesto.tenant !== null) {
       await contesto.tenant.registraAnalisi(identificativo, analisi, provider.name);
-      await contesto.tenant.registraCostiDati(ledger.events);
     }
 
     await contesto.portafoglio.registra({
@@ -654,13 +711,17 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         .send({ errore: 'Corpo della richiesta non valido', dettagli: parsed.error.issues });
     }
 
-    const analisi = await analizzaERegistra(request, request.params.id, {
-      ...(parsed.data.datiDichiarati === undefined
-        ? {}
-        : { datiDichiarati: toDatiDichiarati(parsed.data.datiDichiarati) }),
-      ...(parsed.data.polizze === undefined ? {} : { polizze: parsed.data.polizze.map(toPolizza) }),
-      ...(parsed.data.asOf === undefined ? {} : { asOf: parsed.data.asOf }),
-    });
+    const { risultato: analisi, eventi } = await conCostiDellaRichiesta(() =>
+      analizzaERegistra(request, request.params.id, {
+        ...(parsed.data.datiDichiarati === undefined
+          ? {}
+          : { datiDichiarati: toDatiDichiarati(parsed.data.datiDichiarati) }),
+        ...(parsed.data.polizze === undefined ? {} : { polizze: parsed.data.polizze.map(toPolizza) }),
+        ...(parsed.data.asOf === undefined ? {} : { asOf: parsed.data.asOf }),
+      }),
+    );
+
+    await registraSpese(request, eventi);
 
     if (analisi === null) return reply.status(404).send({ errore: 'Azienda non trovata' });
     return presentAnalysis(analisi);
@@ -788,29 +849,29 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const speseIniziali = ledger.events.length;
     const fallite: { partitaIva: string; motivo: string }[] = [];
     let acquisite = 0;
 
-    for (const riga of anteprima.daAcquisire) {
-      try {
-        const analisi = await analizzaERegistra(request, riga.partitaIva);
-        if (analisi === null) {
-          fallite.push({ partitaIva: riga.partitaIva, motivo: 'Azienda non trovata dal provider' });
-          continue;
+    const { eventi } = await conCostiDellaRichiesta(async () => {
+      for (const riga of anteprima.daAcquisire) {
+        try {
+          const analisi = await analizzaERegistra(request, riga.partitaIva);
+          if (analisi === null) {
+            fallite.push({ partitaIva: riga.partitaIva, motivo: 'Azienda non trovata dal provider' });
+            continue;
+          }
+          acquisite++;
+        } catch (errore) {
+          fallite.push({
+            partitaIva: riga.partitaIva,
+            motivo: errore instanceof ProviderError ? errore.message : 'Errore durante l’acquisizione',
+          });
         }
-        acquisite++;
-      } catch (errore) {
-        fallite.push({
-          partitaIva: riga.partitaIva,
-          motivo: errore instanceof ProviderError ? errore.message : 'Errore durante l’acquisizione',
-        });
       }
-    }
+    });
 
-    const costoEffettivoCentesimi = ledger.events
-      .slice(speseIniziali)
-      .reduce((somma, e) => somma + (e.cacheHit ? 0 : e.costoStimatoCentesimi), 0);
+    await registraSpese(request, eventi);
+    const costoEffettivoCentesimi = costoDegliEventi(eventi);
 
     return { acquisite, fallite, costoEffettivoCentesimi, giaPresenti: anteprima.giaPresenti.length };
   });
@@ -1064,6 +1125,36 @@ const RUOLI = ['amministratore', 'broker', 'assistente', 'sola-lettura'] as cons
  * svuota un campo invia `''`, e rifiutarlo impedirebbe di **cancellare** un recapito
  * sbagliato — che è esattamente ciò che si vuole poter fare.
  */
+/**
+ * Filtri di prospezione.
+ *
+ * I numeri arrivano dalla stringa di query e vanno convertiti: `z.coerce` accetta sia
+ * il numero sia la stringa vuota di un campo lasciato in bianco, che va trattata come
+ * «nessun filtro» e non come zero — un fatturato minimo di zero escluderebbe le aziende
+ * che non lo dichiarano.
+ */
+const numeroFacoltativo = z
+  .preprocess((v) => (v === '' || v === undefined ? undefined : v), z.coerce.number().int().min(0))
+  .optional();
+
+const prospezioneSchema = z.object({
+  denominazione: z.string().trim().max(120).optional(),
+  provincia: z.string().trim().length(2).toUpperCase().optional(),
+  ateco: z.string().trim().max(12).optional(),
+  addettiMin: numeroFacoltativo,
+  addettiMax: numeroFacoltativo,
+  fatturatoMinEuro: numeroFacoltativo,
+  fatturatoMaxEuro: numeroFacoltativo,
+  socioCodiceFiscale: z.string().trim().max(20).optional(),
+  // Tetto basso e dichiarato: a cinque centesimi ad azienda, duecento record sono dieci
+  // euro. Il massimo esiste per impedire che una cifra digitata male costi una giornata.
+  limite: z.coerce.number().int().min(1).max(100).optional(),
+  soloConteggio: z
+    .preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean())
+    .optional()
+    .default(false),
+});
+
 const datiStudioSchema = z.object({
   denominazione: z.string().trim().min(2).max(200).optional(),
   numeroRui: z.string().trim().max(40).nullable().optional(),

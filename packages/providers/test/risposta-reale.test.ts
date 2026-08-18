@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Money, classifySize } from '@aegis/core';
 import { mappaAnagrafica, mappaAssetti, mappaBilanciSintetici } from '../src/openapi/mapper.js';
 import { OpenApiProvider } from '../src/openapi/provider.js';
+import { MemoryCostLedger } from '../src/http.js';
 
 /**
  * Risposta reale di `GET company.openapi.com/IT-advanced/{piva}`, agosto 2026.
@@ -416,5 +417,120 @@ describe('Indirizzo dalla risposta reale', () => {
   it('conserva le coordinate, che servono a misurare la contiguità fra le sedi', () => {
     expect(anagrafica.value.sedeLegale?.latitudine).toBeCloseTo(41.8071, 3);
     expect(anagrafica.value.sedeLegale?.longitudine).toBeCloseTo(12.47843, 3);
+  });
+});
+
+/**
+ * Ricerca di prospect: contare non deve costare.
+ *
+ * Il servizio `/IT-search` espone una modalità `dryRun` che il fornitore dichiara
+ * gratuita e che restituisce solo **quante** aziende corrispondono e quanto costerebbe
+ * l'elenco. È il meccanismo su cui poggia l'intera funzione: senza, comporre una ricerca
+ * per tentativi costerebbe un centesimo a tentativo — poco, ma abbastanza da far
+ * smettere di provare.
+ *
+ * La risposta qui sotto è quella reale osservata su `province=BS`.
+ */
+const CONTEGGIO_REALE = { data: [], count: 3488, cost: 0.01, success: true, message: '', error: null };
+
+describe('Prospezione: il conteggio è gratuito', () => {
+  function provider(risposta: unknown, chiamate: string[]) {
+    const fetchImpl = ((url: string): Promise<Response> => {
+      chiamate.push(String(url));
+      return Promise.resolve(
+        new Response(JSON.stringify(risposta), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+
+    const ledger = new MemoryCostLedger();
+    return { provider: new OpenApiProvider({ token: 't', fetchImpl, ledger }), ledger };
+  }
+
+  it('in sola conta non addebita nulla', async () => {
+    const chiamate: string[] = [];
+    const { provider: p, ledger } = provider(CONTEGGIO_REALE, chiamate);
+
+    const esito = await p.cercaProspect({ provincia: 'BS', addettiMin: 20 }, { soloConteggio: true });
+
+    expect(esito.totale).toBe(3488);
+    expect(esito.aziende).toEqual([]);
+    // Zero, non «poco»: è la promessa fatta all'utente nella pagina.
+    expect(ledger.totaleCentesimi()).toBe(0);
+    expect(chiamate[0]).toContain('dryRun=1');
+  });
+
+  it('riporta il prezzo dichiarato dal fornitore, non quello scritto nel listino', async () => {
+    const chiamate: string[] = [];
+    const { provider: p } = provider({ ...CONTEGGIO_REALE, cost: 0.05 }, chiamate);
+
+    const esito = await p.cercaProspect({ provincia: 'BS' }, { soloConteggio: true });
+
+    // Fidarsi del listino nel codice significherebbe accorgersi di un aumento di prezzo
+    // solo a fine mese, leggendo il residuo del credito.
+    expect(esito.costoElencoCentesimi).toBe(5);
+  });
+
+  it('l’elenco vero non chiede il dryRun e arricchisce i risultati', async () => {
+    const chiamate: string[] = [];
+    const { provider: p } = provider(RICERCA_REALE, chiamate);
+
+    const esito = await p.cercaProspect({ provincia: 'RM' });
+
+    expect(esito.soloConteggio).toBe(false);
+    expect(esito.aziende).toHaveLength(1);
+    expect(chiamate[0]).not.toContain('dryRun');
+    // Senza arricchimento il servizio restituisce **solo gli identificativi interni**:
+    // un elenco di stringhe opache, che si paga e non si può mostrare.
+    expect(chiamate[0]).toContain('dataEnrichment=start');
+  });
+
+  it('addebita ciò che il fornitore dichiara, non il lotto richiesto', async () => {
+    const chiamate: string[] = [];
+    // Si chiedono venticinque aziende, il fornitore ne restituisce una e dichiara di
+    // aver fatto pagare cinque centesimi.
+    const { provider: p, ledger } = provider({ ...RICERCA_REALE, cost: 0.05 }, chiamate);
+
+    await p.cercaProspect({ provincia: 'RM', limite: 25 });
+
+    // Registrare la stima farebbe comparire nel registro 1,25 € mai addebitati: il
+    // consuntivo di spesa smetterebbe di corrispondere all'estratto conto del fornitore.
+    expect(ledger.totaleCentesimi()).toBe(5);
+  });
+
+  it('in assenza di prezzo dichiarato resta la stima prudenziale', async () => {
+    const chiamate: string[] = [];
+    const senzaCosto = { data: RICERCA_REALE.data, success: true, message: '', error: null };
+    const { provider: p, ledger } = provider(senzaCosto, chiamate);
+
+    await p.cercaProspect({ provincia: 'RM', limite: 10 });
+
+    // Dieci record a cinque centesimi: meglio sovrastimare che tacere una spesa.
+    expect(ledger.totaleCentesimi()).toBe(50);
+  });
+
+  it('toglie i punti dal codice ATECO, che il fornitore confronta senza', async () => {
+    const chiamate: string[] = [];
+    const { provider: p } = provider(CONTEGGIO_REALE, chiamate);
+
+    await p.cercaProspect({ provincia: 'BS', ateco: '25.62.00' }, { soloConteggio: true });
+
+    // Verificato sul servizio reale: «25.62.00» restituisce zero aziende, «256200» pure,
+    // «2562» ne restituisce sessantuno. Inviare il codice punteggiato è un filtro che
+    // non trova mai nulla — e sembra un'assenza di aziende, non un errore di formato.
+    expect(chiamate[0]).toContain('atecoCode=256200');
+    expect(chiamate[0]).not.toContain('25.62.00');
+  });
+
+  it('non spedisce i filtri lasciati in bianco', async () => {
+    const chiamate: string[] = [];
+    const { provider: p } = provider(CONTEGGIO_REALE, chiamate);
+
+    await p.cercaProspect({ provincia: 'BS' }, { soloConteggio: true });
+
+    expect(chiamate[0]).not.toContain('minEmployees');
+    expect(chiamate[0]).not.toContain('companyName');
   });
 });

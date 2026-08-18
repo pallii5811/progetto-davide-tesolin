@@ -12,7 +12,14 @@ import type { Bilancio, CompanyProfile, EventiNegativi, PartitaIva, Sourced } fr
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger } from '../http.js';
 import { ProviderError } from '../port.js';
-import type { CompanyDataProvider, CompanySearchResult, FetchLevel, SearchCriteria } from '../port.js';
+import type {
+  CompanyDataProvider,
+  CompanySearchResult,
+  CriteriProspezione,
+  FetchLevel,
+  RisultatoProspezione,
+  SearchCriteria,
+} from '../port.js';
 import { OPENAPI_DEFAULT_CONFIG, baseUrlPer, baseUrlRischioPer } from './config.js';
 import type { AmbienteOpenApi, OpenApiConfig, ServiceConfig } from './config.js';
 import {
@@ -25,7 +32,31 @@ import {
   sedeDi,
 } from './mapper.js';
 import { mappaNegativita } from './negativita.js';
-import { asArray, bool, partitaIvaOf, pick, str } from './parse.js';
+import { asArray, bool, num, partitaIvaOf, pick, str } from './parse.js';
+
+/**
+ * Quante aziende si scaricano per volta, se non è chiesto altrimenti.
+ *
+ * Il prezzo della ricerca è **a record**: un elenco senza limite su una provincia intera
+ * costerebbe centinaia di euro. Il valore predefinito è quindi deliberatamente piccolo, e
+ * il preventivo esatto viene mostrato prima di ogni scarico.
+ */
+const LOTTO_PREDEFINITO = 25;
+
+/**
+ * Livello di arricchimento dei risultati.
+ *
+ * Senza, il servizio restituisce **solo gli identificativi interni**: nessuna
+ * denominazione, nessuna partita IVA, nessun indirizzo. Costa un centesimo e non serve a
+ * niente. Con `start` costa cinque centesimi ad azienda e restituisce l'anagrafica
+ * minima, che è il minimo per decidere se quell'impresa interessa.
+ */
+const ARRICCHIMENTO = 'start';
+
+/** Cinque centesimi ad azienda: verificato sul servizio reale. */
+function costoLotto(record: number): number {
+  return record * 5;
+}
 
 export interface OpenApiProviderOptions {
   readonly token: string;
@@ -108,6 +139,118 @@ export class OpenApiProvider implements CompanyDataProvider {
 
     const elementi = asArray(pick(raw, 'data', 'result', 'items') ?? raw);
     return elementi.map((item) => this.#toSearchResult(item, partitaIvaOf(item, 'vatCode', 'partitaIva')));
+  }
+
+  /**
+   * Ricerca di prospect su `/IT-search`.
+   *
+   * Due modalità con lo stesso identico filtro, e questo è il punto: la modalità di solo
+   * conteggio (`dryRun`) risponde **quante** aziende corrispondono e quanto costerebbe
+   * scaricarle, senza scaricare nulla e senza costare nulla. Comporre i filtri a
+   * tentativi diventa gratuito, e chi cerca vede il prezzo prima di pagarlo — che su un
+   * servizio a consumo è la differenza fra uno strumento e una trappola.
+   */
+  async cercaProspect(
+    criteri: CriteriProspezione,
+    opzioni: { readonly soloConteggio?: boolean | undefined } = {},
+  ): Promise<RisultatoProspezione> {
+    const service = this.#config.services.prospezione;
+    const soloConteggio = opzioni.soloConteggio ?? false;
+    const limite = criteri.limite ?? LOTTO_PREDEFINITO;
+
+    const filtri = {
+      companyName: criteri.denominazione,
+      province: criteri.provincia?.toUpperCase(),
+      // Il fornitore confronta il codice così com'è archiviato, cioè **senza punti**:
+      // «25.62.00» non trova nulla, «2562» trova sessantuno aziende.
+      atecoCode: criteri.ateco?.replace(/[^0-9]/g, ''),
+      minEmployees: criteri.addettiMin,
+      maxEmployees: criteri.addettiMax,
+      minTurnover: criteri.fatturatoMinEuro,
+      maxTurnover: criteri.fatturatoMaxEuro,
+      shareHolderTaxCode: criteri.socioCodiceFiscale,
+      activityStatus: criteri.soloAttive === false ? undefined : 'ATTIVA',
+    };
+
+    if (soloConteggio) {
+      /*
+        Due domande diverse, due conteggi — entrambi gratuiti.
+
+        Senza limite il servizio dice **quante aziende esistono**; con il limite e
+        l'arricchimento dice **quanto costa il lotto** che si sta per comprare, perché il
+        prezzo va a record. Chiederne uno solo significherebbe mostrare o un totale senza
+        prezzo o un prezzo senza sapere di quante aziende si stia parlando.
+      */
+      const [totali, preventivo] = await Promise.all([
+        this.#contaProspect({ ...filtri }),
+        this.#contaProspect({ ...filtri, limit: limite, dataEnrichment: ARRICCHIMENTO }),
+      ]);
+
+      return {
+        totale: totali.count,
+        costoElencoCentesimi: preventivo.costoCentesimi,
+        aziende: [],
+        soloConteggio: true,
+        lotto: Math.min(limite, totali.count),
+      };
+    }
+
+    const raw = await this.#company.request<unknown>({
+      service: 'prospezione',
+      path: service.path,
+      query: {
+        ...filtri,
+        limit: limite,
+        skip: criteri.salta,
+        // Senza arricchimento la risposta contiene **soltanto gli identificativi**: un
+        // elenco di stringhe opache, inutile da mostrare e comunque da pagare.
+        dataEnrichment: ARRICCHIMENTO,
+      },
+      cacheTtlSeconds: service.ttlSeconds,
+      // Stima prudenziale prima della chiamata, corretta subito dopo con il costo che il
+      // fornitore dichiara: si paga per i record restituiti, non per quelli chiesti.
+      costoCentesimi: costoLotto(limite),
+      costoDallaRisposta: (payload) => {
+        const dichiarato = num(payload, 'cost');
+        return dichiarato === null ? null : Math.round(dichiarato * 100);
+      },
+    });
+
+    const elementi = asArray(pick(raw, 'data') ?? []);
+    const dichiarato = num(raw, 'cost');
+
+    return {
+      totale: num(raw, 'count') ?? elementi.length,
+      costoElencoCentesimi:
+        dichiarato === null ? costoLotto(elementi.length) : Math.round(dichiarato * 100),
+      aziende: elementi.map((item) =>
+        this.#toSearchResult(item, partitaIvaOf(item, 'vatCode', 'partitaIva')),
+      ),
+      soloConteggio: false,
+      lotto: elementi.length,
+    };
+  }
+
+  /** Conteggio in modalità `dryRun`: non scarica nulla, non addebita nulla. */
+  async #contaProspect(
+    query: Record<string, unknown>,
+  ): Promise<{ count: number; costoCentesimi: number }> {
+    const raw = await this.#company.request<unknown>({
+      service: 'prospezione',
+      path: this.#config.services.prospezione.path,
+      query: { ...query, dryRun: 1 },
+      // Nessuna cache: è gratuito, e un numero di ieri varrebbe meno della chiamata.
+      cacheTtlSeconds: 0,
+      costoCentesimi: 0,
+    });
+
+    const dichiarato = num(raw, 'cost');
+    return {
+      count: num(raw, 'count') ?? 0,
+      // Il prezzo lo dichiara il fornitore a ogni risposta: fidarsi del listino scritto
+      // nel codice significherebbe accorgersi di un aumento solo a fine mese.
+      costoCentesimi: dichiarato === null ? 0 : Math.round(dichiarato * 100),
+    };
   }
 
   async fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile> {

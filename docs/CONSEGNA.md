@@ -119,6 +119,26 @@ centinaia di euro di chiamate.
 
 ---
 
+## 4-ter. Trovare clienti nuovi
+
+La voce **Nuovi clienti** cerca imprese che non si hanno ancora: provincia, codice ATECO,
+addetti e fatturato (minimo e massimo), denominazione parziale.
+
+**Contare è gratuito.** Il pulsante «Conta quante sono» non scarica nulla e non addebita
+nulla: risponde quante imprese corrispondono e quanto costerebbe l'elenco. I filtri si
+compongono per tentativi senza spendere, ed è il modo in cui vanno usati.
+
+**L'elenco si paga a record**: cinque centesimi ad azienda, verificato sul servizio reale.
+Il lotto si sceglie prima (10, 25, 50 o 100) e il preventivo esatto compare accanto al
+pulsante di scarico. Analizzare una delle aziende trovate costa a parte, come qualunque
+altra analisi.
+
+**Il codice ATECO va scritto senza punti** e il confronto è esatto: `2562` trova sessantuno
+aziende in provincia di Brescia, `25.62.00` non ne trova nessuna, e `25` ne trova undici —
+perché una divisione non comprende le proprie sottocategorie. È una stranezza del fornitore,
+ed è dichiarata nel modulo; il contatore gratuito permette di scoprirla in due tentativi.
+
+---
 ## 5. Dati reali
 
 Il profilo aziendale arriva da [OpenAPI.com](https://openapi.com). In `.env`:

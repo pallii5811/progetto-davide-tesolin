@@ -43,6 +43,55 @@ export interface CompanySearchResult {
   readonly providerId: string;
 }
 
+/**
+ * Criteri per cercare aziende che non si conoscono ancora.
+ *
+ * È una ricerca diversa da `SearchCriteria`: là si parte da un'azienda nota e se ne
+ * chiede il profilo, qui si descrive **un insieme** — un territorio, un settore, una
+ * dimensione — e si chiede chi lo popola. È la differenza fra analizzare un cliente e
+ * trovarne uno.
+ */
+export interface CriteriProspezione {
+  readonly denominazione?: string | undefined;
+  /** Sigla provinciale, es. `BS`. */
+  readonly provincia?: string | undefined;
+  /**
+   * Codice ATECO **senza punti**.
+   *
+   * Il confronto del fornitore è esatto: `25` e `2562` sono due insiemi diversi, e il
+   * primo non comprende il secondo. Verificato sui dati reali, e dichiarato
+   * nell'interfaccia perché nessuno se lo aspetta.
+   */
+  readonly ateco?: string | undefined;
+  readonly addettiMin?: number | undefined;
+  readonly addettiMax?: number | undefined;
+  readonly fatturatoMinEuro?: number | undefined;
+  readonly fatturatoMaxEuro?: number | undefined;
+  /** Codice fiscale di un socio: tutte le società che fanno capo alla stessa persona. */
+  readonly socioCodiceFiscale?: string | undefined;
+  readonly soloAttive?: boolean | undefined;
+  readonly limite?: number | undefined;
+  readonly salta?: number | undefined;
+}
+
+export interface RisultatoProspezione {
+  /** Quante aziende corrispondono ai criteri, indipendentemente da quante se ne scaricano. */
+  readonly totale: number;
+  /**
+   * Quante se ne scaricano davvero.
+   *
+   * Il prezzo del servizio è **a record**: senza un lotto dichiarato, un elenco su una
+   * provincia intera costerebbe centinaia di euro. Totale e lotto sono numeri diversi e
+   * vanno mostrati diversi, altrimenti si compra un insieme credendo di comprarne un altro.
+   */
+  readonly lotto: number;
+  /** Costo dell'elenco **per il lotto indicato**, in centesimi, dichiarato dal fornitore. */
+  readonly costoElencoCentesimi: number;
+  /** Vuoto quando si è chiesto il solo conteggio. */
+  readonly aziende: readonly CompanySearchResult[];
+  readonly soloConteggio: boolean;
+}
+
 export interface SearchCriteria {
   readonly denominazione?: string | undefined;
   readonly partitaIva?: string | undefined;
@@ -64,6 +113,17 @@ export interface CostEvent {
 export interface CompanyDataProvider {
   readonly name: string;
   search(criteria: SearchCriteria): Promise<readonly CompanySearchResult[]>;
+  /**
+   * Ricerca di prospect.
+   *
+   * Con `soloConteggio` non scarica nulla e non costa nulla: risponde quante aziende
+   * corrispondono e quanto costerebbe averle. È ciò che permette di comporre i filtri
+   * a tentativi senza bruciare credito, e va offerto **prima** della ricerca vera.
+   */
+  cercaProspect(
+    criteri: CriteriProspezione,
+    opzioni?: { readonly soloConteggio?: boolean | undefined },
+  ): Promise<RisultatoProspezione>;
   fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile>;
 }
 

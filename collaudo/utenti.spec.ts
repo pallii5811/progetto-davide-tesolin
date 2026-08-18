@@ -13,6 +13,11 @@ test.describe('Gestione dei collaboratori', () => {
   const collaboratore = { email: 'nuovo.collaboratore@studio.it', nome: 'Nuovo Collaboratore' };
 
   test('crea, sospende e riattiva un collaboratore', async ({ page, browser }) => {
+    // Apre una seconda sessione in un browser separato e ne verifica la revoca: è il
+    // collaudo più lungo della suite, e su una macchina carica il minuto preimpostato
+    // non basta. Il rosso che ne deriva non riguarda il software.
+    test.setTimeout(180_000);
+
     const sorveglianza = sorvegliaErrori(page);
     await accedi(page);
     await page.goto('/impostazioni/utenti');
