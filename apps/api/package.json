@@ -1,0 +1,22 @@
+{
+  "name": "@aegis/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@aegis/core": "0.1.0",
+    "@aegis/db": "0.1.0",
+    "@aegis/providers": "0.1.0",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^10.0.1",
+    "drizzle-orm": "^0.38.3",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.1"
+  }
+}

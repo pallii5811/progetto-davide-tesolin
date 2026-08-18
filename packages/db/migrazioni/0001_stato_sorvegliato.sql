@@ -1,0 +1,1 @@
+ALTER TABLE "analisi" ADD COLUMN "stato_sorvegliato" jsonb;

@@ -1,0 +1,27 @@
+{
+  "name": "@aegis/db",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Schema PostgreSQL multi-tenant: snapshot immutabili, analisi riproducibili, audit trail.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.5",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.9"
+  }
+}

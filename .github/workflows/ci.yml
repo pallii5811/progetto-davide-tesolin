@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verifica:
+    name: Compilazione, lint e test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Compilazione (TypeScript strict)
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verifica formattazione
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      # Il frontend ha un proprio type-check integrato nella build di Next:
+      # va eseguito perché copre i Server Component, esclusi dal build dei pacchetti.
+      - name: Build del frontend
+        run: npm run build --workspace @aegis/web
+
+  collaudo:
+    name: Collaudo su browser reale
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installazione dipendenze
+        run: npm ci
+
+      - name: Compilazione dei pacchetti
+        run: npm run build
+
+      # Solo Chromium: tre motori triplicherebbero il tempo senza aggiungere nulla su
+      # un applicativo interno, dove il parco browser è noto.
+      - name: Installazione del browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Collaudo
+        run: npm run collaudo
+
+      # Le tracce servono a capire un fallimento senza doverlo riprodurre a mano.
+      - name: Tracce dei collaudi falliti
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracce-collaudo
+          path: test-results/
+          retention-days: 7

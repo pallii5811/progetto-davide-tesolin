@@ -1,0 +1,179 @@
+@import 'tailwindcss';
+
+/*
+ * Sistema di design AEGIS.
+ *
+ * Applicativo professionale ad alta densità informativa: l'intermediario ci passa la
+ * giornata e deve leggere tabelle, non ammirare animazioni. Poche superfici, gerarchia
+ * tipografica netta, colore usato solo dove porta informazione — la gravità di un rischio,
+ * lo stato di una copertura. Mai come decorazione.
+ */
+
+@theme {
+  --color-fondo: oklch(0.98 0.004 260);
+  --color-superficie: oklch(1 0 0);
+  --color-bordo: oklch(0.91 0.006 260);
+  --color-bordo-forte: oklch(0.84 0.008 260);
+
+  --color-testo: oklch(0.24 0.014 260);
+  --color-testo-tenue: oklch(0.5 0.012 260);
+  --color-testo-debole: oklch(0.62 0.01 260);
+
+  --color-marchio: oklch(0.42 0.11 254);
+  --color-marchio-tenue: oklch(0.95 0.02 254);
+
+  /* Scala di gravità: dal basso al critico. */
+  --color-basso: oklch(0.62 0.12 155);
+  --color-basso-fondo: oklch(0.95 0.035 155);
+  --color-moderato: oklch(0.72 0.13 100);
+  --color-moderato-fondo: oklch(0.96 0.04 100);
+  --color-rilevante: oklch(0.72 0.15 65);
+  --color-rilevante-fondo: oklch(0.96 0.05 65);
+  --color-alto: oklch(0.62 0.18 32);
+  --color-alto-fondo: oklch(0.95 0.045 32);
+  --color-critico: oklch(0.5 0.2 22);
+  --color-critico-fondo: oklch(0.94 0.05 22);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-fondo: oklch(0.19 0.012 260);
+    --color-superficie: oklch(0.235 0.014 260);
+    --color-bordo: oklch(0.31 0.014 260);
+    --color-bordo-forte: oklch(0.4 0.016 260);
+
+    --color-testo: oklch(0.95 0.006 260);
+    --color-testo-tenue: oklch(0.74 0.012 260);
+    --color-testo-debole: oklch(0.6 0.012 260);
+
+    --color-marchio: oklch(0.72 0.12 254);
+    --color-marchio-tenue: oklch(0.28 0.05 254);
+
+    --color-basso-fondo: oklch(0.28 0.05 155);
+    --color-moderato-fondo: oklch(0.3 0.06 100);
+    --color-rilevante-fondo: oklch(0.3 0.07 65);
+    --color-alto-fondo: oklch(0.3 0.08 32);
+    --color-critico-fondo: oklch(0.3 0.09 22);
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-testo);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeri incolonnati: in una tabella di importi è la differenza fra leggibile e illeggibile. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Stampa.
+ *
+ * Il report è il documento che il broker consegna al cliente e allega al fascicolo di
+ * adeguatezza: deve uscire dalla stampante come un documento, non come una pagina web
+ * fotografata. Niente cromature dell'applicazione, colori forzati in chiaro, e nessuna
+ * riga di tabella spezzata a metà fra due fogli.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 14mm;
+  }
+
+  /*
+   * La carta è bianca, sempre.
+   *
+   * Senza questo blocco, chi lavora con il tema scuro stampa il documento del cliente
+   * con la tavolozza scura: riquadri di allerta come blocchi pieni di inchiostro e testo
+   * chiaro che sulla carta sparisce. Forzare solo il fondo del `body` non basta — i
+   * colori dei componenti vengono dalle variabili, ed è lì che vanno riportati.
+   */
+  :root {
+    --color-fondo: oklch(1 0 0);
+    --color-superficie: oklch(1 0 0);
+    --color-bordo: oklch(0.85 0.006 260);
+    --color-bordo-forte: oklch(0.7 0.008 260);
+
+    --color-testo: oklch(0.18 0.014 260);
+    --color-testo-tenue: oklch(0.42 0.012 260);
+    --color-testo-debole: oklch(0.52 0.01 260);
+
+    --color-marchio: oklch(0.38 0.11 254);
+    --color-marchio-tenue: oklch(1 0 0);
+
+    /* Fondi di gravità azzerati: sulla carta la gravità la dice il testo, non l'inchiostro. */
+    --color-basso: oklch(0.45 0.12 155);
+    --color-basso-fondo: oklch(1 0 0);
+    --color-moderato: oklch(0.5 0.13 100);
+    --color-moderato-fondo: oklch(1 0 0);
+    --color-rilevante: oklch(0.52 0.15 65);
+    --color-rilevante-fondo: oklch(1 0 0);
+    --color-alto: oklch(0.5 0.18 32);
+    --color-alto-fondo: oklch(1 0 0);
+    --color-critico: oklch(0.42 0.2 22);
+    --color-critico-fondo: oklch(1 0 0);
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    font-size: 10.5pt;
+  }
+
+  /* Un riquadro senza fondo si distingue dal bordo: resta leggibile e non consuma toner. */
+  [class*='bg-critico-fondo'],
+  [class*='bg-alto-fondo'],
+  [class*='bg-rilevante-fondo'],
+  [class*='bg-moderato-fondo'],
+  [class*='bg-basso-fondo'],
+  [class*='bg-marchio-tenue'] {
+    border-width: 1px;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page-break {
+    break-before: page;
+  }
+
+  /* Un rischio o una copertura non devono mai spezzarsi fra due pagine. */
+  .print-keep {
+    break-inside: avoid;
+  }
+
+  details {
+    display: none !important;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr,
+  thead {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}

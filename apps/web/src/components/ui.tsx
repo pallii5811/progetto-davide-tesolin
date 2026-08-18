@@ -1,0 +1,202 @@
+/**
+ * Elementi di interfaccia condivisi.
+ *
+ * Il pezzo che conta è `Spiegazione`: rende visibile, per ogni numero, la formula, gli
+ * input, le note e i riferimenti normativi. È il requisito «scatola di vetro» tradotto
+ * in un componente — se un dato non sa spiegarsi, non merita di stare a schermo.
+ */
+
+import type { ReactNode } from 'react';
+import type { ExplanationDto, LivelloRischio, StatoGap } from '@/lib/api';
+
+export function Sezione({
+  id,
+  titolo,
+  sottotitolo,
+  azione,
+  children,
+}: {
+  id?: string;
+  titolo: string;
+  sottotitolo?: string;
+  azione?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    // `scroll-mt` compensa la barra di navigazione appiccicata: senza, l'ancora
+    // porta il titolo esattamente sotto la barra e sembra non aver funzionato.
+    <section id={id} className="mb-10 scroll-mt-16">
+      <div className="mb-4 flex items-baseline justify-between gap-4 border-b border-bordo pb-2">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">{titolo}</h2>
+          {sottotitolo !== undefined && <p className="mt-0.5 text-sm text-testo-tenue">{sottotitolo}</p>}
+        </div>
+        {azione}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function Scheda({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`rounded-lg border border-bordo bg-superficie p-4 ${className}`}>{children}</div>;
+}
+
+export function Metrica({
+  etichetta,
+  valore,
+  nota,
+  tono = 'neutro',
+}: {
+  etichetta: string;
+  valore: string;
+  nota?: string;
+  tono?: 'neutro' | 'positivo' | 'attenzione' | 'critico';
+}) {
+  const colore =
+    tono === 'positivo'
+      ? 'text-basso'
+      : tono === 'attenzione'
+        ? 'text-rilevante'
+        : tono === 'critico'
+          ? 'text-critico'
+          : 'text-testo';
+
+  return (
+    <Scheda>
+      {/*
+        Coppia termine/definizione e non due paragrafi: un lettore di schermo annuncia
+        «Patrimonio esposto, 9.400.000 €» come una cosa sola, invece di leggere
+        un'etichetta e più avanti un numero senza sapere a cosa appartenga.
+      */}
+      <dl data-testid={`metrica-${chiave(etichetta)}`}>
+        <dt className="text-xs font-medium uppercase tracking-wide text-testo-debole">{etichetta}</dt>
+        <dd className={`tabular mt-1.5 text-2xl font-semibold ${colore}`}>{valore}</dd>
+        {nota !== undefined && <dd className="mt-1 text-xs leading-snug text-testo-tenue">{nota}</dd>}
+      </dl>
+    </Scheda>
+  );
+}
+
+/** Identificativo stabile a partire dall'etichetta: «Patrimonio esposto» → `patrimonio-esposto`. */
+function chiave(etichetta: string): string {
+  // Le lettere accentate si riducono alla lettera base invece di sparire: trattate come
+  // separatori, «Già in portafoglio» darebbe `gi-in-portafoglio`.
+  return etichetta
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+const CLASSI_LIVELLO: Record<LivelloRischio, string> = {
+  basso: 'bg-basso-fondo text-basso border-basso/30',
+  moderato: 'bg-moderato-fondo text-moderato border-moderato/30',
+  rilevante: 'bg-rilevante-fondo text-rilevante border-rilevante/30',
+  alto: 'bg-alto-fondo text-alto border-alto/30',
+  critico: 'bg-critico-fondo text-critico border-critico/40',
+};
+
+export function BadgeRischio({ livello, testo }: { livello: LivelloRischio; testo?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${CLASSI_LIVELLO[livello]}`}
+    >
+      {testo ?? livello}
+    </span>
+  );
+}
+
+const CLASSI_STATO: Record<StatoGap, string> = {
+  assente: 'bg-critico-fondo text-critico border-critico/40',
+  sottoassicurata: 'bg-alto-fondo text-alto border-alto/30',
+  'massimale-insufficiente': 'bg-rilevante-fondo text-rilevante border-rilevante/30',
+  'da-quantificare': 'bg-moderato-fondo text-moderato border-moderato/30',
+  'in-scadenza': 'bg-moderato-fondo text-moderato border-moderato/30',
+  adeguata: 'bg-basso-fondo text-basso border-basso/30',
+};
+
+export function BadgeStato({ stato, testo }: { stato: StatoGap; testo: string }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${CLASSI_STATO[stato]}`}
+    >
+      {testo}
+    </span>
+  );
+}
+
+export function BadgeConfidenza({ livello }: { livello: string }) {
+  const classi = livello === 'alta' ? 'text-basso' : livello === 'media' ? 'text-moderato' : 'text-alto';
+  return <span className={`text-xs font-medium ${classi}`}>confidenza {livello}</span>;
+}
+
+/**
+ * Il dettaglio del calcolo, in linea e richiudibile.
+ * Nessun numero della piattaforma è privo di questo blocco.
+ */
+export function Spiegazione({ dati, aperta = false }: { dati: ExplanationDto; aperta?: boolean }) {
+  return (
+    <details open={aperta} className="group mt-2">
+      <summary className="cursor-pointer list-none text-xs font-medium text-marchio hover:underline">
+        <span className="group-open:hidden">▸ Come è stato calcolato</span>
+        <span className="hidden group-open:inline">▾ Nascondi il calcolo</span>
+      </summary>
+
+      <div className="mt-2 rounded border border-bordo bg-fondo p-3 text-xs leading-relaxed">
+        {dati.formula !== null && (
+          <p className="mb-2">
+            <span className="text-testo-debole">Formula: </span>
+            <code className="font-mono text-testo">{dati.formula}</code>
+          </p>
+        )}
+
+        {dati.input.length > 0 && (
+          <dl className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
+            {dati.input.map((i) => (
+              <div key={i.etichetta} className="contents">
+                <dt className="text-testo-tenue">{i.etichetta}</dt>
+                <dd className="tabular text-right font-medium">{i.valore}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {dati.note.map((nota) => (
+          <p key={nota} className="mt-1.5 border-l-2 border-bordo-forte pl-2 text-testo-tenue">
+            {nota}
+          </p>
+        ))}
+
+        {dati.riferimenti.length > 0 && (
+          <p className="mt-2 text-testo-debole">Riferimenti: {dati.riferimenti.join(' · ')}</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+export function Avviso({
+  tono,
+  titolo,
+  children,
+}: {
+  tono: 'critico' | 'attenzione' | 'informativo';
+  titolo: string;
+  children: ReactNode;
+}) {
+  const classi =
+    tono === 'critico'
+      ? 'border-critico/40 bg-critico-fondo'
+      : tono === 'attenzione'
+        ? 'border-rilevante/40 bg-rilevante-fondo'
+        : 'border-marchio/30 bg-marchio-tenue';
+
+  return (
+    <div className={`rounded-lg border p-4 ${classi}`}>
+      <p className="font-semibold">{titolo}</p>
+      <div className="mt-1.5 text-sm leading-relaxed">{children}</div>
+    </div>
+  );
+}

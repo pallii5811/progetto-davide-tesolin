@@ -1,0 +1,1961 @@
+{
+  "id": "66b7177b-d3f6-435f-aab1-17da586f73c1",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.analisi": {
+      "name": "analisi",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eseguita_da": {
+          "name": "eseguita_da",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "as_of": {
+          "name": "as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "score_credito": {
+          "name": "score_credito",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classe_credito": {
+          "name": "classe_credito",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fido_consigliato_centesimi": {
+          "name": "fido_consigliato_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "patrimonio_esposto_centesimi": {
+          "name": "patrimonio_esposto_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "esposizione_non_assicurata_centesimi": {
+          "name": "esposizione_non_assicurata_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rischi_critici": {
+          "name": "rischi_critici",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copertura_assente": {
+          "name": "copertura_assente",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stato_cat_nat": {
+          "name": "stato_cat_nat",
+          "type": "stato_cat_nat",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risultato": {
+          "name": "risultato",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "versione_core": {
+          "name": "versione_core",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "versione_catalogo_rischi": {
+          "name": "versione_catalogo_rischi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "versione_regole": {
+          "name": "versione_regole",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creata_il": {
+          "name": "creata_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "analisi_per_azienda": {
+          "name": "analisi_per_azienda",
+          "columns": [
+            {
+              "expression": "azienda_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "as_of",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "analisi_per_catnat": {
+          "name": "analisi_per_catnat",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stato_cat_nat",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "analisi_per_score": {
+          "name": "analisi_per_score",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "score_credito",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "analisi_azienda_id_aziende_id_fk": {
+          "name": "analisi_azienda_id_aziende_id_fk",
+          "tableFrom": "analisi",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "analisi_tenant_id_tenants_id_fk": {
+          "name": "analisi_tenant_id_tenants_id_fk",
+          "tableFrom": "analisi",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "analisi_snapshot_id_snapshot_azienda_id_fk": {
+          "name": "analisi_snapshot_id_snapshot_azienda_id_fk",
+          "tableFrom": "analisi",
+          "tableTo": "snapshot_azienda",
+          "columnsFrom": [
+            "snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "analisi_eseguita_da_utenti_id_fk": {
+          "name": "analisi_eseguita_da_utenti_id_fk",
+          "tableFrom": "analisi",
+          "tableTo": "utenti",
+          "columnsFrom": [
+            "eseguita_da"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_log": {
+      "name": "audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utente_id": {
+          "name": "utente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "azione": {
+          "name": "azione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entita": {
+          "name": "entita",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entita_id": {
+          "name": "entita_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dettagli": {
+          "name": "dettagli",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "indirizzo_ip": {
+          "name": "indirizzo_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avvenuto_il": {
+          "name": "avvenuto_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "audit_per_entita": {
+          "name": "audit_per_entita",
+          "columns": [
+            {
+              "expression": "entita",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entita_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "audit_per_tenant": {
+          "name": "audit_per_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "avvenuto_il",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_log_tenant_id_tenants_id_fk": {
+          "name": "audit_log_tenant_id_tenants_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "audit_log_utente_id_utenti_id_fk": {
+          "name": "audit_log_utente_id_utenti_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "utenti",
+          "columnsFrom": [
+            "utente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.aziende": {
+      "name": "aziende",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "partita_iva": {
+          "name": "partita_iva",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "codice_fiscale": {
+          "name": "codice_fiscale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "denominazione": {
+          "name": "denominazione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provincia": {
+          "name": "provincia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ateco_primario": {
+          "name": "ateco_primario",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_cliente": {
+          "name": "is_cliente",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "creata_il": {
+          "name": "creata_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "aggiornata_il": {
+          "name": "aggiornata_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "aziende_piva_per_tenant": {
+          "name": "aziende_piva_per_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "partita_iva",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "aziende_per_denominazione": {
+          "name": "aziende_per_denominazione",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "denominazione",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "aziende_tenant_id_tenants_id_fk": {
+          "name": "aziende_tenant_id_tenants_id_fk",
+          "tableFrom": "aziende",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.compagnie": {
+      "name": "compagnie",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "denominazione": {
+          "name": "denominazione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gruppo": {
+          "name": "gruppo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "codice_ivass": {
+          "name": "codice_ivass",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "partita_iva": {
+          "name": "partita_iva",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "compagnie_denominazione_unica": {
+          "name": "compagnie_denominazione_unica",
+          "columns": [
+            {
+              "expression": "denominazione",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dossier": {
+      "name": "dossier",
+      "schema": "",
+      "columns": {
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dati_dichiarati": {
+          "name": "dati_dichiarati",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "completezza": {
+          "name": "completezza",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aggiornato_da": {
+          "name": "aggiornato_da",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aggiornato_il": {
+          "name": "aggiornato_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dossier_azienda_id_aziende_id_fk": {
+          "name": "dossier_azienda_id_aziende_id_fk",
+          "tableFrom": "dossier",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "dossier_tenant_id_tenants_id_fk": {
+          "name": "dossier_tenant_id_tenants_id_fk",
+          "tableFrom": "dossier",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "dossier_aggiornato_da_utenti_id_fk": {
+          "name": "dossier_aggiornato_da_utenti_id_fk",
+          "tableFrom": "dossier",
+          "tableTo": "utenti",
+          "columnsFrom": [
+            "aggiornato_da"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "dossier_azienda_id_pk": {
+          "name": "dossier_azienda_id_pk",
+          "columns": [
+            "azienda_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.eventi_monitoraggio": {
+      "name": "eventi_monitoraggio",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_evento_monitoraggio",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "titolo": {
+          "name": "titolo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descrizione": {
+          "name": "descrizione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rilevanza": {
+          "name": "rilevanza",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 3
+        },
+        "valore_precedente": {
+          "name": "valore_precedente",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valore_nuovo": {
+          "name": "valore_nuovo",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "azione_suggerita": {
+          "name": "azione_suggerita",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rilevato_il": {
+          "name": "rilevato_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "letto_il": {
+          "name": "letto_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gestito_il": {
+          "name": "gestito_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gestito_da": {
+          "name": "gestito_da",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "eventi_da_gestire": {
+          "name": "eventi_da_gestire",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "gestito_il",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "rilevanza",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "eventi_monitoraggio_azienda_id_aziende_id_fk": {
+          "name": "eventi_monitoraggio_azienda_id_aziende_id_fk",
+          "tableFrom": "eventi_monitoraggio",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "eventi_monitoraggio_tenant_id_tenants_id_fk": {
+          "name": "eventi_monitoraggio_tenant_id_tenants_id_fk",
+          "tableFrom": "eventi_monitoraggio",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "eventi_monitoraggio_gestito_da_utenti_id_fk": {
+          "name": "eventi_monitoraggio_gestito_da_utenti_id_fk",
+          "tableFrom": "eventi_monitoraggio",
+          "tableTo": "utenti",
+          "columnsFrom": [
+            "gestito_da"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.gap_coperture": {
+      "name": "gap_coperture",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "analisi_id": {
+          "name": "analisi_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "copertura": {
+          "name": "copertura",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stato": {
+          "name": "stato",
+          "type": "stato_gap",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priorita": {
+          "name": "priorita",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "obbligo_di_legge": {
+          "name": "obbligo_di_legge",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "capitale_raccomandato_centesimi": {
+          "name": "capitale_raccomandato_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capitale_in_essere_centesimi": {
+          "name": "capitale_in_essere_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "azione": {
+          "name": "azione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivazione_adeguatezza": {
+          "name": "motivazione_adeguatezza",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "gap_lista_lavoro": {
+          "name": "gap_lista_lavoro",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stato",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "priorita",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "gap_coperture_analisi_id_analisi_id_fk": {
+          "name": "gap_coperture_analisi_id_analisi_id_fk",
+          "tableFrom": "gap_coperture",
+          "tableTo": "analisi",
+          "columnsFrom": [
+            "analisi_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "gap_coperture_tenant_id_tenants_id_fk": {
+          "name": "gap_coperture_tenant_id_tenants_id_fk",
+          "tableFrom": "gap_coperture",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "gap_coperture_azienda_id_aziende_id_fk": {
+          "name": "gap_coperture_azienda_id_aziende_id_fk",
+          "tableFrom": "gap_coperture",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.polizze": {
+      "name": "polizze",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "copertura": {
+          "name": "copertura",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "compagnia": {
+          "name": "compagnia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "compagnia_id": {
+          "name": "compagnia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "numero_polizza": {
+          "name": "numero_polizza",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "somma_assicurata_centesimi": {
+          "name": "somma_assicurata_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "massimale_centesimi": {
+          "name": "massimale_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "franchigia_centesimi": {
+          "name": "franchigia_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scoperto": {
+          "name": "scoperto",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "premio_annuo_centesimi": {
+          "name": "premio_annuo_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "forma_garanzia": {
+          "name": "forma_garanzia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_effetto": {
+          "name": "data_effetto",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data_scadenza": {
+          "name": "data_scadenza",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "documento_url": {
+          "name": "documento_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creata_il": {
+          "name": "creata_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "polizze_per_azienda": {
+          "name": "polizze_per_azienda",
+          "columns": [
+            {
+              "expression": "azienda_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "polizze_per_scadenza": {
+          "name": "polizze_per_scadenza",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data_scadenza",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "polizze_azienda_id_aziende_id_fk": {
+          "name": "polizze_azienda_id_aziende_id_fk",
+          "tableFrom": "polizze",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "polizze_tenant_id_tenants_id_fk": {
+          "name": "polizze_tenant_id_tenants_id_fk",
+          "tableFrom": "polizze",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "polizze_compagnia_id_compagnie_id_fk": {
+          "name": "polizze_compagnia_id_compagnie_id_fk",
+          "tableFrom": "polizze",
+          "tableTo": "compagnie",
+          "columnsFrom": [
+            "compagnia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.registro_costi_dati": {
+      "name": "registro_costi_dati",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "servizio": {
+          "name": "servizio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "costo_centesimi": {
+          "name": "costo_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "servito_da_cache": {
+          "name": "servito_da_cache",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "avvenuto_il": {
+          "name": "avvenuto_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "costi_per_tenant": {
+          "name": "costi_per_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "avvenuto_il",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "registro_costi_dati_tenant_id_tenants_id_fk": {
+          "name": "registro_costi_dati_tenant_id_tenants_id_fk",
+          "tableFrom": "registro_costi_dati",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "registro_costi_dati_azienda_id_aziende_id_fk": {
+          "name": "registro_costi_dati_azienda_id_aziende_id_fk",
+          "tableFrom": "registro_costi_dati",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessioni": {
+      "name": "sessioni",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "utente_id": {
+          "name": "utente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "impronta_token": {
+          "name": "impronta_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creata_il": {
+          "name": "creata_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "scade_il": {
+          "name": "scade_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ultimo_utilizzo": {
+          "name": "ultimo_utilizzo",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "indirizzo_ip": {
+          "name": "indirizzo_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revocata_il": {
+          "name": "revocata_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "sessioni_impronta_unica": {
+          "name": "sessioni_impronta_unica",
+          "columns": [
+            {
+              "expression": "impronta_token",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sessioni_per_utente": {
+          "name": "sessioni_per_utente",
+          "columns": [
+            {
+              "expression": "utente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessioni_utente_id_utenti_id_fk": {
+          "name": "sessioni_utente_id_utenti_id_fk",
+          "tableFrom": "sessioni",
+          "tableTo": "utenti",
+          "columnsFrom": [
+            "utente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "sessioni_tenant_id_tenants_id_fk": {
+          "name": "sessioni_tenant_id_tenants_id_fk",
+          "tableFrom": "sessioni",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.snapshot_azienda": {
+      "name": "snapshot_azienda",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "azienda_id": {
+          "name": "azienda_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "livello": {
+          "name": "livello",
+          "type": "livello_acquisizione",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profilo": {
+          "name": "profilo",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "risposta_grezza": {
+          "name": "risposta_grezza",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "osservato_il": {
+          "name": "osservato_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acquisito_il": {
+          "name": "acquisito_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "costo_centesimi": {
+          "name": "costo_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "snapshot_per_azienda": {
+          "name": "snapshot_per_azienda",
+          "columns": [
+            {
+              "expression": "azienda_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "osservato_il",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "snapshot_azienda_azienda_id_aziende_id_fk": {
+          "name": "snapshot_azienda_azienda_id_aziende_id_fk",
+          "tableFrom": "snapshot_azienda",
+          "tableTo": "aziende",
+          "columnsFrom": [
+            "azienda_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "snapshot_azienda_tenant_id_tenants_id_fk": {
+          "name": "snapshot_azienda_tenant_id_tenants_id_fk",
+          "tableFrom": "snapshot_azienda",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.solidita_compagnia": {
+      "name": "solidita_compagnia",
+      "schema": "",
+      "columns": {
+        "compagnia_id": {
+          "name": "compagnia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anno": {
+          "name": "anno",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "solvency_ratio": {
+          "name": "solvency_ratio",
+          "type": "numeric(6, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quota_tier1_unrestricted": {
+          "name": "quota_tier1_unrestricted",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fondi_propri_centesimi": {
+          "name": "fondi_propri_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scr_centesimi": {
+          "name": "scr_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "premi_lordi_centesimi": {
+          "name": "premi_lordi_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reclami_anno": {
+          "name": "reclami_anno",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rating_agenzia": {
+          "name": "rating_agenzia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rating_valore": {
+          "name": "rating_valore",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "carrier_strength_score": {
+          "name": "carrier_strength_score",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fonte": {
+          "name": "fonte",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aggiornato_il": {
+          "name": "aggiornato_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "solidita_compagnia_compagnia_id_compagnie_id_fk": {
+          "name": "solidita_compagnia_compagnia_id_compagnie_id_fk",
+          "tableFrom": "solidita_compagnia",
+          "tableTo": "compagnie",
+          "columnsFrom": [
+            "compagnia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "solidita_compagnia_compagnia_id_anno_pk": {
+          "name": "solidita_compagnia_compagnia_id_anno_pk",
+          "columns": [
+            "compagnia_id",
+            "anno"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tenants": {
+      "name": "tenants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "denominazione": {
+          "name": "denominazione",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "numero_rui": {
+          "name": "numero_rui",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "partita_iva": {
+          "name": "partita_iva",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "budget_dati_mensile_centesimi": {
+          "name": "budget_dati_mensile_centesimi",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "attivo": {
+          "name": "attivo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.utenti": {
+      "name": "utenti",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nome": {
+          "name": "nome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ruolo": {
+          "name": "ruolo",
+          "type": "ruolo_utente",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'broker'"
+        },
+        "creato_il": {
+          "name": "creato_il",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "ultimo_accesso": {
+          "name": "ultimo_accesso",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tentativi_falliti": {
+          "name": "tentativi_falliti",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "bloccato_fino_a": {
+          "name": "bloccato_fino_a",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attivo": {
+          "name": "attivo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {
+        "utenti_email_unica": {
+          "name": "utenti_email_unica",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "utenti_per_tenant": {
+          "name": "utenti_per_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "utenti_tenant_id_tenants_id_fk": {
+          "name": "utenti_tenant_id_tenants_id_fk",
+          "tableFrom": "utenti",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.livello_acquisizione": {
+      "name": "livello_acquisizione",
+      "schema": "public",
+      "values": [
+        "base",
+        "esteso",
+        "completo"
+      ]
+    },
+    "public.ruolo_utente": {
+      "name": "ruolo_utente",
+      "schema": "public",
+      "values": [
+        "amministratore",
+        "broker",
+        "assistente",
+        "sola-lettura"
+      ]
+    },
+    "public.stato_cat_nat": {
+      "name": "stato_cat_nat",
+      "schema": "public",
+      "values": [
+        "non-soggetta",
+        "in-scadenza",
+        "inadempiente",
+        "adempiente"
+      ]
+    },
+    "public.stato_gap": {
+      "name": "stato_gap",
+      "schema": "public",
+      "values": [
+        "assente",
+        "sottoassicurata",
+        "massimale-insufficiente",
+        "in-scadenza",
+        "adeguata",
+        "da-quantificare"
+      ]
+    },
+    "public.tipo_evento_monitoraggio": {
+      "name": "tipo_evento_monitoraggio",
+      "schema": "public",
+      "values": [
+        "anagrafica-variata",
+        "nuova-sede",
+        "ateco-variato",
+        "salto-dimensionale",
+        "bilancio-depositato",
+        "evento-negativo",
+        "procedura-aperta",
+        "score-variato",
+        "polizza-in-scadenza",
+        "obbligo-normativo"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

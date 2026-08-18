@@ -1,0 +1,14 @@
+# Generati da drizzle-kit: sono l'output di uno strumento, non codice da riformattare.
+# Riformattarli farebbe apparire modificato un file che descrive una migrazione già applicata.
+packages/db/migrazioni/
+
+dist/
+.next/
+.dati/
+.sonda/
+node_modules/
+
+.collaudo-dati/
+test-results/
+playwright-report/
+schermate/

@@ -1,0 +1,855 @@
+/**
+ * Regole di identificazione e modulazione dei rischi.
+ *
+ * Dichiarative, non imperative: ogni regola è un dato, non una `if` sepolta in una funzione.
+ * Questo consente di versionarle, testarle una per una, mostrarle all'utente come motivazione
+ * («questo rischio ti è stato attribuito perché…») e — passo successivo — renderle modificabili
+ * dall'intermediario senza toccare il codice.
+ *
+ * Il predicato restituisce tre valori, non due:
+ *   `true`   → il fatto sussiste
+ *   `false`  → il fatto non sussiste
+ *   `ignoto` → il dato non c'è. Il rischio viene comunque proposto, marcato «da verificare».
+ *
+ * Trattare `ignoto` come `false` significherebbe far sparire dal report i rischi su cui il
+ * questionario non è stato compilato: esattamente quelli su cui il cliente è più scoperto.
+ */
+
+import { Money } from '../shared/money.js';
+import type { Money as Euro } from '../shared/money.js';
+import type { CompanyFacts } from '../company/facts.js';
+import { atecoStartsWith } from '../shared/identifiers.js';
+import type { RiskId } from './taxonomy.js';
+import { worstExposure } from './geo.js';
+
+export type Verdict = true | false | 'ignoto';
+
+export interface IdentifyRule {
+  readonly kind: 'identifica';
+  readonly id: string;
+  readonly risk: RiskId;
+  readonly when: (facts: CompanyFacts) => Verdict;
+  readonly rationale: string;
+}
+
+export interface ModulateRule {
+  readonly kind: 'modula';
+  readonly id: string;
+  readonly risk: RiskId;
+  readonly when: (facts: CompanyFacts) => Verdict;
+  /** Variazione della probabilità, in passi della scala 1-5. */
+  readonly likelihood?: number | undefined;
+  /** Variazione dell'impatto, in passi della scala 1-5. */
+  readonly impact?: number | undefined;
+  readonly rationale: string;
+}
+
+/**
+ * Misura di prevenzione o protezione già in essere presso l'azienda.
+ * Si applica **dopo** la modulazione, per ottenere il rischio residuo: è la differenza
+ * fra inerente e residuo a dimostrare al cliente il valore di ciò che ha già fatto —
+ * e a giustificare perché il capitale da trasferire è quello e non un altro.
+ */
+export interface ControlRule {
+  readonly kind: 'controllo';
+  readonly id: string;
+  readonly risk: RiskId;
+  readonly when: (facts: CompanyFacts) => Verdict;
+  readonly likelihood?: number | undefined;
+  readonly impact?: number | undefined;
+  /** Perché il controllo, se presente, riduce il rischio. */
+  readonly rationale: string;
+  /**
+   * La misura, scritta come la si propone a un imprenditore.
+   *
+   * Distinta dal `rationale`, che descrive un controllo **presente**: questa descrive un
+   * controllo **da mettere**, ed è ciò che permette di raccomandare la prevenzione invece
+   * di limitarsi a constatarne l'assenza. Per un consulente è un argomento di vendita;
+   * per il cliente, un investimento di cui si può discutere il ritorno.
+   */
+  readonly misura: string;
+}
+
+export type RiskRule = IdentifyRule | ModulateRule | ControlRule;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Predicati di supporto
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SEMPRE = (): Verdict => true;
+
+/** Converte un booleano opzionale in un verdetto a tre stati. */
+function tri(value: boolean | null): Verdict {
+  return value ?? 'ignoto';
+}
+
+function sezione(facts: CompanyFacts, ...sezioni: readonly string[]): Verdict {
+  if (facts.atecoSezione === null) return 'ignoto';
+  return sezioni.includes(facts.atecoSezione);
+}
+
+function divisione(facts: CompanyFacts, ...divisioni: readonly string[]): Verdict {
+  if (facts.atecoDivisione === null) return 'ignoto';
+  return divisioni.includes(facts.atecoDivisione);
+}
+
+/** Vero se il codice ATECO primario o uno dei secondari inizia con uno dei prefissi. */
+function atecoTra(facts: CompanyFacts, ...prefissi: readonly string[]): Verdict {
+  if (facts.ateco === null) return 'ignoto';
+  const tutti = [facts.ateco, ...facts.atecoSecondari];
+  return tutti.some((code) => prefissi.some((p) => atecoStartsWith(code, p)));
+}
+
+function importoOltre(value: Euro | null, soglia: number): Verdict {
+  if (value === null) return 'ignoto';
+  return Money.toEuro(value) > soglia;
+}
+
+function numeroOltre(value: number | null, soglia: number): Verdict {
+  if (value === null) return 'ignoto';
+  return value > soglia;
+}
+
+function sismicaAlta(facts: CompanyFacts): Verdict {
+  const exposure = worstExposure(facts.provinceOperative);
+  if (exposure === null) return 'ignoto';
+  return exposure.sismica === 'alta';
+}
+
+function idraulicaAlta(facts: CompanyFacts): Verdict {
+  const exposure = worstExposure(facts.provinceOperative);
+  if (exposure === null) return 'ignoto';
+  return exposure.idraulica === 'alta';
+}
+
+/** Vero se l'azienda dichiara una certificazione fra quelle indicate (confronto insensibile a maiuscole). */
+function certificata(facts: CompanyFacts, ...norme: readonly string[]): Verdict {
+  if (facts.certificazioni.length === 0) return 'ignoto';
+  const dichiarate = facts.certificazioni.map((c) => c.toUpperCase().replace(/[\s:]/g, ''));
+  return norme.some((n) => dichiarate.some((d) => d.includes(n.toUpperCase().replace(/[\s:]/g, ''))));
+}
+
+// Divisioni ATECO a rischio ambientale rilevante: chimica, gomma-plastica, metallurgia,
+// trattamento rifiuti, estrazione, energia.
+const DIVISIONI_AMBIENTALI = [
+  '05',
+  '06',
+  '07',
+  '08',
+  '09',
+  '19',
+  '20',
+  '21',
+  '22',
+  '23',
+  '24',
+  '25',
+  '35',
+  '36',
+  '37',
+  '38',
+  '39',
+];
+
+// Divisioni con lavorazione fisica e macchinari critici.
+const DIVISIONI_PRODUTTIVE = [
+  '10',
+  '11',
+  '13',
+  '14',
+  '15',
+  '16',
+  '17',
+  '18',
+  '20',
+  '21',
+  '22',
+  '23',
+  '24',
+  '25',
+  '26',
+  '27',
+  '28',
+  '29',
+  '30',
+  '31',
+  '32',
+  '33',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regole
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const RISK_RULES: readonly RiskRule[] = [
+  // ── Patrimonio ────────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'incendio/sempre',
+    risk: 'incendio-fabbricati',
+    when: SEMPRE,
+    rationale: 'Ogni impresa occupa locali e detiene beni strumentali esposti al rischio di incendio.',
+  },
+  {
+    kind: 'modula',
+    id: 'incendio/immobili-di-proprieta',
+    risk: 'incendio-fabbricati',
+    when: (f) => tri(f.possiedeImmobili),
+    impact: 1,
+    rationale: 'Gli immobili sono di proprietà: il danno colpisce direttamente il patrimonio aziendale.',
+  },
+  {
+    kind: 'modula',
+    id: 'incendio/attivita-produttiva',
+    risk: 'incendio-fabbricati',
+    when: (f) => divisione(f, ...DIVISIONI_PRODUTTIVE),
+    likelihood: 1,
+    rationale: 'Attività di trasformazione con presenza di fonti di innesco e materiali combustibili.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'furto/scorte-o-commercio',
+    risk: 'furto-scorte',
+    when: (f) => {
+      const conScorte = importoOltre(f.rimanenze, 10_000);
+      if (conScorte === true) return true;
+      const commercio = sezione(f, 'G');
+      if (commercio === true) return true;
+      return conScorte === 'ignoto' || commercio === 'ignoto' ? 'ignoto' : false;
+    },
+    rationale: 'Presenza di scorte o attività commerciale con beni facilmente asportabili.',
+  },
+  {
+    kind: 'modula',
+    id: 'furto/scorte-rilevanti',
+    risk: 'furto-scorte',
+    when: (f) => importoOltre(f.rimanenze, 500_000),
+    impact: 1,
+    rationale: 'Valore delle rimanenze superiore a 500.000 €.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'atmosferici/sempre',
+    risk: 'eventi-atmosferici',
+    when: SEMPRE,
+    rationale: 'Esposizione generalizzata a vento, grandine e sovraccarico neve sui fabbricati occupati.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'sisma/sempre',
+    risk: 'catastrofale-sisma',
+    when: SEMPRE,
+    rationale: "L'intero territorio nazionale è classificato in zona sismica.",
+  },
+  {
+    kind: 'modula',
+    id: 'sisma/zona-alta',
+    risk: 'catastrofale-sisma',
+    when: sismicaAlta,
+    likelihood: 1,
+    rationale: 'Sede o unità locali in provincia a sismicità prevalente elevata (zone 1-2).',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'alluvione/sempre',
+    risk: 'catastrofale-alluvione',
+    when: SEMPRE,
+    rationale: 'Rischio idrogeologico diffuso e ricompreso nell’obbligo assicurativo CAT NAT.',
+  },
+  {
+    kind: 'modula',
+    id: 'alluvione/zona-idraulica-alta',
+    risk: 'catastrofale-alluvione',
+    when: idraulicaAlta,
+    likelihood: 1,
+    rationale: 'Insediamento in provincia ad elevata pericolosità idraulica.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'guasto-macchinario/produttiva',
+    risk: 'guasto-macchinario',
+    when: (f) => {
+      const produttiva = divisione(f, ...DIVISIONI_PRODUTTIVE);
+      if (produttiva === true) return true;
+      const impianti = importoOltre(f.valoreImpiantiNetto, 50_000);
+      if (impianti === true) return true;
+      return produttiva === 'ignoto' || impianti === 'ignoto' ? 'ignoto' : false;
+    },
+    rationale: 'Presenza di impianti e macchinari rilevanti nel ciclo produttivo.',
+  },
+  {
+    kind: 'modula',
+    id: 'guasto-macchinario/impianti-rilevanti',
+    risk: 'guasto-macchinario',
+    when: (f) => importoOltre(f.valoreImpiantiNetto, 500_000),
+    impact: 1,
+    rationale: 'Impianti iscritti a bilancio per oltre 500.000 € al netto degli ammortamenti.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'elettronica/sempre',
+    risk: 'danno-elettronica',
+    when: SEMPRE,
+    rationale: 'Ogni impresa dipende da apparecchiature elettroniche per la propria operatività.',
+  },
+
+  // ── Interruzione ──────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'fermo/sempre',
+    risk: 'fermo-attivita',
+    when: SEMPRE,
+    rationale:
+      'Un danno materiale rilevante comporta sempre una perdita di margine nel periodo di ripristino.',
+  },
+  {
+    kind: 'modula',
+    id: 'fermo/margine-elevato',
+    risk: 'fermo-attivita',
+    when: (f) => importoOltre(f.margineDiContribuzione, 1_000_000),
+    impact: 1,
+    rationale: 'Margine di contribuzione annuo superiore a 1 M€: ogni mese di fermo vale oltre 80.000 €.',
+  },
+  {
+    kind: 'modula',
+    id: 'fermo/immobilizzazioni-specifiche',
+    risk: 'fermo-attivita',
+    when: (f) => divisione(f, ...DIVISIONI_PRODUTTIVE),
+    likelihood: 1,
+    rationale:
+      'Ciclo produttivo legato a impianti specifici, difficilmente sostituibili nel breve periodo.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'fornitore-critico/produttiva',
+    risk: 'dipendenza-fornitore-critico',
+    when: (f) => divisione(f, ...DIVISIONI_PRODUTTIVE),
+    rationale: 'Attività di trasformazione dipendente da forniture di materie prime e semilavorati.',
+  },
+  {
+    kind: 'identifica',
+    id: 'indisponibilita-sede/sempre',
+    risk: 'indisponibilita-sede',
+    when: SEMPRE,
+    rationale: 'Ordinanze dell’autorità e danni a immobili limitrofi possono impedire l’accesso ai locali.',
+  },
+  {
+    kind: 'modula',
+    id: 'indisponibilita-sede/sede-unica',
+    risk: 'indisponibilita-sede',
+    when: (f) => (f.numeroUnitaLocali === null ? 'ignoto' : f.numeroUnitaLocali <= 1),
+    impact: 1,
+    rationale: 'Sede unica: nessuna alternativa operativa immediata.',
+  },
+
+  // ── Responsabilità civile ─────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'rct/sempre',
+    risk: 'rc-verso-terzi',
+    when: SEMPRE,
+    rationale: 'L’esercizio di qualunque attività d’impresa genera esposizione risarcitoria verso terzi.',
+  },
+  {
+    kind: 'modula',
+    id: 'rct/cantiere',
+    risk: 'rc-verso-terzi',
+    when: (f) => {
+      const dichiarato = tri(f.lavoraInCantiere);
+      if (dichiarato === true) return true;
+      return sezione(f, 'F') === true ? true : dichiarato;
+    },
+    likelihood: 1,
+    impact: 1,
+    rationale:
+      'Attività svolta presso cantieri o sedi di terzi: esposizione a danni verso terzi molto più elevata.',
+  },
+  {
+    kind: 'modula',
+    id: 'rct/responsabilita-illimitata',
+    risk: 'rc-verso-terzi',
+    when: (f) => f.responsabilitaIllimitata,
+    impact: 1,
+    rationale:
+      'Forma giuridica a responsabilità illimitata: il risarcimento aggredisce anche il patrimonio dei soci.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'rco/dipendenti',
+    risk: 'rc-verso-dipendenti',
+    when: (f) => tri(f.haDipendenti),
+    rationale: 'Presenza di lavoratori subordinati: esposizione a rivalsa INAIL e danno differenziale.',
+  },
+  {
+    kind: 'modula',
+    id: 'rco/organico-esteso',
+    risk: 'rc-verso-dipendenti',
+    when: (f) => numeroOltre(f.addetti, 30),
+    likelihood: 1,
+    rationale:
+      'Organico superiore a 30 addetti: frequenza attesa degli infortuni proporzionalmente maggiore.',
+  },
+  {
+    kind: 'modula',
+    id: 'rco/cantiere',
+    risk: 'rc-verso-dipendenti',
+    when: (f) => {
+      const dichiarato = tri(f.lavoraInCantiere);
+      return dichiarato === true || sezione(f, 'F') === true ? true : dichiarato;
+    },
+    likelihood: 1,
+    rationale: 'Lavorazioni in cantiere: settore a più elevata incidenza infortunistica.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'rc-prodotto/produzione-o-distribuzione',
+    risk: 'rc-prodotto',
+    when: (f) => {
+      const dichiarato = tri(f.produceBeniFinali);
+      if (dichiarato === true) return true;
+      const settore = sezione(f, 'C', 'G');
+      if (settore === true) return true;
+      return dichiarato === 'ignoto' || settore === 'ignoto' ? 'ignoto' : false;
+    },
+    rationale:
+      'Immissione di prodotti sul mercato: responsabilità oggettiva del produttore o del distributore.',
+  },
+  {
+    kind: 'modula',
+    id: 'rc-prodotto/export-nord-america',
+    risk: 'rc-prodotto',
+    when: (f) => tri(f.esportaUsaCanada),
+    likelihood: 1,
+    impact: 1,
+    rationale:
+      'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa non comparabili a quelli europei.',
+  },
+  {
+    kind: 'modula',
+    id: 'rc-prodotto/export-rilevante',
+    risk: 'rc-prodotto',
+    when: (f) => (f.quotaExport === null ? 'ignoto' : f.quotaExport > 0.3),
+    impact: 1,
+    rationale:
+      'Quota di export superiore al 30%: esposizione a più ordinamenti e a foro competente estero.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'inquinamento/settori-ambientali',
+    risk: 'rc-inquinamento',
+    when: (f) => divisione(f, ...DIVISIONI_AMBIENTALI),
+    rationale:
+      'Attività con potenziale impatto ambientale e obblighi di bonifica in caso di contaminazione.',
+  },
+
+  {
+    kind: 'identifica',
+    id: 'rc-professionale/servizi-professionali',
+    risk: 'rc-professionale',
+    when: (f) => sezione(f, 'M', 'J', 'K'),
+    rationale:
+      'Prestazione di servizi professionali e tecnici: esposizione al danno puramente patrimoniale.',
+  },
+
+  // ── Persone ───────────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'infortunio-titolare/conduzione-personale',
+    risk: 'infortunio-titolare',
+    when: (f) => {
+      if (f.responsabilitaIllimitata) return true;
+      if (f.numeroSoci > 0 && f.numeroSoci <= 3) return true;
+      return f.addetti === null ? 'ignoto' : f.addetti < 15;
+    },
+    rationale: 'Impresa a conduzione personale o familiare: il reddito dipende dalla persona del titolare.',
+  },
+  {
+    kind: 'identifica',
+    id: 'key-man/pmi',
+    risk: 'perdita-key-man',
+    when: (f) => (f.dimensione === 'grande' ? false : true),
+    rationale: 'Nelle PMI competenze e relazioni commerciali sono concentrate su poche persone.',
+  },
+  {
+    kind: 'modula',
+    id: 'key-man/socio-unico-persona-fisica',
+    risk: 'perdita-key-man',
+    // Un solo socio persona fisica: la sua uscita non lascia nessuno legittimato a
+    // decidere, e le banche revocano gli affidamenti prima che il notaio abbia finito.
+    when: (f) => f.numeroSoci === 1 && !f.haSociPersonaGiuridica,
+    impact: 1,
+    likelihood: 0,
+    rationale: 'Socio unico persona fisica: nessun altro socio può assumere le decisioni sociali.',
+  },
+  {
+    kind: 'modula',
+    id: 'key-man/organico-ridotto',
+    risk: 'perdita-key-man',
+    when: (f) => (f.addetti === null ? 'ignoto' : f.addetti < 10),
+    impact: 1,
+    rationale: 'Organico inferiore a 10 addetti: nessuna ridondanza sulle funzioni critiche.',
+  },
+  {
+    kind: 'identifica',
+    id: 'infortunio-dipendenti/presenza-organico',
+    risk: 'infortunio-dipendenti',
+    when: (f) => tri(f.haDipendenti),
+    rationale: 'Presenza di personale dipendente esposto a rischio infortunistico.',
+  },
+
+  // ── Cyber ─────────────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'ransomware/sempre',
+    risk: 'ransomware',
+    when: SEMPRE,
+    rationale: 'Le PMI sono il bersaglio prevalente degli attacchi ransomware opportunistici.',
+  },
+  {
+    kind: 'modula',
+    id: 'ransomware/dipendenza-produttiva',
+    risk: 'ransomware',
+    when: (f) => divisione(f, ...DIVISIONI_PRODUTTIVE),
+    impact: 1,
+    rationale: 'Sistemi gestionali e di controllo di produzione interconnessi: il blocco ferma la linea.',
+  },
+  {
+    kind: 'identifica',
+    id: 'data-breach/trattamento-dati',
+    risk: 'data-breach',
+    when: (f) => {
+      const dichiarato = tri(f.trattaDatiPersonali);
+      if (dichiarato === true) return true;
+      // Con dipendenti si trattano comunque dati personali: il fatto è deducibile.
+      return f.haDipendenti === true ? true : dichiarato;
+    },
+    rationale: 'Trattamento di dati personali di clienti, fornitori o dipendenti.',
+  },
+  {
+    kind: 'modula',
+    id: 'data-breach/dati-particolari',
+    risk: 'data-breach',
+    when: (f) => tri(f.trattaDatiParticolari),
+    impact: 1,
+    rationale:
+      'Trattamento di categorie particolari di dati (art. 9 GDPR): sanzioni e danno reputazionale superiori.',
+  },
+  {
+    kind: 'modula',
+    id: 'data-breach/ecommerce',
+    risk: 'data-breach',
+    when: (f) => tri(f.haEcommerce),
+    likelihood: 1,
+    rationale: 'Canale e-commerce attivo: superficie di attacco esposta su internet e dati di pagamento.',
+  },
+  {
+    kind: 'identifica',
+    id: 'frode-informatica/sempre',
+    risk: 'frode-informatica',
+    when: SEMPRE,
+    rationale:
+      'Le frodi su cambio IBAN e compromissione della posta aziendale colpiscono trasversalmente ogni settore.',
+  },
+
+  // ── Legale e governance ───────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'd-and-o/societa-di-capitali',
+    risk: 'responsabilita-amministratori',
+    when: (f) =>
+      f.formaGiuridica === 'spa' ||
+      f.formaGiuridica === 'srl' ||
+      f.formaGiuridica === 'srls' ||
+      f.formaGiuridica === 'sapa' ||
+      f.formaGiuridica === 'cooperativa',
+    rationale: 'Società di capitali: gli amministratori rispondono personalmente ex artt. 2392 ss. c.c.',
+  },
+  {
+    kind: 'modula',
+    id: 'd-and-o/patrimonio-rilevante',
+    risk: 'responsabilita-amministratori',
+    when: (f) => importoOltre(f.totaleAttivo, 5_000_000),
+    impact: 1,
+    rationale:
+      'Totale attivo superiore a 5 M€: entità delle azioni di responsabilità proporzionalmente maggiore.',
+  },
+  {
+    kind: 'modula',
+    id: 'd-and-o/gruppo',
+    risk: 'responsabilita-amministratori',
+    when: (f) => f.appartieneAGruppo,
+    likelihood: 1,
+    rationale:
+      'Appartenenza a gruppo societario: responsabilità da direzione e coordinamento ex art. 2497 c.c.',
+  },
+  {
+    kind: 'identifica',
+    id: 'contenzioso/sempre',
+    risk: 'contenzioso-legale',
+    when: SEMPRE,
+    rationale:
+      'Esposizione ordinaria a controversie con clienti, fornitori, dipendenti e pubbliche amministrazioni.',
+  },
+  {
+    kind: 'identifica',
+    id: '231/enti-strutturati',
+    risk: 'sanzioni-231',
+    when: (f) => {
+      const societaDiCapitali =
+        f.formaGiuridica === 'spa' || f.formaGiuridica === 'srl' || f.formaGiuridica === 'cooperativa';
+      if (!societaDiCapitali) return false;
+      const perAddetti = numeroOltre(f.addetti, 15);
+      if (perAddetti === true) return true;
+      const perFatturato = importoOltre(f.fatturato, 5_000_000);
+      if (perFatturato === true) return true;
+      return perAddetti === 'ignoto' && perFatturato === 'ignoto' ? 'ignoto' : false;
+    },
+    rationale: 'Ente strutturato esposto alla responsabilità amministrativa da reato ex D.Lgs. 231/2001.',
+  },
+
+  // ── Credito ───────────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'insolvenza-clienti/crediti-commerciali',
+    risk: 'insolvenza-clienti',
+    when: (f) => importoOltre(f.creditiVersoClienti, 25_000),
+    rationale: 'Presenza di crediti commerciali significativi esposti al rischio di mancato incasso.',
+  },
+  {
+    kind: 'modula',
+    id: 'insolvenza-clienti/esposizione-rilevante',
+    risk: 'insolvenza-clienti',
+    when: (f) => {
+      if (f.creditiVersoClienti === null || f.patrimonioNetto === null) return 'ignoto';
+      if (!Money.isPositive(f.patrimonioNetto)) return true;
+      return Money.toEuro(f.creditiVersoClienti) > Money.toEuro(f.patrimonioNetto);
+    },
+    impact: 1,
+    rationale:
+      'I crediti verso clienti superano il patrimonio netto: un’insolvenza rilevante erode i mezzi propri.',
+  },
+  {
+    kind: 'identifica',
+    id: 'concentrazione/primo-cliente',
+    risk: 'concentrazione-clienti',
+    when: (f) => (f.concentrazionePrimoCliente === null ? 'ignoto' : f.concentrazionePrimoCliente > 0.2),
+    rationale: 'Quota rilevante del fatturato concentrata su un singolo cliente.',
+  },
+  {
+    kind: 'modula',
+    id: 'concentrazione/molto-elevata',
+    risk: 'concentrazione-clienti',
+    when: (f) => (f.concentrazionePrimoCliente === null ? 'ignoto' : f.concentrazionePrimoCliente > 0.4),
+    impact: 1,
+    likelihood: 1,
+    rationale:
+      'Oltre il 40% del fatturato su un solo cliente: la sua perdita compromette l’equilibrio economico.',
+  },
+
+  // ── Trasporti ─────────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'merci/trasporto-proprio-o-settore',
+    risk: 'danno-merci-trasporto',
+    when: (f) => {
+      const dichiarato = tri(f.trasportaMerciProprie);
+      if (dichiarato === true) return true;
+      const settore = sezione(f, 'G', 'H');
+      if (settore === true) return true;
+      return dichiarato === 'ignoto' || settore === 'ignoto' ? 'ignoto' : false;
+    },
+    rationale:
+      'Movimentazione di merci proprie o per conto terzi oltre i limiti di responsabilità del vettore.',
+  },
+  {
+    kind: 'identifica',
+    id: 'flotta/veicoli-aziendali',
+    risk: 'sinistro-flotta',
+    when: (f) => (f.numeroVeicoli === null ? 'ignoto' : f.numeroVeicoli > 0),
+    rationale: 'Presenza di veicoli aziendali soggetti a obbligo assicurativo e a rischio di sinistro.',
+  },
+  {
+    kind: 'modula',
+    id: 'flotta/parco-esteso',
+    risk: 'sinistro-flotta',
+    when: (f) => numeroOltre(f.numeroVeicoli, 10),
+    likelihood: 1,
+    impact: 1,
+    rationale:
+      'Parco superiore a 10 veicoli: gestione a libro matricola e sinistrosità attesa significativa.',
+  },
+
+  // ── Contrattuale ──────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'garanzie/costruzioni-e-appalti',
+    risk: 'escussione-garanzie',
+    when: (f) => sezione(f, 'F'),
+    rationale:
+      'Attività su appalti e commesse con obbligo di prestare cauzioni e garanzie di buona esecuzione.',
+  },
+
+  // ── Normativo ─────────────────────────────────────────────────────────────
+  {
+    kind: 'identifica',
+    id: 'catnat/imprese-registro-imprese',
+    risk: 'inadempimento-catnat',
+    // Le imprese agricole ex art. 2135 c.c. sono escluse: per loro opera il Fondo AGRICAT.
+    when: (f) => (f.atecoSezione === null ? 'ignoto' : f.atecoSezione !== 'A'),
+    rationale:
+      'Impresa iscritta al Registro delle Imprese, soggetta all’obbligo assicurativo catastrofale ex L. 213/2023.',
+  },
+  {
+    kind: 'modula',
+    id: 'catnat/beni-rilevanti',
+    risk: 'inadempimento-catnat',
+    when: (f) => importoOltre(f.valoreImmobiliNetto, 200_000),
+    impact: 1,
+    rationale:
+      'Immobili strumentali di valore rilevante: entità dei beni da assicurare per obbligo di legge.',
+  },
+  {
+    kind: 'identifica',
+    id: 'sicurezza-lavoro/dipendenti',
+    risk: 'sicurezza-lavoro',
+    when: (f) => tri(f.haDipendenti),
+    rationale: 'Obblighi del datore di lavoro in materia di salute e sicurezza ex D.Lgs. 81/2008.',
+  },
+  {
+    kind: 'modula',
+    id: 'sicurezza-lavoro/settore-a-rischio',
+    risk: 'sicurezza-lavoro',
+    when: (f) => {
+      const costruzioni = sezione(f, 'F');
+      if (costruzioni === true) return true;
+      return divisione(f, ...DIVISIONI_PRODUTTIVE);
+    },
+    likelihood: 1,
+    rationale: 'Settore ad elevata incidenza infortunistica secondo le statistiche INAIL.',
+  },
+
+  // ── Controlli in essere (riducono il rischio residuo) ──────────────────────
+  {
+    kind: 'controllo',
+    id: 'controllo/impianto-antincendio',
+    risk: 'incendio-fabbricati',
+    when: (f) => tri(f.haImpiantoAntincendio),
+    likelihood: -1,
+    rationale: 'Impianto di rilevazione e spegnimento dichiarato presente.',
+    misura:
+      'Installare un impianto di rilevazione e spegnimento automatico: è la protezione che le compagnie riconoscono con lo sconto più consistente sul premio incendio.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/allarme-antifurto',
+    risk: 'furto-scorte',
+    when: (f) => tri(f.haAllarme),
+    likelihood: -1,
+    rationale: 'Impianto di allarme dichiarato presente.',
+    misura:
+      'Installare un impianto di allarme con collegamento a istituto di vigilanza. Molte polizze furto lo richiedono come condizione di operatività, non come sconto: senza, la garanzia può non rispondere.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/modello-231',
+    risk: 'sanzioni-231',
+    when: (f) => tri(f.haModello231),
+    likelihood: -1,
+    impact: -1,
+    rationale:
+      'Modello di organizzazione, gestione e controllo adottato: efficacia esimente ex art. 6 D.Lgs. 231/2001 se attuato e vigilato.',
+    misura:
+      'Adottare un modello di organizzazione e gestione ex D.Lgs. 231/2001 con organismo di vigilanza: è l’unica esimente prevista dalla norma, e senza di essa la responsabilità dell’ente non si esclude.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/iso-27001-ransomware',
+    risk: 'ransomware',
+    when: (f) => certificata(f, 'ISO 27001', 'ISO/IEC 27001'),
+    likelihood: -1,
+    rationale: 'Sistema di gestione della sicurezza delle informazioni certificato ISO/IEC 27001.',
+    misura:
+      'Certificare un sistema di gestione della sicurezza delle informazioni (ISO/IEC 27001): sopra certe soglie di fatturato le compagnie cyber ne condizionano l’offerta.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/iso-27001-databreach',
+    risk: 'data-breach',
+    when: (f) => certificata(f, 'ISO 27001', 'ISO/IEC 27001'),
+    likelihood: -1,
+    rationale: 'Sistema di gestione della sicurezza delle informazioni certificato ISO/IEC 27001.',
+    misura:
+      'Certificare un sistema di gestione della sicurezza delle informazioni (ISO/IEC 27001): riduce la probabilità di violazione e documenta le misure adeguate richieste dall’art. 32 GDPR.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/iso-45001',
+    risk: 'sicurezza-lavoro',
+    when: (f) => certificata(f, 'ISO 45001', 'OHSAS 18001'),
+    likelihood: -1,
+    rationale: 'Sistema di gestione della salute e sicurezza sul lavoro certificato.',
+    misura:
+      'Certificare un sistema di gestione della salute e sicurezza sul lavoro (ISO 45001): incide sulla frequenza degli infortuni e sulla posizione dell’impresa in caso di contestazione.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/iso-45001-infortuni',
+    risk: 'infortunio-dipendenti',
+    when: (f) => certificata(f, 'ISO 45001', 'OHSAS 18001'),
+    likelihood: -1,
+    rationale: 'Sistema di gestione della sicurezza certificato: minore frequenza attesa degli infortuni.',
+    misura:
+      'Certificare un sistema di gestione della sicurezza (ISO 45001): minore frequenza attesa degli infortuni, e un elemento a favore nella valutazione della responsabilità.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/iso-9001-prodotto',
+    risk: 'rc-prodotto',
+    when: (f) => certificata(f, 'ISO 9001'),
+    likelihood: -1,
+    rationale:
+      'Sistema di gestione della qualità certificato ISO 9001: tracciabilità e controllo dei lotti.',
+    misura:
+      'Certificare un sistema di gestione della qualità (ISO 9001) con tracciabilità dei lotti: in caso di difetto la tracciabilità circoscrive il richiamo invece di estenderlo a tutta la produzione.',
+  },
+  {
+    kind: 'controllo',
+    id: 'controllo/iso-14001',
+    risk: 'rc-inquinamento',
+    when: (f) => certificata(f, 'ISO 14001', 'EMAS'),
+    likelihood: -1,
+    rationale: 'Sistema di gestione ambientale certificato.',
+    misura:
+      'Certificare un sistema di gestione ambientale (ISO 14001): riduce la probabilità di evento inquinante e documenta la diligenza dell’impresa.',
+  },
+];
+
+/** Regole applicabili a un dato rischio, per mostrarne la motivazione nel report. */
+export function rulesForRisk(risk: RiskId): readonly RiskRule[] {
+  return RISK_RULES.filter((r) => r.risk === risk);
+}
+
+export const RULES_VERSION = '2026.1';
+
+/** Predicati esportati per la scrittura di regole personalizzate per singolo intermediario. */
+export const predicates = {
+  tri,
+  sezione,
+  divisione,
+  atecoTra,
+  importoOltre,
+  numeroOltre,
+  certificata,
+  sismicaAlta,
+  idraulicaAlta,
+} as const;

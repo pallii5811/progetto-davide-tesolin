@@ -1,0 +1,18 @@
+{
+  "//": "Progetto usato solo dal lint: copre test e script, che sono esclusi dai tsconfig di build per non finire in dist ma devono comunque essere analizzati con le informazioni di tipo.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "collaudo/**/*.ts",
+    "playwright.config.ts",
+    "packages/*/test/**/*.ts",
+    "apps/api/test/**/*.ts",
+    "apps/web/test/**/*.ts"
+  ]
+}

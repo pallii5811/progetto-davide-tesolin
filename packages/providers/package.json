@@ -1,0 +1,24 @@
+{
+  "name": "@aegis/providers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Acquisizione dati aziendali da provider esterni (OpenAPI.com) e mappatura sul modello canonico.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@aegis/core": "0.1.0"
+  }
+}

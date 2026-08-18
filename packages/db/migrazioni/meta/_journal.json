@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787009793817,
+      "tag": "0000_schema_iniziale",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787048754546,
+      "tag": "0001_stato_sorvegliato",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787078049781,
+      "tag": "0002_regular_bromley",
+      "breakpoints": true
+    }
+  ]
+}

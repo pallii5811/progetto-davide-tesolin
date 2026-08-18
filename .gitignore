@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+coverage/
+.turbo/
+.pglite/
+*.log
+.DS_Store
+Thumbs.db
+
+# Risposte grezze delle sonde: possono contenere dati di aziende reali
+.sonda/
+
+# Database locale PGlite
+.dati/
+# Archivi messi da parte dopo un guasto: contengono dati, non codice
+.dati-danneggiato-*/
+
+# Archivio e tracce del collaudo su browser
+.collaudo-dati/
+test-results/
+playwright-report/
+schermate/

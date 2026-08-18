@@ -1,0 +1,52 @@
+{
+  "name": "aegis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AEGIS — Credit & Insurance Risk Intelligence per intermediari assicurativi",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,mjs,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,mjs,json,md,css}\"",
+    "verifica": "npm run build && npm run lint && npm test",
+    "demo": "tsx scripts/demo.ts",
+    "diagnostica": "tsx --env-file=.env scripts/diagnostica.ts",
+    "sonda": "tsx --env-file=.env scripts/sonda.ts",
+    "verifica:reale": "tsx scripts/verifica-reale.ts",
+    "verifica:sessione": "tsx scripts/verifica-sessione.ts",
+    "dev:api": "npm run dev --workspace @aegis/api",
+    "dev:api:demo": "tsx watch scripts/dev-demo.ts",
+    "dev:web": "npm run dev --workspace @aegis/web",
+    "migra": "tsx scripts/migra.ts",
+    "migra:genera": "npm run generate --workspace @aegis/db",
+    "reimposta-password": "tsx scripts/reimposta-password.ts",
+    "collaudo": "playwright test --project=scrivania",
+    "collaudo:schermate": "playwright test --project=schermate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.10.2",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0",
+    "vitest": "^2.1.8"
+  }
+}
