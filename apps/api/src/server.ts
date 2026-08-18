@@ -18,7 +18,14 @@ import {
   valutaCompletezza,
 } from '@aegis/core';
 import type { CompanyProfile, DatiDichiarati, PolizzaInEssere } from '@aegis/core';
-import { MemoryCache, MemoryCostLedger, ProviderError, createCompanyProvider } from '@aegis/providers';
+import {
+  MemoryCache,
+  MemoryCostLedger,
+  OPENAPI_DEFAULT_CONFIG,
+  ProviderError,
+  createCompanyProvider,
+  verificaAutorizzazioni,
+} from '@aegis/providers';
 import type { CostEvent } from '@aegis/providers';
 import { RegistroPerRichiesta, conCostiDellaRichiesta, costoDegliEventi } from './costi-richiesta.js';
 import type { CompanyDataProvider } from '@aegis/providers';
@@ -406,6 +413,27 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
     await tenant.studio.aggiorna(parsed.data);
     return tenant.studio.leggi();
+  });
+
+  /**
+   * Stato delle autorizzazioni sui servizi dati.
+   *
+   * Verifica **gratuita**: si sonda con una partita IVA inesistente, e il rifiuto per
+   * scope mancante arriva prima di ogni lavorazione. Serve a rispondere alla domanda che
+   * l'intermediario si pone guardando un'analisi incompleta — «manca il dato o manca
+   * l'abbonamento?» — senza che debba aprire un terminale.
+   */
+  app.get('/api/servizi', async (request, reply) => {
+    const sessione = soloAmministratore(request, reply);
+    if (sessione === null) return reply;
+
+    const token = process.env['OPENAPI_TOKEN']?.trim() ?? '';
+    if (token === '') {
+      return { datiReali: false, servizi: [] };
+    }
+
+    const servizi = await verificaAutorizzazioni({ token, config: OPENAPI_DEFAULT_CONFIG });
+    return { datiReali: true, servizi };
   });
 
   app.get('/api/utenti', async (request, reply) => {

@@ -461,6 +461,28 @@ export async function collegamentiDiAzienda(
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/collegamenti`);
 }
 
+export interface StatoServizioDati {
+  chiave: string;
+  descrizione: string;
+  scope: string;
+  costoCentesimi: number;
+  stato: 'autorizzato' | 'non-autorizzato' | 'non-raggiungibile';
+  dettaglio: string;
+}
+
+/**
+ * Quali servizi dati il token può chiamare.
+ *
+ * La verifica è gratuita e va fatta al momento: le autorizzazioni si cambiano dalla
+ * console del fornitore, e un elenco memorizzato racconterebbe la situazione di ieri.
+ */
+export async function statoServiziDati(): Promise<{
+  datiReali: boolean;
+  servizi: StatoServizioDati[];
+}> {
+  return chiama('/api/servizi');
+}
+
 export interface CriteriProspezione {
   denominazione?: string;
   provincia?: string;

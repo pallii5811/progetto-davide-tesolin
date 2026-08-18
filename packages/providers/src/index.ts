@@ -8,6 +8,7 @@ export * from './port.js';
 export * from './http.js';
 export * from './mock.js';
 export * from './openapi/config.js';
+export * from './openapi/autorizzazioni.js';
 export * from './openapi/parse.js';
 export * from './openapi/mapper.js';
 export * from './openapi/negativita.js';
