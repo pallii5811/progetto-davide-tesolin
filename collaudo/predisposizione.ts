@@ -5,12 +5,20 @@
  * ogni esecuzione: un collaudo che dipende da dati lasciati in giro dalla volta precedente
  * non dimostra nulla.
  *
+ * È un **passo a sé** dello script `npm run collaudo`, non il `globalSetup` di Playwright:
+ * quello parte *dopo* i servizi web, e azzerare l'archivio sotto un'API già avviata la
+ * lascia a servire dati che sul disco non esistono più. Il guasto si presentava come
+ * «indirizzo o password non corretti» — un accesso che fallisce per un utente che nel
+ * frattempo esiste davvero — e restava nascosto finché l'archivio della volta prima
+ * conteneva già l'utente giusto.
+ *
  * Crea l'amministratore con una password nota. Il prodotto non viene toccato: al suo
  * avvio `predisponiPrimoAccesso` troverà un utente già presente e non farà nulla, che è
  * esattamente il comportamento previsto su un archivio non vuoto.
  */
 
 import { rmSync } from 'node:fs';
+import { basename } from 'node:path';
 import { applicaSchemaTollerante, assicuraTenantPredefinito, connetti, creaUtente } from '@aegis/db';
 import { derivaPassword, verificaRequisitiPassword } from '../apps/api/src/auth.js';
 import { AMMINISTRATORE, CARTELLA_DATI } from './ambiente.js';
@@ -43,4 +51,10 @@ export default async function predisponi(): Promise<void> {
     // ad aprire l'archivio, e il collaudo fallirebbe per una ragione che non c'entra.
     await connessione.chiudi();
   }
+}
+
+// Eseguito direttamente (`tsx collaudo/predisposizione.ts`): è così che parte il collaudo,
+// prima che Playwright avvii i servizi.
+if (process.argv[1] !== undefined && import.meta.url.endsWith(basename(process.argv[1]))) {
+  await predisponi();
 }

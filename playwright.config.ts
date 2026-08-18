@@ -15,7 +15,6 @@ import { CARTELLA_DATI, INDIRIZZO_API, INDIRIZZO_WEB, PORTA_API, PORTA_WEB } fro
 export default defineConfig({
   testDir: './collaudo',
   testMatch: '**/*.spec.ts',
-  globalSetup: './collaudo/predisposizione.ts',
 
   // I collaudi condividono un solo archivio: eseguirli in parallelo li farebbe
   // interferire fra loro, e un fallimento intermittente è peggio di nessun collaudo.

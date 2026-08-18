@@ -12,7 +12,9 @@ import { accedi, AZIENDA_DI_PROVA, sorvegliaErrori } from './aiuti.js';
  * salvataggio della compagine → interrogazione incrociata → collegamento in pagina. È
  * anche l'unico modo di accorgersi se una di quelle giunture si stacca.
  */
-const SECONDA_AZIENDA = '02657870644';
+// Partita IVA dimostrativa **non usata da altri collaudi**: analizzarla mette un'azienda
+// in portafoglio, e il collaudo dell'importazione conta proprio quante ne mancano.
+const SECONDA_AZIENDA = '12345678903';
 
 test.describe('Assetto proprietario e gruppo', () => {
   test.beforeEach(async ({ page }) => {
@@ -67,9 +69,10 @@ test.describe('Assetto proprietario e gruppo', () => {
     const collegamenti = page.getByText('Collegamenti nel tuo portafoglio');
     await expect(collegamenti).toBeVisible();
 
-    // Il collegamento deve essere percorribile: è il gesto che trasforma la scoperta
-    // in un'altra analisi.
+    // Il collegamento deve essere **percorribile**, ed è l'indirizzo a dirlo: è il gesto
+    // che trasforma la scoperta in un'altra analisi. Legarlo al nome dell'azienda
+    // lascerebbe passare un collegamento rotto purché l'etichetta fosse giusta.
     const sezione = page.locator('#assetto');
-    await expect(sezione.getByRole('link', { name: /S\.R\.L\.|S\.P\.A\./ }).first()).toBeVisible();
+    await expect(sezione.locator(`a[href="/azienda/${SECONDA_AZIENDA}"]`).first()).toBeVisible();
   });
 });

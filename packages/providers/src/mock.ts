@@ -103,7 +103,24 @@ export class MockCompanyProvider implements CompanyDataProvider {
 
   fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile> {
     const normalizzato = identifier.replace(/\s/g, '');
-    const variante = VARIANTI.find((v) => v.partitaIva === normalizzato) ?? VARIANTI[0]!;
+    const nota = VARIANTI.find((v) => v.partitaIva === normalizzato);
+
+    /*
+      Una partita IVA sconosciuta ricade sul primo profilo dimostrativo — ma **conservando
+      la partita IVA richiesta**.
+
+      Restituire l'identità della variante di ripiego significa rispondere «ecco l'azienda
+      X» a chi ha chiesto l'azienda Y: davanti a un cliente confonde, e in archivio fa
+      comparire un'azienda che nessuno ha analizzato. I numeri restano quelli del profilo
+      di ripiego, e la modalità dimostrativa è dichiarata in testa a ogni pagina: nessuno
+      può scambiarli per dati reali.
+    */
+    const variante: Variante =
+      nota ?? {
+        ...VARIANTI[0]!,
+        partitaIva: normalizzato,
+        denominazione: `AZIENDA DIMOSTRATIVA ${normalizzato}`,
+      };
 
     const base = demoCompanyProfile();
     const conVariante = applicaVariante(base, variante);
@@ -133,7 +150,9 @@ export class MockCompanyProvider implements CompanyDataProvider {
 }
 
 function applicaVariante(base: CompanyProfile, variante: Variante): CompanyProfile {
-  if (variante.moltiplicatore === 1) {
+  // La scorciatoia vale solo se anche l'identità coincide: altrimenti si restituirebbe
+  // il profilo di base con la sua partita IVA, cioè un'azienda diversa da quella chiesta.
+  if (variante.moltiplicatore === 1 && variante.partitaIva === base.identity.partitaIva) {
     return base;
   }
 
