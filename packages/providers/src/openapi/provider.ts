@@ -84,6 +84,15 @@ export class OpenApiProvider implements CompanyDataProvider {
   /** Dominio distinto per i servizi di rischio, con scope di token proprio. */
   readonly #risk: HttpProviderClient;
   readonly #now: () => Date;
+  /**
+   * Memoria delle pratiche asincrone già aperte.
+   *
+   * Una pratica costa all'apertura e la lettura è gratuita: se l'attesa scade e la
+   * successiva analisi ne aprisse un'altra, si pagherebbe due volte lo stesso
+   * accertamento. Qui si conserva l'identificativo, così il secondo tentativo **legge**
+   * invece di comprare.
+   */
+  readonly #cache: Cache | undefined;
 
   constructor(options: OpenApiProviderOptions) {
     if (options.token.trim() === '') {
@@ -91,6 +100,7 @@ export class OpenApiProvider implements CompanyDataProvider {
     }
     this.#config = options.config ?? OPENAPI_DEFAULT_CONFIG;
     this.#now = options.now ?? ((): Date => new Date());
+    this.#cache = options.cache;
     this.#company = new HttpProviderClient({
       baseUrl: options.ambiente === undefined ? this.#config.baseUrlCompany : baseUrlPer(options.ambiente),
       token: options.token,
@@ -410,19 +420,56 @@ export class OpenApiProvider implements CompanyDataProvider {
     osservatoIl: Date,
   ): Promise<Sourced<EventiNegativi> | null> {
     const servizio = this.#config.services.eventiNegativi;
+    const chiavePratica = `pratica:negativita:${identifier}`;
 
     try {
+      /*
+        Se una pratica per questa azienda è già stata aperta, se ne legge il risultato:
+        gratis. Aprirne un'altra costerebbe altri quarantacinque centesimi per accertare
+        gli stessi protesti — e succede proprio nel caso peggiore, quando la prima attesa
+        è scaduta perché il servizio era lento.
+      */
+      const gia = this.#cache?.get(chiavePratica);
+      if (gia !== undefined && typeof gia.value === 'string') {
+        const risultato = await this.#leggiNegativita(gia.value);
+        return risultato === null ? null : mappaNegativita(risultato, osservatoIl);
+      }
+
       const esito = await this.#risk.requestAsync({
         service: servizio.path,
         startPath: servizio.path,
         body: { cf_piva: identifier },
-        statusPath: this.#config.percorsoStatoRichiesta,
+        statusPath: this.#config.percorsoStatoRichiestaRischio,
+        resultPath: this.#config.percorsoRisultatoNegativita,
         costoCentesimi: servizio.costoCentesimi,
         cacheTtlSeconds: servizio.ttlSeconds,
       });
 
+      // L'identificativo si conserva **anche quando l'attesa è scaduta**: è esattamente
+      // il caso in cui evita di ricomprare.
+      if (esito.richiestaId !== null) {
+        this.#cache?.set(chiavePratica, {
+          value: esito.richiestaId,
+          expiresAt: Date.now() + servizio.ttlSeconds * 1000,
+        });
+      }
+
       if (esito.stato !== 'completata') return null;
       return mappaNegativita(esito.payload, osservatoIl);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Lettura del risultato di una pratica già aperta: gratuita. */
+  async #leggiNegativita(richiestaId: string): Promise<unknown> {
+    try {
+      return await this.#risk.request<unknown>({
+        service: `${this.#config.services.eventiNegativi.path}/risultato`,
+        path: this.#config.percorsoRisultatoNegativita.replace('{id}', encodeURIComponent(richiestaId)),
+        cacheTtlSeconds: this.#config.services.eventiNegativi.ttlSeconds,
+        costoCentesimi: 0,
+      });
     } catch {
       return null;
     }

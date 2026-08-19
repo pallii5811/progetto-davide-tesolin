@@ -26,6 +26,7 @@ test('le rotte sono compilate e pronte', async ({ page }) => {
     '/impostazioni/utenti',
     '/impostazioni/studio',
     '/impostazioni/servizi',
+    '/impostazioni/compagnie',
     '/monitoraggio',
     `/azienda/${AZIENDA_DI_PROVA}`,
     `/azienda/${AZIENDA_DI_PROVA}/dati`,

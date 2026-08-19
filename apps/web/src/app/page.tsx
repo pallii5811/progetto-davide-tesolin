@@ -70,9 +70,13 @@ export default async function PaginaRicerca({
       {stato !== null && stato.datiReali && (
         <div className="mb-6">
           <Avviso tono="attenzione" titolo="Dati reali — ogni analisi consuma credito">
-            Le ricerche e le analisi interrogano OpenAPI.com: circa 10 centesimi per azienda. Le aziende già
-            in portafoglio non vengono riacquistate. Per provare senza spendere, avviare il servizio con{' '}
-            <code className="font-mono">npm run dev:api:demo</code>.
+            Le ricerche e le analisi interrogano OpenAPI.com:{' '}
+            <strong>
+              {(stato.costoAnalisiCentesimi / 100).toFixed(2).replace('.', ',')} € per analisi
+            </strong>
+            , {(stato.costoAnalisiApprofonditaCentesimi / 100).toFixed(2).replace('.', ',')} € se
+            approfondita. Le aziende già in portafoglio non vengono riacquistate. Per provare senza
+            spendere, avviare il servizio con <code className="font-mono">npm run dev:api:demo</code>.
           </Avviso>
         </div>
       )}

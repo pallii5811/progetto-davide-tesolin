@@ -461,6 +461,32 @@ export async function collegamentiDiAzienda(
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/collegamenti`);
 }
 
+export interface SoliditaCompagnia {
+  compagniaId: string;
+  denominazione: string;
+  gruppo: string | null;
+  anno: number;
+  solvencyRatio: number | null;
+  fonte: string;
+  punteggio: number;
+  fascia: 'critica' | 'debole' | 'adeguata' | 'solida' | 'molto-solida';
+  fasciaEtichetta: string;
+  componenti: { key: string; label: string; weight: number; score: number | null; rationale: string }[];
+  allerte: string[];
+  confidenza: string;
+  spiegazione: ExplanationDto;
+}
+
+/**
+ * Compagnie censite con la loro solidità.
+ *
+ * Il punteggio è ricalcolato dal servizio a ogni lettura: un numero congelato
+ * sopravvivrebbe alla regola che l'ha prodotto.
+ */
+export async function compagnieCensite(): Promise<{ compagnie: SoliditaCompagnia[] }> {
+  return chiama('/api/compagnie');
+}
+
 export interface StatoServizioDati {
   chiave: string;
   descrizione: string;
@@ -552,7 +578,13 @@ export async function analizzaAzienda(
   });
 }
 
-export async function statoServizio(): Promise<{ stato: string; provider: string; datiReali: boolean }> {
+export async function statoServizio(): Promise<{
+  stato: string;
+  provider: string;
+  datiReali: boolean;
+  costoAnalisiCentesimi: number;
+  costoAnalisiApprofonditaCentesimi: number;
+}> {
   return chiama('/health');
 }
 

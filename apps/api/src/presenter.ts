@@ -11,6 +11,8 @@
  */
 
 import {
+  SOLIDITY_BAND_LABEL,
+  computeCarrierStrength,
   AREA_LABEL,
   COMPANY_SIZE_LABEL,
   COVERAGE_CATEGORY_LABEL,
@@ -27,6 +29,7 @@ import {
   incidenzaGapSuPatrimonio,
 } from '@aegis/core';
 import type {
+  RatingAgenzia,
   AssessedRisk,
   CompanyAnalysis,
   CoverageGap,
@@ -39,6 +42,7 @@ import type {
 // Importato esplicitamente perché il tipo di ritorno di `presentAnalysis` lo referenzia:
 // senza, il compilatore non riesce a nominarlo in modo portabile.
 import type { FormaConsigliata } from '@aegis/core';
+import type { RigaSolidita } from '@aegis/db';
 
 export interface MoneyDto {
   readonly centesimi: number;
@@ -590,5 +594,63 @@ function presentGap(gap: CoverageGap) {
       motivazioneTermine: gap.piano.motivazioneTermine,
     },
     insidie: gap.insidie,
+  };
+}
+
+
+/**
+ * Solidità di una compagnia, con il punteggio ricalcolato al momento.
+ *
+ * Il motore riceve i dati grezzi e restituisce punteggio, fascia, componenti e allerte:
+ * l'interfaccia non calcola nulla, mostra. È la stessa regola che vale per lo score di
+ * credito, e per la stessa ragione — un numero mostrato deve poter essere difeso.
+ */
+export function presentaSolidita(riga: RigaSolidita) {
+  const forza = computeCarrierStrength({
+    denominazione: riga.denominazione,
+    gruppo: riga.gruppo,
+    annoRiferimento: riga.anno,
+    solvencyRatio: riga.solvencyRatio,
+    quotaTier1Unrestricted: riga.quotaTier1Unrestricted,
+    fondiPropriAmmissibili: riga.fondiPropriCentesimi as Money | null,
+    scr: riga.scrCentesimi as Money | null,
+    premiLordiContabilizzati: riga.premiLordiCentesimi as Money | null,
+    reclamiAnno: riga.reclamiAnno,
+    ratingEsterno:
+      riga.ratingAgenzia === null || riga.ratingValore === null
+        ? null
+        : {
+            agenzia: riga.ratingAgenzia as RatingAgenzia,
+            rating: riga.ratingValore,
+            dataAssegnazione: riga.aggiornatoIl,
+          },
+    fonte: riga.fonte,
+  });
+
+  return {
+    compagniaId: riga.compagniaId,
+    denominazione: riga.denominazione,
+    gruppo: riga.gruppo,
+    anno: riga.anno,
+    solvencyRatio: riga.solvencyRatio,
+    fonte: riga.fonte,
+    punteggio: forza.value.value,
+    fascia: forza.value.band,
+    fasciaEtichetta: SOLIDITY_BAND_LABEL[forza.value.band],
+    /*
+      I punteggi delle componenti si arrotondano qui.
+
+      Il motore lavora in virgola mobile e produce «94.00000000000001»: un numero esatto
+      quanto 94, e illeggibile. Arrotondare nel motore falserebbe le medie pesate a valle;
+      arrotondare nella pagina lo lascerebbe passare a chiunque altro legga l'API. Il posto
+      giusto è il confine fra dominio e presentazione, che è esattamente questo.
+    */
+    componenti: forza.value.components.map((c) => ({
+      ...c,
+      score: c.score === null ? null : Math.round(c.score),
+    })),
+    allerte: forza.value.allerte,
+    confidenza: forza.confidence,
+    spiegazione: explanation(forza.explanation),
   };
 }

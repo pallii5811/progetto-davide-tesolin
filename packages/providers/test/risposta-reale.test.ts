@@ -3,6 +3,7 @@ import { Money, classifySize } from '@aegis/core';
 import { mappaAnagrafica, mappaAssetti, mappaBilanciSintetici } from '../src/openapi/mapper.js';
 import { OpenApiProvider } from '../src/openapi/provider.js';
 import { MemoryCostLedger } from '../src/http.js';
+import { mappaNegativita } from '../src/openapi/negativita.js';
 
 /**
  * Risposta reale di `GET company.openapi.com/IT-advanced/{piva}`, agosto 2026.
@@ -532,5 +533,62 @@ describe('Prospezione: il conteggio è gratuito', () => {
 
     expect(chiamate[0]).not.toContain('minEmployees');
     expect(chiamate[0]).not.toContain('companyName');
+  });
+});
+
+/**
+ * Eventi negativi, sulla risposta reale.
+ *
+ * Il servizio è asincrono e si paga all'apertura della pratica: quarantacinque centesimi
+ * per accertare protesti, pregiudizievoli e procedure concorsuali. È il fattore che pesa
+ * il **20% dello score di credito**, e finché non era collegato quel venti per cento
+ * restava «non valutabile» su ogni azienda analizzata.
+ *
+ * La risposta qui sotto è quella vera osservata su OPENAPI S.p.A.: nessun evento negativo.
+ * La forma è quella che conta — gli elenchi arrivano `null`, non come array vuoti.
+ */
+const NEGATIVITA_REALE = {
+  data: {
+    presenzaPregiudizievoli: false,
+    pregiudizievoli: null,
+    presenzaProcedure: false,
+    procedure: null,
+    presenzaProtesti: false,
+    protesti: null,
+  },
+  success: true,
+  message: '',
+  error: null,
+};
+
+describe('Eventi negativi sulla risposta reale', () => {
+  const OSSERVATO_ORA = new Date('2026-08-19T00:00:00Z');
+
+  it('legge «nessun evento» senza scambiarlo per «non verificato»', () => {
+    const eventi = mappaNegativita(NEGATIVITA_REALE, OSSERVATO_ORA);
+
+    /*
+      La distinzione è tutta qui. «Nessun protesto» è un'informazione **positiva** che alza
+      lo score; «non ho potuto controllare» lo lascia indeterminato. Confonderle significa
+      premiare un'azienda mai verificata come se fosse risultata pulita.
+    */
+    expect(eventi.value.protesti).toEqual([]);
+    expect(eventi.value.pregiudizievoli).toEqual([]);
+    expect(eventi.value.procedure).toEqual([]);
+  });
+
+  it('regge gli elenchi nulli, che è come il fornitore dichiara l’assenza', () => {
+    // Il servizio non manda array vuoti: manda `null`. Un mapper che si aspetta un array
+    // solleverebbe qui, e l'analisi perderebbe il fattore che ha appena pagato.
+    expect(() => mappaNegativita(NEGATIVITA_REALE, OSSERVATO_ORA)).not.toThrow();
+  });
+
+  it('conserva la provenienza e il momento dell’accertamento', () => {
+    const eventi = mappaNegativita(NEGATIVITA_REALE, OSSERVATO_ORA);
+
+    // Un accertamento senza data non vale nulla in un fascicolo: i protesti di oggi non
+    // sono quelli di sei mesi fa.
+    expect(eventi.observedAt).toEqual(OSSERVATO_ORA);
+    expect(eventi.source.kind).toBe('provider');
   });
 });

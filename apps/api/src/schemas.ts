@@ -117,6 +117,30 @@ export const polizzaSchema = z.object({
   note: z.string().nullable().default(null),
 });
 
+/**
+ * Dati di solidità di una compagnia, come si leggono nella SFCR.
+ *
+ * Tutto facoltativo tranne denominazione, anno e fonte: il motore sa lavorare con un dato
+ * parziale e dichiara quali componenti non ha potuto valutare. Pretendere l'elenco
+ * completo significherebbe non far censire nessuna compagnia.
+ */
+export const compagniaSchema = z.object({
+  denominazione: z.string().trim().min(2).max(160),
+  gruppo: z.string().trim().max(160).optional(),
+  codiceIvass: z.string().trim().max(20).optional(),
+  anno: z.coerce.number().int().min(2000).max(2100),
+  /** Rapporto, non percentuale: 2,6 significa 260%. */
+  solvencyRatio: z.coerce.number().min(0).max(20).optional(),
+  quotaTier1Unrestricted: z.coerce.number().min(0).max(1).optional(),
+  fondiPropriEuro: z.coerce.number().min(0).optional(),
+  scrEuro: z.coerce.number().min(0).optional(),
+  premiLordiEuro: z.coerce.number().min(0).optional(),
+  reclamiAnno: z.coerce.number().int().min(0).optional(),
+  ratingAgenzia: z.string().trim().max(40).optional(),
+  ratingValore: z.string().trim().max(10).optional(),
+  fonte: z.string().trim().min(2).max(120),
+});
+
 export const analisiRequestSchema = z.object({
   datiDichiarati: datiDichiaratiSchema.optional(),
   polizze: z.array(polizzaSchema).optional(),

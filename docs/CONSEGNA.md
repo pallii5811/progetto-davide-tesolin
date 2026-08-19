@@ -173,6 +173,30 @@ npm run diagnostica
 
 ---
 
+## 5-bis. Solidità delle compagnie
+
+**Impostazioni → Solidità delle compagnie.** Una polizza è una promessa di pagamento
+futura: vale quanto vale chi la sottoscrive. Il rischio di controparte è il punto cieco
+della consulenza assicurativa italiana.
+
+I dati si inseriscono **a mano dalla SFCR**, la relazione che la direttiva Solvency II
+impone a ogni compagnia di pubblicare ogni anno, e dalle statistiche reclami IVASS. Non
+sono stimati e non sono dedotti: chi consegna una proposta deve poter dire da quale
+documento viene ogni numero.
+
+Bastano **denominazione, esercizio e solvency ratio** per ottenere un punteggio; gli
+altri campi lo affinano. Il solvency ratio si scrive come sta nella relazione — `260`,
+non `2,6`.
+
+Il punteggio si **ricalcola a ogni lettura**: non è conservato in tabella, perché un
+numero congelato sopravvive alla regola che lo ha prodotto e nessuno si accorge che è
+vecchio finché non deve difenderlo davanti a un cliente.
+
+Soglie sul solvency ratio: sotto 100% **critica** — la compagnia non copre il proprio
+requisito patrimoniale — - 150% debole · 200% adeguata · 250% solida · oltre, molto
+solida. La media del mercato italiano si colloca stabilmente sopra il 250%.
+
+---
 ## 6. Produzione
 
 ### 6.1 Database
@@ -350,8 +374,9 @@ Onestà, perché il committente possa pianificare:
 - **collegamenti societari oltre il proprio portafoglio**: due aziende si collegano se
   condividono un socio ed entrambe sono state analizzate. Non è una visura nazionale
   delle partecipazioni;
-- **dati SFCR e reclami IVASS reali** per il rating di solidità delle compagnie: il motore
-  di calcolo c'è, i dati vanno ingeriti;
+- **ingestione automatica dei dati SFCR**: oggi il censimento delle compagnie è manuale,
+  un documento alla volta. Il motore e l'interfaccia sono completi; manca il caricamento
+  massivo da una fonte, che nessuno pubblica in un formato interrogabile;
 - **bilancio dettagliato, protesti e pregiudizievoli** su OpenAPI: sono prodotti a
   sottoscrizione separata, i percorsi non sono confermati e finché non lo saranno il codice
   **non li chiama**, per non pagare chiamate a vuoto;

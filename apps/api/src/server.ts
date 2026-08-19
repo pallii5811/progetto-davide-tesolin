@@ -23,6 +23,7 @@ import {
   MemoryCostLedger,
   OPENAPI_DEFAULT_CONFIG,
   ProviderError,
+  costoAnalisi,
   createCompanyProvider,
   verificaAutorizzazioni,
 } from '@aegis/providers';
@@ -55,15 +56,18 @@ declare module 'fastify' {
     sessione?: Sessione;
   }
 }
-import { presentAnalysis } from './presenter.js';
+import { presentAnalysis, presentaSolidita } from './presenter.js';
 import { z } from 'zod';
 import {
   analisiRequestSchema,
+  compagniaSchema,
   fetchLevelSchema,
   searchQuerySchema,
   toDatiDichiarati,
   toPolizza,
 } from './schemas.js';
+// L'anagrafe delle compagnie è condivisa fra intermediari: non passa dal contesto tenant.
+import { elencoSolidita, salvaSolidita } from '@aegis/db';
 import { MemoryDossierStore, MemoryPortafoglioStore } from './store.js';
 import type { DossierStore, PortafoglioStore } from './store.js';
 import type { Persistenza } from './persistenza.js';
@@ -200,6 +204,14 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     stato: 'ok',
     provider: provider.name,
     datiReali: !provider.name.startsWith('Demo'),
+    /*
+      Il costo di un'analisi lo dichiara il servizio, non lo scrive a mano l'interfaccia.
+      Dipende da quali fonti sono attive — collegare gli eventi negativi lo ha portato da
+      dieci a cinquantacinque centesimi — e un numero scritto a mano in una pagina resta
+      quello del giorno in cui è stato scritto.
+    */
+    costoAnalisiCentesimi: costoAnalisi('completo'),
+    costoAnalisiApprofonditaCentesimi: costoAnalisi('profondito'),
     persistenza: persistenza?.descrizione ?? 'in memoria (i dati non sopravvivono al riavvio)',
     datiPersistenti: persistenza !== undefined,
     autenticazione: autenticazioneRichiesta,
@@ -434,6 +446,59 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const servizi = await verificaAutorizzazioni({ token, config: OPENAPI_DEFAULT_CONFIG });
     return { datiReali: true, servizi };
+  });
+
+  /**
+   * Solidità delle compagnie.
+   *
+   * Il punteggio si **ricalcola a ogni lettura** dal motore, non si conserva in tabella:
+   * un numero congelato sopravvive alla regola che l'ha prodotto, e nessuno si accorge che
+   * è vecchio finché non deve difenderlo davanti a un cliente.
+   *
+   * I dati sono condivisi fra tutti gli intermediari, e deliberatamente: il solvency ratio
+   * è pubblicato nella SFCR che la direttiva Solvency II impone. Non è informazione di
+   * portafoglio, è un fatto pubblico.
+   */
+  app.get('/api/compagnie', async (request, reply) => {
+    if (persistenza === undefined) return { compagnie: [] };
+    if (request.sessione === undefined && autenticazioneRichiesta) {
+      return reply.status(401).send({ errore: 'Autenticazione richiesta' });
+    }
+
+    const righe = await elencoSolidita(persistenza.db);
+    return { compagnie: righe.map(presentaSolidita) };
+  });
+
+  app.post('/api/compagnie', async (request, reply) => {
+    const sessione = soloAmministratore(request, reply);
+    if (sessione === null) return reply;
+    if (persistenza === undefined) {
+      return reply.status(409).send({ errore: 'Senza persistenza non è possibile censire compagnie' });
+    }
+
+    const parsed = compagniaSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi', dettagli: parsed.error.issues });
+    }
+
+    await salvaSolidita(persistenza.db, {
+      denominazione: parsed.data.denominazione,
+      gruppo: parsed.data.gruppo ?? null,
+      codiceIvass: parsed.data.codiceIvass ?? null,
+      anno: parsed.data.anno,
+      solvencyRatio: parsed.data.solvencyRatio ?? null,
+      quotaTier1Unrestricted: parsed.data.quotaTier1Unrestricted ?? null,
+      fondiPropriCentesimi: parsed.data.fondiPropriEuro === undefined ? null : Math.round(parsed.data.fondiPropriEuro * 100),
+      scrCentesimi: parsed.data.scrEuro === undefined ? null : Math.round(parsed.data.scrEuro * 100),
+      premiLordiCentesimi: parsed.data.premiLordiEuro === undefined ? null : Math.round(parsed.data.premiLordiEuro * 100),
+      reclamiAnno: parsed.data.reclamiAnno ?? null,
+      ratingAgenzia: parsed.data.ratingAgenzia ?? null,
+      ratingValore: parsed.data.ratingValore ?? null,
+      fonte: parsed.data.fonte,
+    });
+
+    const righe = await elencoSolidita(persistenza.db);
+    return { compagnie: righe.map(presentaSolidita) };
   });
 
   app.get('/api/utenti', async (request, reply) => {

@@ -167,7 +167,7 @@ export function analizzaAssetto(
   const unicoSocioSocietario =
     conQuota.length === 1 &&
     conQuota[0]?.tipo === 'persona-giuridica' &&
-    (conQuota[0]?.quotaPercentuale ?? null) === null
+    conQuota[0].quotaPercentuale === null
       ? conQuota[0]
       : null;
 

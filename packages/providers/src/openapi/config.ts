@@ -45,6 +45,10 @@ export interface OpenApiConfig {
   };
   /** Percorso di lettura dello stato delle pratiche asincrone. */
   readonly percorsoStatoRichiesta: string;
+  /** Stato di una pratica sul dominio del rischio: percorso diverso da quello aziendale. */
+  readonly percorsoStatoRichiestaRischio: string;
+  /** Risultato della verifica di negativita: endpoint dedicato, lettura gratuita. */
+  readonly percorsoRisultatoNegativita: string;
 }
 
 /**
@@ -67,6 +71,14 @@ export const OPENAPI_DEFAULT_CONFIG: OpenApiConfig = {
   baseUrlCompany: 'https://company.openapi.com',
   baseUrlRisk: 'https://risk.openapi.com',
   percorsoStatoRichiesta: '/IT-request/{id}',
+  /*
+    Il dominio del rischio ha percorsi propri, e non sono una variante ortografica di
+    quelli aziendali: lo stato si legge su "/IT-richiesta/{id}", il **risultato** su un
+    endpoint dedicato. Riusare il percorso del dominio aziendale produce un 404 su una
+    pratica già aperta e già pagata — l'errore più caro possibile.
+  */
+  percorsoStatoRichiestaRischio: '/IT-richiesta/{id}',
+  percorsoRisultatoNegativita: '/IT-negativita/{id}/dettaglio',
   services: {
     /**
      * Ricerca per insiemi: territorio, settore, dimensione.
@@ -144,13 +156,18 @@ export const OPENAPI_DEFAULT_CONFIG: OpenApiConfig = {
      *
      * ⚠ Richiede che il token sia autorizzato allo scope `risk`: con un token di sole
      * API aziende il servizio risponde `401 Wrong Token` pur essendoci credito sul conto.
+     *
+     * ✅ Verificato su chiamata reale: la pratica si completa in una trentina di secondi,
+     * lo stato si legge su `/IT-richiesta/{id}` e il risultato su
+     * `/IT-negativita/{id}/dettaglio`. Gli elenchi arrivano `null` quando non c'è nulla,
+     * non come array vuoti.
      */
     eventiNegativi: {
       path: '/IT-negativita',
       ttlSeconds: 7 * GIORNO,
       costoCentesimi: 45,
       descrizione: 'Protesti, pregiudizievoli e procedure concorsuali (asincrono)',
-      verificato: false,
+      verificato: true,
       scope: 'risk / IT-negativita',
     },
   },

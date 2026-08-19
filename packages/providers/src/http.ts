@@ -225,7 +225,28 @@ export class HttpProviderClient {
 
       const descrizione = estraiStato(stato);
       if (descrizione === 'completata') {
-        return { stato: 'completata', richiestaId, payload: stato };
+        /*
+          Lo stato dice **che** la pratica è pronta, non **cosa** contiene: su questo
+          fornitore il risultato sta su un percorso dedicato, e leggere il corpo dello
+          stato restituirebbe l'intestazione della richiesta — identificativo, date,
+          soggetto — senza un solo protesto dentro. Un'analisi che dichiara «nessun evento
+          negativo» perché ha letto il documento sbagliato è peggio di un errore.
+
+          La lettura del risultato è gratuita quanto quella dello stato: si paga
+          l'apertura della pratica, una volta sola.
+        */
+        if (options.resultPath === undefined) {
+          return { stato: 'completata', richiestaId, payload: stato };
+        }
+
+        const risultato = await this.request<unknown>({
+          service: `${options.service}/risultato`,
+          path: options.resultPath.replace('{id}', encodeURIComponent(richiestaId)),
+          cacheTtlSeconds: options.cacheTtlSeconds,
+          costoCentesimi: 0,
+        });
+
+        return { stato: 'completata', richiestaId, payload: risultato };
       }
       if (descrizione === 'fallita') {
         return { stato: 'fallita', richiestaId, payload: stato };
@@ -327,6 +348,14 @@ export interface AsyncRequestOptions {
   readonly body: unknown;
   /** Percorso di lettura dello stato, con `{id}` come segnaposto. */
   readonly statusPath: string;
+  /**
+   * Percorso del **risultato**, quando è diverso da quello dello stato.
+   *
+   * Alcuni servizi asincroni separano le due cose: lo stato dice se la pratica è pronta,
+   * un secondo percorso ne restituisce il contenuto. Se assente, si usa il corpo dello
+   * stato — che è il comportamento dei servizi che vi includono già l'esito.
+   */
+  readonly resultPath?: string | undefined;
   readonly costoCentesimi: number;
   readonly cacheTtlSeconds: number;
   /** Tempo massimo di attesa complessivo, in millisecondi. */
