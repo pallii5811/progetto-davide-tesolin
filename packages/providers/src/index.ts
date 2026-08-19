@@ -13,10 +13,13 @@ export * from './openapi/parse.js';
 export * from './openapi/mapper.js';
 export * from './openapi/negativita.js';
 export * from './openapi/provider.js';
+export * from './openapi/prezzi.js';
 
 import { MockCompanyProvider } from './mock.js';
 import { OpenApiProvider } from './openapi/provider.js';
 import { MemoryCache, MemoryCostLedger } from './http.js';
+import { OPENAPI_DEFAULT_CONFIG } from './openapi/config.js';
+import { conPrezzi, prezziDaConfigurazione } from './openapi/prezzi.js';
 import type { Cache, CostLedger } from './http.js';
 import type { CompanyDataProvider } from './port.js';
 
@@ -38,9 +41,17 @@ export function createCompanyProvider(options: ProviderFactoryOptions = {}): Com
   if (token === '') {
     return new MockCompanyProvider();
   }
+  /*
+    I prezzi effettivi dipendono dal contratto: lo stesso servizio costa 0,30 € a chiamata
+    singola e meno di 9 centesimi in abbonamento a volume. Governano il tetto di spesa e il
+    credito residuo, quindi devono poter essere dichiarati senza toccare il codice.
+  */
+  const prezzi = prezziDaConfigurazione(process.env['AEGIS_PREZZI_CENTESIMI']);
+
   return new OpenApiProvider({
     token,
     ambiente: options.ambiente ?? 'produzione',
+    config: conPrezzi(OPENAPI_DEFAULT_CONFIG, prezzi),
     cache: options.cache ?? new MemoryCache(),
     ledger: options.ledger ?? new MemoryCostLedger(),
   });

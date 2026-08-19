@@ -127,12 +127,25 @@ export const OPENAPI_DEFAULT_CONFIG: OpenApiConfig = {
       verificato: true,
       scope: 'company / IT-advanced',
     },
+    /**
+     * Profilo completo: cariche, sedi, gruppo e i quarantotto indicatori già elaborati.
+     *
+     * Il prezzo era indicato a 48 centesimi **per stima**, mai verificato — e infatti il
+     * listino pubblico dichiara 0,30 € a chiamata singola. Una stima al rialzo non è
+     * innocua: fa scattare il tetto di spesa prima del dovuto e mostra un credito residuo
+     * più basso del vero, cioè spinge a non usare un servizio che costa meno di quanto si
+     * crede.
+     *
+     * Resta comunque un valore predefinito, non una verità: il prezzo effettivo dipende
+     * dal contratto, e a volume scende sotto i 9 centesimi. Si sovrascrive dalla
+     * configurazione con `AEGIS_PREZZI_CENTESIMI`.
+     */
     profiloCompleto: {
       path: '/IT-full/{id}',
       ttlSeconds: 30 * GIORNO,
-      costoCentesimi: 48,
-      descrizione: 'Dataset completo. ⚠ Contenuto non ancora verificato: provare prima di abilitarlo.',
-      verificato: false,
+      costoCentesimi: 30,
+      descrizione: 'Cariche, sedi operative, gruppo societario e 48 indicatori già elaborati',
+      verificato: true,
       scope: 'company / IT-full',
     },
     /**
