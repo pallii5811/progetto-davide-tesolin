@@ -879,7 +879,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     await registraSpese(request, eventi);
 
     if (analisi === null) return reply.status(404).send({ errore: 'Azienda non trovata' });
-    return presentAnalysis(analisi);
+
+    /*
+      Un accertamento asincrono aperto e non ancora concluso non è un dato mancante: è un
+      dato **in arrivo**, già pagato. Dirlo cambia l'azione di chi legge — ricaricare fra
+      un minuto invece di chiedere i protesti al cliente — e la pratica resta in memoria,
+      quindi il ricaricamento non costa nulla.
+    */
+    const accertamentiInCorso =
+      analisi.profile.eventiNegativi === null &&
+      OPENAPI_DEFAULT_CONFIG.services.eventiNegativi.verificato &&
+      !provider.name.startsWith('Demo');
+
+    return { ...presentAnalysis(analisi), accertamentiInCorso };
   });
 
   // ── Salvataggio dei dati di intervista, senza ricalcolo ─────────────────────

@@ -143,7 +143,7 @@ export function CampoTriStato({
               onClick={() => onChange(opzione.valore)}
               className={`flex-1 rounded border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-marchio/25 ${
                 attiva
-                  ? 'border-marchio bg-marchio text-white'
+                  ? 'border-marchio bg-azione text-azione-testo'
                   : 'border-bordo-forte bg-fondo hover:border-marchio/50'
               }`}
             >

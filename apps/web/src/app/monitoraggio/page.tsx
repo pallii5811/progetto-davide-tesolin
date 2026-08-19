@@ -99,7 +99,7 @@ function FiltroLink({
       aria-current={attivo ? 'page' : undefined}
       className={`rounded-full border px-3 py-1.5 text-sm transition ${
         attivo
-          ? 'border-marchio bg-marchio text-white'
+          ? 'border-marchio bg-azione text-azione-testo'
           : 'border-bordo-forte bg-superficie hover:border-marchio/50'
       }`}
     >

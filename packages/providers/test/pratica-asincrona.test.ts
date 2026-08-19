@@ -112,3 +112,86 @@ describe('Pratiche asincrone già aperte', () => {
     expect(cache.get('pratica:negativita:12485671007')?.value).toBe('pratica-1');
   }, 120_000);
 });
+
+/**
+ * Una pratica in lavorazione non è una pratica pulita.
+ *
+ * È la distinzione più pericolosa di tutta l'integrazione. Il servizio, interrogato mentre
+ * l'accertamento è ancora in corso, può restituire un documento con gli elenchi vuoti:
+ * identico, byte per byte, a quello di un'azienda senza protesti.
+ *
+ * Confonderli significa scrivere «nessun evento pregiudizievole» in uno score di credito e
+ * in un fascicolo di adeguatezza, su un'impresa che nessuno ha finito di verificare.
+ */
+describe('Risultato letto solo a pratica conclusa', () => {
+  function servizio(statoPratica: string, chiamate: string[]) {
+    return ((url: string, init?: RequestInit): Promise<Response> => {
+      const indirizzo = String(url);
+      chiamate.push(`${init?.method ?? 'GET'} ${indirizzo}`);
+
+      if (indirizzo.includes('/dettaglio')) {
+        // Elenchi vuoti: la forma che, letta senza controllare lo stato, assolve.
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                presenzaProtesti: false,
+                protesti: null,
+                presenzaPregiudizievoli: false,
+                pregiudizievoli: null,
+                presenzaProcedure: false,
+                procedure: null,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: { id: 'pratica-1', status: statoPratica } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+  }
+
+  it('non legge il risultato di una pratica ancora in lavorazione', async () => {
+    const cache = new MemoryCache();
+    cache.set('pratica:negativita:12485671007', {
+      value: 'pratica-1',
+      expiresAt: Date.now() + 600_000,
+    });
+
+    const chiamate: string[] = [];
+    const provider = new OpenApiProvider({ token: 't', cache, fetchImpl: servizio('PENDING', chiamate) });
+
+    const profilo = await provider.fetchProfile('12485671007', 'completo');
+
+    // Nessun evento negativo **dichiarato**: il fattore resta non valutabile, che è la
+    // verità. Il contrario sarebbe un'assoluzione senza processo.
+    expect(profilo.eventiNegativi).toBeNull();
+    expect(chiamate.some((c) => c.includes('/dettaglio'))).toBe(false);
+  }, 90_000);
+
+  it('legge il risultato quando la pratica è conclusa', async () => {
+    const cache = new MemoryCache();
+    cache.set('pratica:negativita:12485671007', {
+      value: 'pratica-1',
+      expiresAt: Date.now() + 600_000,
+    });
+
+    const chiamate: string[] = [];
+    const provider = new OpenApiProvider({
+      token: 't',
+      cache,
+      fetchImpl: servizio('COMPLETED', chiamate),
+    });
+
+    const profilo = await provider.fetchProfile('12485671007', 'completo');
+
+    expect(profilo.eventiNegativi?.value.protesti).toEqual([]);
+    expect(chiamate.some((c) => c.includes('/dettaglio'))).toBe(true);
+  }, 90_000);
+});

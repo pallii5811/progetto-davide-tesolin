@@ -56,6 +56,22 @@ const LOTTO_PREDEFINITO = 25;
  */
 const ARRICCHIMENTO = 'start';
 
+/**
+ * Quanto si attende un accertamento asincrono prima di restituire l'analisi senza.
+ *
+ * Misurato sul servizio reale: una pratica di negatività si completa in una trentina di
+ * secondi. Aspettarla tutta significa lasciare l'intermediario davanti a una pagina bianca
+ * per quarantasette secondi — e chi aspetta quarantasette secondi conclude che il software
+ * è rotto, non che sta lavorando.
+ *
+ * Si attende dieci secondi: quel tanto che basta a raccogliere le pratiche veloci. Se non
+ * fa in tempo, l'analisi esce comunque e **dichiara** che l'accertamento è in corso;
+ * l'identificativo resta in memoria e il ricaricamento successivo lo completa in meno di un
+ * secondo, gratis. Un'attesa breve con un dato dichiarato mancante è onesta; un'attesa
+ * lunga con lo stesso dato è solo lenta.
+ */
+const ATTESA_ACCERTAMENTI_MS = 10_000;
+
 /** Cinque centesimi ad azienda: verificato sul servizio reale. */
 function costoLotto(record: number): number {
   return record * 5;
@@ -443,6 +459,7 @@ export class OpenApiProvider implements CompanyDataProvider {
         resultPath: this.#config.percorsoRisultatoNegativita,
         costoCentesimi: servizio.costoCentesimi,
         cacheTtlSeconds: servizio.ttlSeconds,
+        timeoutMs: ATTESA_ACCERTAMENTI_MS,
       });
 
       // L'identificativo si conserva **anche quando l'attesa è scaduta**: è esattamente
@@ -461,9 +478,31 @@ export class OpenApiProvider implements CompanyDataProvider {
     }
   }
 
-  /** Lettura del risultato di una pratica già aperta: gratuita. */
+  /**
+   * Risultato di una pratica già aperta — **solo se conclusa**.
+   *
+   * Lo stato si controlla prima, e non è una cautela accademica: una pratica ancora in
+   * lavorazione può restituire un documento con gli elenchi vuoti, indistinguibile da
+   * «nessun protesto». Mapparlo significherebbe dichiarare pulita un'azienda che nessuno
+   * ha finito di verificare, e quel «pulita» finisce in uno score di credito e in un
+   * fascicolo di adeguatezza.
+   *
+   * Entrambe le letture sono gratuite: si è pagata l'apertura, una volta sola.
+   */
   async #leggiNegativita(richiestaId: string): Promise<unknown> {
     try {
+      const stato = await this.#risk.request<unknown>({
+        service: `${this.#config.services.eventiNegativi.path}/stato`,
+        path: this.#config.percorsoStatoRichiestaRischio.replace(
+          '{id}',
+          encodeURIComponent(richiestaId),
+        ),
+        cacheTtlSeconds: 0,
+        costoCentesimi: 0,
+      });
+
+      if (!praticaConclusa(stato)) return null;
+
       return await this.#risk.request<unknown>({
         service: `${this.#config.services.eventiNegativi.path}/risultato`,
         path: this.#config.percorsoRisultatoNegativita.replace('{id}', encodeURIComponent(richiestaId)),
@@ -523,4 +562,17 @@ export class OpenApiProvider implements CompanyDataProvider {
       providerId: piva ?? str(raw, 'vatCode', 'partitaIva', 'taxCode', 'id') ?? '',
     };
   }
+}
+
+/**
+ * La pratica è conclusa?
+ *
+ * Solo uno stato esplicitamente concluso autorizza a leggerne il risultato. Nel dubbio si
+ * risponde «no»: attendere un minuto in più non costa nulla, dichiarare pulita un'azienda
+ * non verificata costa un'analisi sbagliata.
+ */
+function praticaConclusa(risposta: unknown): boolean {
+  const dati = pick(risposta, 'data') ?? risposta;
+  const stato = str(dati, 'status', 'stato', 'state') ?? '';
+  return /^(DONE|COMPLETED|COMPLETE|OK|SUCCESS)$/i.test(stato.trim());
 }

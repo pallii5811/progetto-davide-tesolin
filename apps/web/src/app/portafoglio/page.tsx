@@ -125,7 +125,7 @@ export default async function PaginaPortafoglio({
               aria-current={attivo ? 'page' : undefined}
               className={`rounded-full border px-3 py-1.5 text-sm transition ${
                 attivo
-                  ? 'border-marchio bg-marchio text-white'
+                  ? 'border-marchio bg-azione text-azione-testo'
                   : 'border-bordo-forte bg-superficie hover:border-marchio/50'
               }`}
             >
@@ -181,7 +181,7 @@ export default async function PaginaPortafoglio({
               </span>
               <Link
                 href={`/azienda/${azienda.identificativo}`}
-                className="rounded bg-marchio px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
               >
                 Apri
               </Link>
@@ -252,7 +252,7 @@ export default async function PaginaPortafoglio({
                 <td className="px-4 py-3 text-right">
                   <Link
                     href={`/azienda/${azienda.identificativo}`}
-                    className="rounded bg-marchio px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                    className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
                   >
                     Apri
                   </Link>

@@ -219,6 +219,13 @@ export interface AnalisiDto {
     }[];
   } | null;
   livelloDatiEconomici: 'assente' | 'sintetico' | 'completo';
+  /**
+   * Un accertamento asincrono è stato aperto e non è ancora concluso.
+   *
+   * Non è un dato mancante: è un dato in arrivo, già pagato. Ricaricare fra un minuto lo
+   * include, e non costa nulla perché la pratica resta in memoria.
+   */
+  accertamentiInCorso: boolean;
   arricchimentiPossibili: { dato: string; sbloccherebbe: string[] }[];
   rischi: RischioDto[];
   rischiMeta: {

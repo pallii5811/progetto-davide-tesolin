@@ -17,21 +17,54 @@
 
   --color-testo: oklch(0.24 0.014 260);
   --color-testo-tenue: oklch(0.5 0.012 260);
-  --color-testo-debole: oklch(0.62 0.01 260);
+  /*
+     0,54 e non 0,62: il valore precedente dava un contrasto di 3,64:1 su fondo bianco,
+     sotto il 4,5:1 che le WCAG richiedono per il testo normale. Su uno schermo buono in
+     un ufficio ben illuminato non si notava; su un portatile economico alle sette di sera
+     quella riga diventava illeggibile. Misurato, non stimato: ora 5,06:1.
+  */
+  --color-testo-debole: oklch(0.54 0.01 260);
 
   --color-marchio: oklch(0.42 0.11 254);
   --color-marchio-tenue: oklch(0.95 0.02 254);
 
+  /*
+     Il colore dell'**azione**, distinto da quello del marchio.
+
+     Sembrano la stessa cosa e non lo sono. Il marchio serve al testo — un collegamento, un
+     titolo — e nel tema scuro deve essere chiaro per staccarsi dal fondo. Il pulsante è il
+     contrario: il colore sta dietro, e il testo ci va sopra.
+
+     Usare il marchio come fondo di un pulsante con testo bianco funziona nel tema chiaro
+     (8,5:1) e crolla in quello scuro, dove il marchio è azzurro chiaro: bianco su
+     #6ea8ee dà **2,47:1**, contro il 4,5 richiesto. Ogni pulsante principale del prodotto
+     era illeggibile in modalità scura, e nessuna verifica visiva se n'era accorta perché
+     erano tutte in modalità chiara.
+  */
+  --color-azione: oklch(0.42 0.11 254);
+  --color-azione-testo: oklch(1 0 0);
+
+
   /* Scala di gravità: dal basso al critico. */
-  --color-basso: oklch(0.62 0.12 155);
+  /*
+     I colori della gravità sono testo **sul fondo della propria gravità**: un badge
+     «alto» è arancione su arancione chiarissimo. Nella prima stesura erano scelti a
+     occhio e quattro su cinque stavano fra 2,20:1 e 3,37:1, contro il 4,5 richiesto —
+     leggibili su un buon monitor, non su un portatile in una sala riunioni.
+
+     Ora ogni valore è calcolato: il più chiaro che supera 4,5:1 sul proprio fondo. Si è
+     scurito il testo e non schiarito il fondo, perché il fondo distingue le gravità a
+     colpo d'occhio ed è ciò che rende la tabella dei rischi leggibile di sguardo.
+  */
+  --color-basso: oklch(0.51 0.12 155);
   --color-basso-fondo: oklch(0.95 0.035 155);
-  --color-moderato: oklch(0.72 0.13 100);
+  --color-moderato: oklch(0.53 0.13 100);
   --color-moderato-fondo: oklch(0.96 0.04 100);
-  --color-rilevante: oklch(0.72 0.15 65);
+  --color-rilevante: oklch(0.54 0.15 65);
   --color-rilevante-fondo: oklch(0.96 0.05 65);
-  --color-alto: oklch(0.62 0.18 32);
+  --color-alto: oklch(0.54 0.18 32);
   --color-alto-fondo: oklch(0.95 0.045 32);
-  --color-critico: oklch(0.5 0.2 22);
+  --color-critico: oklch(0.54 0.2 22);
   --color-critico-fondo: oklch(0.94 0.05 22);
 
   --font-sans:
@@ -48,15 +81,26 @@
 
     --color-testo: oklch(0.95 0.006 260);
     --color-testo-tenue: oklch(0.74 0.012 260);
-    --color-testo-debole: oklch(0.6 0.012 260);
+    /* Sul fondo scuro serve il movimento opposto: 0,6 dava 4,22:1, 0,66 dà 5,36:1. */
+    --color-testo-debole: oklch(0.66 0.012 260);
 
     --color-marchio: oklch(0.72 0.12 254);
     --color-marchio-tenue: oklch(0.28 0.05 254);
 
+    /* Il fondo resta chiaro e il testo diventa scuro: 7,59:1. */
+    --color-azione: oklch(0.72 0.12 254);
+    --color-azione-testo: oklch(0.18 0.014 260);
+
+    /* Sul fondo scuro il testo va schiarito, non scurito: stessi conti, verso opposto. */
+    --color-basso: oklch(0.65 0.12 155);
     --color-basso-fondo: oklch(0.28 0.05 155);
+    --color-moderato: oklch(0.68 0.13 100);
     --color-moderato-fondo: oklch(0.3 0.06 100);
+    --color-rilevante: oklch(0.68 0.15 65);
     --color-rilevante-fondo: oklch(0.3 0.07 65);
+    --color-alto: oklch(0.69 0.18 32);
     --color-alto-fondo: oklch(0.3 0.08 32);
+    --color-critico: oklch(0.69 0.2 22);
     --color-critico-fondo: oklch(0.3 0.09 22);
   }
 }
@@ -104,6 +148,9 @@ body {
     --color-superficie: oklch(1 0 0);
     --color-bordo: oklch(0.85 0.006 260);
     --color-bordo-forte: oklch(0.7 0.008 260);
+
+    --color-azione: oklch(0.42 0.11 254);
+    --color-azione-testo: oklch(1 0 0);
 
     --color-testo: oklch(0.18 0.014 260);
     --color-testo-tenue: oklch(0.42 0.012 260);

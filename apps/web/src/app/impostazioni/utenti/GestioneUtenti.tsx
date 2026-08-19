@@ -182,7 +182,7 @@ function Azione({
 }) {
   const { pending } = useFormStatus();
   const classi = primaria
-    ? 'bg-marchio text-white hover:opacity-90'
+    ? 'bg-azione text-azione-testo hover:opacity-90'
     : pericolosa
       ? 'border border-critico/40 text-critico hover:bg-critico-fondo'
       : 'border border-bordo-forte text-testo-tenue hover:text-testo';

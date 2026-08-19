@@ -29,7 +29,7 @@ export default function Errore({ error, reset }: { error: Error; reset: () => vo
         <button
           type="button"
           onClick={reset}
-          className="rounded bg-marchio px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+          className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-marchio/40"
         >
           Riprova
         </button>

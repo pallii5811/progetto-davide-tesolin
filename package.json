@@ -37,6 +37,7 @@
     "collaudo:schermate": "tsx collaudo/predisposizione.ts && playwright test --project=schermate"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.17.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.2",

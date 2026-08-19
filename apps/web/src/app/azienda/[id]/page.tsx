@@ -106,6 +106,24 @@ export default async function PaginaAzienda({
         </div>
       )}
 
+      {/*
+        L'accertamento dei protesti si completa in una trentina di secondi. Aspettarlo
+        dentro la richiesta significherebbe lasciare l'intermediario davanti a una pagina
+        bianca per quarantasette secondi — e chi aspetta quarantasette secondi conclude che
+        il software è rotto. Meglio consegnare l'analisi subito e dire cosa sta arrivando.
+      */}
+      {analisi.accertamentiInCorso && (
+        <div className="mb-6">
+          <Avviso tono="informativo" titolo="Accertamento protesti in corso">
+            La verifica di protesti, pregiudizievoli e procedure concorsuali è stata avviata
+            ed è già stata pagata: si completa in circa un minuto.{' '}
+            <strong>Ricaricare questa pagina</strong> per includerla — il ricaricamento non
+            consuma credito. Fino ad allora il fattore vale il 20% dello score e resta non
+            valutabile.
+          </Avviso>
+        </div>
+      )}
+
       <NavigazioneSezioni />
 
       {/* ── Indicatori di sintesi ─────────────────────────────────────────── */}
@@ -941,7 +959,7 @@ function Intestazione({
           </Link>
           <Link
             href={`/azienda/${identificativo}/report`}
-            className="rounded bg-marchio px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            className="rounded bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-marchio/40"
           >
             Report per il cliente
           </Link>

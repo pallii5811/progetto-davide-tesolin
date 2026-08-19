@@ -149,7 +149,7 @@ export default async function PaginaProspect({
 
           <button
             type="submit"
-            className="rounded bg-marchio px-5 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
           >
             Conta quante sono
           </button>
@@ -193,7 +193,7 @@ export default async function PaginaProspect({
               <Link
                 href={`/prospect?${queryScarica.toString()}`}
                 data-testid="scarica-elenco"
-                className="rounded bg-marchio px-5 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
               >
                 Scarica l&apos;elenco
               </Link>
@@ -235,7 +235,7 @@ export default async function PaginaProspect({
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/azienda/${azienda.providerId}`}
-                        className="rounded bg-marchio px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                        className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
                       >
                         Analizza
                       </Link>
