@@ -34,7 +34,8 @@
     "migra:genera": "npm run generate --workspace @aegis/db",
     "reimposta-password": "tsx scripts/reimposta-password.ts",
     "collaudo": "tsx collaudo/predisposizione.ts && playwright test --project=scrivania",
-    "collaudo:schermate": "tsx collaudo/predisposizione.ts && playwright test --project=schermate"
+    "collaudo:schermate": "tsx collaudo/predisposizione.ts && playwright test --project=schermate",
+    "campi-noti": "node strumenti/estrai-campi.mjs packages/providers/src packages/providers/src/openapi/campi-noti.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

@@ -580,7 +580,9 @@ export function mappaEventiNegativi(
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   return fromProvider(
-    { protesti, pregiudizievoli, procedure },
+    // Questo mappatore lavora sui servizi che restituiscono i soli elenchi, senza gli
+    // indicatori di presenza: nessuna discordanza da conservare.
+    { protesti, pregiudizievoli, procedure, presenzaDichiarataSenzaDettaglio: [] },
     PROVIDER,
     service,
     REGISTRO_PROTESTI,

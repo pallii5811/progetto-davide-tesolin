@@ -31,12 +31,35 @@ export function mappaNegativita(raw: unknown, osservatoIl: Date): Sourced<Eventi
   const contenuto: unknown = pick(raw, 'data', 'result') ?? raw;
   const radice: unknown = Array.isArray(contenuto) ? (contenuto[0] ?? {}) : contenuto;
 
+  const protesti = mappaProtesti(radice);
+  const pregiudizievoli = mappaPregiudizievoli(radice);
+  const procedure = mappaProcedure(radice);
+
+  /*
+    Gli indicatori di presenza, accanto agli elenchi.
+
+    Il servizio reale risponde con `presenzaProtesti`, `presenzaPregiudizievoli` e
+    `presenzaProcedure`, e gli elenchi arrivano `null` quando non c'è nulla. Ma possono
+    arrivare `null` **anche quando l'indicatore dice di sì**: dettaglio non compreso nel
+    servizio, o pratica ancora in lavorazione.
+
+    Leggere i soli elenchi significherebbe rispondere «nessun protesto» su un'impresa
+    protestata — un certificato di buona salute falso, sul fattore che pesa il venti per
+    cento dello score. Qui la discordanza viene conservata invece che appianata.
+  */
+  const dichiarati: ('protesti' | 'pregiudizievoli' | 'procedure')[] = [];
+  if (bool(radice, 'presenzaProtesti') === true && protesti.length === 0) {
+    dichiarati.push('protesti');
+  }
+  if (bool(radice, 'presenzaPregiudizievoli') === true && pregiudizievoli.length === 0) {
+    dichiarati.push('pregiudizievoli');
+  }
+  if (bool(radice, 'presenzaProcedure') === true && procedure.length === 0) {
+    dichiarati.push('procedure');
+  }
+
   return fromProvider(
-    {
-      protesti: mappaProtesti(radice),
-      pregiudizievoli: mappaPregiudizievoli(radice),
-      procedure: mappaProcedure(radice),
-    },
+    { protesti, pregiudizievoli, procedure, presenzaDichiarataSenzaDettaglio: dichiarati },
     PROVIDER,
     'IT-negativita',
     REGISTRO_PROTESTI,
@@ -119,10 +142,25 @@ export function soloIndicatori(raw: unknown): { presenti: boolean; quali: readon
   const contenuto: unknown = pick(raw, 'data', 'result') ?? raw;
   const radice: unknown = Array.isArray(contenuto) ? (contenuto[0] ?? {}) : contenuto;
 
+  /*
+    I nomi veri vengono per primi.
+
+    Questa funzione cercava `protesti`, `hasProtests`, `protests` — nomi plausibili e mai
+    verificati. Il servizio reale usa `presenzaProtesti`, e quelle chiavi contengono gli
+    **elenchi**, non i booleani: `bool` non trovava mai nulla, la funzione restituiva
+    sempre `null`, e il presidio che avrebbe dovuto riconoscere «indicatori senza
+    dettaglio» non è mai entrato in funzione una sola volta.
+
+    Le grafie ipotizzate restano dopo, come ripieghi: costano nulla e coprono eventuali
+    varianti. Ma quella giusta è la prima, ed è quella osservata sulla risposta vera.
+  */
   const indicatori: [string, boolean | null][] = [
-    ['protesti', bool(radice, 'protesti', 'hasProtests', 'protests')],
-    ['pregiudizievoli', bool(radice, 'pregiudizievoli', 'hasPrejudicials', 'prejudicials')],
-    ['procedure concorsuali', bool(radice, 'procedure', 'hasProcedures', 'procedures')],
+    ['protesti', bool(radice, 'presenzaProtesti', 'hasProtests', 'protests')],
+    [
+      'pregiudizievoli',
+      bool(radice, 'presenzaPregiudizievoli', 'hasPrejudicials', 'prejudicials'),
+    ],
+    ['procedure concorsuali', bool(radice, 'presenzaProcedure', 'hasProcedures', 'procedures')],
   ];
 
   const noti = indicatori.filter(([, valore]) => valore !== null);

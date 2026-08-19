@@ -57,6 +57,78 @@ describe('Mappatura eventi negativi', () => {
     expect(mappaNegativita(risposta, OSSERVATO).value.protesti).toHaveLength(1);
   });
 
+  it('legge gli indicatori di presenza con i nomi che il servizio usa davvero', () => {
+    /*
+      La funzione cercava `protesti`, `hasProtests`, `protests`: nomi plausibili e mai
+      verificati. Il servizio reale usa `presenzaProtesti`, e quelle chiavi contengono gli
+      **elenchi**, non i booleani. Risultato: la lettura restituiva sempre `null`, e il
+      presidio che doveva riconoscere «indicatori senza dettaglio» non è mai entrato in
+      funzione nemmeno una volta.
+    */
+    const reale = {
+      data: {
+        presenzaProtesti: false,
+        protesti: null,
+        presenzaPregiudizievoli: false,
+        pregiudizievoli: null,
+        presenzaProcedure: false,
+        procedure: null,
+      },
+    };
+
+    expect(soloIndicatori(reale)).toEqual({ presenti: false, quali: [] });
+  });
+
+  it('non dichiara pulita un’azienda i cui protesti il registro afferma senza dettagliare', () => {
+    /*
+      Il caso più insidioso, e il motivo per cui questo presidio esiste: gli elenchi
+      arrivano vuoti mentre gli indicatori dicono di sì — dettaglio non compreso nel
+      servizio, o pratica ancora in lavorazione.
+
+      Letti i soli elenchi, la risposta sarebbe «nessun evento negativo»: un certificato di
+      buona salute su un'impresa protestata, sul fattore che pesa il venti per cento dello
+      score di credito.
+    */
+    const conBuco = {
+      data: {
+        presenzaProtesti: true,
+        protesti: null,
+        presenzaPregiudizievoli: true,
+        pregiudizievoli: null,
+        presenzaProcedure: false,
+        procedure: null,
+      },
+    };
+
+    const esito = mappaNegativita(conBuco, OSSERVATO).value;
+
+    expect(esito.protesti).toEqual([]);
+    expect(esito.presenzaDichiarataSenzaDettaglio).toEqual(['protesti', 'pregiudizievoli']);
+    expect(soloIndicatori(conBuco)).toEqual({
+      presenti: true,
+      quali: ['protesti', 'pregiudizievoli'],
+    });
+  });
+
+  it('quando il dettaglio c’è, non segnala alcuna discordanza', () => {
+    // La discordanza va segnalata solo quando esiste: dichiararla sempre la renderebbe
+    // rumore, e chi legge smetterebbe di guardarla proprio quando conta.
+    const completo = {
+      data: {
+        presenzaProtesti: true,
+        protesti: [{ data: '2024-03-15', importo: 12_400, tipo: 'Cambiale', luogo: 'Brescia' }],
+        presenzaPregiudizievoli: false,
+        pregiudizievoli: null,
+        presenzaProcedure: false,
+        procedure: null,
+      },
+    };
+
+    const esito = mappaNegativita(completo, OSSERVATO).value;
+    expect(esito.protesti.length).toBe(1);
+    expect(esito.presenzaDichiarataSenzaDettaglio).toEqual([]);
+  });
+
   it('conserva la provenienza', () => {
     const sourced = mappaNegativita({ data: {} }, OSSERVATO);
     expect(sourced.source).toEqual({
@@ -70,16 +142,43 @@ describe('Mappatura eventi negativi', () => {
   });
 });
 
+/**
+ * Gli indicatori sintetici.
+ *
+ * Questi collaudi verificavano i nomi di campo che erano stati **indovinati**, non
+ * osservati: `protesti`, `pregiudizievoli`, `procedure` usati come booleani. Passavano
+ * mentre il prodotto era rotto, perché ripetevano l'ipotesi sbagliata del codice invece di
+ * confrontarla con la realtà — un collaudo scritto sull'assunzione che verifica non
+ * dimostra nulla, dà solo la sensazione di aver verificato.
+ *
+ * Ora si parte dai nomi della risposta reale. Le grafie alternative restano collaudate
+ * come ripieghi, ma dichiarate per quello che sono.
+ */
 describe('Indicatori sintetici di negatività', () => {
-  it('riconosce l’assenza di negatività dai soli booleani', () => {
-    const esito = soloIndicatori({ data: { protesti: false, pregiudizievoli: false, procedure: false } });
+  it('riconosce l’assenza di negatività dai nomi della risposta reale', () => {
+    const esito = soloIndicatori({
+      data: {
+        presenzaProtesti: false,
+        presenzaPregiudizievoli: false,
+        presenzaProcedure: false,
+      },
+    });
     expect(esito?.presenti).toBe(false);
   });
 
   it('elenca quali negatività risultano presenti', () => {
-    const esito = soloIndicatori({ data: { protesti: true, pregiudizievoli: false, procedure: true } });
+    const esito = soloIndicatori({
+      data: { presenzaProtesti: true, presenzaPregiudizievoli: false, presenzaProcedure: true },
+    });
     expect(esito?.presenti).toBe(true);
     expect(esito?.quali).toEqual(['protesti', 'procedure concorsuali']);
+  });
+
+  it('accetta anche le grafie di ripiego, che costano nulla e coprono le varianti', () => {
+    const esito = soloIndicatori({
+      data: { hasProtests: true, hasPrejudicials: false, hasProcedures: false },
+    });
+    expect(esito?.quali).toEqual(['protesti']);
   });
 
   it('restituisce null quando nessun indicatore è presente', () => {

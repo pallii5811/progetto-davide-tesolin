@@ -14,6 +14,8 @@ export * from './openapi/mapper.js';
 export * from './openapi/negativita.js';
 export * from './openapi/provider.js';
 export * from './openapi/prezzi.js';
+export * from './openapi/campi-noti.js';
+export * from './openapi/sorveglianza-campi.js';
 
 import { MockCompanyProvider } from './mock.js';
 import { OpenApiProvider } from './openapi/provider.js';

@@ -232,12 +232,26 @@ export interface EventiNegativi {
   readonly protesti: readonly Protesto[];
   readonly pregiudizievoli: readonly Pregiudizievole[];
   readonly procedure: readonly ProceduraConcorsuale[];
+  /**
+   * Il registro **dichiara** la presenza di eventi di cui non ha fornito il dettaglio.
+   *
+   * Non è una sottigliezza: l'archivio risponde con tre indicatori booleani accanto agli
+   * elenchi, e gli elenchi possono arrivare vuoti anche quando gli indicatori dicono di
+   * sì — dettaglio non incluso nel servizio, oppure ancora in lavorazione.
+   *
+   * Trattare quel caso come «nessun evento» significa emettere un certificato di buona
+   * salute su un'impresa protestata, sul fattore che pesa il **venti per cento** dello
+   * score di credito. Un elenco vuoto e un elenco ignoto sono due cose opposte, e vanno
+   * tenute distinte fino a schermo.
+   */
+  readonly presenzaDichiarataSenzaDettaglio: readonly ('protesti' | 'pregiudizievoli' | 'procedure')[];
 }
 
 export const NESSUN_EVENTO_NEGATIVO: EventiNegativi = {
   protesti: [],
   pregiudizievoli: [],
   procedure: [],
+  presenzaDichiarataSenzaDettaglio: [],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

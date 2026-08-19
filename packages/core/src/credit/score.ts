@@ -588,6 +588,36 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
     }
   }
 
+  /*
+    Il registro dichiara eventi di cui non ha dato il dettaglio.
+
+    È il caso più insidioso: gli elenchi arrivano vuoti e, letti da soli, dicono «pulita».
+    Ma gli indicatori dicono il contrario, e senza importi né date non si può pesare nulla.
+
+    Non si stima una penalità inventata: si dichiara che la valutazione **non è
+    completa**. Un punteggio pieno su un'impresa protestata è un certificato di buona
+    salute falso, e su una proposta assicurativa vale molto più di qualche punto.
+  */
+  const dichiaratiSenzaDettaglio = eventi.presenzaDichiarataSenzaDettaglio;
+  if (dichiaratiSenzaDettaglio.length > 0) {
+    const elenco = dichiaratiSenzaDettaglio.join(', ');
+    return {
+      key: 'eventi-negativi',
+      label: 'Eventi negativi',
+      weight: PESI.eventiNegativi,
+      score: null,
+      rationale:
+        `Il registro dichiara la presenza di ${elenco}, senza fornirne il dettaglio: ` +
+        'la valutazione resta incompleta finché non si acquisisce la visura specifica. ' +
+        'Non si attribuisce un punteggio, perché senza importi e date sarebbe inventato.',
+      details: [
+        `Presenza dichiarata dal registro: ${elenco}.`,
+        'Elenchi non forniti: nessun importo, nessuna data, nessuna possibilità di pesarli.',
+        'Richiedere la visura protesti dedicata prima di formulare una proposta.',
+      ],
+    };
+  }
+
   if (details.length === 0) {
     details.push('Nessun protesto, pregiudizievole o procedura concorsuale rilevata.');
   }

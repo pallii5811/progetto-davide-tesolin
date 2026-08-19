@@ -242,6 +242,7 @@ export function demoCompanyProfile(): CompanyProfile {
         ],
         pregiudizievoli: [],
         procedure: [],
+        presenzaDichiarataSenzaDettaglio: [],
       },
       PROVIDER,
       'IT-protests',

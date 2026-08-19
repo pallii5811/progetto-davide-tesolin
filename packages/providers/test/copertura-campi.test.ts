@@ -135,10 +135,60 @@ describe.skipIf(!disponibile)('Copertura dei campi acquistati', () => {
     ).toEqual([]);
   });
 
+  it('gli eventi negativi vengono letti per intero, indicatori compresi', () => {
+    /*
+      Questo campione mancava, ed è costato caro: la risposta reale porta tre indicatori
+      booleani — `presenzaProtesti`, `presenzaPregiudizievoli`, `presenzaProcedure` —
+      accanto agli elenchi. Nessuno li leggeva, perché la funzione che avrebbe dovuto
+      farlo cercava nomi plausibili e mai verificati.
+
+      Su un'azienda con protesti dichiarati e dettaglio non fornito, la piattaforma avrebbe
+      risposto «nessun evento negativo»: un certificato di buona salute falso, sul fattore
+      che pesa il venti per cento dello score di credito.
+    */
+    const { totale, mancanti } = divario('prod-IT-negativita-12485671007.json');
+
+    expect(totale).toBeGreaterThan(3);
+    expect(
+      mancanti,
+      `campi acquistati e mai letti (${mancanti.length} su ${totale}): ${mancanti.join(', ')}`,
+    ).toEqual([]);
+  });
+
   it('ogni campo scartato ha una motivazione scritta', () => {
     // Un elenco di eccezioni senza motivi torna a essere una lista di dimenticanze.
     for (const [campo, motivo] of Object.entries(SCARTATI_A_RAGION_VEDUTA)) {
       expect(motivo.length, `«${campo}» è scartato senza spiegare perché`).toBeGreaterThan(20);
     }
+  });
+});
+
+/**
+ * L'elenco dei campi noti serve alla sorveglianza a runtime, che confronta ogni risposta
+ * del fornitore con esso e segnala ciò che non vi compare.
+ *
+ * Se invecchia, la sorveglianza smette di sorvegliare proprio i campi nuovi — cioè l'unica
+ * cosa per cui esiste. Qui lo si rigenera dai sorgenti e lo si confronta con quello
+ * committato: chi aggiunge una lettura senza rigenerarlo se ne accorge subito.
+ */
+describe('Elenco dei campi noti', () => {
+  it('è allineato con quello che i mappatori leggono davvero', async () => {
+    const { CAMPI_NOTI } = await import('../src/openapi/campi-noti.js');
+
+    /*
+      Si usa **lo stesso estrattore** che genera il file, non una seconda lettura
+      approssimata: due estrattori diversi divergono, e il collaudo finirebbe per passare
+      misurando qualcos'altro. È esattamente l'errore che ha lasciato passare per mesi la
+      metà dei campi acquistati.
+    */
+    const { estraiCampi } = (await import('../../../strumenti/estrai-campi.mjs')) as {
+      estraiCampi: (dir: string) => readonly string[];
+    };
+    const attesi = estraiCampi(join(process.cwd(), 'packages', 'providers', 'src'));
+
+    expect(
+      [...CAMPI_NOTI],
+      'campi-noti.ts non è allineato ai mappatori. Rigenerare con: npm run campi-noti',
+    ).toEqual([...attesi]);
   });
 });
