@@ -204,6 +204,15 @@ export async function salvaStudioAzione(_precedente: Esito | null, modulo: FormD
     indirizzo: campoTestuale(modulo, 'indirizzo').trim(),
     email: campoTestuale(modulo, 'email').trim(),
     telefono: campoTestuale(modulo, 'telefono').trim(),
+    /*
+      Il logo arriva già come data URI: la conversione avviene nel browser, dove il file
+      c'è. Passare qui il file grezzo richiederebbe multipart su tutta la catena — modulo,
+      azione, API — per un'immagine che pesa quanto un'icona.
+
+      Stringa vuota significa «togli il logo», e va distinta da «campo non inviato»:
+      chi vuole rimuovere il proprio marchio deve poterlo fare.
+    */
+    logo: campoTestuale(modulo, 'logo').trim(),
   };
 
   let esito: Awaited<ReturnType<typeof chiamaApi>>;

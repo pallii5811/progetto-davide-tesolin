@@ -113,6 +113,18 @@ export const tenants = pgTable('tenants', {
   indirizzo: text('indirizzo'),
   email: text('email'),
   telefono: text('telefono'),
+  /**
+   * Logo dello studio, come data URI.
+   *
+   * Il report è il documento che l'intermediario consegna al proprio cliente e su cui
+   * mette la faccia: senza il suo marchio resta lo stampato di un fornitore, e nessuno
+   * consegna a un cliente lo stampato di un fornitore.
+   *
+   * Conservato dentro il record e non come file su disco: sopravvive ai trasferimenti di
+   * macchina, entra nei backup del database insieme a tutto il resto, e non introduce una
+   * cartella di file caricati da proteggere separatamente.
+   */
+  logo: text('logo'),
   /** Tetto di spesa mensile sui dati, in centesimi. Oltre, l'acquisizione si blocca. */
   budgetDatiMensileCentesimi: denaro('budget_dati_mensile_centesimi'),
   /**

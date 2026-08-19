@@ -676,6 +676,8 @@ export interface DatiStudio {
   indirizzo: string | null;
   email: string | null;
   telefono: string | null;
+  /** Logo come data URI: intesta il report che il cliente riceve. */
+  logo: string | null;
 }
 
 /** Anagrafica dell'intermediario: intesta i documenti consegnati al contraente. */

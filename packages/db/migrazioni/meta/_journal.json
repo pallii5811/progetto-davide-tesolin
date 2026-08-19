@@ -43,6 +43,13 @@
       "when": 1787173738306,
       "tag": "0005_indice_costi_per_giorno",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787177338306,
+      "tag": "0006_logo_studio",
+      "breakpoints": true
     }
   ]
 }

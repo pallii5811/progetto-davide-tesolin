@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { salvaStudioAzione } from '../actions';
+import { CampoLogo } from './CampoLogo';
 import type { DatiStudio } from '@/lib/api';
 
 const CAMPO =
@@ -122,6 +123,8 @@ export function ModuloStudio({ studio }: { studio: DatiStudio | null }) {
           <p className={`text-sm ${esito.ok ? 'text-basso' : 'text-critico'}`}>{esito.messaggio}</p>
         )}
       </div>
+
+      <CampoLogo iniziale={studio?.logo ?? null} />
 
       <Bottone />
     </form>

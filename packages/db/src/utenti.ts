@@ -294,6 +294,8 @@ export interface DatiStudio {
   readonly indirizzo: string | null;
   readonly email: string | null;
   readonly telefono: string | null;
+  /** Logo come data URI: il report è il documento su cui l'intermediario mette la faccia. */
+  readonly logo: string | null;
 }
 
 /**
@@ -313,6 +315,7 @@ export async function leggiStudio(db: Database, tenantId: string): Promise<DatiS
       indirizzo: schema.tenants.indirizzo,
       email: schema.tenants.email,
       telefono: schema.tenants.telefono,
+      logo: schema.tenants.logo,
     })
     .from(schema.tenants)
     .where(eq(schema.tenants.id, tenantId))
@@ -444,6 +447,7 @@ export interface ModificheStudio {
   readonly indirizzo?: string | null | undefined;
   readonly email?: string | null | undefined;
   readonly telefono?: string | null | undefined;
+  readonly logo?: string | null | undefined;
 }
 
 export async function aggiornaStudio(
@@ -457,7 +461,7 @@ export async function aggiornaStudio(
   if (dati.denominazione !== undefined && dati.denominazione.trim() !== '') {
     modifiche['denominazione'] = dati.denominazione.trim();
   }
-  for (const chiave of ['numeroRui', 'partitaIva', 'indirizzo', 'email', 'telefono'] as const) {
+  for (const chiave of ['numeroRui', 'partitaIva', 'indirizzo', 'email', 'telefono', 'logo'] as const) {
     const valore = dati[chiave];
     if (valore === undefined) continue;
     modifiche[chiave] = valore === null || valore.trim() === '' ? null : valore.trim();

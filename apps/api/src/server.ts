@@ -1586,6 +1586,25 @@ const datiStudioSchema = z.object({
   indirizzo: z.string().trim().max(200).nullable().optional(),
   email: z.string().trim().max(200).nullable().optional(),
   telefono: z.string().trim().max(40).nullable().optional(),
+  /**
+   * Logo dello studio, come data URI di un'immagine.
+   *
+   * Si accettano solo `data:image/...`: un data URI è testo, e senza questo vincolo
+   * qualunque contenuto — compreso uno script — finirebbe in un attributo `src` del
+   * report, che l'intermediario consegna al proprio cliente.
+   *
+   * Il limite di 512 KB è generoso per un logo e stretto abbastanza da non trasformare
+   * l'anagrafica dello studio in un archivio di immagini.
+   */
+  logo: z
+    .string()
+    .trim()
+    .max(512 * 1024)
+    .regex(/^data:image\/(png|jpeg|webp|svg\+xml);base64,/, {
+      message: 'Il logo deve essere un’immagine PNG, JPEG, WebP o SVG',
+    })
+    .nullable()
+    .optional(),
 });
 
 const nuovoUtenteSchema = z.object({

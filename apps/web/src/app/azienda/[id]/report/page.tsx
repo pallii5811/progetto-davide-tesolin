@@ -63,8 +63,30 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         {/* ── Frontespizio ───────────────────────────────────────────────── */}
         <header className="print-keep mb-8 border-b-2 border-testo pb-5">
           {studio !== null && (
-            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-bordo pb-3">
-              <p className="text-sm font-bold tracking-tight">{studio.denominazione}</p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-bordo pb-3">
+              <div className="flex items-center gap-3">
+                {/*
+                  Il marchio dello studio, quando c'è.
+
+                  Non è decorazione: questo documento l'intermediario lo consegna al proprio
+                  cliente e ci mette la faccia. Senza il suo marchio resta lo stampato di un
+                  fornitore, e nessuno consegna a un cliente lo stampato di un fornitore.
+
+                  Altezza limitata e larghezza libera: i loghi degli studi sono quasi sempre
+                  orizzontali, e vincolare la larghezza li schiaccerebbe. `object-contain`
+                  impedisce la deformazione, che su un marchio si nota subito.
+                */}
+                {studio.logo !== null && studio.logo !== '' && (
+                  // eslint-disable-next-line @next/next/no-img-element -- data URI: nessuna
+                  // ottimizzazione possibile, e `next/image` richiederebbe un dominio noto.
+                  <img
+                    src={studio.logo}
+                    alt={`Logo di ${studio.denominazione}`}
+                    className="h-10 w-auto max-w-[12rem] object-contain"
+                  />
+                )}
+                <p className="text-sm font-bold tracking-tight">{studio.denominazione}</p>
+              </div>
               <p className="text-xs text-testo-tenue">
                 {[
                   studio.numeroRui === null ? null : `RUI n. ${studio.numeroRui}`,
