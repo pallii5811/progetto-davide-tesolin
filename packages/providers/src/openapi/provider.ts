@@ -8,8 +8,8 @@
  */
 
 import { DATI_DICHIARATI_VUOTI, parsePartitaIva } from '@aegis/core';
-import { BILANCIO_DEPOSITATO, REGISTRO_IMPRESE, fromProvider } from '@aegis/core';
-import type { Bilancio, CompanyProfile, EventiNegativi, PartitaIva, Sourced } from '@aegis/core';
+import { BILANCIO_DEPOSITATO, REGISTRO_IMPRESE, Money, fromProvider, isBilancioSinteticoUtile } from '@aegis/core';
+import type { Bilancio, CompanyProfile, EventiNegativi, Money as Euro, PartitaIva, Sourced } from '@aegis/core';
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger } from '../http.js';
 import { ProviderError } from '../port.js';
@@ -20,6 +20,7 @@ import type {
   FetchLevel,
   RisultatoProspezione,
   SearchCriteria,
+  SintesiAzienda,
 } from '../port.js';
 import { OPENAPI_DEFAULT_CONFIG, baseUrlPer, baseUrlRischioPer } from './config.js';
 import type { AmbienteOpenApi, OpenApiConfig, ServiceConfig } from './config.js';
@@ -35,7 +36,7 @@ import {
 } from './mapper.js';
 import type { ProfiloCompleto } from './mapper.js';
 import { mappaNegativita } from './negativita.js';
-import { asArray, bool, num, partitaIvaOf, pick, str } from './parse.js';
+import { asArray, bool, money, num, partitaIvaOf, pick, str } from './parse.js';
 
 /**
  * Quante aziende si scaricano per volta, se non è chiesto altrimenti.
@@ -570,8 +571,63 @@ export class OpenApiProvider implements CompanyDataProvider {
       // fornitore (`60d1bfc7…`): finiva nel collegamento «Analizza», che è la chiave con
       // cui l'archivio riconosce l'azienda ed evita di riacquistarla.
       providerId: piva ?? str(raw, 'vatCode', 'partitaIva', 'taxCode', 'id') ?? '',
+      sintesi: sintesiDa(raw),
     };
   }
+}
+
+/**
+ * I numeri che il record acquistato porta già con sé.
+ *
+ * Si legge l'ultimo esercizio **utile** — le anagrafiche restituiscono anche l'anno in
+ * corso con tutti i valori nulli, e mostrarlo darebbe «fatturato: —» su un'azienda che il
+ * fatturato ce l'ha. Gli altri campi si cercano prima fra quelli anagrafici, che sono più
+ * aggiornati del bilancio depositato, e solo poi nel bilancio.
+ *
+ * Restituisce `null` quando non c'è **niente** da mostrare: una riga di trattini fa
+ * credere che l'azienda non abbia dati, mentre il vero significato è che quel record non
+ * li contiene.
+ */
+function sintesiDa(raw: unknown): SintesiAzienda | null {
+  const esercizi = mappaBilanciSintetici(raw).filter(isBilancioSinteticoUtile);
+  const ultimo = esercizi[0] ?? null;
+
+  const dipendenti =
+    num(raw, 'employees', 'numeroDipendenti', 'addetti', 'employeesNumber') ??
+    ultimo?.dipendenti ??
+    null;
+
+  const euro = (valore: Euro | null | undefined): number | null =>
+    valore === null || valore === undefined ? null : Money.toEuro(valore);
+
+  const sintesi: SintesiAzienda = {
+    annoUltimoBilancio: ultimo?.anno ?? null,
+    dipendenti,
+    fatturatoEuro: euro(money(raw, 'turnover', 'fatturato', 'revenue') ?? ultimo?.fatturato),
+    patrimonioNettoEuro: euro(ultimo?.patrimonioNetto),
+    totaleAttivoEuro: euro(ultimo?.totaleAttivo),
+    capitaleSocialeEuro: euro(
+      money(raw, 'shareCapital', 'capitaleSociale') ?? ultimo?.capitaleSociale,
+    ),
+    retribuzioneMediaEuro: euro(ultimo?.retribuzioneMediaLorda),
+    numeroSoci: contaSoci(raw),
+    eserciziDisponibili: esercizi.length,
+  };
+
+  const qualcosa =
+    sintesi.dipendenti !== null ||
+    sintesi.fatturatoEuro !== null ||
+    sintesi.capitaleSocialeEuro !== null ||
+    sintesi.numeroSoci !== null ||
+    sintesi.eserciziDisponibili > 0;
+
+  return qualcosa ? sintesi : null;
+}
+
+/** Quanti soci dichiara il record. `null` distingue «non li porta» da «non ne ha». */
+function contaSoci(raw: unknown): number | null {
+  const elenco = pick(raw, 'shareHolders', 'shareholders', 'soci', 'members');
+  return Array.isArray(elenco) ? elenco.length : null;
 }
 
 /**

@@ -19,6 +19,7 @@ import type {
   FetchLevel,
   RisultatoProspezione,
   SearchCriteria,
+  SintesiAzienda,
 } from './port.js';
 
 interface Variante {
@@ -104,6 +105,10 @@ export class MockCompanyProvider implements CompanyDataProvider {
         attiva: true,
         statoAttivita: 'attiva' as const,
         providerId: v.partitaIva,
+        // Anche la dimostrazione deve mostrare ciò che la ricerca vera porta con sé:
+        // altrimenti il difetto «pago il record e vedo l'ATECO» tornerebbe invisibile
+        // proprio nella modalità con cui si collauda.
+        sintesi: sintesiDimostrativa(v),
       })),
     );
   }
@@ -154,6 +159,7 @@ export class MockCompanyProvider implements CompanyDataProvider {
             attiva: true,
             statoAttivita: 'attiva' as const,
             providerId: v.partitaIva,
+            sintesi: sintesiDimostrativa(v),
           })),
     });
   }
@@ -265,4 +271,29 @@ function parseAtecoOrThrow(code: string): AtecoCode {
     throw new ProviderError(`Codice ATECO dimostrativo non valido: ${code}`, 'risposta-non-valida');
   }
   return code as AtecoCode;
+}
+
+/**
+ * La sintesi dimostrativa, coerente con il bilancio della stessa variante.
+ *
+ * I numeri si ricavano dallo stesso moltiplicatore che scala il bilancio: mostrare in
+ * ricerca un fatturato diverso da quello che l'analisi calcolerà due clic dopo sarebbe
+ * peggio che non mostrarlo, perché insegnerebbe a non fidarsi della prima schermata.
+ */
+function sintesiDimostrativa(variante: Variante): SintesiAzienda {
+  const scala = (valore: number): number => Math.round(valore * variante.moltiplicatore);
+
+  return {
+    annoUltimoBilancio: 2025,
+    dipendenti: scala(35),
+    fatturatoEuro: scala(6_480_000),
+    patrimonioNettoEuro: scala(1_280_000),
+    totaleAttivoEuro: scala(5_550_000),
+    capitaleSocialeEuro: scala(500_000),
+    // Costo del personale diviso gli addetti: è il modo in cui si ricava dai bilanci
+    // sintetici, e resta un ordine di grandezza, non una busta paga.
+    retribuzioneMediaEuro: Math.round(1_600_000 / 35),
+    numeroSoci: 2,
+    eserciziDisponibili: 10,
+  };
 }

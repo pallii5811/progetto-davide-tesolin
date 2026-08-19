@@ -932,8 +932,30 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const risultati = await provider.search(parsed.data);
-    return { risultati, provider: provider.name };
+    /*
+      La ricerca per partita IVA **è a pagamento**: acquista l'anagrafica estesa, che poi
+      l'analisi riusa dalla cache invece di ricomprarla.
+
+      Per un periodo il costo non è stato né registrato né soggetto al tetto: il credito
+      usciva dal contratto e il registro diceva zero. Ne seguivano tre cose, tutte gravi —
+      il tetto giornaliero non proteggeva la ricerca, il credito residuo mostrava un numero
+      falso, e chi vedeva il saldo calare non aveva modo di sapere dove fossero finiti i
+      soldi. Una spesa che non compare nella propria contabilità è peggio di una spesa
+      alta: non si può governare.
+    */
+    const esitoTetto = await oltreIlTetto(request);
+    if (esitoTetto !== null) {
+      return reply.status(429).send({
+        errore: messaggioTetto(esitoTetto, 'Le ricerche riprendono domani.'),
+      });
+    }
+
+    const { risultato: risultati, eventi } = await conCostiDellaRichiesta(() =>
+      provider.search(parsed.data),
+    );
+    await registraSpese(request, eventi);
+
+    return { risultati, provider: provider.name, costoCentesimi: costoDegliEventi(eventi) };
   });
 
   /**

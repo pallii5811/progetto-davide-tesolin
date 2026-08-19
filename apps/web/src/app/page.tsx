@@ -1,7 +1,9 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
 import { INDIRIZZO_API, cercaAziende, statoServizio } from '@/lib/api';
+import type { RisultatoRicerca } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
+import { ModuloRicerca } from './ModuloRicerca';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,47 +124,24 @@ export default async function PaginaRicerca({
       )}
 
       <Scheda className="mb-8">
-        <form method="get" className="grid gap-4 sm:grid-cols-[2fr_1fr_auto]">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-              Denominazione
-            </span>
-            <input
-              type="text"
-              name="q"
-              defaultValue={parametri.q ?? ''}
-              placeholder="Ragione sociale, anche parziale"
-              className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio"
-            />
-          </label>
+        <ModuloRicerca
+          denominazione={parametri.q ?? ''}
+          partitaIva={parametri.piva ?? ''}
+          aPagamento={stato?.datiReali === true}
+        />
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-              Partita IVA
-            </span>
-            <input
-              type="text"
-              name="piva"
-              inputMode="numeric"
-              defaultValue={parametri.piva ?? ''}
-              placeholder="11 cifre"
-              className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio"
-            />
-          </label>
-
-          <button
-            type="submit"
-            className="self-end rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
-          >
-            Cerca
-          </button>
-        </form>
-
-        <p className="mt-3 text-xs text-testo-debole">
-          Esempi in modalità dimostrativa: <code className="font-mono">03158460174</code> (meccanica,
-          Brescia) · <code className="font-mono">02657870644</code> (costruzioni, Avellino) ·{' '}
-          <code className="font-mono">02413390390</code> (logistica, Ravenna)
-        </p>
+        {/*
+          Gli esempi hanno senso solo quando sono utilizzabili: sui dati reali quelle tre
+          partite IVA non esistono, e chi le provasse pagherebbe una ricerca per non
+          trovare nulla.
+        */}
+        {stato !== null && !stato.datiReali && (
+          <p className="mt-3 text-xs text-testo-debole">
+            Esempi in modalità dimostrativa: <code className="font-mono">03158460174</code>{' '}
+            (meccanica, Brescia) · <code className="font-mono">02657870644</code> (costruzioni,
+            Avellino) · <code className="font-mono">02413390390</code> (logistica, Ravenna)
+          </p>
+        )}
       </Scheda>
 
       {errore !== null && (
@@ -175,56 +154,27 @@ export default async function PaginaRicerca({
         <p className="text-sm text-testo-tenue">Nessuna azienda trovata con questi criteri.</p>
       )}
 
+      {/*
+        Cosa si è ottenuto e cosa manca ancora.
+
+        Il risultato della ricerca è **una conferma di identità**, non l'analisi: cinque
+        campi per stabilire che l'azienda è quella giusta prima di spendere per il resto.
+        Senza dirlo, chi ha appena visto scalare del credito guarda cinque colonne e
+        conclude che il prodotto non funzioni — è successo davvero, e la domanda era
+        «dove sono tutti i dati?».
+
+        Il dato camerale che si sta leggendo è **già pagato**: l'analisi lo riusa e non lo
+        ricompra. Dirlo serve a far capire che il passo successivo costa meno di quanto
+        sembri, non a giustificare la spesa.
+      */}
       {risultati !== null && risultati.risultati.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-bordo">
-          <table className="w-full text-sm">
-            <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Denominazione</th>
-                <th className="px-4 py-2.5 font-medium">Partita IVA</th>
-                <th className="px-4 py-2.5 font-medium">Sede</th>
-                <th className="px-4 py-2.5 font-medium">ATECO</th>
-                <th className="px-4 py-2.5 font-medium">Stato</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {risultati.risultati.map((azienda) => (
-                <tr key={azienda.providerId} className="border-t border-bordo bg-superficie">
-                  <td className="px-4 py-3 font-medium">{azienda.denominazione}</td>
-                  <td className="tabular px-4 py-3 text-testo-tenue">{azienda.partitaIva ?? '—'}</td>
-                  <td className="px-4 py-3 text-testo-tenue">
-                    {azienda.comune ?? '—'}
-                    {azienda.provincia !== null && ` (${azienda.provincia})`}
-                  </td>
-                  <td className="tabular px-4 py-3 text-testo-tenue">{azienda.ateco ?? '—'}</td>
-                  {/*
-                    Lo stato camerale prima dell'analisi: analizzare un'impresa cessata
-                    spende credito per un profilo che non serve a nessun preventivo.
-                  */}
-                  <td className="px-4 py-3">
-                    {azienda.statoAttivita === 'attiva' ? (
-                      <span className="text-testo-tenue">Attiva</span>
-                    ) : (
-                      <span className="rounded bg-critico/15 px-2 py-0.5 text-xs font-medium capitalize text-critico">
-                        {azienda.statoAttivita.replace('-', ' ')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/azienda/${azienda.providerId}`}
-                      className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
-                    >
-                      Analizza
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mb-3 space-y-4">
+          {risultati.risultati.map((azienda) => (
+            <SchedaRisultato key={azienda.providerId} azienda={azienda} />
+          ))}
         </div>
       )}
+
 
       {/*
         La ricerca per denominazione usa l'elenco camerale, che non porta il settore.
@@ -237,4 +187,123 @@ export default async function PaginaRicerca({
       )}
     </>
   );
+}
+
+/**
+ * Il risultato di una ricerca, con quello che il record acquistato contiene già.
+ *
+ * Era una riga di tabella con sei colonne. Ma il record che la ricerca compra —
+ * `IT-advanced`, dieci centesimi — porta addetti, fatturato, patrimonio, capitale sociale,
+ * retribuzione media, la compagine sociale e dieci anni di bilanci sintetici: mostrarne
+ * sei campi significava pagare l'intero e far vedere l'ATECO.
+ *
+ * Non era solo spreco. Chi vede scalare del credito e riceve cinque colonne conclude che
+ * il prodotto non funzioni — ed è successo davvero, con la domanda «dove sono tutti i
+ * dati?». Il difetto stava in un mappatore che scartava campi già pagati, e nel fatto che
+ * nessuno avesse mai confrontato ciò che si comprava con ciò che si mostrava.
+ *
+ * L'analisi resta il passo che conta: bilanci riclassificati, merito creditizio, rischi,
+ * somme assicurande. Ma qui si vede già se vale la pena di farla, ed è esattamente ciò a
+ * cui serve una ricerca.
+ */
+function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
+  const s = azienda.sintesi;
+
+  return (
+    <div className="rounded-lg border border-bordo bg-superficie p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold">{azienda.denominazione}</p>
+          <p className="mt-0.5 text-xs text-testo-debole">
+            <span className="tabular">{azienda.partitaIva ?? '—'}</span>
+            {' · '}
+            {azienda.comune ?? '—'}
+            {azienda.provincia !== null && ` (${azienda.provincia})`}
+            {azienda.ateco !== null && (
+              <>
+                {' · ATECO '}
+                <span className="tabular">{azienda.ateco}</span>
+              </>
+            )}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/*
+            Lo stato camerale prima dell'analisi: analizzare un'impresa cessata spende
+            credito per un profilo che non serve a nessun preventivo.
+          */}
+          {azienda.statoAttivita === 'attiva' ? (
+            <span className="rounded border border-basso/30 bg-basso-fondo px-1.5 py-0.5 text-xs font-medium text-basso">
+              attiva
+            </span>
+          ) : (
+            <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium capitalize text-critico">
+              {azienda.statoAttivita.replace('-', ' ')}
+            </span>
+          )}
+          <Link
+            href={`/azienda/${azienda.providerId}`}
+            className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
+          >
+            Analizza
+          </Link>
+        </div>
+      </div>
+
+      {s !== null && (
+        <>
+          <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+            <Dato etichetta="Dipendenti" valore={numero(s.dipendenti)} />
+            <Dato etichetta="Fatturato" valore={euro(s.fatturatoEuro)} />
+            <Dato etichetta="Patrimonio netto" valore={euro(s.patrimonioNettoEuro)} />
+            <Dato etichetta="Totale attivo" valore={euro(s.totaleAttivoEuro)} />
+            <Dato etichetta="Capitale sociale" valore={euro(s.capitaleSocialeEuro)} />
+            <Dato etichetta="Retribuzione media" valore={euro(s.retribuzioneMediaEuro)} />
+            <Dato etichetta="Soci" valore={numero(s.numeroSoci)} />
+            <Dato etichetta="Esercizi disponibili" valore={numero(s.eserciziDisponibili)} />
+          </dl>
+
+          <p className="mt-3 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-tenue">
+            {s.annoUltimoBilancio !== null && (
+              <>
+                Dati dell&apos;esercizio {s.annoUltimoBilancio}, dal Registro Imprese.{' '}
+              </>
+            )}
+            Con l&apos;analisi arrivano bilanci riclassificati, merito creditizio, registro dei
+            rischi, somme assicurande e verifica dell&apos;obbligo catastrofale.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Dato({ etichetta, valore }: { etichetta: string; valore: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-testo-debole">{etichetta}</dt>
+      <dd className="tabular mt-0.5 text-sm font-medium">{valore}</dd>
+    </div>
+  );
+}
+
+/**
+ * «Non disponibile» e «zero» sono cose diverse.
+ *
+ * Un fatturato assente significa che il record non lo porta; stampare «0 €» direbbe che
+ * l'azienda non ha fatturato, che è un'affermazione ben più forte e quasi sempre falsa.
+ */
+function euro(valore: number | null): string {
+  return valore === null
+    ? 'n.d.'
+    : new Intl.NumberFormat('it-IT', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumFractionDigits: 0,
+      }).format(valore);
+}
+
+function numero(valore: number | null): string {
+  return valore === null ? 'n.d.' : new Intl.NumberFormat('it-IT').format(valore);
 }

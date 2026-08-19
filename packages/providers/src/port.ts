@@ -51,6 +51,37 @@ export interface CompanySearchResult {
    * non ha significato fuori da quel fornitore.
    */
   readonly providerId: string;
+  /**
+   * Quello che il record acquistato contiene già.
+   *
+   * La ricerca per partita IVA compra `IT-advanced`, cioè l'anagrafica **estesa**: addetti,
+   * fatturato, patrimonio, capitale sociale, retribuzione media, dieci anni di bilanci
+   * sintetici e la compagine sociale. Per un periodo il risultato ne conservava sei campi
+   * e buttava via il resto: si pagava il record intero e si vedeva l'ATECO.
+   *
+   * Non era solo spreco — era la ragione per cui la ricerca sembrava rotta. Chi vede
+   * scalare del credito e riceve cinque colonne conclude che il prodotto non funzioni, e
+   * ha ragione a concluderlo.
+   *
+   * `null` quando la ricerca è stata **testuale**: l'elenco camerale per denominazione
+   * non porta questi dati, e restituire zeri li farebbe sembrare misurati.
+   */
+  readonly sintesi: SintesiAzienda | null;
+}
+
+/** I numeri che l'anagrafica estesa porta con sé, già pagati con la ricerca. */
+export interface SintesiAzienda {
+  readonly annoUltimoBilancio: number | null;
+  readonly dipendenti: number | null;
+  readonly fatturatoEuro: number | null;
+  readonly patrimonioNettoEuro: number | null;
+  readonly totaleAttivoEuro: number | null;
+  readonly capitaleSocialeEuro: number | null;
+  /** Retribuzione annua lorda media, ricavata dal costo del personale sugli addetti. */
+  readonly retribuzioneMediaEuro: number | null;
+  readonly numeroSoci: number | null;
+  /** Quanti esercizi il record contiene: dice se l'analisi avrà una storia da leggere. */
+  readonly eserciziDisponibili: number;
 }
 
 /**

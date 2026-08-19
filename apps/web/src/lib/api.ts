@@ -49,6 +49,25 @@ export interface RisultatoRicerca {
   attiva: boolean;
   statoAttivita: 'attiva' | 'inattiva' | 'sospesa' | 'cessata' | 'in-liquidazione' | 'fallita';
   providerId: string;
+  /**
+   * I numeri che il record acquistato porta già con sé.
+   *
+   * `null` sulle ricerche per denominazione: l'elenco camerale non li contiene, e mostrare
+   * dei trattini farebbe credere che l'azienda non abbia dati.
+   */
+  sintesi: SintesiRicerca | null;
+}
+
+export interface SintesiRicerca {
+  annoUltimoBilancio: number | null;
+  dipendenti: number | null;
+  fatturatoEuro: number | null;
+  patrimonioNettoEuro: number | null;
+  totaleAttivoEuro: number | null;
+  capitaleSocialeEuro: number | null;
+  retribuzioneMediaEuro: number | null;
+  numeroSoci: number | null;
+  eserciziDisponibili: number;
 }
 
 export type LivelloRischio = 'basso' | 'moderato' | 'rilevante' | 'alto' | 'critico';
