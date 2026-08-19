@@ -1,12 +1,13 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
-import { analizzaAzienda, collegamentiDiAzienda } from '@/lib/api';
+import { analizzaAzienda, collegamentiDiAzienda, compagnieCensite } from '@/lib/api';
 import type {
   AnalisiDto,
   CollegamentoSocietario,
   GapDto,
   LivelloRischio,
   RischioDto,
+  SoliditaCompagnia,
 } from '@/lib/api';
 import {
   Avviso,
@@ -60,6 +61,16 @@ export default async function PaginaAzienda({
   // rotta non risponde l'analisi resta leggibile, e questa sezione semplicemente manca.
   const collegamenti: CollegamentoSocietario[] = await collegamentiDiAzienda(id)
     .then((r) => r.collegamenti)
+    .catch(() => []);
+
+  /*
+    La solidità della compagnia va mostrata **accanto alla polizza**, non in un'anagrafe a
+    parte: è lì che si decide se quella copertura va bene, ed è lì che serve sapere se chi
+    l'ha sottoscritta è in grado di pagare. Un dato corretto ma lontano dal punto di
+    decisione vale quanto un dato assente.
+  */
+  const compagnie: SoliditaCompagnia[] = await compagnieCensite()
+    .then((r) => r.compagnie)
     .catch(() => []);
 
   // Zero euro di esposizione con delle coperture non quantificabili non è una buona
@@ -510,7 +521,11 @@ export default async function PaginaAzienda({
       >
         <div className="space-y-3">
           {gap.voci.map((voce) => (
-            <VoceGap key={voce.copertura} voce={voce} />
+            <VoceGap
+              key={voce.copertura}
+              voce={voce}
+              compagnia={compagniaDi(voce, compagnie)}
+            />
           ))}
         </div>
       </Sezione>
@@ -951,7 +966,35 @@ function Intestazione({
   );
 }
 
-function VoceGap({ voce }: { voce: GapDto }) {
+/**
+ * La compagnia della polizza, se è stata censita.
+ *
+ * Il confronto è sul nome normalizzato: sulle polizze la ragione sociale si scrive in
+ * dieci modi — con e senza «S.p.A.», con e senza punti — e un confronto letterale non
+ * troverebbe quasi mai la compagnia che pure è in anagrafe.
+ */
+function compagniaDi(voce: GapDto, compagnie: readonly SoliditaCompagnia[]): SoliditaCompagnia | null {
+  if (voce.polizza === null) return null;
+  const cercata = normalizzaNome(voce.polizza.compagnia);
+  return compagnie.find((c) => normalizzaNome(c.denominazione) === cercata) ?? null;
+}
+
+function normalizzaNome(valore: string): string {
+  return valore
+    .toLowerCase()
+    .replace(/[.,]/g, '')
+    .replace(/\b(spa|srl|s p a|s r l|societa|assicurazioni|compagnia)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function VoceGap({
+  voce,
+  compagnia,
+}: {
+  voce: GapDto;
+  compagnia: SoliditaCompagnia | null;
+}) {
   return (
     <Scheda className={voce.stato === 'adeguata' ? 'opacity-70' : ''}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -1013,6 +1056,32 @@ function VoceGap({ voce }: { voce: GapDto }) {
           Polizza {voce.polizza.compagnia}
           {voce.polizza.numero !== null && ` n. ${voce.polizza.numero}`} · scadenza{' '}
           {new Intl.DateTimeFormat('it-IT').format(new Date(voce.polizza.scadenza))}
+          {/*
+            Una copertura adeguata presso una compagnia fragile non è una copertura
+            adeguata: è il rischio spostato da un posto visibile a uno che nessuno guarda.
+          */}
+          {compagnia !== null && (
+            <>
+              {' · '}
+              <span
+                className={
+                  compagnia.fascia === 'critica' || compagnia.fascia === 'debole'
+                    ? 'font-medium text-critico'
+                    : 'text-testo-tenue'
+                }
+              >
+                solidità {compagnia.punteggio}/100 · {compagnia.fasciaEtichetta}
+              </span>
+            </>
+          )}
+          {compagnia === null && (
+            <>
+              {' · '}
+              <Link href="/impostazioni/compagnie" className="text-marchio hover:underline">
+                solidità non censita
+              </Link>
+            </>
+          )}
         </p>
       )}
 

@@ -11,7 +11,7 @@
  *    non riproducibile è indifendibile davanti a una contestazione.
  */
 
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -695,4 +695,32 @@ export async function collegamentiSocietari(
   }
 
   return [...perSocio.values()];
+}
+
+/**
+ * Quanto ha speso oggi questo intermediario.
+ *
+ * Serve al tetto di spesa, che è l'unica difesa contro l'errore più caro possibile su un
+ * servizio prepagato: un'importazione massiva lanciata due volte, un filtro sbagliato, una
+ * dimenticanza. Il credito non si esaurisce con un avviso, si esaurisce e basta — e il
+ * lunedì mattina l'intermediario scopre che nessuna analisi funziona più.
+ *
+ * Le chiamate servite dalla cache non contano: non sono state pagate.
+ */
+export async function spesaOdierna(db: Database, tenantId: string, adesso = new Date()): Promise<number> {
+  const inizioGiornata = new Date(adesso);
+  inizioGiornata.setHours(0, 0, 0, 0);
+
+  const righe = await db
+    .select({ totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)` })
+    .from(schema.registroCostiDati)
+    .where(
+      and(
+        eq(schema.registroCostiDati.tenantId, tenantId),
+        eq(schema.registroCostiDati.servitoDaCache, false),
+        gte(schema.registroCostiDati.avvenutoIl, inizioGiornata),
+      ),
+    );
+
+  return centesimi(righe[0]?.totale ?? 0);
 }

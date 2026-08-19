@@ -197,6 +197,24 @@ requisito patrimoniale — - 150% debole · 200% adeguata · 250% solida · oltr
 solida. La media del mercato italiano si colloca stabilmente sopra il 250%.
 
 ---
+## 5-ter. Tetto di spesa
+
+`AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI` — predefinito **2000** (20 € al giorno per
+intermediario). Zero disattiva il controllo.
+
+Il tetto si verifica **prima** di ogni operazione a pagamento, non a consuntivo: un limite
+controllato dopo è un rendiconto, non un limite. Raggiunto il tetto, analisi, importazioni
+e scarichi di prospect rispondono `429` con l'importo già speso; il **conteggio dei
+prospect resta disponibile**, perché è gratuito ed è l'unico strumento per pianificare la
+spesa del giorno dopo.
+
+Le chiamate servite dalla cache non contano: non sono state pagate.
+
+Il tetto vale **per intermediario**: le spese di uno studio non fermano il lavoro di un
+altro.
+
+---
+
 ## 6. Produzione
 
 ### 6.1 Database
@@ -360,6 +378,26 @@ Per il ciclo di vita delle sessioni contro un servizio già in esecuzione:
 ```bash
 npm run verifica:sessione -- admin@aegis.local <password>
 ```
+
+---
+
+## 10-bis. Da fare prima della produzione: Row Level Security
+
+L'isolamento fra intermediari è oggi **applicativo**: ogni lettura risolve l'azienda
+attraverso il proprio intermediario, e nessun percorso lo salta — verificato riga per riga.
+Ma è una garanzia che dipende dalla disciplina di chi scrive il codice, non dal database.
+
+`packages/db/src/rls.ts` contiene le policy PostgreSQL che imporrebbero l'isolamento a
+livello di motore: se il codice sbaglia, il database restituisce zero righe invece dei dati
+di un altro studio. **Sono scritte e non sono mai state applicate.**
+
+Attivarle richiede due cose: eseguire quel SQL come migrazione con un ruolo proprietario, e
+impostare `SET LOCAL app.tenant_id` all'apertura di ogni transazione applicativa. È un
+intervento sul livello di accesso ai dati, va fatto su un PostgreSQL vero e va collaudato:
+non è materiale da ultima serata prima della consegna.
+
+In un sistema che custodisce i portafogli clienti di broker concorrenti, questa è la prima
+voce della lista di produzione.
 
 ---
 

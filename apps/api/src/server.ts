@@ -67,7 +67,7 @@ import {
   toPolizza,
 } from './schemas.js';
 // L'anagrafe delle compagnie è condivisa fra intermediari: non passa dal contesto tenant.
-import { elencoSolidita, salvaSolidita } from '@aegis/db';
+import { elencoSolidita, salvaSolidita, spesaOdierna } from '@aegis/db';
 import { MemoryDossierStore, MemoryPortafoglioStore } from './store.js';
 import type { DossierStore, PortafoglioStore } from './store.js';
 import type { Persistenza } from './persistenza.js';
@@ -147,6 +147,37 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    * Senza persistenza non c'è dove scriverle: la modalità in memoria serve ai test e alla
    * dimostrazione, dove il credito non esiste.
    */
+  /**
+   * Tetto di spesa giornaliero, in centesimi.
+   *
+   * Zero disattiva il controllo. Il valore predefinito è deliberatamente basso: su un
+   * servizio prepagato l'errore più caro non è la singola analisi sbagliata, è
+   * l'importazione lanciata due volte o il filtro impostato male — e il credito non si
+   * esaurisce con un avviso, si esaurisce e basta.
+   *
+   * Chi vuole spendere di più lo dichiara: alzare un numero in configurazione è una
+   * decisione consapevole, scoprire il conto a zero non lo è.
+   */
+  const tettoGiornaliero = Number.parseInt(
+    process.env['AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI'] ?? '2000',
+    10,
+  );
+
+  /**
+   * Rifiuta le operazioni a pagamento quando il tetto è stato raggiunto.
+   *
+   * Il controllo è **prima** della chiamata, non dopo: un tetto verificato a consuntivo
+   * è un rendiconto, non un tetto.
+   */
+  const oltreIlTetto = async (request: FastifyRequest): Promise<number | null> => {
+    if (tettoGiornaliero <= 0 || persistenza === undefined) return null;
+    const sessione = request.sessione;
+    if (sessione === undefined) return null;
+
+    const speso = await spesaOdierna(persistenza.db, sessione.tenantId);
+    return speso >= tettoGiornaliero ? speso : null;
+  };
+
   const registraSpese = async (
     request: FastifyRequest,
     eventi: readonly CostEvent[],
@@ -699,6 +730,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(400).send({ errore: 'Indicare almeno un criterio di ricerca' });
     }
 
+    // Il conteggio è gratuito e non tocca il tetto: bloccarlo impedirebbe di capire
+    // quanto costerebbe una ricerca proprio a chi sta già attento alla spesa.
+    if (!soloConteggio) {
+      const speso = await oltreIlTetto(request);
+      if (speso !== null) {
+        return reply.status(429).send({
+          errore:
+            `Tetto di spesa giornaliero raggiunto: ${(speso / 100).toFixed(2)} € su ` +
+            `${(tettoGiornaliero / 100).toFixed(2)} €. Il conteggio resta disponibile e gratuito.`,
+        });
+      }
+    }
+
     const { risultato, eventi } = await conCostiDellaRichiesta(() =>
       provider.cercaProspect(criteri, { soloConteggio }),
     );
@@ -807,6 +851,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply
         .status(400)
         .send({ errore: 'Corpo della richiesta non valido', dettagli: parsed.error.issues });
+    }
+
+    const speso = await oltreIlTetto(request);
+    if (speso !== null) {
+      return reply.status(429).send({
+        errore:
+          `Tetto di spesa giornaliero raggiunto: ${(speso / 100).toFixed(2)} € su ` +
+          `${(tettoGiornaliero / 100).toFixed(2)} €. L'analisi riprende domani, oppure ` +
+          'alzare AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI dopo aver verificato il credito residuo.',
+      });
     }
 
     const { risultato: analisi, eventi } = await conCostiDellaRichiesta(() =>
@@ -947,6 +1001,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         errore:
           `Il file contiene ${anteprima.daAcquisire.length} aziende da acquisire: il massimo per ` +
           `singola importazione è ${MASSIMO_PER_IMPORTAZIONE}. Procedere a scaglioni.`,
+      });
+    }
+
+    const speso = await oltreIlTetto(request);
+    if (speso !== null) {
+      return reply.status(429).send({
+        errore:
+          `Tetto di spesa giornaliero raggiunto: ${(speso / 100).toFixed(2)} € su ` +
+          `${(tettoGiornaliero / 100).toFixed(2)} €. L'importazione riprende domani, oppure ` +
+          'alzare AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI dopo aver verificato il credito residuo.',
       });
     }
 
