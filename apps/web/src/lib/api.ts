@@ -245,6 +245,8 @@ export interface AnalisiDto {
    * include, e non costa nulla perché la pratica resta in memoria.
    */
   accertamentiInCorso: boolean;
+  /** Indicatori e qualifiche già elaborati dall'archivio camerale, compresi nel prezzo. */
+  indicatoriArchivio: IndicatoriArchivioDto;
   arricchimentiPossibili: { dato: string; sbloccherebbe: string[] }[];
   rischi: RischioDto[];
   rischiMeta: {
@@ -768,4 +770,142 @@ export async function leggiPortafoglio(): Promise<{
   };
 }> {
   return chiama('/api/portafoglio');
+}
+
+/**
+ * Indicatori e qualifiche già elaborati dall'archivio camerale.
+ *
+ * Rispecchia esattamente il blocco del dominio: sono compresi nel prezzo del profilo
+ * completo, e sceglierne qui un sottoinsieme rifarebbe l'errore da cui il blocco nasce —
+ * comprare il record intero e mostrarne una parte.
+ */
+export interface IndicatoriArchivioDto {
+  redditivita: {
+    roe: number | null;
+    roi: number | null;
+    ros: number | null;
+    roaMonetario: number | null;
+    incidenzaGestioneStraordinaria: number | null;
+  } | null;
+  risultatiOperativi: {
+    cashFlow: number | null;
+    ebit: number | null;
+    ebitda: number | null;
+    cashFlowDueEserciziPrima: number | null;
+    ebitDueEserciziPrima: number | null;
+    ebitdaDueEserciziPrima: number | null;
+  } | null;
+  solidita: {
+    acidTest: number | null;
+    currentRatio: number | null;
+    coperturaCapitaleCircolante: number | null;
+    tassoCoperturaImmobilizzazioni: number | null;
+    margineDiStruttura: number | null;
+    indiceMargineDiStruttura: number | null;
+    margineDiStrutturaSecondario: number | null;
+  } | null;
+  indebitamento: {
+    rapportoDebitoBancario: number | null;
+    gradoDiCapitalizzazione: number | null;
+    debitoBancarioSuTotaleAttivo: number | null;
+    debtRatio: number | null;
+    leva: number | null;
+  } | null;
+  liquidita: {
+    cassaSuDebitiBancariBreve: number | null;
+    cassaSuDebitiFinanziariBreve: number | null;
+    cassaSuDebitiTotaliBreve: number | null;
+  } | null;
+  leveFinanziarie: {
+    ebitdaLevaLorda: number | null;
+    ebitdaLevaNetta: number | null;
+    pfnSuEbitda: number | null;
+  } | null;
+  coperturaOneri: {
+    ebitdaSuInteressiLordi: number | null;
+    ebitdaSuInteressiNetti: number | null;
+    ebitSuInteressiLordi: number | null;
+    ebitSuInteressiNetti: number | null;
+  } | null;
+  strutturaFinanziaria: {
+    composizioneDebitoFinanziario: number | null;
+    debitoFinanziarioLordoSuPatrimonio: number | null;
+    debitoFinanziarioNettoSuPatrimonio: number | null;
+    pfnSuPatrimonio: number | null;
+  } | null;
+  cicloFinanziario: {
+    durataCreditiVersoClienti: number | null;
+    durataDebitiVersoFornitori: number | null;
+    durataCicloFinanziario: number | null;
+    durataScorte: number | null;
+  } | null;
+  oneriFinanziari: {
+    indiceDiOnerosita: number | null;
+    rod: number | null;
+    rodFinanziario: number | null;
+  } | null;
+  efficienza: { rotazioneCreditiVersoClienti: number | null; indiceDiRotazione: number | null } | null;
+  sviluppo: {
+    valoreAggiunto: number | null;
+    variazioneEbit: number | null;
+    debitoFinanziarioLordo: number | null;
+    mol: number | null;
+    valoreDellaProduzione: number | null;
+    totaleAttivo: number | null;
+  } | null;
+  kpi: {
+    rotazioneDebiti: number | null;
+    oneriFinanziariSuEbitda: number | null;
+    rotazioneMagazzino: number | null;
+    marginePercentualeEbitda: number | null;
+    patrimonioSuTotaleAttivo: number | null;
+  } | null;
+  gare: {
+    anno: number;
+    presentate: number | null;
+    vinte: number | null;
+    valoreEuro: number | null;
+  }[];
+  statisticheAddetti: {
+    impiegati: number | null;
+    tempoDeterminato: number | null;
+    tempoIndeterminato: number | null;
+    tempoPieno: number | null;
+    tempoParziale: number | null;
+  } | null;
+  qualifiche: {
+    haCertificazioneSoa: boolean | null;
+    esportatore: boolean | null;
+    importatore: boolean | null;
+    pmiInnovativa: boolean | null;
+    startUpInnovativa: boolean | null;
+    impresaArtigiana: boolean | null;
+    numeroUnitaLocali: number | null;
+    appartieneAGruppoIva: boolean | null;
+    capogruppoIva: boolean | null;
+    sitoWeb: string | null;
+    telefono: string | null;
+    fax: string | null;
+    dimensioneImpresa: string | null;
+    fasciaDiFatturato: string | null;
+    andamentoFatturatoPercentuale: number | null;
+    annoFatturato: number | null;
+    atecoSecondario: string | null;
+    settoreRae: string | null;
+    settoreSae: string | null;
+    codiceNace: string | null;
+    codiceSicPrimario: string | null;
+    codiceSicSecondario: string | null;
+    addetti: number | null;
+    fasciaAddetti: string | null;
+    andamentoAddettiPercentuale: number | null;
+    dataCostituzione: string | null;
+    haControllantiEstere: boolean | null;
+    haControllateEstere: boolean | null;
+    email: string | null;
+    codiceSdi: string | null;
+    presenteSuiSocial: boolean | null;
+    commercializzabile: boolean | null;
+    aggiornatoIl: string | null;
+  } | null;
 }

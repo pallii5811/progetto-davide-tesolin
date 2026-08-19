@@ -159,6 +159,18 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     catNat: presentCatNat(analisi),
     assetto: presentAssetto(analisi),
     ubicazioni: presentUbicazioni(analisi),
+    /*
+      Gli indicatori che l'archivio camerale ha già calcolato.
+
+      Passano **così come sono**, senza selezione: sono compresi nel prezzo già pagato, e
+      decidere qui quali meritino di arrivare a schermo significherebbe rifare l'errore da
+      cui questo blocco nasce — comprare il record intero e mostrarne una parte.
+
+      Restano separati dal punteggio della piattaforma, che si calcola dai bilanci
+      riclassificati: due letture indipendenti dello stesso bilancio sono una controprova,
+      una sola è un atto di fede.
+    */
+    indicatoriArchivio: analisi.profile.indicatoriFornitore,
     gap: {
       voci: analisi.gap.gaps.map(presentGap),
       coperturaAssente: analisi.gap.coperturaAssente,

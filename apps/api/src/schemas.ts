@@ -26,6 +26,7 @@ const indirizzoSchema = z.object({
   via: z.string(),
   civico: z.string().nullable().default(null),
   cap: z.string().default(''),
+  frazione: z.string().nullable().default(null),
   comune: z.string(),
   provincia: z.string().length(2),
   regione: z.string().nullable().default(null),

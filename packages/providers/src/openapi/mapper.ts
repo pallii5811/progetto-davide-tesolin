@@ -6,6 +6,7 @@
  * di comodo. Un fatturato «0» perché il campo era assente falserebbe lo score.
  */
 
+import { mappaIndicatoriFornitore } from './indicatori.js';
 import {
   NESSUN_EVENTO_NEGATIVO,
   REGISTRO_IMPRESE,
@@ -15,6 +16,7 @@ import {
 } from '@aegis/core';
 import type {
   Anagrafica,
+  IndicatoriFornitore,
   Assetti,
   AtecoCode,
   Bilancio,
@@ -147,6 +149,7 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
     via: via ?? '',
     civico: str(source, 'streetNumber', 'civico', 'numero') ?? separata?.civico ?? null,
     cap: str(source, 'zipCode', 'cap', 'postalCode') ?? '',
+    frazione: str(source, 'hamlet', 'frazione', 'localita'),
     comune: comune ?? '',
     provincia: (provincia ?? '').toUpperCase().slice(0, 2),
     regione,
@@ -265,6 +268,13 @@ export function mappaAnagrafica(raw: unknown, service: string, osservatoIl: Date
       null,
     fatturatoDichiarato:
       money(raw, 'turnover', 'fatturato', 'revenue') ?? ultimoSintetico?.fatturato ?? null,
+    // Cessazione: distingue «chiusa di recente», dove ci sono ancora polizze e
+    // responsabilità postume da gestire, da «chiusa da anni», dove non c'è più nulla.
+    dataCessazione: date(raw, 'endDate', 'dataCessazione', 'cessationDate'),
+    // Codice fiscale chiuso su una posizione ancora attiva è una contraddizione da
+    // vedere prima di emettere: quasi sempre è una cessazione non ancora propagata.
+    codiceFiscaleCessato: bool(raw, 'taxCodeCeased'),
+    codiceCatastale: str(sede ?? raw, 'townCode', 'codiceCatastale', 'codiceBelfiore'),
   };
 
   return fromProvider(anagrafica, PROVIDER, service, REGISTRO_IMPRESE, osservatoIl);
@@ -373,6 +383,9 @@ export function mappaAssetti(raw: unknown, service: string, osservatoIl: Date): 
       tipo,
       quotaPercentuale: percent(s, 'percentShare', 'sharePercentage', 'quotaPercentuale', 'quota'),
       quotaValore: money(s, 'shareValue', 'valoreQuota', 'quotaValore'),
+      // Da quando detiene la quota: un cambio di compagine recente e un assetto fermo da
+      // vent'anni sono due rischi diversi, e senza questa data si confondono.
+      socioDal: date(s, 'sinceDate', 'dataAcquisizione'),
     };
   });
 
@@ -383,6 +396,12 @@ export function mappaAssetti(raw: unknown, service: string, osservatoIl: Date): 
       codiceFiscale: str(c, 'taxCode', 'codiceFiscale', 'cf'),
       ruolo,
       dataNomina: date(c, 'appointmentDate', 'dataNomina'),
+      // L'età degli amministratori è un fattore di continuità aziendale, non anagrafe per
+      // curiosità: un amministratore unico anziano senza successione è un rischio di
+      // persona chiave che nessun bilancio mostra.
+      eta: num(c, 'age'),
+      dataNascita: date(c, 'birthDate', 'dataNascita'),
+      luogoNascita: str(c, 'birthTown', 'luogoNascita', 'comuneNascita'),
       isRappresentanteLegale:
         /legale rappresentante|amministratore unico|presidente|legal representative/i.test(ruolo),
     };
@@ -595,6 +614,8 @@ export const EVENTI_NEGATIVI_ASSENTI = NESSUN_EVENTO_NEGATIVO;
  */
 export interface ProfiloCompleto {
   readonly cariche: readonly Carica[];
+  /** Indici, gare, qualifiche: già calcolati dall'archivio e compresi nel prezzo. */
+  readonly indicatori: IndicatoriFornitore;
   readonly unitaLocali: readonly UnitaLocale[];
   readonly gruppo: {
     readonly appartieneAGruppo: boolean;
@@ -613,6 +634,10 @@ function tipoUnitaDaCodice(codice: string | null, descrizione: string | null): T
 }
 
 export function mappaProfiloCompleto(raw: unknown): ProfiloCompleto {
+  // Quarantotto indici, le gare pubbliche e le qualifiche d'impresa: sono nella stessa
+  // risposta già pagata, e per un periodo la metà di essi non veniva letta.
+  const indicatori = mappaIndicatoriFornitore(raw);
+
   // ── Cariche ───────────────────────────────────────────────────────────────
   const cariche: Carica[] = asArray(pick(raw, 'managers')).map((m) => {
     // Fra le cariche compaiono anche le persone giuridiche — il socio unico, per esempio.
@@ -630,6 +655,11 @@ export function mappaProfiloCompleto(raw: unknown): ProfiloCompleto {
       ruolo: str(pick(primoRuolo, 'role'), 'description', 'descrizione') ?? 'Non specificata',
       dataNomina: date(primoRuolo, 'roleStartDate'),
       isRappresentanteLegale: bool(m, 'isLegalRepresentative') ?? false,
+      // Il profilo completo porta anche l'anagrafe della persona: età, data e luogo di
+      // nascita. Servono alla continuità aziendale e alle verifiche sul titolare effettivo.
+      eta: num(m, 'age'),
+      dataNascita: date(m, 'birthDate'),
+      luogoNascita: str(m, 'birthTown'),
     };
   });
 
@@ -664,5 +694,5 @@ export function mappaProfiloCompleto(raw: unknown): ProfiloCompleto {
           controllantiEstere: bool(gruppoRaw, 'hasForeignParents') ?? false,
         };
 
-  return { cariche, unitaLocali, gruppo };
+  return { cariche, indicatori, unitaLocali, gruppo };
 }

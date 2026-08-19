@@ -11,6 +11,7 @@ import type { Sourced } from '../shared/provenance.js';
 import type { Money as Euro } from '../shared/money.js';
 import type { AtecoCode, CodiceFiscale, PartitaIva } from '../shared/identifiers.js';
 import type { Bilancio, BilancioSintetico } from './financials.js';
+import type { IndicatoriFornitore } from './indicatori-fornitore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Identità
@@ -72,6 +73,14 @@ export interface Indirizzo {
   readonly comune: string;
   readonly provincia: string;
   readonly regione: string | null;
+  /**
+   * Frazione o località.
+   *
+   * Su un rischio incendio o catastrofale non è un dettaglio postale: due frazioni dello
+   * stesso comune possono stare una in golena e l'altra sul rilievo, e il perito che va
+   * a vedere deve trovare il posto giusto.
+   */
+  readonly frazione: string | null;
   readonly latitudine: number | null;
   readonly longitudine: number | null;
 }
@@ -105,6 +114,24 @@ export interface Anagrafica {
   readonly telefono: string | null;
   readonly numeroAddetti: number | null;
   readonly fatturatoDichiarato: Euro | null;
+  /**
+   * Data di cessazione dichiarata dal registro.
+   *
+   * Distingue «cessata di recente» da «cessata da anni»: sulla prima ci sono ancora
+   * polizze in corso da gestire e responsabilità postume degli amministratori, sulla
+   * seconda non c'è più niente da fare. Lo stato da solo non lo dice.
+   */
+  readonly dataCessazione: Date | null;
+  /**
+   * Codice fiscale cessato.
+   *
+   * Un codice fiscale chiuso mentre la posizione risulta ancora attiva è una
+   * contraddizione che va vista prima di emettere: quasi sempre è una cessazione in
+   * corso che il registro non ha ancora propagato.
+   */
+  readonly codiceFiscaleCessato: boolean | null;
+  /** Codice catastale del comune (Belfiore): identifica il territorio senza ambiguità. */
+  readonly codiceCatastale: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,6 +144,15 @@ export interface Socio {
   readonly tipo: 'persona-fisica' | 'persona-giuridica';
   readonly quotaPercentuale: number | null;
   readonly quotaValore: Euro | null;
+  /**
+   * Da quando detiene la quota.
+   *
+   * Un cambio di compagine recente è un fatto che pesa: cambia chi decide, spesso cambia
+   * la strategia, e su una D&O o una fideiussione è la prima cosa che un assuntore
+   * chiede. Senza questa data un passaggio di controllo di tre mesi fa è indistinguibile
+   * da un assetto fermo da vent'anni.
+   */
+  readonly socioDal: Date | null;
 }
 
 export interface Carica {
@@ -126,6 +162,17 @@ export interface Carica {
   readonly dataNomina: Date | null;
   /** Un amministratore unico o un titolare effettivo è, di norma, anche una persona chiave. */
   readonly isRappresentanteLegale: boolean;
+  /**
+   * Età, data e luogo di nascita.
+   *
+   * Non è anagrafe per curiosità: l'età degli amministratori è un fattore di rischio
+   * riconosciuto sulla continuità aziendale — un amministratore unico ottantenne senza
+   * successione è un rischio di persona chiave che nessun bilancio mostra — e serve alle
+   * verifiche antiriciclaggio sul titolare effettivo.
+   */
+  readonly eta: number | null;
+  readonly dataNascita: Date | null;
+  readonly luogoNascita: string | null;
 }
 
 export interface Assetti {
@@ -300,6 +347,15 @@ export interface CompanyProfile {
   readonly bilanciSintetici: readonly Sourced<BilancioSintetico>[];
   readonly eventiNegativi: Sourced<EventiNegativi> | null;
   readonly unitaLocali: Sourced<readonly UnitaLocale[]> | null;
+  /**
+   * Indicatori e qualifiche già elaborati dall'archivio camerale.
+   *
+   * Arrivano con il profilo completo e costano zero in più: sono compresi nei
+   * quarantotto centesimi già spesi. Restano vuoti quando quel servizio non è stato
+   * acquistato — mai riempiti di zeri, che su un indice di redditività sarebbero
+   * un'affermazione falsa.
+   */
+  readonly indicatoriFornitore: IndicatoriFornitore;
   readonly datiDichiarati: DatiDichiarati;
 }
 

@@ -8,7 +8,14 @@
  */
 
 import { DATI_DICHIARATI_VUOTI, parsePartitaIva } from '@aegis/core';
-import { BILANCIO_DEPOSITATO, REGISTRO_IMPRESE, Money, fromProvider, isBilancioSinteticoUtile } from '@aegis/core';
+import {
+  BILANCIO_DEPOSITATO,
+  INDICATORI_FORNITORE_VUOTI,
+  REGISTRO_IMPRESE,
+  Money,
+  fromProvider,
+  isBilancioSinteticoUtile,
+} from '@aegis/core';
 import type { Bilancio, CompanyProfile, EventiNegativi, Money as Euro, PartitaIva, Sourced } from '@aegis/core';
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger } from '../http.js';
@@ -35,6 +42,7 @@ import {
   sedeDi,
 } from './mapper.js';
 import type { ProfiloCompleto } from './mapper.js';
+import { mappaIndicatoriFornitore } from './indicatori.js';
 import { mappaNegativita } from './negativita.js';
 import { asArray, bool, money, num, partitaIvaOf, pick, str } from './parse.js';
 
@@ -329,6 +337,8 @@ export class OpenApiProvider implements CompanyDataProvider {
         bilanciSintetici: [],
         eventiNegativi: null,
         unitaLocali: null,
+        // L'anagrafica minima non porta indici: dichiararlo, non riempire di zeri.
+        indicatoriFornitore: INDICATORI_FORNITORE_VUOTI,
         datiDichiarati: DATI_DICHIARATI_VUOTI,
       };
     }
@@ -345,6 +355,9 @@ export class OpenApiProvider implements CompanyDataProvider {
         bilanciSintetici,
         eventiNegativi: null,
         unitaLocali: null,
+        // L'anagrafica estesa porta le qualifiche che sa (gruppo IVA); gli indici
+        // economico-finanziari arrivano solo con il profilo completo.
+        indicatoriFornitore: mappaIndicatoriFornitore(rawAnagrafica),
         datiDichiarati: DATI_DICHIARATI_VUOTI,
       };
     }
@@ -383,6 +396,12 @@ export class OpenApiProvider implements CompanyDataProvider {
         profilo === null || profilo.unitaLocali.length === 0
           ? null
           : fromProvider(profilo.unitaLocali, this.name, 'IT-full', REGISTRO_IMPRESE, osservatoIl),
+      /*
+        Gli indici del profilo completo hanno la precedenza: sono quarantotto contro le
+        poche qualifiche che l'anagrafica estesa porta con sé. Quando l'approfondimento
+        non è stato chiesto, o è fallito, restano quelle — meglio poche che nessuna.
+      */
+      indicatoriFornitore: profilo?.indicatori ?? mappaIndicatoriFornitore(rawAnagrafica),
       datiDichiarati: DATI_DICHIARATI_VUOTI,
     };
   }

@@ -15,6 +15,7 @@ import {
   REGISTRO_PROTESTI,
   fromProvider,
 } from '../shared/provenance.js';
+import type { IndicatoriFornitore } from '../company/indicatori-fornitore.js';
 import { reclassify } from '../company/financials.js';
 import type { Bilancio, BilancioSintetico } from '../company/financials.js';
 import type { CompanyProfile, Indirizzo } from '../company/profile.js';
@@ -28,6 +29,7 @@ const SEDE: Indirizzo = {
   cap: '25030',
   comune: 'Adro',
   provincia: 'BS',
+  frazione: null,
   regione: 'Lombardia',
   latitudine: 45.622,
   longitudine: 9.96,
@@ -168,6 +170,9 @@ export function demoCompanyProfile(): CompanyProfile {
         telefono: '+39 030 1234567',
         numeroAddetti: 35,
         fatturatoDichiarato: euro(6_480_000),
+        dataCessazione: null,
+        codiceFiscaleCessato: false,
+        codiceCatastale: 'A057',
       },
       PROVIDER,
       'IT-company-advanced',
@@ -185,6 +190,7 @@ export function demoCompanyProfile(): CompanyProfile {
             codiceFiscale: 'RSSGNN70A01A944X',
             tipo: 'persona-fisica',
             quotaPercentuale: 0.6,
+            socioDal: new Date('2004-03-11T00:00:00Z'),
             quotaValore: euro(300_000),
           },
           {
@@ -192,6 +198,7 @@ export function demoCompanyProfile(): CompanyProfile {
             codiceFiscale: 'RSSMRT75E41A944R',
             tipo: 'persona-fisica',
             quotaPercentuale: 0.4,
+            socioDal: new Date('2004-03-11T00:00:00Z'),
             quotaValore: euro(200_000),
           },
         ],
@@ -202,6 +209,9 @@ export function demoCompanyProfile(): CompanyProfile {
             ruolo: 'Amministratore unico',
             dataNomina: new Date('2019-04-29T00:00:00Z'),
             isRappresentanteLegale: true,
+            eta: 58,
+            dataNascita: new Date('1968-04-22T00:00:00Z'),
+            luogoNascita: 'BRESCIA (BS)',
           },
         ],
         controllante: null,
@@ -238,6 +248,7 @@ export function demoCompanyProfile(): CompanyProfile {
       REGISTRO_PROTESTI,
       osservato,
     ),
+    indicatoriFornitore: indicatoriDimostrativi(),
     unitaLocali: fromProvider(
       [
         { tipo: 'sede-legale', indirizzo: SEDE, attivita: 'Uffici e stabilimento', addetti: 30 },
@@ -357,3 +368,134 @@ export function demoPolizze(): readonly PolizzaInEssere[] {
 
 /** Data di riferimento delle analisi dimostrative. */
 export const DEMO_AS_OF = new Date('2026-08-17T00:00:00Z');
+
+/**
+ * Gli indicatori che l'archivio camerale restituisce già calcolati.
+ *
+ * Nella dimostrazione devono esserci **tutti**, e coerenti con il bilancio della stessa
+ * azienda: una modalità dimostrativa che mostra meno campi di quella reale nasconde
+ * proprio i difetti che dovrebbe far emergere — è già successo con la ricerca, che
+ * comprava il record completo e ne mostrava sei campi.
+ */
+function indicatoriDimostrativi(): IndicatoriFornitore {
+  return {
+    redditivita: {
+      roe: 12.4,
+      roi: 8.9,
+      ros: 6.3,
+      roaMonetario: 7.1,
+      incidenzaGestioneStraordinaria: 98,
+    },
+    risultatiOperativi: {
+      cashFlow: 735_000,
+      ebit: 465_000,
+      ebitda: 850_000,
+      cashFlowDueEserciziPrima: 610_000,
+      ebitDueEserciziPrima: 388_000,
+      ebitdaDueEserciziPrima: 742_000,
+    },
+    solidita: {
+      acidTest: 0.94,
+      currentRatio: 1.32,
+      coperturaCapitaleCircolante: 0.21,
+      tassoCoperturaImmobilizzazioni: 0.78,
+      margineDiStruttura: -410_000,
+      indiceMargineDiStruttura: 0.78,
+      margineDiStrutturaSecondario: 740_000,
+    },
+    indebitamento: {
+      rapportoDebitoBancario: 0.58,
+      gradoDiCapitalizzazione: 0.23,
+      debitoBancarioSuTotaleAttivo: 0.33,
+      debtRatio: 0.77,
+      leva: 4.34,
+    },
+    liquidita: {
+      cassaSuDebitiBancariBreve: 0.61,
+      cassaSuDebitiFinanziariBreve: 0.61,
+      cassaSuDebitiTotaliBreve: 0.19,
+    },
+    leveFinanziarie: { ebitdaLevaLorda: 2.08, ebitdaLevaNetta: 1.63, pfnSuEbitda: 1.63 },
+    coperturaOneri: {
+      ebitdaSuInteressiLordi: 9.24,
+      ebitdaSuInteressiNetti: 9.24,
+      ebitSuInteressiLordi: 5.05,
+      ebitSuInteressiNetti: 5.05,
+    },
+    strutturaFinanziaria: {
+      composizioneDebitoFinanziario: 0.35,
+      debitoFinanziarioLordoSuPatrimonio: 1.38,
+      debitoFinanziarioNettoSuPatrimonio: 1.09,
+      pfnSuPatrimonio: 1.09,
+    },
+    cicloFinanziario: {
+      durataCreditiVersoClienti: 92.4,
+      durataDebitiVersoFornitori: 78.1,
+      durataCicloFinanziario: 66.3,
+      durataScorte: 52,
+    },
+    oneriFinanziari: { indiceDiOnerosita: 1.42, rod: 4.85, rodFinanziario: 4.85 },
+    efficienza: { rotazioneCreditiVersoClienti: 3.95, indiceDiRotazione: 1.17 },
+    sviluppo: {
+      valoreAggiunto: 7.4,
+      variazioneEbit: 19.8,
+      debitoFinanziarioLordo: -4.2,
+      mol: 14.6,
+      valoreDellaProduzione: 6.1,
+      totaleAttivo: 3.9,
+    },
+    kpi: {
+      rotazioneDebiti: 0.61,
+      oneriFinanziariSuEbitda: 0.11,
+      rotazioneMagazzino: 6.9,
+      marginePercentualeEbitda: 13.1,
+      patrimonioSuTotaleAttivo: 0.23,
+    },
+    gare: [
+      { anno: 2025, presentate: 4, vinte: 2, valoreEuro: 318_000 },
+      { anno: 2024, presentate: 3, vinte: 1, valoreEuro: 96_500 },
+    ],
+    statisticheAddetti: {
+      impiegati: 28,
+      tempoDeterminato: 11,
+      tempoIndeterminato: 89,
+      tempoPieno: 94,
+      tempoParziale: 6,
+    },
+    qualifiche: {
+      haCertificazioneSoa: true,
+      esportatore: true,
+      importatore: true,
+      pmiInnovativa: false,
+      startUpInnovativa: false,
+      impresaArtigiana: false,
+      numeroUnitaLocali: 2,
+      appartieneAGruppoIva: false,
+      capogruppoIva: false,
+      sitoWeb: 'www.meccanicabresciana.example',
+      telefono: '030 1234567',
+      fax: '030 1234568',
+      dimensioneImpresa: 'Piccola impresa',
+      fasciaDiFatturato: '5000000 - 9999999',
+      andamentoFatturatoPercentuale: 6.1,
+      annoFatturato: 2025,
+      atecoSecondario: '2599',
+      settoreRae: 'ATTIVITA MANIFATTURIERE',
+      settoreSae: 'Imprese produttive',
+      codiceNace: '2562',
+      codiceSicPrimario: '3599',
+      codiceSicSecondario: '3444',
+      addetti: 35,
+      fasciaAddetti: '21 - 49',
+      andamentoAddettiPercentuale: 12,
+      dataCostituzione: new Date('2004-03-11T00:00:00Z'),
+      haControllantiEstere: false,
+      haControllateEstere: false,
+      email: 'amministrazione@meccanicabresciana.example',
+      codiceSdi: 'M5UXCR1',
+      presenteSuiSocial: true,
+      commercializzabile: true,
+      aggiornatoIl: new Date('2026-08-18T00:00:00Z'),
+    },
+  };
+}

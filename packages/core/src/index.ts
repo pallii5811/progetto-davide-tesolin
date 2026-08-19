@@ -17,6 +17,7 @@ export * from './shared/math.js';
 export * from './company/profile.js';
 export * from './company/financials.js';
 export * from './company/indicators.js';
+export * from './company/indicatori-fornitore.js';
 export * from './company/size.js';
 export * from './company/facts.js';
 export * from './company/completeness.js';

@@ -1,8 +1,10 @@
 import { richiediSessione } from '@/lib/sessione';
+import { IndicatoriArchivio } from './IndicatoriArchivio';
 import Link from 'next/link';
 import { analizzaAzienda, collegamentiDiAzienda, compagnieCensite } from '@/lib/api';
 import type {
   AnalisiDto,
+  IndicatoriArchivioDto,
   CollegamentoSocietario,
   GapDto,
   LivelloRischio,
@@ -211,6 +213,22 @@ export default async function PaginaAzienda({
             <strong>{catNat.baseAssicurabile?.formattato ?? 'da quantificare'}</strong>.
           </Avviso>
         </div>
+      )}
+
+      {/*
+        Gli indicatori dell'archivio camerale.
+
+        Stanno **prima** delle ubicazioni e dopo il credito perché è lì che se ne ha
+        bisogno: chi ha appena letto il punteggio vuole sapere se i conti dell'archivio
+        raccontano la stessa storia, e le qualifiche — export, SOA, gare — dicono quali
+        coperture cercare prima ancora di guardare dove sta l'azienda.
+
+        La sezione non compare quando il profilo completo non è stato acquistato: venti
+        trattini comunicherebbero «il software non funziona» invece di «questo servizio
+        non è stato chiesto».
+      */}
+      {haIndicatoriArchivio(analisi.indicatoriArchivio) && (
+        <IndicatoriArchivio dati={analisi.indicatoriArchivio} />
       )}
 
       {/* ── Ubicazioni e rischio territoriale ─────────────────────────────── */}
@@ -1313,3 +1331,21 @@ const ETICHETTE_A_CURA: Record<GapDto['piano']['aCura'], string> = {
   cliente: 'del cliente',
   congiunta: 'congiunta',
 };
+
+/**
+ * La sezione degli indicatori si disegna solo se c'è qualcosa da mostrare.
+ *
+ * Il profilo completo è facoltativo e costa: quando non è stato acquistato tutti i gruppi
+ * sono nulli, e una sezione piena di trattini direbbe «il software non funziona» invece di
+ * «questo servizio non è stato chiesto». Sono due messaggi opposti.
+ */
+function haIndicatoriArchivio(dati: IndicatoriArchivioDto): boolean {
+  if (dati.gare.length > 0) return true;
+  return Object.entries(dati).some(
+    ([chiave, gruppo]) =>
+      chiave !== 'gare' &&
+      gruppo !== null &&
+      typeof gruppo === 'object' &&
+      Object.values(gruppo as object).some((v) => v !== null && v !== undefined),
+  );
+}
