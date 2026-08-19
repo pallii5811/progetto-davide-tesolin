@@ -411,6 +411,51 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           titolo="Coperture proposte e motivazione dell’adeguatezza"
           nota="Per ciascuna copertura è indicata la ragione per cui è ritenuta adeguata alle richieste e alle esigenze rilevate, in conformità all’Allegato 4-ter del Reg. IVASS n. 40/2018."
         >
+          {/*
+            Prima le coperture che il cliente **ha già**. Il documento parla di «coperture
+            attualmente in essere» fin dal primo capitolo: non elencarle lascerebbe al
+            lettore la domanda più ovvia — «quali?» — e a un documento di adeguatezza non
+            è permesso lasciarla aperta. La rilevazione dello stato di fatto è parte della
+            prestazione, non un preambolo.
+          */}
+          {gap.voci.some((v) => v.polizza !== null) && (
+            <div className="print-keep mb-5">
+              <h3 className="mb-2 font-semibold">Coperture attualmente in essere</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-testo text-left">
+                      <th className="py-2 pr-3 font-semibold">Garanzia</th>
+                      <th className="py-2 pr-3 font-semibold">Compagnia</th>
+                      <th className="py-2 pr-3 text-right font-semibold">Capitale</th>
+                      <th className="py-2 font-semibold">Scadenza</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gap.voci
+                      .filter((v) => v.polizza !== null)
+                      .map((v) => (
+                        <tr key={v.copertura} className="border-b border-bordo align-top">
+                          <td className="py-2 pr-3">{v.etichetta}</td>
+                          <td className="py-2 pr-3">
+                            {v.polizza!.compagnia}
+                            {v.polizza!.numero !== null && (
+                              <span className="text-xs text-testo-tenue"> n. {v.polizza!.numero}</span>
+                            )}
+                          </td>
+                          <td className="tabular py-2 pr-3 text-right">
+                            {v.capitaleInEssere?.formattato ?? '—'}
+                          </td>
+                          <td className="py-2 text-xs" suppressHydrationWarning>
+                            {new Date(v.polizza!.scadenza).toLocaleDateString('it-IT')}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {interventi.length === 0 ? (
             <p>
               Le coperture in essere risultano congrue rispetto ai rischi residui rilevati. Non si

@@ -8,12 +8,16 @@ import { accedi, sorvegliaErrori } from './aiuti.js';
  * quattrocento clienti in un foglio di calcolo. Se questo passaggio non funziona, tutto il
  * resto non arriva mai in mano a nessuno.
  *
- * Le partite IVA usate sono quelle dimostrative: nessuna chiamata a pagamento.
+ * Le partite IVA sono valide ma **dedicate a questo file**: nessun altro collaudo le
+ * analizza. La suite condivide un solo archivio, e «da acquisire: 2» è vero soltanto se
+ * nessun collaudo precedente ha già portato una delle due in portafoglio — è già
+ * successo, con un test che visitava un'azienda dimostrativa e faceva sparire un
+ * acquisto da questo conteggio.
  */
 const CSV = [
   'Codice cliente;Ragione sociale;Partita IVA;Agente',
-  'C-0012;MECCANICA BRESCIANA;03158460174;Rossi',
-  'C-0013;COSTRUZIONI IRPINE;02657870644;Bianchi',
+  'C-0012;CLIENTE IMPORTATO UNO;01234567897;Rossi',
+  'C-0013;CLIENTE IMPORTATO DUE;01111111116;Bianchi',
   'C-0014;CLIENTE SENZA PIVA;;Verdi',
   'C-0015;RIGA SBAGLIATA;non disponibile;Verdi',
 ].join('\n');
@@ -67,9 +71,11 @@ test.describe('Presa in carico massiva', () => {
     await page.goto('/portafoglio');
     // Nella tabella, non nella scheda: quest'ultima esiste nel DOM ma è nascosta alle
     // larghezze da scrivania, ed è la tabella che il broker sta effettivamente guardando.
+    // Le partite IVA dedicate non corrispondono a varianti note: il provider dimostrativo
+    // le battezza con la partita IVA nel nome, ed è quella che si cerca in tabella.
     const tabella = page.getByRole('table');
-    await expect(tabella).toContainText(/MECCANICA BRESCIANA/i);
-    await expect(tabella).toContainText(/COSTRUZIONI IRPINE/i);
+    await expect(tabella).toContainText(/01234567897/);
+    await expect(tabella).toContainText(/01111111116/);
   });
 
   test('non riacquista ciò che è già in portafoglio', async ({ page }) => {

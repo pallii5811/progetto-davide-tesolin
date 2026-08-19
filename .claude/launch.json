@@ -4,8 +4,22 @@
     {
       "name": "aegis-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace", "@aegis/web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--workspace",
+        "@aegis/web"
+      ],
       "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "veezco-schermate",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/Famiglia/miraxgroupckb-repo/scripts/servi-statico.mjs"
+      ],
+      "port": 4173,
       "autoPort": true
     }
   ]
