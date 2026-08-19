@@ -71,12 +71,32 @@ export default async function PaginaRicerca({
         evita di prendere per buoni dei numeri inventati; sapere di essere sui dati reali
         evita di scoprire a fine mese quanto è costato provare.
       */}
+      {/*
+        Il rimedio è diverso perché lo è chi legge, e dirgliene uno che non lo riguarda è
+        peggio del silenzio: la versione precedente rimandava «alle impostazioni», dove
+        non c'è nulla da attivare. Il collegamento agli archivi dipende dalla
+        configurazione con cui il servizio è stato avviato — chi sviluppa può cambiarla
+        con un comando, un intermediario no, e mandarcelo lo fa sentire incapace di una
+        cosa che è semplicemente fuori dalla sua portata.
+      */}
       {stato !== null && !stato.datiReali && (
         <div className="mb-6">
           <Avviso tono="informativo" titolo="Modalità dimostrativa">
-            La piattaforma sta usando dati dimostrativi coerenti e non consuma credito: servono a
-            provare il percorso, non a fondare una proposta. Il collegamento agli archivi reali si
-            attiva dalle impostazioni.
+            Le aziende che compaiono qui sono <strong>inventate</strong>, per quanto coerenti:
+            servono a provare il percorso e non consumano credito, ma su di esse non si fonda
+            nessuna proposta a un cliente.{' '}
+            {process.env.NODE_ENV === 'production' ? (
+              <>
+                Il collegamento agli archivi camerali non è attivo su questa installazione:
+                segnalarlo all&apos;assistenza.
+              </>
+            ) : (
+              <>
+                Per lavorare sulle aziende vere, riavviare il servizio con{' '}
+                <code className="font-mono">npm run dev:api</code> al posto di{' '}
+                <code className="font-mono">npm run dev:api:demo</code>.
+              </>
+            )}
           </Avviso>
         </div>
       )}

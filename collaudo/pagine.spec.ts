@@ -22,6 +22,37 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
     { percorso: '/impostazioni/utenti', atteso: /Utenti dello studio/i },
   ];
 
+  test('l’avviso di modalità dimostrativa dice il vero e indica un rimedio praticabile', async ({
+    page,
+  }) => {
+    /*
+      Nasce da un errore mio, sopravvissuto perché nessun collaudo guardava questo testo:
+      l'avviso rimandava «alle impostazioni», dove non c'è nulla da attivare. Chi lo
+      leggeva ci andava, non trovava niente, e concludeva che il prodotto fosse rotto.
+
+      Un avviso che manda in un posto sbagliato è peggio di un avviso assente: consuma la
+      fiducia di chi lo segue. Qui si verificano le due cose che deve fare — dichiarare
+      che i dati **non sono veri**, e indicare il rimedio che chi legge può davvero
+      compiere.
+    */
+    await page.goto('/');
+
+    // Il titolo esatto dell'avviso, non una ricerca a tentoni: «modalità dimostrativa»
+    // compare anche fra gli esempi di partita IVA sotto il modulo di ricerca.
+    const avviso = page.getByText('Modalità dimostrativa', { exact: true }).locator('..');
+    await expect(avviso).toBeVisible();
+    const testo = await avviso.innerText();
+
+    // Che i dati non siano veri va detto con una parola sola e inequivocabile: chi legge
+    // di fretta deve capirlo senza interpretare.
+    expect(testo).toMatch(/inventate/i);
+
+    // Il collaudo gira in sviluppo: il rimedio è il comando che chi legge può eseguire,
+    // non un rinvio a una pagina dove non c'è niente da attivare.
+    expect(testo).toContain('npm run dev:api');
+    expect(testo).not.toMatch(/impostazioni/i);
+  });
+
   for (const { percorso, atteso } of pagine) {
     test(`${percorso} risponde e mostra il proprio contenuto`, async ({ page }) => {
       const sorveglianza = sorvegliaErrori(page);
