@@ -6,7 +6,7 @@
  * essere irrobustita senza toccare il database, e il database non vede mai una password.
  */
 
-import { and, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -319,6 +319,115 @@ export async function leggiStudio(db: Database, tenantId: string): Promise<DatiS
     .limit(1);
 
   return righe[0] ?? null;
+}
+
+export interface StudioElenco {
+  readonly id: string;
+  readonly denominazione: string;
+  readonly numeroRui: string | null;
+  readonly gestorePiattaforma: boolean;
+  readonly attivo: boolean;
+  readonly creatoIl: Date;
+  readonly utenti: number;
+}
+
+/**
+ * Gli studi presenti sulla piattaforma.
+ *
+ * L'unica lettura che attraversa gli studi, e per questo riservata a chi gestisce la
+ * piattaforma: restituisce quanti collaboratori ha ciascuno, non cosa ci sia dentro.
+ * Il gestore amministra le utenze, non i portafogli dei propri clienti.
+ */
+export async function elencoStudi(db: Database): Promise<readonly StudioElenco[]> {
+  /*
+    Il conteggio si fa con una giunzione, non con una sottoquery correlata scritta a mano.
+
+    Interpolando le colonne in `sql` grezzo, Drizzle emette i nomi **non qualificati**:
+    `WHERE "tenant_id" = "id"` — e dentro la sottoquery `"id"` è la colonna di `utenti`,
+    che ce l'ha anche lei. Il confronto diventa «l'utente con sé stesso», è sempre falso,
+    e il risultato è uno zero perfettamente plausibile che non solleva nulla.
+
+    Con la giunzione il costruttore conosce entrambe le tabelle e qualifica da sé. Il
+    raggruppamento per sola chiave primaria basta: le altre colonne ne dipendono
+    funzionalmente, e PostgreSQL lo sa.
+  */
+  const righe = await db
+    .select({
+      id: schema.tenants.id,
+      denominazione: schema.tenants.denominazione,
+      numeroRui: schema.tenants.numeroRui,
+      gestorePiattaforma: schema.tenants.gestorePiattaforma,
+      attivo: schema.tenants.attivo,
+      creatoIl: schema.tenants.creatoIl,
+      utenti: sql<string>`COUNT(${schema.utenti.id})`,
+    })
+    .from(schema.tenants)
+    .leftJoin(schema.utenti, eq(schema.utenti.tenantId, schema.tenants.id))
+    .groupBy(schema.tenants.id)
+    .orderBy(desc(schema.tenants.gestorePiattaforma), schema.tenants.denominazione);
+
+  return righe.map((r) => ({ ...r, utenti: Number(r.utenti) }));
+}
+
+/**
+ * Apre un nuovo studio cliente.
+ *
+ * Nasce sempre **non gestore**: l'infrastruttura resta di chi l'ha installata, e un
+ * cliente creato per errore con quel flag vedrebbe la fornitura dati di tutti gli altri.
+ */
+export async function creaStudio(db: Database, denominazione: string): Promise<string> {
+  const creati = await db
+    .insert(schema.tenants)
+    .values({ denominazione, gestorePiattaforma: false })
+    .returning({ id: schema.tenants.id });
+
+  const creato = creati[0];
+  if (creato === undefined) throw new Error('Creazione dello studio non riuscita');
+  return creato.id;
+}
+
+/**
+ * Sospende o riattiva uno studio.
+ *
+ * Sospendere non cancella: i dati restano, gli accessi no. È la leva per il mancato
+ * pagamento di un abbonamento, dove distruggere il portafoglio di un cliente sarebbe
+ * sproporzionato e probabilmente illecito.
+ */
+export async function impostaAttivitaStudio(
+  db: Database,
+  tenantId: string,
+  attivo: boolean,
+): Promise<void> {
+  await db.update(schema.tenants).set({ attivo }).where(eq(schema.tenants.id, tenantId));
+}
+
+/**
+ * Chi è lo studio di chi sta lavorando: se gestisce la piattaforma e se è ancora attivo.
+ *
+ * Le due cose si leggono insieme perché servono insieme, a ogni richiesta, e sarebbero
+ * due interrogazioni sulla stessa riga.
+ *
+ * `gestorePiattaforma` è la sola porta d'accesso a ciò che riguarda la fornitura dei dati
+ * — servizi autorizzati, credito residuo, spesa complessiva. Uno studio cliente non deve
+ * poterlo scoprire nemmeno per errore, e non basta nasconderne le voci di menù.
+ *
+ * `attivo` è la sospensione: uno studio sospeso non entra e non resta dentro. Verificarla
+ * solo all'accesso lascerebbe lavorare per giorni chi ha già un cookie in tasca.
+ */
+export interface StatoStudio {
+  readonly gestorePiattaforma: boolean;
+  readonly attivo: boolean;
+}
+
+export async function statoStudio(db: Database, tenantId: string): Promise<StatoStudio> {
+  const righe = await db
+    .select({ gestorePiattaforma: schema.tenants.gestorePiattaforma, attivo: schema.tenants.attivo })
+    .from(schema.tenants)
+    .where(eq(schema.tenants.id, tenantId))
+    .limit(1);
+
+  // Uno studio che non esiste non è né gestore né attivo: negare è l'unico esito sicuro.
+  return righe[0] ?? { gestorePiattaforma: false, attivo: false };
 }
 
 /**

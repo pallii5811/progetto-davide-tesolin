@@ -42,13 +42,27 @@ export default async function PaginaRicerca({
         </p>
       </div>
 
+      {/*
+        Due messaggi diversi per lo stesso guasto, perché i lettori sono due.
+        In sviluppo serve l'indirizzo che non risponde e il comando per riavviare; in
+        esercizio quel testo direbbe a un intermediario di lanciare comandi che non può
+        lanciare, facendo sembrare rotto il prodotto invece del servizio.
+      */}
       {stato === null && (
         <div className="mb-6">
-          <Avviso tono="critico" titolo="Servizio API non raggiungibile">
-            Nessuna risposta da <code className="font-mono">{INDIRIZZO_API}</code>. Avviare il servizio
-            con <code className="font-mono">npm run dev:api</code>, oppure indicare l&apos;indirizzo
-            corretto nella variabile <code className="font-mono">AEGIS_API_URL</code>.
-          </Avviso>
+          {process.env.NODE_ENV === 'production' ? (
+            <Avviso tono="critico" titolo="Servizio momentaneamente non disponibile">
+              Non è al momento possibile interrogare gli archivi. I dati già acquisiti restano
+              consultabili dal portafoglio. Se la situazione persiste, segnalarlo all&apos;assistenza.
+            </Avviso>
+          ) : (
+            <Avviso tono="critico" titolo="Servizio API non raggiungibile">
+              Nessuna risposta da <code className="font-mono">{INDIRIZZO_API}</code>. Avviare il
+              servizio con <code className="font-mono">npm run dev:api</code>, oppure indicare
+              l&apos;indirizzo corretto nella variabile{' '}
+              <code className="font-mono">AEGIS_API_URL</code>.
+            </Avviso>
+          )}
         </div>
       )}
 
@@ -60,9 +74,9 @@ export default async function PaginaRicerca({
       {stato !== null && !stato.datiReali && (
         <div className="mb-6">
           <Avviso tono="informativo" titolo="Modalità dimostrativa">
-            La piattaforma sta usando dati dimostrativi coerenti e non consuma credito. Per lavorare sui
-            dati reali serve un token OpenAPI.com in <code className="font-mono">.env</code>: viene letto
-            all&apos;avvio del servizio.
+            La piattaforma sta usando dati dimostrativi coerenti e non consuma credito: servono a
+            provare il percorso, non a fondare una proposta. Il collegamento agli archivi reali si
+            attiva dalle impostazioni.
           </Avviso>
         </div>
       )}
@@ -70,13 +84,19 @@ export default async function PaginaRicerca({
       {stato !== null && stato.datiReali && (
         <div className="mb-6">
           <Avviso tono="attenzione" titolo="Dati reali — ogni analisi consuma credito">
-            Le ricerche e le analisi interrogano OpenAPI.com:{' '}
+            Ogni analisi interroga gli archivi camerali e consuma credito:{' '}
             <strong>
               {(stato.costoAnalisiCentesimi / 100).toFixed(2).replace('.', ',')} € per analisi
             </strong>
             , {(stato.costoAnalisiApprofonditaCentesimi / 100).toFixed(2).replace('.', ',')} € se
-            approfondita. Le aziende già in portafoglio non vengono riacquistate. Per provare senza
-            spendere, avviare il servizio con <code className="font-mono">npm run dev:api:demo</code>.
+            approfondita. Le aziende già in portafoglio non vengono riacquistate, e la ricerca per
+            provincia conta i risultati senza costo prima di scaricarne uno.
+            {process.env.NODE_ENV !== 'production' && (
+              <>
+                {' '}
+                Per provare senza spendere: <code className="font-mono">npm run dev:api:demo</code>.
+              </>
+            )}
           </Avviso>
         </div>
       )}

@@ -2,14 +2,21 @@ import Link from 'next/link';
 import { richiediSessione } from '@/lib/sessione';
 
 /**
- * Le impostazioni sono divise in due: ciò che riguarda **la propria** utenza, aperto a
- * tutti, e ciò che riguarda **lo studio**, riservato agli amministratori. La scheda
- * «Utenti» non compare a chi non può usarla: un comando visibile che risponde «vietato»
- * è peggio di un comando assente.
+ * Le impostazioni sono divise in tre.
+ *
+ * Ciò che riguarda **la propria utenza** è aperto a tutti. Ciò che riguarda **lo studio**
+ * è degli amministratori. Ciò che riguarda **la piattaforma** — gli studi ospitati, la
+ * fornitura dei dati — è solo di chi la gestisce, ed è una proprietà diversa dal ruolo:
+ * essere amministratore del proprio studio non dà alcun titolo sull'infrastruttura.
+ *
+ * Le schede che non si possono usare non compaiono: un comando visibile che risponde
+ * «vietato» è peggio di un comando assente. Ma nascondere non è proteggere — le rotte
+ * corrispondenti rifiutano per conto proprio, e questo è il secondo strato.
  */
 export default async function LayoutImpostazioni({ children }: { children: React.ReactNode }) {
   const utente = await richiediSessione();
   const amministratore = utente.ruolo === 'amministratore';
+  const gestore = utente.gestorePiattaforma === true;
 
   return (
     <>
@@ -27,7 +34,8 @@ export default async function LayoutImpostazioni({ children }: { children: React
         {amministratore && <Scheda href="/impostazioni/studio">Anagrafica studio</Scheda>}
         {amministratore && <Scheda href="/impostazioni/utenti">Utenti dello studio</Scheda>}
         <Scheda href="/impostazioni/compagnie">Solidità delle compagnie</Scheda>
-        {amministratore && <Scheda href="/impostazioni/servizi">Servizi dati</Scheda>}
+        {gestore && <Scheda href="/impostazioni/studi">Studi sulla piattaforma</Scheda>}
+        {gestore && <Scheda href="/impostazioni/servizi">Servizi dati</Scheda>}
       </nav>
 
       {children}

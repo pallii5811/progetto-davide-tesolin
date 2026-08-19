@@ -8,7 +8,7 @@
  */
 
 import { DATI_DICHIARATI_VUOTI, parsePartitaIva } from '@aegis/core';
-import { fromProvider } from '@aegis/core';
+import { BILANCIO_DEPOSITATO, REGISTRO_IMPRESE, fromProvider } from '@aegis/core';
 import type { Bilancio, CompanyProfile, EventiNegativi, PartitaIva, Sourced } from '@aegis/core';
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger } from '../http.js';
@@ -300,7 +300,12 @@ export class OpenApiProvider implements CompanyDataProvider {
         ? []
         : mappaBilanciSintetici(rawAnagrafica).map((b) => ({
             value: b,
-            source: { kind: 'provider' as const, provider: this.name, service: servizio },
+            source: {
+              kind: 'provider' as const,
+              provider: this.name,
+              service: servizio,
+              registro: BILANCIO_DEPOSITATO,
+            },
             // Un bilancio "vale" alla data di chiusura dell'esercizio, non a quella di
             // lettura: è questa distinzione a far scattare la penalità per dato obsoleto.
             observedAt: b.dataChiusura ?? new Date(Date.UTC(b.anno, 11, 31)),
@@ -376,7 +381,7 @@ export class OpenApiProvider implements CompanyDataProvider {
       unitaLocali:
         profilo === null || profilo.unitaLocali.length === 0
           ? null
-          : fromProvider(profilo.unitaLocali, this.name, 'IT-full', osservatoIl),
+          : fromProvider(profilo.unitaLocali, this.name, 'IT-full', REGISTRO_IMPRESE, osservatoIl),
       datiDichiarati: DATI_DICHIARATI_VUOTI,
     };
   }
@@ -412,7 +417,12 @@ export class OpenApiProvider implements CompanyDataProvider {
         .slice(0, 5)
         .map((b) => ({
           value: b,
-          source: { kind: 'provider' as const, provider: this.name, service: 'IT-balance-sheet' },
+          source: {
+            kind: 'provider' as const,
+            provider: this.name,
+            service: 'IT-balance-sheet',
+            registro: BILANCIO_DEPOSITATO,
+          },
           // Il bilancio "vale" alla data di chiusura dell'esercizio, non alla data di lettura:
           // è questa distinzione a far scattare correttamente la penalità per dato obsoleto.
           observedAt: b.dataChiusura,

@@ -211,6 +211,7 @@ const DDL: readonly string[] = [
     email text,
     telefono text,
     budget_dati_mensile_centesimi bigint,
+    gestore_piattaforma boolean NOT NULL DEFAULT false,
     creato_il timestamptz NOT NULL DEFAULT now(),
     attivo boolean NOT NULL DEFAULT true
   )`,
@@ -433,6 +434,9 @@ const DDL: readonly string[] = [
     avvenuto_il timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS costi_per_tenant ON registro_costi_dati (tenant_id, avvenuto_il)`,
+  // Il tetto complessivo somma tutti gli studi: senza indice sulla sola data quella
+  // lettura scansiona un registro che cresce di una riga per chiamata e non si pota mai.
+  `CREATE INDEX IF NOT EXISTS costi_per_giorno ON registro_costi_dati (avvenuto_il)`,
 ];
 
 /**

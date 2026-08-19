@@ -9,7 +9,12 @@
 
 import { euro } from '../shared/money.js';
 import { ateco, partitaIva } from '../shared/identifiers.js';
-import { fromProvider } from '../shared/provenance.js';
+import {
+  BILANCIO_DEPOSITATO,
+  REGISTRO_IMPRESE,
+  REGISTRO_PROTESTI,
+  fromProvider,
+} from '../shared/provenance.js';
 import { reclassify } from '../company/financials.js';
 import type { Bilancio, BilancioSintetico } from '../company/financials.js';
 import type { CompanyProfile, Indirizzo } from '../company/profile.js';
@@ -166,6 +171,7 @@ export function demoCompanyProfile(): CompanyProfile {
       },
       PROVIDER,
       'IT-company-advanced',
+      REGISTRO_IMPRESE,
       osservato,
     ),
     assetti: fromProvider(
@@ -203,14 +209,15 @@ export function demoCompanyProfile(): CompanyProfile {
       },
       PROVIDER,
       'IT-shareholders',
+      REGISTRO_IMPRESE,
       osservato,
     ),
     bilanci: [
-      fromProvider(bilancio2025(), PROVIDER, 'IT-balance-sheet', osservatoBilancio),
-      fromProvider(bilancio2024(), PROVIDER, 'IT-balance-sheet', osservatoBilancio),
+      fromProvider(bilancio2025(), PROVIDER, 'IT-balance-sheet', BILANCIO_DEPOSITATO, osservatoBilancio),
+      fromProvider(bilancio2024(), PROVIDER, 'IT-balance-sheet', BILANCIO_DEPOSITATO, osservatoBilancio),
     ],
     bilanciSintetici: [sinteticoDa(bilancio2025()), sinteticoDa(bilancio2024())].map((s) =>
-      fromProvider(s, PROVIDER, 'IT-advanced', osservatoBilancio),
+      fromProvider(s, PROVIDER, 'IT-advanced', BILANCIO_DEPOSITATO, osservatoBilancio),
     ),
     eventiNegativi: fromProvider(
       {
@@ -228,6 +235,7 @@ export function demoCompanyProfile(): CompanyProfile {
       },
       PROVIDER,
       'IT-protests',
+      REGISTRO_PROTESTI,
       osservato,
     ),
     unitaLocali: fromProvider(
@@ -242,6 +250,7 @@ export function demoCompanyProfile(): CompanyProfile {
       ],
       PROVIDER,
       'IT-local-units',
+      REGISTRO_IMPRESE,
       osservato,
     ),
     datiDichiarati: {

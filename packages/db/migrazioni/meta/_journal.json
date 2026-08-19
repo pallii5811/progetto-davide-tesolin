@@ -29,6 +29,20 @@
       "when": 1787083738306,
       "tag": "0003_burly_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787170138306,
+      "tag": "0004_gestore_piattaforma",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787173738306,
+      "tag": "0005_indice_costi_per_giorno",
+      "breakpoints": true
     }
   ]
 }

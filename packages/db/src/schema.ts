@@ -115,6 +115,19 @@ export const tenants = pgTable('tenants', {
   telefono: text('telefono'),
   /** Tetto di spesa mensile sui dati, in centesimi. Oltre, l'acquisizione si blocca. */
   budgetDatiMensileCentesimi: denaro('budget_dati_mensile_centesimi'),
+  /**
+   * Distingue chi **gestisce** la piattaforma da chi la **usa**.
+   *
+   * Gli archivi dati si pagano con un contratto unico, intestato al gestore, e gli studi
+   * che lavorano sulla piattaforma non ne sanno nulla: non vedono il fornitore, non vedono
+   * il credito residuo, non possono toccare le autorizzazioni. Sono informazioni della
+   * filiera, non del loro mestiere, e mostrargliele significa esporre la fornitura a
+   * chiunque apra le impostazioni.
+   *
+   * È una proprietà dello studio, non della persona: un amministratore è tale dentro il
+   * proprio studio, e questo non gli dà alcun titolo sull'infrastruttura di tutti.
+   */
+  gestorePiattaforma: boolean('gestore_piattaforma').notNull().default(false),
   creatoIl: timestamp('creato_il', { withTimezone: true }).notNull().defaultNow(),
   attivo: boolean('attivo').notNull().default(true),
 });
@@ -550,7 +563,19 @@ export const registroCostiDati = pgTable(
     servitoDaCache: boolean('servito_da_cache').notNull().default(false),
     avvenutoIl: timestamp('avvenuto_il', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('costi_per_tenant').on(t.tenantId, t.avvenutoIl)],
+  (t) => [
+    index('costi_per_tenant').on(t.tenantId, t.avvenutoIl),
+    /*
+      Secondo indice, sulla sola data.
+
+      Il tetto complessivo somma la spesa di **tutti** gli studi, e lo fa prima di ogni
+      operazione a pagamento. Su quella lettura l'indice per tenant non serve: comincia
+      dalla colonna che la query non filtra, e il motore ripiega su una scansione
+      dell'intera tabella. Il registro cresce di una riga per chiamata e non viene mai
+      potato — funzionerebbe benissimo il primo mese e sempre peggio dopo.
+    */
+    index('costi_per_giorno').on(t.avvenutoIl),
+  ],
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

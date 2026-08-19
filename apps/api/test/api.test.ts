@@ -75,6 +75,28 @@ describe('API', () => {
     expect(body.credito.fido.spiegazione.input.length).toBeGreaterThan(3);
   });
 
+  it('nessuna fonte dell’analisi nomina il distributore dei dati', async () => {
+    /*
+      Il presidio si applica all'**intera risposta**, non a un campo scelto: è l'unico
+      modo di coprire anche i campi che verranno aggiunti domani. Un'analisi la si legge
+      a video e la si consegna stampata al cliente del broker; la fonte che deve comparire
+      è il registro pubblico dove il dato è depositato — «Registro Imprese» —, non l'API
+      commerciale da cui è transitato, che nessun cliente e nessun ispettore conosce.
+
+      È insieme una questione di solidità del documento e di riservatezza della fornitura.
+    */
+    const { body } = await post('/api/aziende/03158460174/analisi', {});
+    const risposta = JSON.stringify(body);
+
+    for (const distributore of ['OpenAPI', 'openapi', 'IT-advanced', 'IT-full', 'IT-negativita']) {
+      expect(risposta, `l'analisi cita «${distributore}»`).not.toContain(distributore);
+    }
+
+    // E il registro vero c'è: un presidio che passa perché la fonte è sparita del tutto
+    // sarebbe peggio del difetto che previene.
+    expect(risposta).toContain('Registro Imprese');
+  });
+
   it('conserva i dati di intervista fra due analisi successive', async () => {
     const url = '/api/aziende/02657870644/analisi';
 

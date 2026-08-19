@@ -6,7 +6,13 @@
  * di comodo. Un fatturato «0» perché il campo era assente falserebbe lo score.
  */
 
-import { NESSUN_EVENTO_NEGATIVO, fromProvider, isBilancioSinteticoUtile } from '@aegis/core';
+import {
+  NESSUN_EVENTO_NEGATIVO,
+  REGISTRO_IMPRESE,
+  REGISTRO_PROTESTI,
+  fromProvider,
+  isBilancioSinteticoUtile,
+} from '@aegis/core';
 import type {
   Anagrafica,
   Assetti,
@@ -261,7 +267,7 @@ export function mappaAnagrafica(raw: unknown, service: string, osservatoIl: Date
       money(raw, 'turnover', 'fatturato', 'revenue') ?? ultimoSintetico?.fatturato ?? null,
   };
 
-  return fromProvider(anagrafica, PROVIDER, service, osservatoIl);
+  return fromProvider(anagrafica, PROVIDER, service, REGISTRO_IMPRESE, osservatoIl);
 }
 
 /**
@@ -398,7 +404,7 @@ export function mappaAssetti(raw: unknown, service: string, osservatoIl: Date): 
     })),
   };
 
-  return fromProvider(assetti, PROVIDER, service, osservatoIl);
+  return fromProvider(assetti, PROVIDER, service, REGISTRO_IMPRESE, osservatoIl);
 }
 
 export function mappaUnitaLocali(
@@ -419,7 +425,7 @@ export function mappaUnitaLocali(
     })
     .filter((u): u is UnitaLocale => u !== null);
 
-  return fromProvider(unita, PROVIDER, service, osservatoIl);
+  return fromProvider(unita, PROVIDER, service, REGISTRO_IMPRESE, osservatoIl);
 }
 
 /**
@@ -554,7 +560,13 @@ export function mappaEventiNegativi(
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
-  return fromProvider({ protesti, pregiudizievoli, procedure }, PROVIDER, service, osservatoIl);
+  return fromProvider(
+    { protesti, pregiudizievoli, procedure },
+    PROVIDER,
+    service,
+    REGISTRO_PROTESTI,
+    osservatoIl,
+  );
 }
 
 function classificaPregiudizievole(descrizione: string): Pregiudizievole['tipo'] {

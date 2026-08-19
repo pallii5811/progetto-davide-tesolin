@@ -23,6 +23,7 @@ const PAGINE: readonly (readonly [string, string])[] = [
   ['catalogo rischi', '/catalogo'],
   ['impostazioni', '/impostazioni'],
   ['compagnie', '/impostazioni/compagnie'],
+  ['studi sulla piattaforma', '/impostazioni/studi'],
   ['analisi azienda', `/azienda/${AZIENDA_DI_PROVA}`],
   ['dati di intervista', `/azienda/${AZIENDA_DI_PROVA}/dati`],
   ['report per il cliente', `/azienda/${AZIENDA_DI_PROVA}/report`],

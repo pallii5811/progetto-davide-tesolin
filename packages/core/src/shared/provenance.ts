@@ -7,11 +7,20 @@
  */
 
 export type DataSource =
-  /** Dato ottenuto da un provider esterno a pagamento (OpenAPI.com, Creditsafe, ...). */
+  /**
+   * Dato acquistato da un distributore esterno.
+   *
+   * `registro` è obbligatorio e non è una formalità: il distributore è un tramite tecnico,
+   * l'origine del dato è un registro pubblico. In un fascicolo di adeguatezza va difeso
+   * «Registro Imprese, visura del 12/03/2026» — nominare l'API da cui è transitato indica
+   * un soggetto che né il cliente né IVASS conoscono, e indebolisce il documento.
+   * È per questo che `describeSource` mostra il registro e mai il distributore.
+   */
   | {
       readonly kind: 'provider';
       readonly provider: string;
       readonly service: string;
+      readonly registro: string;
       readonly reference?: string;
     }
   /** Dato estratto da un documento ufficiale (visura, bilancio depositato, SFCR). */
@@ -50,14 +59,26 @@ export function sourced<T>(
   return { value, source, observedAt, confidence };
 }
 
+/**
+ * I registri pubblici da cui i dati provengono davvero.
+ *
+ * Nominati qui una volta sola perché sono ciò che il cliente legge e ciò che
+ * l'intermediario dovrà difendere: se un domani cambia il distributore, queste stringhe
+ * non si toccano — non descrivono da chi compriamo, ma dove il dato è depositato.
+ */
+export const REGISTRO_IMPRESE = 'Registro Imprese';
+export const BILANCIO_DEPOSITATO = 'Bilancio depositato al Registro Imprese';
+export const REGISTRO_PROTESTI = 'Registro protesti e procedure concorsuali';
+
 export function fromProvider<T>(
   value: T,
   provider: string,
   service: string,
+  registro: string,
   observedAt: Date,
   confidence: Confidence = 'alta',
 ): Sourced<T> {
-  return { value, source: { kind: 'provider', provider, service }, observedAt, confidence };
+  return { value, source: { kind: 'provider', provider, service, registro }, observedAt, confidence };
 }
 
 export function declared<T>(value: T, by: string, observedAt: Date): Sourced<T> {
@@ -107,11 +128,16 @@ export function ageInMonths(s: Sourced<unknown>, asOf: Date): number {
   return Math.floor(ageInDays(s, asOf) / 30.44);
 }
 
-/** Descrizione leggibile della fonte, per report e UI. */
+/**
+ * Descrizione leggibile della fonte, per report e UI.
+ *
+ * Per i dati acquistati mostra **il registro pubblico, mai il distributore**: si veda la
+ * nota su `DataSource`. Per la diagnostica interna esiste `describeSourceTecnica`.
+ */
 export function describeSource(source: DataSource): string {
   switch (source.kind) {
     case 'provider':
-      return `${source.provider} · ${source.service}`;
+      return source.registro;
     case 'documento':
       return `${source.tipo} (${source.riferimento})`;
     case 'dichiarato':
@@ -125,4 +151,17 @@ export function describeSource(source: DataSource): string {
     case 'norma':
       return `Riferimento normativo: ${source.riferimento}`;
   }
+}
+
+/**
+ * Come `describeSource`, ma nomina anche il distributore e il servizio interrogato.
+ *
+ * Riservata alle pagine tecniche di chi gestisce la piattaforma: serve a capire quale
+ * chiamata ha prodotto un dato quando qualcosa non torna. Non va usata in nulla che
+ * l'intermediario possa mostrare al proprio cliente.
+ */
+export function describeSourceTecnica(source: DataSource): string {
+  return source.kind === 'provider'
+    ? `${source.registro} · via ${source.provider} ${source.service}`
+    : describeSource(source);
 }

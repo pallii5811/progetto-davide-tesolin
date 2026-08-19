@@ -25,13 +25,46 @@ import * as schema from './schema.js';
  * e negli indici, manca solo chi popola l'identità dell'utente.
  */
 export async function assicuraTenantPredefinito(db: Database, denominazione: string): Promise<string> {
-  const esistenti = await db.select({ id: schema.tenants.id }).from(schema.tenants).limit(1);
+  const esistenti = await db
+    .select({ id: schema.tenants.id })
+    .from(schema.tenants)
+    .orderBy(schema.tenants.creatoIl)
+    .limit(1);
   const esistente = esistenti[0];
-  if (esistente !== undefined) return esistente.id;
+  if (esistente !== undefined) {
+    /*
+      Archivio nato prima che esistesse la distinzione fra gestore e clienti.
 
+      Senza questa riparazione nessuno risulterebbe gestore: le pagine della fornitura
+      dati diventerebbero irraggiungibili per tutti, compreso chi ha installato la
+      piattaforma, e non ci sarebbe modo di rimediare dall'interfaccia.
+
+      La migrazione versionata fa lo stesso su PostgreSQL. Qui serve lo stesso perché il
+      percorso di sviluppo crea lo schema con `CREATE TABLE IF NOT EXISTS`, che su una
+      tabella già presente non aggiunge le colonne nuove e non ripara nulla.
+    */
+    const gestori = await db
+      .select({ id: schema.tenants.id })
+      .from(schema.tenants)
+      .where(eq(schema.tenants.gestorePiattaforma, true))
+      .limit(1);
+
+    if (gestori[0] === undefined) {
+      await db
+        .update(schema.tenants)
+        .set({ gestorePiattaforma: true })
+        .where(eq(schema.tenants.id, esistente.id));
+    }
+
+    return esistente.id;
+  }
+
+  // Il primo studio che esiste su un archivio vuoto è quello di chi ha installato la
+  // piattaforma: è lui a possedere il contratto con gli archivi dati. Gli studi creati
+  // dopo sono clienti, e restano tali salvo intervento esplicito.
   const creati = await db
     .insert(schema.tenants)
-    .values({ denominazione })
+    .values({ denominazione, gestorePiattaforma: true })
     .returning({ id: schema.tenants.id });
 
   const creato = creati[0];
@@ -721,6 +754,50 @@ export async function spesaOdierna(db: Database, tenantId: string, adesso = new 
         gte(schema.registroCostiDati.avvenutoIl, inizioGiornata),
       ),
     );
+
+  return centesimi(righe[0]?.totale ?? 0);
+}
+
+/**
+ * Quanto hanno speso oggi **tutti** gli studi insieme.
+ *
+ * Il tetto per studio non basta quando il contratto con gli archivi è uno solo e il
+ * credito è condiviso: dieci studi ciascuno sotto il proprio tetto lo esauriscono lo
+ * stesso, e si fermano tutti nello stesso istante — compresi i nove che non hanno
+ * sbagliato nulla. Questo è il numero su cui si difende la fornitura.
+ *
+ * Volutamente senza `tenantId`: è l'unica lettura del registro costi che attraversa gli
+ * studi, ed è riservata a chi gestisce la piattaforma.
+ */
+export async function spesaOdiernaComplessiva(db: Database, adesso = new Date()): Promise<number> {
+  const inizioGiornata = new Date(adesso);
+  inizioGiornata.setHours(0, 0, 0, 0);
+
+  const righe = await db
+    .select({ totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)` })
+    .from(schema.registroCostiDati)
+    .where(
+      and(
+        eq(schema.registroCostiDati.servitoDaCache, false),
+        gte(schema.registroCostiDati.avvenutoIl, inizioGiornata),
+      ),
+    );
+
+  return centesimi(righe[0]?.totale ?? 0);
+}
+
+/**
+ * Quanto è stato speso in tutto, da sempre, su tutti gli studi.
+ *
+ * Sottratto al credito caricato dà il residuo. Il fornitore non è la fonte di questo
+ * numero: lo è il nostro registro, che segna ogni centesimo al momento della risposta e
+ * non conta ciò che è stato servito dalla cache.
+ */
+export async function spesaComplessiva(db: Database): Promise<number> {
+  const righe = await db
+    .select({ totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)` })
+    .from(schema.registroCostiDati)
+    .where(eq(schema.registroCostiDati.servitoDaCache, false));
 
   return centesimi(righe[0]?.totale ?? 0);
 }

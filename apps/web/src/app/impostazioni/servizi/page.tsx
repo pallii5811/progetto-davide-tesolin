@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { richiediSessione } from '@/lib/sessione';
-import { statoServiziDati } from '@/lib/api';
-import type { StatoServizioDati } from '@/lib/api';
+import { statoFornitura, statoServiziDati } from '@/lib/api';
+import type { StatoFornitura, StatoServizioDati } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -19,9 +19,14 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PaginaServizi() {
   const utente = await richiediSessione();
-  if (utente.ruolo !== 'amministratore') redirect('/impostazioni');
+  // Non `ruolo`: la fornitura dei dati è di chi gestisce la piattaforma, e un
+  // amministratore di studio cliente non deve nemmeno sapere da chi arrivano i dati.
+  if (utente.gestorePiattaforma !== true) redirect('/impostazioni');
 
-  const esito = await statoServiziDati().catch(() => null);
+  const [esito, fornitura] = await Promise.all([
+    statoServiziDati().catch(() => null),
+    statoFornitura().catch(() => null),
+  ]);
 
   /*
     L'intestazione si disegna **sempre**, qualunque sia l'esito.
@@ -38,6 +43,7 @@ export default async function PaginaServizi() {
         credito non basta, ogni servizio va autorizzato dalla console. Questa verifica non
         consuma credito.
       </p>
+      {fornitura !== null && fornitura.persistenza && <Fornitura stato={fornitura} />}
     </>
   );
 
@@ -99,6 +105,65 @@ export default async function PaginaServizi() {
       {mancanti.length === 0 && irraggiungibili.length === 0 && (
         <p className="mt-4 text-sm text-basso">
           Tutti i servizi configurati sono autorizzati.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Credito residuo e consumo, sotto gli occhi di chi paga il contratto.
+ *
+ * Il residuo non si chiede al fornitore: si calcola per differenza fra il credito
+ * dichiarato caricato e quanto il **nostro** registro ha segnato, che annota ogni
+ * centesimo al momento della risposta e non conta ciò che è arrivato dalla cache. Un
+ * residuo che non torna con il proprio registro è un problema da vedere, non da nascondere.
+ *
+ * Quando il credito caricato non è stato dichiarato lo si dice, invece di mostrare un
+ * numero che sembrerebbe un residuo e sarebbe soltanto una sottrazione senza minuendo.
+ */
+function Fornitura({ stato }: { stato: StatoFornitura }) {
+  const euro = (c: number): string =>
+    new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(c / 100);
+
+  const residuo = stato.residuoCentesimi ?? null;
+  const consumatoOggi = stato.consumatoOggiCentesimi ?? 0;
+  const soglia = stato.creditoCaricatoCentesimi * 0.15;
+  const scarso = residuo !== null && residuo <= soglia;
+
+  return (
+    <div className="mb-6 rounded-lg border border-bordo bg-superficie p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-testo-debole">Credito residuo</p>
+          {residuo === null ? (
+            <p className="mt-0.5 text-sm text-testo-tenue">
+              Non calcolabile: il credito caricato non è stato dichiarato.
+            </p>
+          ) : (
+            <p className={`tabular mt-0.5 text-2xl font-bold ${scarso ? 'text-critico' : ''}`}>
+              {euro(residuo)}
+            </p>
+          )}
+        </div>
+        <div className="text-right">
+          <p className="text-xs uppercase tracking-wide text-testo-debole">Consumato oggi</p>
+          <p className="tabular mt-0.5 text-lg font-semibold">{euro(consumatoOggi)}</p>
+          <p className="text-xs text-testo-debole">tutti gli studi insieme</p>
+        </div>
+      </div>
+
+      {scarso && (
+        <p className="mt-3 border-l-2 border-critico/50 pl-2 text-sm text-critico">
+          Credito in esaurimento. Quando finisce si fermano <strong>tutti</strong> gli studi
+          contemporaneamente, senza preavviso.
+        </p>
+      )}
+
+      {(stato.tettoComplessivoCentesimi ?? 0) > 0 && (
+        <p className="mt-3 text-xs leading-relaxed text-testo-debole">
+          Limite giornaliero della piattaforma {euro(stato.tettoComplessivoCentesimi ?? 0)} · per
+          singolo studio {euro(stato.tettoPerStudioCentesimi ?? 0)}
         </p>
       )}
     </div>

@@ -412,6 +412,8 @@ export interface UtenteCorrente {
   email?: string;
   nome?: string;
   ruolo?: string;
+  /** Se lo studio di questo utente gestisce la piattaforma: apre le pagine di filiera. */
+  gestorePiattaforma?: boolean;
 }
 
 export async function utenteCorrente(): Promise<UtenteCorrente> {
@@ -514,6 +516,36 @@ export async function statoServiziDati(): Promise<{
   servizi: StatoServizioDati[];
 }> {
   return chiama('/api/servizi');
+}
+
+export interface StudioOspitato {
+  id: string;
+  denominazione: string;
+  numeroRui: string | null;
+  gestore: boolean;
+  attivo: boolean;
+  utenti: number;
+  apertoIl: string;
+}
+
+/** Gli studi ospitati. Riservata a chi gestisce la piattaforma: altrove risponde 404. */
+export async function elencoStudi(): Promise<{ studi: StudioOspitato[] }> {
+  return chiama('/api/studi');
+}
+
+export interface StatoFornitura {
+  persistenza: boolean;
+  creditoCaricatoCentesimi: number;
+  consumatoTotaleCentesimi?: number;
+  /** `null` quando il credito caricato non è stato dichiarato: non si stima, si dice. */
+  residuoCentesimi?: number | null;
+  consumatoOggiCentesimi?: number;
+  tettoComplessivoCentesimi?: number;
+  tettoPerStudioCentesimi?: number;
+}
+
+export async function statoFornitura(): Promise<StatoFornitura> {
+  return chiama('/api/fornitura');
 }
 
 export interface CriteriProspezione {

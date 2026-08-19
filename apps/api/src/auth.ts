@@ -159,6 +159,14 @@ export interface Sessione {
   readonly email: string;
   readonly nome: string;
   readonly ruolo: 'amministratore' | 'broker' | 'assistente' | 'sola-lettura';
+  /**
+   * Se lo studio di questo utente gestisce la piattaforma.
+   *
+   * Ortogonale al ruolo, e va tenuta tale: `amministratore` dice cosa si può fare dentro
+   * il proprio studio, questa dice se lo studio possiede l'infrastruttura. Confonderle
+   * darebbe a ogni intermediario che apre le impostazioni la vista sulla fornitura dati.
+   */
+  readonly gestorePiattaforma: boolean;
 }
 
 /** I ruoli in sola lettura non possono modificare nulla. */

@@ -67,7 +67,13 @@ import {
   toPolizza,
 } from './schemas.js';
 // L'anagrafe delle compagnie è condivisa fra intermediari: non passa dal contesto tenant.
-import { elencoSolidita, salvaSolidita, spesaOdierna } from '@aegis/db';
+import {
+  elencoSolidita,
+  salvaSolidita,
+  spesaComplessiva,
+  spesaOdierna,
+  spesaOdiernaComplessiva,
+} from '@aegis/db';
 import { MemoryDossierStore, MemoryPortafoglioStore } from './store.js';
 import type { DossierStore, PortafoglioStore } from './store.js';
 import type { Persistenza } from './persistenza.js';
@@ -164,18 +170,78 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   );
 
   /**
-   * Rifiuta le operazioni a pagamento quando il tetto è stato raggiunto.
+   * Il tetto complessivo, su tutti gli studi insieme.
+   *
+   * Il tetto per studio difende lo studio dal proprio errore; questo difende la fornitura
+   * dalla somma degli studi. Con un contratto unico e credito condiviso, dieci studi
+   * ciascuno entro il proprio tetto lo esauriscono comunque, e si fermano tutti — anche i
+   * nove che non hanno sbagliato niente.
+   *
+   * Predefinito a zero, cioè disattivato: su un'installazione con un solo studio
+   * sarebbe un secondo limite che duplica il primo e confonde chi legge il rifiuto.
+   */
+  const tettoComplessivo = Number.parseInt(
+    process.env['AEGIS_TETTO_SPESA_COMPLESSIVO_CENTESIMI'] ?? '0',
+    10,
+  );
+
+  /**
+   * Credito caricato sul contratto dati, in centesimi.
+   *
+   * Serve solo a calcolare il residuo per differenza con quanto il registro dei costi ha
+   * segnato. Va riallineato a ogni ricarica: è una dichiarazione di chi gestisce la
+   * piattaforma, non un dato letto dal fornitore.
+   */
+  const creditoCaricato = Number.parseInt(process.env['AEGIS_CREDITO_CARICATO_CENTESIMI'] ?? '0', 10);
+
+  /**
+   * Rifiuta le operazioni a pagamento quando un tetto è stato raggiunto.
    *
    * Il controllo è **prima** della chiamata, non dopo: un tetto verificato a consuntivo
    * è un rendiconto, non un tetto.
+   *
+   * Restituisce quale dei due limiti ha fermato l'operazione, perché i due rifiuti vanno
+   * detti in modo diverso: «hai speso troppo tu oggi» si risolve domani o alzando il
+   * proprio tetto, «il servizio ha raggiunto il limite» non dipende da chi legge, e
+   * suggerirgli di cambiare le proprie impostazioni lo manderebbe a sbattere.
    */
-  const oltreIlTetto = async (request: FastifyRequest): Promise<number | null> => {
-    if (tettoGiornaliero <= 0 || persistenza === undefined) return null;
+  const oltreIlTetto = async (
+    request: FastifyRequest,
+  ): Promise<{ speso: number; limite: number; ambito: 'studio' | 'piattaforma' } | null> => {
+    if (persistenza === undefined) return null;
     const sessione = request.sessione;
     if (sessione === undefined) return null;
 
+    if (tettoComplessivo > 0) {
+      const totale = await spesaOdiernaComplessiva(persistenza.db);
+      if (totale >= tettoComplessivo) {
+        return { speso: totale, limite: tettoComplessivo, ambito: 'piattaforma' };
+      }
+    }
+
+    if (tettoGiornaliero <= 0) return null;
     const speso = await spesaOdierna(persistenza.db, sessione.tenantId);
-    return speso >= tettoGiornaliero ? speso : null;
+    return speso >= tettoGiornaliero ? { speso, limite: tettoGiornaliero, ambito: 'studio' } : null;
+  };
+
+  /**
+   * Il testo del rifiuto, scritto per chi lo legge.
+   *
+   * Le versioni precedenti citavano il nome della variabile d'ambiente da alzare: è
+   * un'istruzione per chi amministra il server, e un intermediario che la legge non può
+   * farci niente se non sentirsi davanti a un attrezzo rotto. Qui si dice cosa è successo,
+   * quando si riparte e a chi rivolgersi.
+   */
+  const messaggioTetto = (
+    esito: { speso: number; limite: number; ambito: 'studio' | 'piattaforma' },
+    ripresa: string,
+  ): string => {
+    const euro = (c: number): string => (c / 100).toFixed(2).replace('.', ',');
+    return esito.ambito === 'piattaforma'
+      ? `Il servizio ha raggiunto il proprio limite di consumo giornaliero. ${ripresa} ` +
+          'Se la cosa si ripete, segnalarlo all’assistenza.'
+      : `Tetto di spesa giornaliero dello studio raggiunto: ${euro(esito.speso)} € su ` +
+          `${euro(esito.limite)} €. ${ripresa}`;
   };
 
   const registraSpese = async (
@@ -261,12 +327,20 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(400).send({ errore: 'Credenziali non valide' });
     }
 
-    const { trovaUtentePerEmail, registraTentativoAccesso, creaSessione } = await import('@aegis/db');
+    const { statoStudio, trovaUtentePerEmail, registraTentativoAccesso, creaSessione } =
+      await import('@aegis/db');
     const utente = await trovaUtentePerEmail(persistenza.db, parsed.data.email);
 
     // Messaggio identico per utente inesistente e password errata: distinguerli
     // consentirebbe di enumerare gli indirizzi registrati.
     const rifiuto = { errore: 'Indirizzo o password non corretti' };
+
+    // Lo studio sospeso rientra nello stesso rifiuto indistinto: dire «il tuo studio è
+    // sospeso» a chi ha indovinato un indirizzo confermerebbe che quell'indirizzo esiste.
+    if (utente !== null && !(await statoStudio(persistenza.db, utente.tenantId)).attivo) {
+      await verificaPassword(parsed.data.password, ESCA_VERIFICA);
+      return reply.status(401).send(rifiuto);
+    }
 
     if (utente === null || !utente.attivo || utente.passwordHash === null) {
       // Si consuma comunque tempo di verifica, così la risposta non è più veloce
@@ -339,6 +413,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           email: sessione.email,
           nome: sessione.nome,
           ruolo: sessione.ruolo,
+          gestorePiattaforma: sessione.gestorePiattaforma,
         };
   });
 
@@ -424,6 +499,30 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   };
 
   /**
+   * Riservato a chi gestisce la piattaforma, non a chi la usa.
+   *
+   * Protegge tutto ciò che riguarda la **fornitura** dei dati: quali servizi il contratto
+   * autorizza, quanto credito resta, quanto si è speso in totale. Sono informazioni di chi
+   * paga il contratto, e uno studio cliente non deve poterle leggere nemmeno conoscendo
+   * l'indirizzo della rotta — nascondere la voce di menù non è un presidio.
+   *
+   * La risposta è 404 e non 403: un «riservato» confermerebbe che dietro quell'indirizzo
+   * c'è qualcosa, e a chi non ne ha titolo non si dà nemmeno quella notizia.
+   */
+  const soloGestore = (request: FastifyRequest, reply: FastifyReply): Sessione | null => {
+    const sessione = request.sessione;
+    if (sessione === undefined) {
+      void reply.status(401).send({ errore: 'Autenticazione richiesta' });
+      return null;
+    }
+    if (!sessione.gestorePiattaforma) {
+      void reply.status(404).send({ errore: 'Risorsa non trovata' });
+      return null;
+    }
+    return sessione;
+  };
+
+  /**
    * Anagrafica dello studio.
    *
    * In lettura è aperta a chiunque abbia una sessione: serve a intestare il report, e
@@ -467,7 +566,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    * l'abbonamento?» — senza che debba aprire un terminale.
    */
   app.get('/api/servizi', async (request, reply) => {
-    const sessione = soloAmministratore(request, reply);
+    const sessione = soloGestore(request, reply);
     if (sessione === null) return reply;
 
     const token = process.env['OPENAPI_TOKEN']?.trim() ?? '';
@@ -477,6 +576,134 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const servizi = await verificaAutorizzazioni({ token, config: OPENAPI_DEFAULT_CONFIG });
     return { datiReali: true, servizi };
+  });
+
+  /**
+   * Gli studi presenti sulla piattaforma.
+   *
+   * Il gestore amministra le utenze dei propri clienti, non i loro portafogli: l'elenco
+   * dice quanti collaboratori ha ciascuno studio e se è attivo, mai cosa ci sia dentro.
+   * L'isolamento vale anche verso l'alto.
+   */
+  app.get('/api/studi', async (request, reply) => {
+    const sessione = soloGestore(request, reply);
+    if (sessione === null) return reply;
+    if (persistenza === undefined) return { studi: [] };
+
+    const { elencoStudi } = await import('@aegis/db');
+    const studi = await elencoStudi(persistenza.db);
+    return {
+      studi: studi.map((s) => ({
+        id: s.id,
+        denominazione: s.denominazione,
+        numeroRui: s.numeroRui,
+        gestore: s.gestorePiattaforma,
+        attivo: s.attivo,
+        utenti: s.utenti,
+        apertoIl: s.creatoIl.toISOString(),
+      })),
+    };
+  });
+
+  /**
+   * Apre uno studio cliente con il suo primo amministratore.
+   *
+   * La password iniziale è generata qui e restituita **una sola volta**: non viene
+   * scritta da nessuna parte in chiaro, e chi apre lo studio la consegna al cliente per
+   * il canale che ritiene. È lo stesso criterio del primo avvio — un valore predefinito
+   * sarebbe la credenziale che tutti conoscono.
+   */
+  app.post('/api/studi', async (request, reply) => {
+    const sessione = soloGestore(request, reply);
+    if (sessione === null) return reply;
+    if (persistenza === undefined) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile' });
+    }
+
+    const parsed = nuovoStudioSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi', dettagli: parsed.error.issues });
+    }
+
+    const { creaStudio, creaUtente, trovaUtentePerEmail } = await import('@aegis/db');
+    const email = parsed.data.email.trim().toLowerCase();
+
+    // Gli indirizzi sono unici su tutta la piattaforma: verificarlo qui dà un errore
+    // comprensibile invece della violazione di vincolo che arriverebbe dal database.
+    if ((await trovaUtentePerEmail(persistenza.db, email)) !== null) {
+      return reply.status(409).send({ errore: 'Questo indirizzo è già registrato' });
+    }
+
+    const password = generaPasswordIniziale();
+    const tenantId = await creaStudio(persistenza.db, parsed.data.denominazione.trim());
+    await creaUtente(persistenza.db, {
+      tenantId,
+      email,
+      nome: parsed.data.nome.trim(),
+      passwordHash: await derivaPassword(password),
+      ruolo: 'amministratore',
+    });
+
+    return reply.status(201).send({ id: tenantId, email, passwordIniziale: password });
+  });
+
+  /** Sospende o riattiva uno studio: i dati restano, gli accessi no. */
+  app.patch<{ Params: { id: string } }>('/api/studi/:id', async (request, reply) => {
+    const sessione = soloGestore(request, reply);
+    if (sessione === null) return reply;
+    if (persistenza === undefined) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile' });
+    }
+
+    const parsed = z.object({ attivo: z.boolean() }).safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi' });
+    }
+
+    // Il gestore non può sospendere sé stesso: si chiuderebbe fuori dalla piattaforma
+    // che amministra, e nessun altro potrebbe riaprirgliela.
+    if (request.params.id === sessione.tenantId) {
+      return reply.status(409).send({ errore: 'Lo studio che gestisce la piattaforma non si sospende' });
+    }
+
+    const { impostaAttivitaStudio } = await import('@aegis/db');
+    await impostaAttivitaStudio(persistenza.db, request.params.id, parsed.data.attivo);
+    return { attivo: parsed.data.attivo };
+  });
+
+  /**
+   * Stato della fornitura dati: quanto credito resta e quanto si sta consumando.
+   *
+   * Il residuo si calcola per differenza fra il credito dichiarato caricato e quanto il
+   * **nostro** registro ha segnato: ogni centesimo è annotato al momento della risposta,
+   * e ciò che è arrivato dalla cache non è stato pagato. Non si chiede al fornitore
+   * perché una lettura del saldo sarebbe essa stessa una chiamata, e perché un residuo
+   * che non torna con il proprio registro è un problema da vedere, non da nascondere.
+   *
+   * `creditoCaricato` a zero significa «non dichiarato»: allora il residuo non si può
+   * calcolare e si dice, invece di mostrare un numero negativo che sembrerebbe un debito.
+   */
+  app.get('/api/fornitura', async (request, reply) => {
+    const sessione = soloGestore(request, reply);
+    if (sessione === null) return reply;
+    if (persistenza === undefined) {
+      return { persistenza: false, creditoCaricatoCentesimi: 0 };
+    }
+
+    const [consumatoTotale, consumatoOggi] = await Promise.all([
+      spesaComplessiva(persistenza.db),
+      spesaOdiernaComplessiva(persistenza.db),
+    ]);
+
+    return {
+      persistenza: true,
+      creditoCaricatoCentesimi: creditoCaricato,
+      consumatoTotaleCentesimi: consumatoTotale,
+      residuoCentesimi: creditoCaricato > 0 ? creditoCaricato - consumatoTotale : null,
+      consumatoOggiCentesimi: consumatoOggi,
+      tettoComplessivoCentesimi: tettoComplessivo,
+      tettoPerStudioCentesimi: tettoGiornaliero,
+    };
   });
 
   /**
@@ -733,12 +960,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     // Il conteggio è gratuito e non tocca il tetto: bloccarlo impedirebbe di capire
     // quanto costerebbe una ricerca proprio a chi sta già attento alla spesa.
     if (!soloConteggio) {
-      const speso = await oltreIlTetto(request);
-      if (speso !== null) {
+      const esito = await oltreIlTetto(request);
+      if (esito !== null) {
         return reply.status(429).send({
-          errore:
-            `Tetto di spesa giornaliero raggiunto: ${(speso / 100).toFixed(2)} € su ` +
-            `${(tettoGiornaliero / 100).toFixed(2)} €. Il conteggio resta disponibile e gratuito.`,
+          errore: messaggioTetto(esito, 'Il conteggio dei risultati resta disponibile e gratuito.'),
         });
       }
     }
@@ -853,13 +1078,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         .send({ errore: 'Corpo della richiesta non valido', dettagli: parsed.error.issues });
     }
 
-    const speso = await oltreIlTetto(request);
-    if (speso !== null) {
+    const esito = await oltreIlTetto(request);
+    if (esito !== null) {
       return reply.status(429).send({
-        errore:
-          `Tetto di spesa giornaliero raggiunto: ${(speso / 100).toFixed(2)} € su ` +
-          `${(tettoGiornaliero / 100).toFixed(2)} €. L'analisi riprende domani, oppure ` +
-          'alzare AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI dopo aver verificato il credito residuo.',
+        errore: messaggioTetto(esito, 'Le analisi riprendono domani.'),
       });
     }
 
@@ -1016,13 +1238,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const speso = await oltreIlTetto(request);
-    if (speso !== null) {
+    const esito = await oltreIlTetto(request);
+    if (esito !== null) {
       return reply.status(429).send({
-        errore:
-          `Tetto di spesa giornaliero raggiunto: ${(speso / 100).toFixed(2)} € su ` +
-          `${(tettoGiornaliero / 100).toFixed(2)} €. L'importazione riprende domani, oppure ` +
-          'alzare AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI dopo aver verificato il credito residuo.',
+        errore: messaggioTetto(esito, 'L’importazione riprende domani. Le aziende già acquisite restano in portafoglio.'),
       });
     }
 
@@ -1283,6 +1502,12 @@ const loginSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
+const nuovoStudioSchema = z.object({
+  denominazione: z.string().trim().min(2).max(200),
+  nome: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(200),
+});
+
 const cambioPasswordSchema = z.object({
   corrente: z.string().min(1).max(200),
   nuova: z.string().min(1).max(200),
@@ -1357,7 +1582,7 @@ const modificaUtenteSchema = z
 
 /** Traduce il cookie in una sessione applicativa, o `null` se non più valida. */
 async function risolviSessione(db: unknown, token: string): Promise<Sessione | null> {
-  const { trovaSessioneValida, trovaUtentePerId } = await import('@aegis/db');
+  const { statoStudio, trovaSessioneValida, trovaUtentePerId } = await import('@aegis/db');
   const database = db as Parameters<typeof trovaSessioneValida>[0];
 
   const sessione = await trovaSessioneValida(database, improntaToken(token), new Date());
@@ -1366,12 +1591,18 @@ async function risolviSessione(db: unknown, token: string): Promise<Sessione | n
   const utente = await trovaUtentePerId(database, sessione.utenteId);
   if (utente === null || !utente.attivo) return null;
 
+  // La sospensione dello studio si verifica **a ogni richiesta**, non solo all'accesso:
+  // controllarla al solo login lascerebbe lavorare per giorni chi ha già il cookie.
+  const studio = await statoStudio(database, utente.tenantId);
+  if (!studio.attivo) return null;
+
   return {
     utenteId: utente.id,
     tenantId: utente.tenantId,
     email: utente.email,
     nome: utente.nome,
     ruolo: utente.ruolo,
+    gestorePiattaforma: studio.gestorePiattaforma,
   };
 }
 

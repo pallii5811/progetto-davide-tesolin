@@ -11,7 +11,7 @@
  * confermata alla prima chiamata reale, quando il token avrà lo scope `risk`.
  */
 
-import { fromProvider } from '@aegis/core';
+import { REGISTRO_PROTESTI, fromProvider } from '@aegis/core';
 import type { EventiNegativi, Pregiudizievole, ProceduraConcorsuale, Protesto, Sourced } from '@aegis/core';
 import { asArray, bool, date, money, moneyOrZero, pick, str } from './parse.js';
 
@@ -39,6 +39,7 @@ export function mappaNegativita(raw: unknown, osservatoIl: Date): Sourced<Eventi
     },
     PROVIDER,
     'IT-negativita',
+    REGISTRO_PROTESTI,
     osservatoIl,
   );
 }

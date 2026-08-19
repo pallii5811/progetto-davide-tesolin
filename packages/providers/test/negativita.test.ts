@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Money } from '@aegis/core';
+import { Money, describeSource } from '@aegis/core';
 import { HttpProviderClient, MemoryCostLedger } from '../src/http.js';
 import { contaEventi, mappaNegativita, soloIndicatori } from '../src/openapi/negativita.js';
 
@@ -63,7 +63,10 @@ describe('Mappatura eventi negativi', () => {
       kind: 'provider',
       provider: 'OpenAPI.com',
       service: 'IT-negativita',
+      registro: 'Registro protesti e procedure concorsuali',
     });
+    // Ciò che il cliente legge è il registro pubblico, mai il distributore.
+    expect(describeSource(sourced.source)).toBe('Registro protesti e procedure concorsuali');
   });
 });
 

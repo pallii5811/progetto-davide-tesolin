@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { Money, isBilancioQuadrato, reclassify } from '@aegis/core';
+import { Money, describeSource, isBilancioQuadrato, reclassify } from '@aegis/core';
 import {
   mappaAnagrafica,
   mappaAssetti,
@@ -101,8 +101,17 @@ describe('Mappatura dell’anagrafica', () => {
       kind: 'provider',
       provider: 'OpenAPI.com',
       service: 'IT-advanced',
+      // L'anagrafica è depositata al Registro Imprese: il distributore la rivende soltanto.
+      registro: 'Registro Imprese',
     });
     expect(risultato.observedAt).toBe(OSSERVATO);
+  });
+
+  it('mostra il registro e non il distributore', () => {
+    // Il broker consegna al proprio cliente un fascicolo che dovrà difendere: la fonte
+    // citata deve essere quella pubblica, non l'intermediario tecnico da cui transita.
+    const risultato = mappaAnagrafica({}, 'IT-advanced', OSSERVATO);
+    expect(describeSource(risultato.source)).toBe('Registro Imprese');
   });
 });
 
