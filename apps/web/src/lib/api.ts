@@ -56,6 +56,65 @@ export interface RisultatoRicerca {
    * dei trattini farebbe credere che l'azienda non abbia dati.
    */
   sintesi: SintesiRicerca | null;
+  /** Il record acquistato per intero. Gli importi sono in **centesimi**, come nel dominio. */
+  anagrafica: AnagraficaRicerca | null;
+  bilanciSintetici: BilancioSinteticoDto[];
+  soci: SocioDto[];
+}
+
+export interface AnagraficaRicerca {
+  formaGiuridica: string;
+  formaGiuridicaDescrizione: string;
+  statoAttivita: string;
+  dataCostituzione: string | null;
+  dataInizioAttivita: string | null;
+  dataCessazione: string | null;
+  codiceFiscaleCessato: boolean | null;
+  numeroREA: string | null;
+  cciaa: string | null;
+  atecoPrimario: string | null;
+  atecoPrimarioDescrizione: string | null;
+  atecoSecondari: string[];
+  sedeLegale: {
+    via: string;
+    civico: string | null;
+    cap: string;
+    frazione: string | null;
+    comune: string;
+    provincia: string;
+    regione: string | null;
+    latitudine: number | null;
+    longitudine: number | null;
+  } | null;
+  codiceCatastale: string | null;
+  capitaleSocialeDeliberato: number | null;
+  capitaleSocialeVersato: number | null;
+  pec: string | null;
+  sitoWeb: string | null;
+  telefono: string | null;
+  numeroAddetti: number | null;
+  fatturatoDichiarato: number | null;
+}
+
+export interface BilancioSinteticoDto {
+  anno: number;
+  dataChiusura: string | null;
+  fatturato: number | null;
+  patrimonioNetto: number | null;
+  totaleAttivo: number | null;
+  costoDelPersonale: number | null;
+  capitaleSociale: number | null;
+  dipendenti: number | null;
+  retribuzioneMediaLorda: number | null;
+}
+
+export interface SocioDto {
+  denominazione: string;
+  codiceFiscale: string | null;
+  tipo: 'persona-fisica' | 'persona-giuridica';
+  quotaPercentuale: number | null;
+  quotaValore: number | null;
+  socioDal: string | null;
 }
 
 export interface SintesiRicerca {

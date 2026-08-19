@@ -4,6 +4,7 @@ import { INDIRIZZO_API, cercaAziende, statoServizio } from '@/lib/api';
 import type { RisultatoRicerca } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { ModuloRicerca } from './ModuloRicerca';
+import { SchedaRisultato } from './SchedaRisultato';
 
 export const dynamic = 'force-dynamic';
 
@@ -206,104 +207,3 @@ export default async function PaginaRicerca({
  * somme assicurande. Ma qui si vede già se vale la pena di farla, ed è esattamente ciò a
  * cui serve una ricerca.
  */
-function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
-  const s = azienda.sintesi;
-
-  return (
-    <div className="rounded-lg border border-bordo bg-superficie p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold">{azienda.denominazione}</p>
-          <p className="mt-0.5 text-xs text-testo-debole">
-            <span className="tabular">{azienda.partitaIva ?? '—'}</span>
-            {' · '}
-            {azienda.comune ?? '—'}
-            {azienda.provincia !== null && ` (${azienda.provincia})`}
-            {azienda.ateco !== null && (
-              <>
-                {' · ATECO '}
-                <span className="tabular">{azienda.ateco}</span>
-              </>
-            )}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/*
-            Lo stato camerale prima dell'analisi: analizzare un'impresa cessata spende
-            credito per un profilo che non serve a nessun preventivo.
-          */}
-          {azienda.statoAttivita === 'attiva' ? (
-            <span className="rounded border border-basso/30 bg-basso-fondo px-1.5 py-0.5 text-xs font-medium text-basso">
-              attiva
-            </span>
-          ) : (
-            <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium capitalize text-critico">
-              {azienda.statoAttivita.replace('-', ' ')}
-            </span>
-          )}
-          <Link
-            href={`/azienda/${azienda.providerId}`}
-            className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
-          >
-            Analizza
-          </Link>
-        </div>
-      </div>
-
-      {s !== null && (
-        <>
-          <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-            <Dato etichetta="Dipendenti" valore={numero(s.dipendenti)} />
-            <Dato etichetta="Fatturato" valore={euro(s.fatturatoEuro)} />
-            <Dato etichetta="Patrimonio netto" valore={euro(s.patrimonioNettoEuro)} />
-            <Dato etichetta="Totale attivo" valore={euro(s.totaleAttivoEuro)} />
-            <Dato etichetta="Capitale sociale" valore={euro(s.capitaleSocialeEuro)} />
-            <Dato etichetta="Retribuzione media" valore={euro(s.retribuzioneMediaEuro)} />
-            <Dato etichetta="Soci" valore={numero(s.numeroSoci)} />
-            <Dato etichetta="Esercizi disponibili" valore={numero(s.eserciziDisponibili)} />
-          </dl>
-
-          <p className="mt-3 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-tenue">
-            {s.annoUltimoBilancio !== null && (
-              <>
-                Dati dell&apos;esercizio {s.annoUltimoBilancio}, dal Registro Imprese.{' '}
-              </>
-            )}
-            Con l&apos;analisi arrivano bilanci riclassificati, merito creditizio, registro dei
-            rischi, somme assicurande e verifica dell&apos;obbligo catastrofale.
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Dato({ etichetta, valore }: { etichetta: string; valore: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-testo-debole">{etichetta}</dt>
-      <dd className="tabular mt-0.5 text-sm font-medium">{valore}</dd>
-    </div>
-  );
-}
-
-/**
- * «Non disponibile» e «zero» sono cose diverse.
- *
- * Un fatturato assente significa che il record non lo porta; stampare «0 €» direbbe che
- * l'azienda non ha fatturato, che è un'affermazione ben più forte e quasi sempre falsa.
- */
-function euro(valore: number | null): string {
-  return valore === null
-    ? 'n.d.'
-    : new Intl.NumberFormat('it-IT', {
-        style: 'currency',
-        currency: 'EUR',
-        maximumFractionDigits: 0,
-      }).format(valore);
-}
-
-function numero(valore: number | null): string {
-  return valore === null ? 'n.d.' : new Intl.NumberFormat('it-IT').format(valore);
-}

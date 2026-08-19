@@ -7,7 +7,14 @@
  * una riga di motore.
  */
 
-import type { CompanyProfile, PartitaIva, StatoAttivita } from '@aegis/core';
+import type {
+  Anagrafica,
+  BilancioSintetico,
+  CompanyProfile,
+  PartitaIva,
+  Socio,
+  StatoAttivita,
+} from '@aegis/core';
 
 /**
  * Livello di approfondimento richiesto.
@@ -52,21 +59,31 @@ export interface CompanySearchResult {
    */
   readonly providerId: string;
   /**
-   * Quello che il record acquistato contiene già.
-   *
-   * La ricerca per partita IVA compra `IT-advanced`, cioè l'anagrafica **estesa**: addetti,
-   * fatturato, patrimonio, capitale sociale, retribuzione media, dieci anni di bilanci
-   * sintetici e la compagine sociale. Per un periodo il risultato ne conservava sei campi
-   * e buttava via il resto: si pagava il record intero e si vedeva l'ATECO.
-   *
-   * Non era solo spreco — era la ragione per cui la ricerca sembrava rotta. Chi vede
-   * scalare del credito e riceve cinque colonne conclude che il prodotto non funzioni, e
-   * ha ragione a concluderlo.
+   * I numeri principali, per il colpo d'occhio.
    *
    * `null` quando la ricerca è stata **testuale**: l'elenco camerale per denominazione
    * non porta questi dati, e restituire zeri li farebbe sembrare misurati.
    */
   readonly sintesi: SintesiAzienda | null;
+  /**
+   * Il record acquistato, **per intero**.
+   *
+   * La ricerca per partita IVA compra `IT-advanced`: anagrafica completa, dieci esercizi
+   * di bilancio sintetico e la compagine sociale. Due volte si è provato a mostrarne una
+   * selezione — prima sei colonne, poi otto numeri — e due volte la selezione era troppo
+   * stretta, perché chi paga un record intero si aspetta un record intero.
+   *
+   * Qui non si sceglie più: passa tutto ciò che il mappatore ha estratto, e la decisione
+   * su cosa mettere in primo piano resta all'interfaccia, che può cambiarla senza che si
+   * perda un dato per strada.
+   *
+   * `null` sulle ricerche testuali, per la stessa ragione di `sintesi`.
+   */
+  readonly anagrafica: Anagrafica | null;
+  /** Tutti gli esercizi che il record contiene, dal più recente. */
+  readonly bilanciSintetici: readonly BilancioSintetico[];
+  /** La compagine sociale dichiarata dal record. */
+  readonly soci: readonly Socio[];
 }
 
 /** I numeri che l'anagrafica estesa porta con sé, già pagati con la ricerca. */

@@ -591,6 +591,21 @@ export class OpenApiProvider implements CompanyDataProvider {
       // cui l'archivio riconosce l'azienda ed evita di riacquistarla.
       providerId: piva ?? str(raw, 'vatCode', 'partitaIva', 'taxCode', 'id') ?? '',
       sintesi: sintesiDa(raw),
+      /*
+        Il record per intero, senza selezione.
+
+        La ricerca testuale restituisce un elenco camerale povero: mappare quelle voci
+        produrrebbe anagrafiche quasi vuote che sembrano dati mancanti invece che dati
+        non acquistati. Si valorizza quindi solo quando c'è la partita IVA, cioè quando
+        si è comprata davvero l'anagrafica estesa.
+      */
+      ...(piva === null
+        ? { anagrafica: null, bilanciSintetici: [], soci: [] }
+        : {
+            anagrafica: mappaAnagrafica(raw, 'IT-advanced', this.#now()).value,
+            bilanciSintetici: mappaBilanciSintetici(raw),
+            soci: mappaAssetti(raw, 'IT-advanced', this.#now()).value.soci,
+          }),
     };
   }
 }

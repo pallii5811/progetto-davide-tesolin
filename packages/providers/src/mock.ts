@@ -109,6 +109,7 @@ export class MockCompanyProvider implements CompanyDataProvider {
         // altrimenti il difetto «pago il record e vedo l'ATECO» tornerebbe invisibile
         // proprio nella modalità con cui si collauda.
         sintesi: sintesiDimostrativa(v),
+        ...recordDimostrativo(v),
       })),
     );
   }
@@ -160,6 +161,8 @@ export class MockCompanyProvider implements CompanyDataProvider {
             statoAttivita: 'attiva' as const,
             providerId: v.partitaIva,
             sintesi: sintesiDimostrativa(v),
+            ...recordDimostrativo(v),
+        ...recordDimostrativo(v),
           })),
     });
   }
@@ -295,5 +298,26 @@ function sintesiDimostrativa(variante: Variante): SintesiAzienda {
     retribuzioneMediaEuro: Math.round(1_600_000 / 35),
     numeroSoci: 2,
     eserciziDisponibili: 10,
+  };
+}
+
+
+/**
+ * Il record completo dimostrativo: anagrafica, esercizi e soci.
+ *
+ * Si ricava dal profilo che l'analisi restituirebbe per la stessa azienda, così che la
+ * ricerca e l'analisi non raccontino due storie diverse. Una dimostrazione che mostra meno
+ * campi di quella reale nasconde proprio i difetti che dovrebbe far emergere.
+ */
+function recordDimostrativo(variante: Variante): Pick<
+  CompanySearchResult,
+  'anagrafica' | 'bilanciSintetici' | 'soci'
+> {
+  const base = demoCompanyProfile();
+  const conVariante = applicaVariante(base, variante);
+  return {
+    anagrafica: conVariante.anagrafica.value,
+    bilanciSintetici: conVariante.bilanciSintetici.map((b) => b.value),
+    soci: conVariante.assetti?.value.soci ?? [],
   };
 }
