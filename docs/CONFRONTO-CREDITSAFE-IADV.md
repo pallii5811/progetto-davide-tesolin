@@ -30,10 +30,11 @@ con i loro *documenti*, non con le loro schermate.
 | Fido consigliato | **sì** | con il vincolo che lo determina, non solo il numero |
 | Bilanci storici | **sì** | fino a 10 esercizi, più la riclassificazione CEE |
 | Protesti, pregiudizievoli, procedure concorsuali | **sì** | e dichiara quando il registro afferma senza dettagliare |
-| Amministratori, soci, titolare effettivo | **parziale** | amministratori e soci sì; **titolare effettivo no** |
+| Amministratori, soci, titolare effettivo | **parziale** | amministratori e soci sì; titolare effettivo no — ma `IT-ubo` esiste, 1,10 € |
 | Struttura del gruppo, controllanti e controllate | **sì** | con controllanti/controllate estere |
 | **Comportamento di pagamento (DBT, giorni di ritardo)** | **no** | non acquistabile in Italia da alcun fornitore |
 | Violazioni di conformità (ambiente, lavoro, fisco) | **no** | non offerto dalla fonte dati attuale |
+| Verifica antiriciclaggio (D.Lgs. 231/2007) | **no** | ⚠ il servizio esiste ed è economico: `IT-aml`, 0,20 € (0,095 € con abbonamento) |
 | Monitoraggio con avvisi sui cambiamenti | **sì** | dieci tipi di evento, fra cui obblighi normativi |
 | Vista di portafoglio con segnalazione delle criticità | **sì** | ordinata per urgenza di intervento, non per punteggio |
 | Report internazionali (48 paesi) | **no** | solo Italia |
@@ -113,8 +114,18 @@ In ordine di valore.
 
 1. ~~Scaricare il fac-simile PMI di Insurance Advisor~~ — **fatto il 19/08/2026**. Ne sono
    usciti quattro capitoli nuovi nel report e le tre voci ancora aperte qui sotto.
-2. **Titolare effettivo**: il servizio esiste (1,10 € a chiamata, 0,88 € a volume). È
-   parità con Creditsafe ed è un obbligo antiriciclaggio per l'intermediario.
+2. **Titolare effettivo** (endpoint `IT-ubo`): parità con Creditsafe e obbligo
+   antiriciclaggio per l'intermediario. **1,10 € a chiamata, 0,88 € con abbonamento** —
+   verificato sul listino pubblico il 20/08/2026
+   (console.openapi.com/apis/company/pricing), dove compare come «€1.100 / €0.880».
+   Costa dieci volte l'anagrafica estesa perché non è un dato camerale: è una visura sul
+   registro dei titolari effettivi, che ha un proprio costo per accesso.
+2-bis. **Antiriciclaggio** (endpoint `IT-aml`, **0,20 €** a chiamata, 0,095 € con
+   abbonamento) e **cariche collegate** (`IT-stakeholders`, stesso prezzo). Entrambi erano
+   segnati come lacune «non offerte dalla fonte dati»: non era vero, e costano meno di un
+   quarto di un'analisi. L'antiriciclaggio è un **obbligo di legge** per
+   l'intermediario, non una funzione in più.
+
 3. **Sessione con il broker**, con il prodotto in mano e nessuna spiegazione preventiva.
 4. ~~Esportazione elenchi~~, ~~selezione dei contenuti del report~~, ~~condivisione del
    questionario~~ e ~~tre livelli di profondità~~: **fatte il 20/08/2026**.
