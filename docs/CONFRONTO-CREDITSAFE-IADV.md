@@ -14,9 +14,10 @@ non con ciò che si vede a schermo usandole. La sola persona che può chiudere q
 un utente che le usa — ed è la ragione per cui la sessione con il broker vale più di
 qualunque altra verifica.
 
-Il fac-simile del report PMI di Insurance Advisor è pubblico (20 pagine, richiede un
-indirizzo e-mail): confrontarlo capitolo per capitolo con il nostro è il passo successivo,
-e va fatto prima della consegna.
+**Il confronto sul fac-simile è stato fatto** (20 pagine, lette il 19/08/2026). Le voci
+qui sotto che riguardano il modulo PMI non vengono più da una brochure ma dal loro
+documento, capitolo per capitolo. Resta vero il limite sulla piattaforma: il confronto è
+con i loro *documenti*, non con le loro schermate.
 
 ---
 
@@ -60,7 +61,12 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 | **Tre livelli di profondità per area di rischio** | **no** | l'analisi ha una profondità sola |
 | **Condivisione del questionario con il cliente** | **no** | l'intervista la compila solo l'intermediario |
 | **Selezione di quali rischi portare nel report** | **no** | il report contiene tutto |
-| **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) con probabilità di superamento soglia | **no** | serve una seconda fonte dati |
+| Scala di impatto economico a quattro fasce, con giorni di fermo | **sì** | e le soglie sono motivate: la più grave è l'art. 2446 c.c. Loro non le motivano |
+| Analisi economica pluriennale e schema del margine di contribuzione | **sì** | lo schema quadra col totale per costruzione, non per riimplementazione |
+| **Analisi del contesto per ubicazione** (soccorso, attività confinanti) | **sì** | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap |
+| **Valori di ricostruzione degli edifici** | **no** | la superficie si ricava da OSM; i parametri CRESME sono commerciali |
+| **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) con probabilità di superamento soglia | **no** | Open-Meteo copre pioggia e vento, **non** grandine e fulmini; uso commerciale a pagamento |
+| **Immagini per ubicazione** | **no** | nessuna fonte esterna necessaria: è caricamento file |
 | Linea Condomini | **no** | fuori perimetro: il prodotto è sulle imprese |
 | Linea Famiglia | **no** | fuori perimetro |
 
@@ -105,12 +111,26 @@ dicono **quali** coperture servono, non solo quanto regge l'impresa.
 
 In ordine di valore.
 
-1. **Scaricare il fac-simile PMI di Insurance Advisor** e confrontarlo capitolo per capitolo
-   con il nostro report. È l'unico confronto che non si può fare da una brochure.
+1. ~~Scaricare il fac-simile PMI di Insurance Advisor~~ — **fatto il 19/08/2026**. Ne sono
+   usciti quattro capitoli nuovi nel report e le tre voci ancora aperte qui sotto.
 2. **Titolare effettivo**: il servizio esiste (1,10 € a chiamata, 0,88 € a volume). È
    parità con Creditsafe ed è un obbligo antiriciclaggio per l'intermediario.
 3. **Sessione con il broker**, con il prodotto in mano e nessuna spiegazione preventiva.
 4. Poi, in ordine decrescente: esportazione elenchi, tre livelli di profondità,
    condivisione del questionario, selezione dei contenuti del report.
-5. La serie storica meteo georiferita richiede una fonte dati aggiuntiva: è una decisione
-   di prodotto, non un compito di sviluppo.
+
+### Le tre voci del loro report ancora aperte
+
+Tutte e tre sono **decisioni di prodotto** prima che compiti di sviluppo, perché ognuna
+porta con sé un costo o un limite da accettare consapevolmente.
+
+- **Storico meteo georiferito.** Open-Meteo dà dieci anni di precipitazioni e raffiche di
+  vento, gratis per uso non commerciale (~29 €/mese per l'uso commerciale). **Grandine e
+  fulmini non li ha**: si può fare una versione a due fenomeni su quattro che dichiara
+  quali mancano, oppure cercare una fonte a pagamento che li copra tutti.
+- **Valori di ricostruzione.** La superficie coperta si ricava da OpenStreetMap; i
+  parametri di costo CRESME sono commerciali. Senza, serve un costo al metro cubo
+  configurabile dall'intermediario — che è difendibile, purché sia dichiarato come sua
+  assunzione e non come un dato di mercato.
+- **Immagini per ubicazione.** Nessuna fonte esterna: è caricamento di file, con le
+  attenzioni che i file caricati richiedono. È la più semplice delle tre.

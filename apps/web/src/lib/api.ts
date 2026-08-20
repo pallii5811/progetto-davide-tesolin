@@ -391,6 +391,25 @@ export interface AnalisiDto {
       sismica: 'alta' | 'media' | 'bassa';
       idraulica: 'alta' | 'media' | 'bassa';
       piuEsposta: boolean;
+      /**
+       * Contesto fisico attorno all'ubicazione: caserme e attività confinanti.
+       *
+       * `null` vuol dire **non osservato** — nessuna coordinata, oppure fonte non
+       * raggiunta. Non vuol dire che intorno non ci sia niente, e la pagina non deve
+       * mai lasciarlo intendere.
+       */
+      contesto: {
+        vigiliDelFuoco: { nome: string; distanzaKm: number; minutiStimati: number }[];
+        attivitaVicine: {
+          nome: string;
+          categoria: string;
+          distanzaMetri: number;
+          aggravaIlRischio: boolean;
+        }[];
+        attivitaCheAggravano: number;
+        raggioAnalizzatoMetri: number;
+        fonte: string;
+      } | null;
     }[];
     complessiIncendio: { ubicazioni: string[]; motivo: string }[];
     aggregatiTerritoriali: { ubicazioni: string[]; motivo: string }[];

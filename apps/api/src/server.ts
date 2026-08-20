@@ -29,6 +29,7 @@ import {
 } from '@aegis/providers';
 import type { CostEvent } from '@aegis/providers';
 import { RegistroPerRichiesta, conCostiDellaRichiesta, costoDegliEventi } from './costi-richiesta.js';
+import { raccogliConEsito } from './contesto-ubicazioni.js';
 import type { CompanyDataProvider, FetchLevel } from '@aegis/providers';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -109,6 +110,38 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     });
   const persistenza = options.persistenza;
 
+  /*
+    Cache del contesto territoriale, separata da quella dei dati d'impresa.
+
+    Separata perché la volatilità è un'altra: una caserma e una carrozzeria non si spostano,
+    mentre un bilancio o un protesto sì. Tenerle insieme costringerebbe a un TTL solo, e
+    quello giusto per il secondo farebbe ricomprare il primo — qui non in denaro, ma in
+    carico su un servizio donato, che è la valuta con cui lo si paga.
+  */
+  const cacheContesto = new MemoryCache();
+
+  /*
+    Quando raccogliere il contesto territoriale.
+
+    Il predefinito è **solo sui dati veri**: in modalità dimostrativa le coordinate sono
+    inventate, e interrogare una fonte reale attorno a un punto immaginario restituirebbe
+    il vicinato vero di un'azienda che non esiste — rumore presentato come osservazione. In
+    più farebbe dipendere i collaudi da un servizio esterno.
+
+    Due deroghe esplicite, perché servono a chi manda in esercizio il prodotto:
+
+      CONTESTO_TERRITORIALE=mai     spegne la raccolta anche sui dati veri. Serve a chi
+                                    lavora dietro una rete chiusa, o quando la fonte è
+                                    ferma e si preferisce un report senza il capitolo a
+                                    uno che attende inutilmente il tempo massimo.
+      CONTESTO_TERRITORIALE=sempre  la accende anche in dimostrativa. Serve a verificare
+                                    la resa del capitolo senza acquistare un'anagrafica.
+  */
+  const modoContesto = process.env['CONTESTO_TERRITORIALE'] ?? 'auto';
+  const contestoAttivo =
+    modoContesto === 'sempre' ||
+    (modoContesto !== 'mai' && !provider.name.startsWith('Demo'));
+
   // Senza persistenza il servizio lavora in memoria e non richiede autenticazione:
   // è la modalità dei test di dominio e della dimostrazione locale. Con la persistenza
   // attiva, invece, ogni rotta è protetta e ogni dato è legato a un intermediario.
@@ -117,6 +150,18 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   const autenticazioneRichiesta = persistenza !== undefined;
 
   const app = Fastify({ logger: options.logger ?? false });
+
+  /*
+    Lo stato del contesto territoriale, dichiarato all'avvio.
+
+    Serve perché la sua assenza è silenziosa: un report senza il capitolo sul contesto è
+    un report valido, e chi lo guarda non ha modo di sapere se la fonte fosse spenta o
+    semplicemente muta su quelle ubicazioni. Dirlo una volta all'avvio costa una riga e
+    toglie un'ambiguità che altrimenti si paga in diagnosi.
+  */
+  app.log.info(
+    `Contesto territoriale: ${contestoAttivo ? `attivo · ${process.env['OVERPASS_URL'] ?? 'Overpass pubblico'}` : `spento (CONTESTO_TERRITORIALE=${modoContesto}, provider ${provider.name})`}`,
+  );
 
   // `credentials: true` è indispensabile perché il cookie di sessione viaggi:
   // senza, il browser lo scarta silenziosamente e l'utente resta disconnesso senza capire.
@@ -1061,7 +1106,27 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       datiDichiarati: unisciDatiDichiarati(profilo.datiDichiarati, dossier?.datiDichiarati),
     };
 
-    const analisi = analyzeCompany(profiloArricchito, dossier?.polizze ?? [], opzioni.asOf ?? new Date());
+    // Il contesto fisico delle ubicazioni: rete, quindi fuori dal motore puro. Non può
+    // far cadere l'analisi — se la fonte tace, la mappa resta vuota e il report lo dice.
+    const territorio = contestoAttivo
+      ? await raccogliConEsito(profiloArricchito, {
+          cache: cacheContesto,
+          baseUrl: process.env['OVERPASS_URL'],
+          userAgent: process.env['OVERPASS_USER_AGENT'],
+        })
+      : undefined;
+
+    const analisi = analyzeCompany(
+      profiloArricchito,
+      dossier?.polizze ?? [],
+      opzioni.asOf ?? new Date(),
+      territorio === undefined
+        ? {}
+        : {
+            contestiTerritoriali: territorio.contesti,
+            esitoContesto: { occupate: territorio.occupate, nonRaggiunte: territorio.nonRaggiunte },
+          },
+    );
 
     // L'analisi viene congelata su database insieme allo snapshot dei dati che l'hanno
     // prodotta: senza, fra tre anni sarebbe impossibile dimostrare su cosa si fondava.

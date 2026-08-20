@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { leggiContestoTerritoriale } from '../src/territorio/contesto.js';
+import { leggiContestoTerritoriale, leggiEsitoContesto } from '../src/territorio/contesto.js';
 import { MemoryCache } from '../src/http.js';
 
 /** Risposta minima nella forma di Overpass. */
@@ -115,6 +115,81 @@ describe('Contesto territoriale', () => {
       const c = await leggiContestoTerritoriale(41.8071, 12.47843, { fetchImpl: scenario.impl });
       expect(c, `${scenario.nome} avrebbe dovuto restituire null senza sollevare`).toBeNull();
     }
+  });
+
+  it('distingue «fonte occupata» da «fonte muta»', async () => {
+    /*
+      Overpass concede due slot per indirizzo IP e rifiuta con 429 quando sono presi. Per
+      una piattaforma che analizza aziende una dopo l'altra è la condizione **normale**, e
+      un `null` indistinto la faceva sembrare un vicinato pulito.
+
+      Le due condizioni portano ad azioni opposte: «occupato» si risolve riprovando,
+      «non raggiunto» va indagato. Chi legge il report deve poterle distinguere.
+    */
+    const occupato = await leggiEsitoContesto(41.8071, 12.47843, {
+      fetchImpl: fetchFinto({}, 429),
+      attesaMassimaMs: 0,
+    });
+    expect(occupato.esito).toBe('occupato');
+
+    const muto = await leggiEsitoContesto(41.8071, 12.47843, {
+      fetchImpl: fetchFinto({}, 503),
+    });
+    expect(muto.esito).toBe('non-raggiunto');
+  });
+
+  it('dopo un rifiuto per limite d’uso attende lo slot annunciato e riprova una volta', async () => {
+    /*
+      Ritentare subito è il comportamento che fa bloccare un indirizzo IP. La politica
+      d'uso di Overpass chiede di leggere `/api/status`, che dichiara quando il prossimo
+      slot si libera, e di aspettare quel tempo.
+    */
+    const chiamate: string[] = [];
+    let interrogazioni = 0;
+
+    const impl = vi.fn(async (url: string | URL | Request) => {
+      const indirizzo = url instanceof Request ? url.url : url.toString();
+      chiamate.push(indirizzo);
+
+      if (indirizzo.endsWith('/status')) {
+        return Promise.resolve(new Response('Rate limit: 2\n1 slots available now.\n', { status: 200 }));
+      }
+
+      interrogazioni += 1;
+      // Il primo tentativo trova la coda, il secondo passa.
+      return Promise.resolve(
+        interrogazioni === 1
+          ? new Response('{}', { status: 429 })
+          : new Response(JSON.stringify(RISPOSTA), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+      );
+    }) as unknown as typeof fetch;
+
+    const esito = await leggiEsitoContesto(41.8071, 12.47843, { fetchImpl: impl });
+
+    expect(esito.esito).toBe('osservato');
+    expect(chiamate.filter((c) => c.endsWith('/status'))).toHaveLength(1);
+    expect(interrogazioni).toBe(2);
+  });
+
+  it('se l’attesa annunciata è troppo lunga, rinuncia e lo dichiara', async () => {
+    /*
+      Il contesto è un accessorio: far aspettare mezzo minuto chi sta producendo un
+      documento, per una sezione in più, è la scelta sbagliata. Meglio dirlo.
+    */
+    const impl = vi.fn(async (url: string | URL | Request) =>
+      Promise.resolve(
+        (url instanceof Request ? url.url : url.toString()).endsWith('/status')
+          ? new Response('Rate limit: 2\n0 slots available now.\nSlot available after: ..., in 240 seconds.\n', { status: 200 })
+          : new Response('{}', { status: 429 }),
+      ),
+    ) as unknown as typeof fetch;
+
+    const esito = await leggiEsitoContesto(41.8071, 12.47843, { fetchImpl: impl, attesaMassimaMs: 8_000 });
+
+    expect(esito.esito).toBe('occupato');
   });
 
   it('non richiama il servizio per un’ubicazione già letta', async () => {

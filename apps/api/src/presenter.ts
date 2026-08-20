@@ -255,6 +255,32 @@ interface UbicazioneDto {
   readonly sismica: string;
   readonly idraulica: string;
   readonly piuEsposta: boolean;
+  /**
+   * Il contesto fisico attorno, se osservato.
+   *
+   * `null` significa **non osservato**, mai «non c'è niente»: chi costruisce la pagina
+   * deve poter dire quale delle due, perché su una valutazione incendio confonderle
+   * significa dichiarare pulito un vicinato che nessuno ha guardato.
+   */
+  readonly contesto: ContestoDto | null;
+}
+
+interface ContestoDto {
+  readonly vigiliDelFuoco: readonly {
+    readonly nome: string;
+    readonly distanzaKm: number;
+    readonly minutiStimati: number;
+  }[];
+  readonly attivitaVicine: readonly {
+    readonly nome: string;
+    readonly categoria: string;
+    readonly distanzaMetri: number;
+    readonly aggravaIlRischio: boolean;
+  }[];
+  readonly attivitaCheAggravano: number;
+  readonly raggioAnalizzatoMetri: number;
+  /** Attribuzione della fonte: viaggia col dato perché la licenza ODbL la impone. */
+  readonly fonte: string;
 }
 
 interface GruppoDto {
@@ -302,6 +328,25 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
       sismica: x.esposizione.sismica,
       idraulica: x.esposizione.idraulica,
       piuEsposta: x.id === u.ubicazionePeggiore?.id,
+      contesto:
+        x.contesto === null
+          ? null
+          : {
+              vigiliDelFuoco: x.contesto.vigiliDelFuoco.map((c) => ({
+                nome: c.nome,
+                distanzaKm: c.distanzaKm,
+                minutiStimati: c.minutiStimati,
+              })),
+              attivitaVicine: x.contesto.attivitaVicine.map((a) => ({
+                nome: a.nome,
+                categoria: a.categoria,
+                distanzaMetri: a.distanzaMetri,
+                aggravaIlRischio: a.aggravaIlRischio,
+              })),
+              attivitaCheAggravano: x.contesto.attivitaCheAggravano,
+              raggioAnalizzatoMetri: x.contesto.raggioAnalizzatoMetri,
+              fonte: x.contesto.fonte,
+            },
     })),
     complessiIncendio: gruppo(u.complessiIncendio),
     aggregatiTerritoriali: gruppo(u.aggregatiTerritoriali),

@@ -37,35 +37,18 @@
 
 import type { Cache } from '../http.js';
 
-export interface PuntoDiInteresse {
-  readonly nome: string;
-  /** Categoria in chiaro: «carrozzeria», «falegnameria», «distributore di carburante». */
-  readonly categoria: string;
-  readonly distanzaMetri: number;
-  /**
-   * Se l'attività è di quelle che aggravano il rischio incendio del vicinato.
-   *
-   * Non è un giudizio sull'esercente: è la ragione per cui i questionari incendio
-   * chiedono cosa c'è di fianco.
-   */
-  readonly aggravaIlRischio: boolean;
-}
+/*
+  I tipi vivono in `@aegis/core`, non qui.
 
-export interface CasermaVigiliDelFuoco {
-  readonly nome: string;
-  readonly distanzaKm: number;
-  /** Stima del tempo di arrivo. Vedi `MINUTI_PER_KM`: è un ordine di grandezza. */
-  readonly minutiStimati: number;
-}
-
-export interface ContestoTerritoriale {
-  readonly vigiliDelFuoco: readonly CasermaVigiliDelFuoco[];
-  readonly attivitaVicine: readonly PuntoDiInteresse[];
-  /** Quante fra le vicine aggravano il rischio: è il numero che va in prima pagina. */
-  readonly attivitaCheAggravano: number;
-  readonly raggioAnalizzatoMetri: number;
-  readonly fonte: string;
-}
+  Il contesto è un fatto di dominio — entra in un'analisi e viene congelato con essa —
+  mentre questo file è solo il modo in cui oggi lo si legge. Tenerne la forma nel motore
+  significa che sostituire Overpass con un'altra fonte non tocca né l'analisi né il report.
+*/
+import type {
+  CasermaVigiliDelFuoco,
+  ContestoTerritoriale,
+  PuntoDiInteresse,
+} from '@aegis/core';
 
 /** Raggio dell'analisi delle vicinanze: è la distanza entro cui un incendio si propaga. */
 const RAGGIO_VICINANZE_METRI = 300;
@@ -113,6 +96,11 @@ export interface ContestoOptions {
   readonly fetchImpl?: typeof fetch | undefined;
   /** Oltre questo tempo si rinuncia: il contesto è un arricchimento, non un requisito. */
   readonly timeoutMs?: number | undefined;
+  /**
+   * Quanto si è disposti ad attendere che si liberi uno slot, dopo un rifiuto per limite
+   * d'uso. Oltre, si rinuncia e lo si dichiara.
+   */
+  readonly attesaMassimaMs?: number | undefined;
   /** Identificazione verso il servizio: la politica d'uso di Overpass la richiede. */
   readonly userAgent?: string | undefined;
 }
@@ -131,17 +119,56 @@ const USER_AGENT_PREDEFINITO =
 const TTL_SECONDI = 90 * 24 * 60 * 60;
 
 /**
+ * Perché una lettura non ha prodotto un contesto.
+ *
+ * Un `null` solo non bastava, e la differenza l'ha mostrata l'esercizio: Overpass pubblico
+ * concede **due slot per indirizzo IP** e rifiuta con 429 quando sono occupati. Una
+ * piattaforma che analizza aziende una dopo l'altra ci finisce dentro di continuo — è la
+ * condizione normale, non l'eccezione.
+ *
+ * Con un `null` indistinto il capitolo spariva dal report senza dire niente, e chi legge
+ * non poteva sapere se attorno all'ubicazione non ci fosse nulla o se nessuno avesse
+ * guardato. Su una valutazione incendio le due cose portano a decisioni opposte.
+ *
+ *  - `occupato`: la fonte ha rifiutato per limite d'uso. **Riprovare più tardi funziona.**
+ *  - `non-raggiunto`: rete assente, timeout, risposta incomprensibile. Da indagare.
+ */
+export type EsitoContesto =
+  | { readonly esito: 'osservato'; readonly contesto: ContestoTerritoriale }
+  | { readonly esito: 'occupato' }
+  | { readonly esito: 'non-raggiunto' };
+
+/**
  * Interroga il contesto attorno a una coordinata.
  *
- * Restituisce `null` in caso di errore o timeout, e **non solleva**: il contesto arricchisce
- * l'analisi, non la determina. Un servizio esterno lento non deve mai impedire di produrre
- * il documento che l'intermediario deve consegnare.
+ * **Non solleva mai**: il contesto arricchisce l'analisi, non la determina, e un servizio
+ * esterno lento non deve impedire di produrre il documento che l'intermediario consegna.
+ * Restituisce `null` quando non c'è un contesto da mostrare; per sapere *perché* — e in
+ * particolare per distinguere «fonte occupata» da «fonte muta» — usare
+ * {@link leggiEsitoContesto}.
  */
 export async function leggiContestoTerritoriale(
   latitudine: number,
   longitudine: number,
   options: ContestoOptions = {},
 ): Promise<ContestoTerritoriale | null> {
+  const esito = await leggiEsitoContesto(latitudine, longitudine, options);
+  return esito.esito === 'osservato' ? esito.contesto : null;
+}
+
+/**
+ * Come {@link leggiContestoTerritoriale}, ma dichiara l'esito.
+ *
+ * Su 429 attende il tempo che Overpass stesso annuncia — la sua politica d'uso chiede
+ * esattamente questo, invece di ritentare a raffica — e riprova **una volta sola**. Oltre,
+ * si arrende e lo dice: un'analisi che aspetta all'infinito una fonte accessoria è peggio
+ * di un'analisi senza quella fonte.
+ */
+export async function leggiEsitoContesto(
+  latitudine: number,
+  longitudine: number,
+  options: ContestoOptions = {},
+): Promise<EsitoContesto> {
   const url = options.baseUrl ?? OVERPASS_PREDEFINITO;
   const richiesta = options.fetchImpl ?? fetch;
   const chiave = `overpass:${latitudine.toFixed(5)}:${longitudine.toFixed(5)}`;
@@ -153,12 +180,12 @@ export async function leggiContestoTerritoriale(
   */
   const memorizzato = options.cache?.get(chiave);
   if (memorizzato !== undefined && memorizzato.expiresAt > Date.now()) {
-    return memorizzato.value as ContestoTerritoriale;
+    return { esito: 'osservato', contesto: memorizzato.value as ContestoTerritoriale };
   }
 
   const query = componiQuery(latitudine, longitudine);
 
-  try {
+  const interroga = async (): Promise<EsitoContesto> => {
     const risposta = await richiesta(url, {
       method: 'POST',
       headers: {
@@ -178,7 +205,10 @@ export async function leggiContestoTerritoriale(
       signal: AbortSignal.timeout(options.timeoutMs ?? 15_000),
     });
 
-    if (!risposta.ok) return null;
+    // 429: gli slot dell'indirizzo IP sono occupati. Non è un guasto e non è un vuoto —
+    // è una coda, e va detto così a chi legge il report.
+    if (risposta.status === 429) return { esito: 'occupato' };
+    if (!risposta.ok) return { esito: 'non-raggiunto' };
 
     const dati: unknown = await risposta.json();
 
@@ -191,12 +221,64 @@ export async function leggiContestoTerritoriale(
       compare — la stessa distinzione fra zero e ignoto che vale in tutto il prodotto.
     */
     const contesto = interpreta(dati, latitudine, longitudine);
-    if (contesto === null) return null;
+    if (contesto === null) return { esito: 'non-raggiunto' };
     options.cache?.set(chiave, { value: contesto, expiresAt: Date.now() + TTL_SECONDI * 1000 });
-    return contesto;
+    return { esito: 'osservato', contesto };
+  };
+
+  try {
+    const primo = await interroga();
+    if (primo.esito !== 'occupato') return primo;
+
+    /*
+      Una sola ripetizione, dopo aver atteso il tempo che il servizio stesso annuncia.
+
+      Overpass pubblica su `/api/status` il momento in cui il prossimo slot si libera:
+      chiederglielo e aspettare è ciò che la sua politica d'uso domanda, ed è anche
+      l'unico modo di ottenere il dato senza peggiorare la coda per tutti. Ritentare
+      subito, invece, è esattamente il comportamento che fa bloccare un indirizzo IP.
+    */
+    const attesaMs = await attesaAnnunciata(url, richiesta, options.attesaMassimaMs ?? 8_000);
+    if (attesaMs === null) return { esito: 'occupato' };
+    await new Promise((r) => setTimeout(r, attesaMs));
+    return await interroga();
   } catch {
-    // Rete assente, servizio sovraccarico, timeout: l'analisi prosegue senza contesto e
-    // lo dichiara. Un arricchimento che fa cadere il documento non è un arricchimento.
+    // Rete assente, timeout, risposta illeggibile: l'analisi prosegue senza contesto e lo
+    // dichiara. Un arricchimento che fa cadere il documento non è un arricchimento.
+    return { esito: 'non-raggiunto' };
+  }
+}
+
+/**
+ * Quanto attendere prima di riprovare, chiedendolo al servizio.
+ *
+ * `/api/status` dichiara gli slot liberi e, se non ce ne sono, fra quanti secondi lo
+ * saranno. Restituisce `null` se l'attesa supera il massimo concesso o se lo stato non è
+ * leggibile: in quel caso si rinuncia, perché il contesto è un accessorio e non vale far
+ * aspettare chi sta producendo un documento.
+ */
+async function attesaAnnunciata(
+  urlInterprete: string,
+  richiesta: typeof fetch,
+  massimoMs: number,
+): Promise<number | null> {
+  try {
+    const urlStato = urlInterprete.replace(/\/interpreter\/?$/, '/status');
+    if (urlStato === urlInterprete) return null;
+
+    const risposta = await richiesta(urlStato, { signal: AbortSignal.timeout(5_000) });
+    if (!risposta.ok) return null;
+
+    const testo = await risposta.text();
+    if (/([1-9]\d*) slots? available now/.test(testo)) return 250;
+
+    const fra = /in (\d+) seconds/.exec(testo);
+    if (fra === null) return null;
+
+    // Un margine breve: allo scadere esatto lo slot può non essere ancora libero.
+    const ms = (Number(fra[1]) + 1) * 1000;
+    return ms <= massimoMs ? ms : null;
+  } catch {
     return null;
   }
 }

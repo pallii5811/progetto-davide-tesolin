@@ -22,6 +22,8 @@ export * from './company/indicatori-fornitore.js';
 export * from './company/size.js';
 export * from './company/facts.js';
 export * from './company/completeness.js';
+export * from './company/contesto-territoriale.js';
+export * from './company/ubicazioni.js';
 
 // ── Credito ──────────────────────────────────────────────────────────────────
 export * from './credit/altman.js';

@@ -20,6 +20,8 @@
  */
 
 import type { Indirizzo, ImmobileDichiarato, TipoUnitaLocale, UnitaLocale } from './profile.js';
+import { AVVERTENZA_CONTESTO } from './contesto-territoriale.js';
+import type { ContestoTerritoriale } from './contesto-territoriale.js';
 import { territorialExposure } from '../risk/geo.js';
 import type { TerritorialExposure } from '../risk/geo.js';
 import type { Confidence } from '../shared/provenance.js';
@@ -49,6 +51,14 @@ export interface Ubicazione {
   /** Esposizione territoriale. Oggi risolta a livello provinciale: vedi nota nel risultato. */
   readonly esposizione: TerritorialExposure;
   readonly haCoordinate: boolean;
+  /**
+   * Il contesto fisico attorno: caserme e attività confinanti.
+   *
+   * `null` ha due cause che restano volutamente indistinte qui — nessuna coordinata, o
+   * fonte non raggiunta. In entrambi i casi l'affermazione da non fare è la stessa:
+   * «intorno non c'è niente». Chi mostra il dato dichiara che non è stato osservato.
+   */
+  readonly contesto: ContestoTerritoriale | null;
 }
 
 /** Un gruppo di ubicazioni che un singolo evento può colpire insieme. */
@@ -136,6 +146,23 @@ export function analizzaUbicazioni(input: {
   readonly sedeLegale: Indirizzo | null;
   readonly unitaLocali: readonly UnitaLocale[];
   readonly immobili: readonly ImmobileDichiarato[];
+  /**
+   * Contesto fisico già raccolto, per chiave di ubicazione.
+   *
+   * Entra dall'esterno perché leggerlo è un'operazione di rete e questo motore è puro.
+   * Le chiavi sono gli `id` che questa stessa funzione produce: chi deve raccoglierli la
+   * chiama una prima volta senza contesti — è un calcolo, non costa nulla — legge le
+   * coordinate che ne escono, e la richiama con la mappa piena.
+   */
+  readonly contesti?: ReadonlyMap<string, ContestoTerritoriale> | undefined;
+  /**
+   * Perché alcune letture del contesto non hanno prodotto nulla.
+   *
+   * Senza questo, una fonte in coda e un vicinato pulito si somigliano troppo: entrambi
+   * producono un'ubicazione senza contesto. Dirlo cambia l'azione di chi legge —
+   * riprovare, oppure andare a guardare.
+   */
+  readonly esitoContesto?: { readonly occupate: number; readonly nonRaggiunte: number } | undefined;
 }): AnalisiUbicazioni {
   const sorgenti: Sorgente[] = [];
 
@@ -184,6 +211,7 @@ export function analizzaUbicazioni(input: {
       haCoordinate:
         (esistente?.haCoordinate ?? false) ||
         (s.indirizzo.latitudine !== null && s.indirizzo.longitudine !== null),
+      contesto: input.contesti?.get(id) ?? esistente?.contesto ?? null,
     });
   }
 
@@ -199,7 +227,7 @@ export function analizzaUbicazioni(input: {
     province: [...new Set(ubicazioni.map((u) => u.indirizzo.provincia.toUpperCase()))],
     comuni: [...new Set(ubicazioni.map((u) => u.indirizzo.comune))],
     domande: domande(ubicazioni),
-    note: note(ubicazioni),
+    note: note(ubicazioni, input.esitoContesto),
     confidenza: ubicazioni.length === 0 ? 'bassa' : ubicazioni.every((u) => u.haCoordinate) ? 'alta' : 'media',
   };
 }
@@ -346,7 +374,10 @@ function domande(ubicazioni: readonly Ubicazione[]): readonly string[] {
   return elenco;
 }
 
-function note(ubicazioni: readonly Ubicazione[]): readonly string[] {
+function note(
+  ubicazioni: readonly Ubicazione[],
+  esitoContesto?: { readonly occupate: number; readonly nonRaggiunte: number },
+): readonly string[] {
   const elenco: string[] = [
     // Dichiarare il limite è parte del risultato: chi legge deve sapere quanto è fine la
     // maglia con cui si è misurato, altrimenti attribuisce alla stima una precisione che
@@ -357,6 +388,51 @@ function note(ubicazioni: readonly Ubicazione[]): readonly string[] {
   if (ubicazioni.some((u) => u.haCoordinate)) {
     elenco.push(
       `Le ubicazioni con coordinate note sono state raggruppate per contiguità entro ${RAGGIO_COMPLESSO_METRI} m.`,
+    );
+  }
+
+  /*
+    Il contesto fisico si dichiara due volte, e per due ragioni diverse.
+
+    La prima è la licenza: la fonte è rilasciata con obbligo di attribuzione, e mostrarne
+    il contenuto senza citarla è una violazione, non una svista di stile.
+
+    La seconda è più importante per chi legge. Se il contesto è stato osservato su tre
+    ubicazioni su cinque, tacere le altre due lascia credere che siano pulite. Un'analisi
+    che non distingue «guardato e non c'è niente» da «non guardato» induce esattamente
+    l'errore che deve prevenire.
+  */
+  const osservate = ubicazioni.filter((u) => u.contesto !== null);
+  if (osservate.length > 0) {
+    const fonti = [...new Set(osservate.map((u) => u.contesto?.fonte ?? ''))].filter((f) => f !== '');
+    elenco.push(
+      `Contesto fisico (caserme e attività confinanti) rilevato su ${osservate.length} ubicazion${osservate.length === 1 ? 'e' : 'i'} su ${ubicazioni.length}. Fonte: ${fonti.join(', ')}.`,
+    );
+    elenco.push(AVVERTENZA_CONTESTO);
+  }
+
+  const nonOsservate = ubicazioni.length - osservate.length;
+  if (osservate.length > 0 && nonOsservate > 0) {
+    elenco.push(
+      `Sulle restanti ${nonOsservate} il contesto non è stato osservato: l'assenza di segnalazioni non va letta come assenza di attività confinanti.`,
+    );
+  }
+
+  /*
+    Il motivo del mancato rilevamento, quando si conosce.
+
+    Vale anche — anzi soprattutto — quando **nessuna** ubicazione è stata osservata: è il
+    caso in cui il capitolo sparisce del tutto dal report, e senza questa riga il documento
+    tacerebbe su un dato che si era deciso di raccogliere.
+  */
+  if (esitoContesto !== undefined && esitoContesto.occupate > 0) {
+    elenco.push(
+      `Contesto fisico non rilevato su ${esitoContesto.occupate} ubicazion${esitoContesto.occupate === 1 ? 'e' : 'i'}: la fonte cartografica ha respinto le richieste per limite d'uso. È una coda, non un'assenza di attività — una nuova analisi più tardi lo recupera.`,
+    );
+  }
+  if (esitoContesto !== undefined && esitoContesto.nonRaggiunte > 0) {
+    elenco.push(
+      `Contesto fisico non rilevato su ${esitoContesto.nonRaggiunte} ubicazion${esitoContesto.nonRaggiunte === 1 ? 'e' : 'i'}: la fonte cartografica non è stata raggiunta.`,
     );
   }
 

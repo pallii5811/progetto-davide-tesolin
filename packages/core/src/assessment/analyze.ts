@@ -56,6 +56,7 @@ import type { GapAnalysis } from '../coverage/gap.js';
 import type { PolizzaInEssere } from '../coverage/policy.js';
 import { analizzaUbicazioni } from '../company/ubicazioni.js';
 import type { AnalisiUbicazioni } from '../company/ubicazioni.js';
+import type { ContestoTerritoriale } from '../company/contesto-territoriale.js';
 import { analizzaAssetto } from '../governance/assetto.js';
 import type { AssettoProprietario } from '../governance/assetto.js';
 
@@ -63,6 +64,16 @@ export interface AnalyzeOptions {
   readonly riclassificazione?: ReclassifyOptions | undefined;
   readonly sommeAssicurande?: SumsInsuredOptions | undefined;
   readonly includiRischiDaVerificare?: boolean | undefined;
+  /**
+   * Contesto fisico delle ubicazioni, già raccolto, per chiave di ubicazione.
+   *
+   * Questo motore non fa rete: il contesto arriva da fuori e viene congelato nell'analisi
+   * insieme al resto. Se manca, l'analisi è la stessa di prima — il contesto arricchisce,
+   * non determina.
+   */
+  readonly contestiTerritoriali?: ReadonlyMap<string, ContestoTerritoriale> | undefined;
+  /** Quante letture del contesto sono fallite, e perché. Vedi `analizzaUbicazioni`. */
+  readonly esitoContesto?: { readonly occupate: number; readonly nonRaggiunte: number } | undefined;
 }
 
 export interface CompanyAnalysis {
@@ -294,6 +305,8 @@ export function analyzeCompany(
     sedeLegale: profile.anagrafica.value.sedeLegale,
     unitaLocali: profile.unitaLocali?.value ?? [],
     immobili: profile.datiDichiarati.immobili,
+    contesti: options.contestiTerritoriali,
+    esitoContesto: options.esitoContesto,
   });
 
   const dannoMassimo = stimaDannoMassimo(

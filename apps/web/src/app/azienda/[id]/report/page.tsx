@@ -4,6 +4,7 @@ import { analizzaAzienda, leggiStudio } from '@/lib/api';
 import type { AnalisiDto, DatiStudio, GapDto } from '@/lib/api';
 import { AnalisiEconomica } from './AnalisiEconomica';
 import { MetricheDiImpatto } from './MetricheDiImpatto';
+import { ContestoUbicazioni } from './ContestoUbicazioni';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 
@@ -51,6 +52,22 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
   );
 
   const interventi = gap.voci.filter((v) => v.stato !== 'adeguata');
+
+  /*
+    Numerazione dei capitoli: contata, non scritta.
+
+    A mano non reggeva. Due capitoli sono condizionali — il danno massimo compare solo se
+    calcolabile, l'obbligo CAT NAT solo se dovuto — e ogni inserimento obbliga a rinumerare
+    tutti quelli sotto. È già andata male una volta: l'aggiunta dell'analisi economica ha
+    lasciato un «3-bis» stampato dopo il quinto capitolo. Su un documento che
+    l'intermediario consegna al proprio cliente, una numerazione che salta è la prima cosa
+    che si nota, e mette in dubbio tutto il resto.
+
+    Il contatore nasce dentro il render, quindi due richieste in parallelo non se lo
+    scambiano; e gli operatori `&&` che avvolgono i capitoli condizionali fanno sì che un
+    capitolo non reso non consumi il proprio numero.
+  */
+  const cap = numerazione();
 
   return (
     <>
@@ -122,8 +139,8 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           </p>
         </header>
 
-        {/* ── 1. Sintesi ─────────────────────────────────────────────────── */}
-        <Capitolo numero="1" titolo="Sintesi per la direzione">
+        {/* ── Sintesi ─────────────────────────────────────────────────── */}
+        <Capitolo numero={cap()} titolo="Sintesi per la direzione">
           <p>
             L&apos;analisi ha identificato <strong>{sintesi.rischiIdentificati} rischi</strong> a carico
             dell&apos;impresa, dei quali <strong>{sintesi.rischiCritici}</strong> di livello alto o critico
@@ -307,9 +324,9 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           )}
         </Capitolo>
 
-        {/* ── 2. Richieste ed esigenze ───────────────────────────────────── */}
+        {/* ── Richieste ed esigenze ───────────────────────────────────── */}
         <Capitolo
-          numero="2"
+          numero={cap()}
           titolo="Richieste ed esigenze rilevate"
           nota="Rilevazione condotta ai sensi dell’art. 58 del Reg. IVASS n. 40/2018, sulla base dei dati camerali e di bilancio dell’impresa e delle informazioni raccolte in sede di intervista."
         >
@@ -355,9 +372,9 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           </div>
         </Capitolo>
 
-        {/* ── 3. Capitali da assicurare ──────────────────────────────────── */}
+        {/* ── Capitali da assicurare ──────────────────────────────────── */}
         <Capitolo
-          numero="3"
+          numero={cap()}
           titolo="Analisi economica"
           nota="Andamento degli esercizi depositati e determinazione del margine di contribuzione, che è la base della somma assicuranda per i danni indiretti."
         >
@@ -368,15 +385,33 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         </Capitolo>
 
         <Capitolo
-          numero="4"
+          numero={cap()}
           titolo="Metriche di impatto economico"
           nota="Soglie ancorate ai dati dell'ultimo bilancio depositato. La soglia critica corrisponde alla perdita che fa scattare gli obblighi degli artt. 2446 e 2447 c.c."
         >
           <MetricheDiImpatto dati={analisi.metricheDiImpatto} />
         </Capitolo>
 
+        {/*
+          Il contesto compare solo se qualcosa è stato osservato.
+
+          Un capitolo che dicesse «non rilevato» su ogni ubicazione non informerebbe:
+          allungherebbe il documento e abituerebbe chi legge a saltare una sezione che,
+          quando c'è, contiene il fattore che separa un principio d'incendio da una perdita
+          totale.
+        */}
+        {ubicazioni.elenco.some((u) => u.contesto !== null) && (
+          <Capitolo
+            numero={cap()}
+            titolo="Contesto fisico delle ubicazioni"
+            nota="Tempo di soccorso e attività confinanti: i due fattori che i questionari incendio chiedono e che nessun bilancio contiene. Rilevati su fonte cartografica libera, mai usati per escludere un rischio."
+          >
+            <ContestoUbicazioni ubicazioni={ubicazioni.elenco} />
+          </Capitolo>
+        )}
+
         <Capitolo
-          numero="5"
+          numero={cap()}
           titolo="Determinazione dei capitali da assicurare"
           nota="I capitali sono determinati dai dati di bilancio depositati e dalle rilevazioni di intervista. Per ciascuno è indicata la base di calcolo adottata."
         >
@@ -404,10 +439,10 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           </div>
         </Capitolo>
 
-        {/* ── 3-bis. Danno massimo e forma della copertura ───────────────── */}
+        {/* ── Danno massimo e forma della copertura ───────────────── */}
         {analisi.dannoMassimo.disponibile && (
           <Capitolo
-            numero="3-bis"
+            numero={cap()}
             titolo="Danno massimo e forma della copertura sui beni"
             nota="La scelta fra valore intero e primo rischio assoluto non riguarda quanto si è coperti, ma come opera l'indennizzo. È una decisione che spetta al contraente, e qui vengono esposti entrambi i lati."
           >
@@ -448,9 +483,9 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           </Capitolo>
         )}
 
-        {/* ── 4. Coperture proposte e motivazione ────────────────────────── */}
+        {/* ── Coperture proposte e motivazione ────────────────────────── */}
         <Capitolo
-          numero="6"
+          numero={cap()}
           titolo="Coperture proposte e motivazione dell’adeguatezza"
           nota="Per ciascuna copertura è indicata la ragione per cui è ritenuta adeguata alle richieste e alle esigenze rilevate, in conformità all’Allegato 4-ter del Reg. IVASS n. 40/2018."
         >
@@ -562,10 +597,10 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           )}
         </Capitolo>
 
-        {/* ── 5. Obbligo CAT NAT ─────────────────────────────────────────── */}
+        {/* ── Obbligo CAT NAT ─────────────────────────────────────────── */}
         {catNat.soggetta && (
           <Capitolo
-            numero="7"
+            numero={cap()}
             titolo="Obbligo assicurativo contro le calamità naturali"
             nota="L. 213/2023 art. 1 cc. 101-111 · DM MEF-MIMIT n. 18 del 30/01/2025."
           >
@@ -612,8 +647,8 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           </Capitolo>
         )}
 
-        {/* ── 6. Limiti ─────────────────────────────────────────────────── */}
-        <Capitolo numero={catNat.soggetta ? '8' : '7'} titolo="Limiti e avvertenze">
+        {/* ── Limiti ─────────────────────────────────────────────────── */}
+        <Capitolo numero={cap()} titolo="Limiti e avvertenze">
           <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed">
             <li>
               I capitali indicati sono determinati con criteri di stima documentati e vanno confermati, per
@@ -697,6 +732,12 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
       </article>
     </>
   );
+}
+
+/** Contatore dei capitoli: restituisce «1», «2», … nell'ordine in cui vengono resi. */
+function numerazione(): () => string {
+  let n = 0;
+  return () => String(++n);
 }
 
 function Capitolo({
