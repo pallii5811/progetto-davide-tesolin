@@ -33,18 +33,21 @@ test.describe('Ricerca di nuovi clienti', () => {
     await page.goto('/prospect');
 
     await page.getByLabel('Provincia').fill('BS');
-    await page.getByRole('button', { name: /Conta quante sono/i }).click();
+    await page.getByRole('button', { name: /Quante sono/i }).click();
 
     // Il conteggio compare, e con esso il prezzo dell'elenco: chi cerca vede quanto
     // costerebbe **prima** di pagarlo.
     await expect(page.getByText(/aziende corrispondono/i)).toBeVisible();
+
+    // Il pulsante che spende sta accanto a quello che conta, non dopo: il conteggio non
+    // deve essere un passaggio obbligato per arrivare all'elenco.
     await expect(page.getByTestId('scarica-elenco')).toBeVisible();
 
     // E nessuna azienda è stata scaricata: la tabella dei risultati non esiste ancora.
     await expect(page.getByRole('table')).toHaveCount(0);
   });
 
-  test('scarica l’elenco solo dopo il secondo gesto', async ({ page }) => {
+  test('scarica l’elenco, e solo su richiesta esplicita', async ({ page }) => {
     await page.goto('/prospect?provincia=BS');
     await page.getByTestId('scarica-elenco').click();
 
@@ -66,5 +69,34 @@ test.describe('Ricerca di nuovi clienti', () => {
   test('con criteri che non trovano nulla lo dice, e suggerisce come allargare', async ({ page }) => {
     await page.goto('/prospect?provincia=ZZ');
     await expect(page.getByText(/Nessuna azienda corrisponde/i)).toBeVisible();
+  });
+
+  test('il costo si legge prima di premere, e il valore predefinito è piccolo', async ({ page }) => {
+    /*
+      Il valore predefinito di un campo che spende è una decisione presa al posto
+      dell'utente. Era venticinque: chi apriva la pagina e premeva senza guardare pagava
+      un euro e venticinque. Ora è cinque, e il prezzo è scritto accanto al campo mentre
+      lo si compila — non dentro l'etichetta di una tendina, dove resterebbe fermo al
+      giorno in cui è stato scritto.
+    */
+    await page.goto('/prospect');
+
+    const quante = page.getByLabel(/Quante aziende vuoi/i);
+    await expect(quante).toHaveValue('5');
+    await expect(page.getByText(/0,25 €/)).toBeVisible();
+
+    await quante.fill('20');
+    await expect(page.getByText(/1,00 €/)).toBeVisible();
+  });
+
+  test('le ditte individuali si possono escludere, e di norma lo sono', async ({ page }) => {
+    /*
+      Le ditte individuali non depositano bilanci: su di esse metà dell'analisi resta
+      vuota qualunque cifra si spenda. E sono la maggioranza dell'archivio — su una
+      ricerca reale, 339 imprese su 542. Senza questo filtro due terzi di ogni elenco
+      pagato sono righe che non si possono valutare.
+    */
+    await page.goto('/prospect');
+    await expect(page.getByLabel(/Forma giuridica/i)).toHaveValue('SR');
   });
 });

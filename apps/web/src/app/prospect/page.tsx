@@ -51,7 +51,18 @@ export default async function PaginaProspect({
     formaGiuridicaCodice: parametri['formaGiuridicaCodice'] ?? 'SR',
     // Quante aziende scaricare: il prezzo è **a record**, non a ricerca, e senza un lotto
     // dichiarato un elenco su una provincia intera costerebbe centinaia di euro.
-    limite: parametri['limite'] ?? '25',
+    /*
+      Cinque, non venticinque.
+
+      Il valore predefinito di un campo che spende è una decisione economica presa al
+      posto dell'utente. Con venticinque, chi apre la pagina e preme il pulsante senza
+      guardare paga un euro e venticinque; con cinque ne paga venticinque centesimi. Se
+      ne vuole di più li scrive, e mentre li scrive vede il prezzo salire.
+
+      È già successo: un elenco da venticinque comprato senza volerlo, su filtri che per
+      giunta non erano quelli mostrati a schermo.
+    */
+    limite: parametri['limite'] ?? '5',
   };
 
   const haFiltri = Object.values(criteri).some((v) => v.trim() !== '');
