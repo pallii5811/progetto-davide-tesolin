@@ -16,7 +16,7 @@ import { ageInMonths, weakestConfidence } from '../shared/provenance.js';
 import type { Confidence, Sourced } from '../shared/provenance.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
 import type { FinancialIndicators } from '../company/indicators.js';
-import type { CompanyProfile, EventiNegativi } from '../company/profile.js';
+import type { CompanyProfile, EventiNegativi, ProceduraConcorsuale } from '../company/profile.js';
 import {
   anniDiAttivita,
   eserciziDisponibili,
@@ -122,7 +122,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   const proceduraAperta = eventi.procedure.find((p) => p.aperta);
   if (proceduraAperta !== undefined) {
     value = Math.min(value, 10);
-    cap = `Procedura concorsuale aperta (${proceduraAperta.tipo}) dal ${formatDate(proceduraAperta.dataApertura)}`;
+    cap = `Procedura concorsuale aperta (${dicitura(proceduraAperta)}) dal ${formatDate(proceduraAperta.dataApertura)}`;
   }
 
   const stato = profile.anagrafica.value.statoAttivita;
@@ -515,6 +515,18 @@ function fattoreAltman(bilancio: BilancioRiclassificato | null): ScoreFactor {
 }
 
 /**
+ * Come si nomina una procedura in un documento che leggerà un broker.
+ *
+ * `tipo` è un'etichetta interna col trattino — «stato-insolvenza» — e finiva stampata
+ * così sotto gli occhi del cliente. Il registro la sua formulazione ce l'ha, ed è quella
+ * che regge davanti a una contestazione: si stampa quella, e si ricade sull’etichetta solo
+ * quando il registro non l'ha mandata.
+ */
+function dicitura(procedura: ProceduraConcorsuale): string {
+  return procedura.descrizione ?? procedura.tipo;
+}
+
+/**
  * @param eventi `null` se la sezione non è stata acquisita.
  *
  * La distinzione è tutt'altro che formale. Trattare «non ho controllato» come «non ci
@@ -580,11 +592,18 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
     if (procedura.aperta) {
       punteggio = 0;
       details.push(
-        `Procedura aperta: ${procedura.tipo} dal ${formatDate(procedura.dataApertura)} → azzeramento`,
+        `Procedura aperta: ${dicitura(procedura)} dal ${formatDate(procedura.dataApertura)} → azzeramento`,
       );
     } else {
       punteggio -= 20;
-      details.push(`Procedura chiusa: ${procedura.tipo} → −20 punti`);
+      // Chiusa e revocata non sono la stessa cosa, e a chi legge interessa quale delle due.
+      const fine =
+        procedura.dataRevoca !== null
+          ? `revocata il ${formatDate(procedura.dataRevoca)}`
+          : procedura.dataChiusura !== null
+            ? `chiusa il ${formatDate(procedura.dataChiusura)}`
+            : 'chiusa';
+      details.push(`Procedura ${fine}: ${dicitura(procedura)} → −20 punti`);
     }
   }
 
