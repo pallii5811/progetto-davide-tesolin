@@ -7,6 +7,7 @@ import { MetricheDiImpatto } from './MetricheDiImpatto';
 import { ContestoUbicazioni } from './ContestoUbicazioni';
 import { ImmaginiUbicazioni } from './ImmaginiUbicazioni';
 import { SelezioneRischi } from './SelezioneRischi';
+import { DettaglioRischi } from './DettaglioRischi';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 
@@ -25,7 +26,7 @@ export default async function PaginaReport({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ escludi?: string }>;
+  searchParams: Promise<{ escludi?: string; profondita?: string }>;
 }) {
   await richiediSessione();
   const { id } = await params;
@@ -40,12 +41,28 @@ export default async function PaginaReport({
     l'indirizzo è il documento: si copia, si rifà identico, e ricaricando senza parametri
     si torna al report intero.
   */
+  const parametri = await searchParams;
   const esclusi = new Set(
-    ((await searchParams).escludi ?? '')
+    (parametri.escludi ?? '')
       .split(',')
       .map((r) => r.trim())
       .filter((r) => r !== ''),
   );
+
+  /*
+    Quanto del ragionamento mostrare, per ogni rischio.
+
+    **L'analisi è una sola e non cambia mai fra un livello e l'altro**: cambia quanto del
+    suo ragionamento finisce sulla carta. È una distinzione che vale la pena tenere ferma —
+    nessun cliente riceve un'analisi più povera, riceve un documento più corto — e per
+    questo il livello sintetico dichiara comunque che le motivazioni esistono e dove sono.
+
+     - `sintetica`   il registro e basta: per una revisione rapida fra professionisti.
+     - `motivata`    (predefinito) più il perché di ogni valutazione: è il livello che
+                     rende il documento difendibile davanti a una contestazione.
+     - `approfondita` più i controlli attesi, i riferimenti normativi e cosa verificare.
+  */
+  const profondita = leggiProfondita(parametri.profondita);
 
   let analisi: AnalisiDto;
   try {
@@ -132,6 +149,7 @@ export default async function PaginaReport({
           livelloResiduo: r.livelloResiduo,
         }))}
         esclusi={[...esclusi]}
+        profondita={profondita}
       />
 
       <article className="mx-auto max-w-[52rem] leading-relaxed">
@@ -453,6 +471,8 @@ export default async function PaginaReport({
               </tbody>
             </table>
           </div>
+
+          <DettaglioRischi rischi={rischi} profondita={profondita} />
         </Capitolo>
 
         {/* ── Capitali da assicurare ──────────────────────────────────── */}
@@ -822,6 +842,21 @@ export default async function PaginaReport({
       </article>
     </>
   );
+}
+
+export type Profondita = 'sintetica' | 'motivata' | 'approfondita';
+
+const PROFONDITA_VALIDE: readonly Profondita[] = ['sintetica', 'motivata', 'approfondita'];
+
+/**
+ * Il livello richiesto, o quello predefinito.
+ *
+ * Un valore sconosciuto non produce un documento vuoto né un errore: ricade sul livello
+ * motivato, che è quello giusto per la maggior parte delle consegne. Un parametro storpiato
+ * in un collegamento incollato non deve costare il documento.
+ */
+function leggiProfondita(valore: string | undefined): Profondita {
+  return PROFONDITA_VALIDE.find((p) => p === valore) ?? 'motivata';
 }
 
 /** Contatore dei capitoli: restituisce «1», «2», … nell'ordine in cui vengono resi. */

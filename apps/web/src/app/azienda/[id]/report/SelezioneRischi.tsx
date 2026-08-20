@@ -32,12 +32,32 @@ interface RischioSelezionabile {
   readonly livelloResiduo: string;
 }
 
+const PROFONDITA = [
+  {
+    chiave: 'sintetica',
+    testo: 'Sintetico',
+    spiegazione: 'Solo il registro dei rischi. Per una revisione rapida fra professionisti.',
+  },
+  {
+    chiave: 'motivata',
+    testo: 'Motivato',
+    spiegazione: 'Con il perché di ogni valutazione. È il livello che rende il documento difendibile.',
+  },
+  {
+    chiave: 'approfondita',
+    testo: 'Approfondito',
+    spiegazione: 'Anche i controlli attesi, i riferimenti normativi e cosa resta da verificare.',
+  },
+] as const;
+
 export function SelezioneRischi({
   rischi,
   esclusi,
+  profondita,
 }: {
   rischi: readonly RischioSelezionabile[];
   esclusi: readonly string[];
+  profondita: string;
 }) {
   const router = useRouter();
   const percorso = usePathname();
@@ -79,6 +99,33 @@ export function SelezioneRischi({
     });
   }
 
+  /*
+    Il livello segue lo stesso principio della selezione: sta nell'indirizzo, e lo stato
+    locale corre avanti perché il pulsante risponda subito invece che al ritorno del server.
+  */
+  const [livello, setLivello] = useState(profondita);
+  const [ultimoDaFuoriLivello, setUltimoDaFuoriLivello] = useState(profondita);
+
+  if (profondita !== ultimoDaFuoriLivello) {
+    setUltimoDaFuoriLivello(profondita);
+    setLivello(profondita);
+  }
+
+  function cambiaProfondita(nuovo: string): void {
+    setLivello(nuovo);
+
+    const q = new URLSearchParams(parametri.toString());
+    // Il livello predefinito non si scrive nell'indirizzo: un collegamento pulito è più
+    // facile da incollare, e «nessun parametro» deve significare «il documento normale».
+    if (nuovo === 'motivata') q.delete('profondita');
+    else q.set('profondita', nuovo);
+
+    const stringa = q.toString();
+    avvia(() => {
+      router.replace(stringa === '' ? percorso : `${percorso}?${stringa}`, { scroll: false });
+    });
+  }
+
   function commuta(id: string): void {
     const nuovi = new Set(fuori);
     if (nuovi.has(id)) nuovi.delete(id);
@@ -107,17 +154,51 @@ export function SelezioneRischi({
           </p>
         </div>
 
-        {fuori.size > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              applica(new Set());
-            }}
-            className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50"
-          >
-            Rimetti tutti
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            Il livello di dettaglio del ragionamento.
+
+            Non cambia l'analisi — che è una sola — ma quanto del suo perché finisce sulla
+            carta: una revisione fra professionisti vuole il registro e basta, una consegna
+            al cliente vuole le motivazioni, una discussione tecnica vuole anche i controlli
+            attesi e le norme.
+          */}
+          <span className="text-xs text-testo-tenue">Dettaglio:</span>
+          <div role="group" aria-label="Livello di dettaglio del report" className="flex">
+            {PROFONDITA.map((p, indice) => (
+              <button
+                key={p.chiave}
+                type="button"
+                aria-pressed={livello === p.chiave}
+                title={p.spiegazione}
+                onClick={() => {
+                  cambiaProfondita(p.chiave);
+                }}
+                className={`border px-2.5 py-1.5 text-sm transition ${
+                  indice === 0 ? 'rounded-l' : ''
+                } ${indice === PROFONDITA.length - 1 ? 'rounded-r' : ''} ${indice > 0 ? '-ml-px' : ''} ${
+                  livello === p.chiave
+                    ? 'relative border-marchio bg-azione text-azione-testo'
+                    : 'border-bordo-forte bg-superficie hover:border-marchio/50'
+                }`}
+              >
+                {p.testo}
+              </button>
+            ))}
+          </div>
+
+          {fuori.size > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                applica(new Set());
+              }}
+              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50"
+            >
+              Rimetti tutti
+            </button>
+          )}
+        </div>
       </div>
 
       {aperto && (

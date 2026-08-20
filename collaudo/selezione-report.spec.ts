@@ -47,7 +47,10 @@ test.describe('Selezione dei rischi da portare nel report', () => {
       elenca esattamente i rischi selezionabili, quindi è l'unica fonte non ambigua.
     */
     await page.getByRole('button', { name: 'Scegli i rischi da includere' }).click();
-    const primaVoce = page.locator('label').filter({ has: page.getByRole('checkbox') }).first();
+    const primaVoce = page
+      .locator('label')
+      .filter({ has: page.getByRole('checkbox') })
+      .first();
     const etichetta = (await primaVoce.innerText()).split('\n')[0]?.trim() ?? '';
     expect(etichetta.length).toBeGreaterThan(3);
 
@@ -68,9 +71,7 @@ test.describe('Selezione dei rischi da portare nel report', () => {
     // Senza l'apostrofo iniziale: nel documento è `&apos;`, che rende un apostrofo dritto,
     // mentre nel codice si scrive quello tipografico. Cercare il carattere renderebbe la
     // prova sensibile a una scelta di composizione invece che al contenuto.
-    await expect(
-      page.getByText(/esclusione riguarda la presentazione, non la valutazione/),
-    ).toBeVisible();
+    await expect(page.getByText(/esclusione riguarda la presentazione, non la valutazione/)).toBeVisible();
     await expect(page.getByText(`Non riportati:`)).toBeVisible();
     await expect(page.getByText(etichetta, { exact: false }).last()).toBeVisible();
 
@@ -115,5 +116,44 @@ test.describe('Selezione dei rischi da portare nel report', () => {
     await page.emulateMedia({ media: 'print' });
     await expect(pannello).toBeHidden();
     await page.emulateMedia({ media: 'screen' });
+  });
+
+  test('i tre livelli cambiano quanto si spiega, non i numeri', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await page.goto(`/azienda/${AZIENDA_DI_PROVA}/report`);
+    await expect(page.getByRole('button', { name: /stampa/i })).toBeVisible({ timeout: 90_000 });
+
+    const punteggi = async () =>
+      (await page.locator('article table tbody tr td').allInnerTexts()).join('|');
+
+    // Predefinito: motivato. Le ragioni ci sono.
+    await expect(page.getByText('Motivazione delle valutazioni')).toBeVisible();
+    const numeriMotivato = await punteggi();
+
+    await page.getByRole('button', { name: 'Sintetico' }).click();
+    await expect(page.getByText('Motivazione delle valutazioni')).toHaveCount(0, { timeout: 30_000 });
+
+    /*
+      Un documento breve che tace di esserlo inganna: il livello sintetico deve dichiarare
+      che le motivazioni esistono e restano nel fascicolo.
+    */
+    await expect(page.getByText(/riporta il registro in forma sintetica/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Approfondito' }).click();
+    await expect(page.getByText(/Misure attese su un rischio di questo tipo/).first()).toBeVisible({
+      timeout: 30_000,
+    });
+
+    /*
+      La proprietà che conta: **i numeri non cambiano mai**. Se cambiassero, i tre livelli
+      sarebbero tre analisi diverse, e il cliente che ne riceve una corta riceverebbe anche
+      una valutazione diversa.
+    */
+    expect(await punteggi()).toBe(numeriMotivato);
+
+    // Tornando al predefinito l'indirizzo resta pulito.
+    await page.getByRole('button', { name: 'Motivato' }).click();
+    await expect(page).not.toHaveURL(/profondita=/);
   });
 });
