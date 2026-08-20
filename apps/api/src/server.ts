@@ -2121,6 +2121,7 @@ const prospezioneSchema = z.object({
   addettiMax: numeroFacoltativo,
   fatturatoMinEuro: numeroFacoltativo,
   fatturatoMaxEuro: numeroFacoltativo,
+  formaGiuridicaCodice: z.string().trim().max(4).toUpperCase().optional(),
   socioCodiceFiscale: z.string().trim().max(20).optional(),
   // Tetto basso e dichiarato: a cinque centesimi ad azienda, duecento record sono dieci
   // euro. Il massimo esiste per impedire che una cifra digitata male costi una giornata.

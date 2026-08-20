@@ -126,6 +126,20 @@ export interface CriteriProspezione {
   readonly fatturatoMinEuro?: number | undefined;
   readonly fatturatoMaxEuro?: number | undefined;
   /** Codice fiscale di un socio: tutte le società che fanno capo alla stessa persona. */
+  /**
+   * Forma giuridica, col codice del registro: `SR` S.r.l., `SP` S.p.A., `DI` ditta
+   * individuale, `RS` S.r.l. semplificata.
+   *
+   * È il filtro che decide se un elenco vale qualcosa. Le ditte individuali **non
+   * depositano bilanci**: su di esse metà dell'analisi resta vuota qualunque cifra si
+   * spenda, e nessun acquisto la riempie. Misurato su una ricerca reale — meccanica in
+   * provincia di Brescia — sono 339 imprese su 542, cioè quasi due terzi di ogni elenco
+   * pagato a cinque centesimi a riga.
+   *
+   * Il fornitore accetta **un codice per volta**: l'elenco separato da virgole risponde
+   * zero. Verificato il 21/08/2026.
+   */
+  readonly formaGiuridicaCodice?: string | undefined;
   readonly socioCodiceFiscale?: string | undefined;
   readonly soloAttive?: boolean | undefined;
   readonly limite?: number | undefined;

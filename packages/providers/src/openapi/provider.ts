@@ -213,6 +213,7 @@ export class OpenApiProvider implements CompanyDataProvider {
       maxEmployees: criteri.addettiMax,
       minTurnover: criteri.fatturatoMinEuro,
       maxTurnover: criteri.fatturatoMaxEuro,
+      legalFormCode: criteri.formaGiuridicaCodice,
       shareHolderTaxCode: criteri.socioCodiceFiscale,
       activityStatus: criteri.soloAttive === false ? undefined : 'ATTIVA',
     };
@@ -303,6 +304,7 @@ export class OpenApiProvider implements CompanyDataProvider {
       maxEmployees: 'addetti a',
       minTurnover: 'fatturato da',
       maxTurnover: 'fatturato a',
+      legalFormCode: 'forma giuridica',
       shareHolderTaxCode: 'codice fiscale del socio',
     };
 

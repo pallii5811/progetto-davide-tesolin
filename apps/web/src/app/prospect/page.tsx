@@ -3,8 +3,18 @@ import { richiediSessione } from '@/lib/sessione';
 import { cercaProspect } from '@/lib/api';
 import type { RisultatoProspezione } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
+import { SelettoreLotto } from './SelettoreLotto';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Quanto costa una riga dell'elenco.
+ *
+ * Il fornitore lo dichiara a ogni risposta e la pagina lo mostra ricalcolato; questo è il
+ * valore usato mentre si compila, prima che una risposta esista. Sta in un solo posto
+ * perché un prezzo scritto in più punti è un prezzo che prima o poi diverge.
+ */
+const CENTESIMI_PER_AZIENDA = 5;
 
 /**
  * Ricerca di prospect.
@@ -36,6 +46,9 @@ export default async function PaginaProspect({
     fatturatoMinEuro: parametri['fatturatoMinEuro'] ?? '',
     fatturatoMaxEuro: parametri['fatturatoMaxEuro'] ?? '',
     socioCodiceFiscale: parametri['socioCodiceFiscale'] ?? '',
+    // Predefinito «solo S.r.l.»: è la forma su cui l'analisi è completa, e partire
+    // dalle ditte individuali significa pagare righe che non si possono valutare.
+    formaGiuridicaCodice: parametri['formaGiuridicaCodice'] ?? 'SR',
     // Quante aziende scaricare: il prezzo è **a record**, non a ricerca, e senza un lotto
     // dichiarato un elenco su una provincia intera costerebbe centinaia di euro.
     limite: parametri['limite'] ?? '25',
@@ -56,11 +69,6 @@ export default async function PaginaProspect({
     }
   }
 
-  const queryScarica = new URLSearchParams(
-    Object.entries(criteri).filter(([, v]) => v.trim() !== ''),
-  );
-  queryScarica.set('limite', criteri.limite);
-  queryScarica.set('scarica', '1');
 
   return (
     <>
@@ -145,32 +153,81 @@ export default async function PaginaProspect({
             />
 
             {/*
-              Il lotto è una scelta economica, non tecnica: il servizio si paga a record,
-              e questa tendina è il punto in cui l'utente decide quanto spendere.
+              Il filtro che decide se un elenco vale qualcosa.
+
+              Le ditte individuali non depositano bilanci: su di esse metà dell'analisi
+              resta vuota qualunque cifra si spenda. E sono la maggioranza dell'archivio —
+              su una ricerca reale, meccanica in provincia di Brescia, 339 su 542. Senza
+              questo filtro due terzi di ogni elenco pagato sono imprese che non si
+              possono valutare.
+
+              Il fornitore accetta un codice per volta: l'elenco separato da virgole
+              risponde zero.
             */}
             <label className="block">
               <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-                Quante scaricarne
+                Forma giuridica
               </span>
               <select
-                name="limite"
-                defaultValue={criteri.limite}
+                name="formaGiuridicaCodice"
+                defaultValue={criteri.formaGiuridicaCodice}
                 className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio"
               >
-                <option value="10">10 aziende · 0,50 €</option>
-                <option value="25">25 aziende · 1,25 €</option>
-                <option value="50">50 aziende · 2,50 €</option>
-                <option value="100">100 aziende · 5,00 €</option>
+                <option value="SR">Solo S.r.l.</option>
+                <option value="SP">Solo S.p.A.</option>
+                <option value="RS">Solo S.r.l. semplificate</option>
+                <option value="DI">Solo ditte individuali</option>
+                <option value="">Tutte le forme</option>
               </select>
+              <span className="mt-1 block text-xs text-testo-tenue">
+                Le ditte individuali non depositano bilanci: su di esse l&apos;analisi resta
+                a metà.
+              </span>
             </label>
+
+            {/*
+              Il lotto è una scelta economica, non tecnica: il servizio si paga a record,
+              e questo campo è il punto in cui l'intermediario decide quanto spendere.
+            */}
+            <SelettoreLotto
+              valoreIniziale={criteri.limite}
+              centesimiPerAzienda={CENTESIMI_PER_AZIENDA}
+              massimo={100}
+            />
           </div>
 
-          <button
-            type="submit"
-            className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
-          >
-            Conta quante sono
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              className="rounded border border-bordo-forte px-5 py-2 text-sm font-medium transition hover:border-marchio"
+            >
+              Quante sono? <span className="text-testo-debole">gratis</span>
+            </button>
+
+            {/*
+              Il pulsante che spende **invia questo modulo**, quindi compra per costruzione
+              ciò che è scritto nei campi.
+
+              Prima era un collegamento composto dai parametri dell'indirizzo, e bastava
+              che il browser ripristinasse i campi dopo un «indietro» — cosa che fa da solo
+              — perché a schermo comparissero i filtri di prima e l'indirizzo fosse vuoto.
+              Si leggeva «Brescia, ATECO 2562, dieci aziende» e si compravano venticinque
+              ditte individuali di Agrigento: un euro e venticinque, e nessun modo di
+              capire perché.
+
+              Sta qui accanto al conteggio e non più in fondo alla pagina: il conteggio non
+              deve essere un passaggio obbligato per arrivare all'elenco.
+            */}
+            <button
+              type="submit"
+              name="scarica"
+              value="1"
+              data-testid="scarica-elenco"
+              className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
+            >
+              Dammi l&apos;elenco
+            </button>
+          </div>
         </form>
       </Scheda>
 
@@ -245,28 +302,9 @@ export default async function PaginaProspect({
                   <span className="text-testo-debole"> · 5 centesimi ad azienda</span>
                 </p>
               </div>
-              {/*
-                Il pulsante che spende **invia il modulo**, non un indirizzo costruito a parte.
-
-                Prima era un collegamento composto dai parametri dell'indirizzo. Bastava che
-                il browser ripristinasse i campi dopo un «indietro» — cosa che fa da solo —
-                perché a schermo comparissero i filtri di prima e l'indirizzo fosse vuoto:
-                si vedeva «Brescia, ATECO 2562» e si comprava un elenco di tutta Italia.
-                Venticinque aziende a caso, un euro e venticinque, e nessun modo di capire
-                perché.
-
-                Inviando il modulo, ciò che si paga è per costruzione ciò che si è scritto.
-              */}
-              <button
-                type="submit"
-                form="ricerca-prospect"
-                name="scarica"
-                value="1"
-                data-testid="scarica-elenco"
-                className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
-              >
-                Scarica l&apos;elenco
-              </button>
+              <p className="text-sm text-testo-tenue">
+                L&apos;elenco si chiede con <strong>Dammi l&apos;elenco</strong>, qui sopra.
+              </p>
             </div>
           )}
         </Scheda>
