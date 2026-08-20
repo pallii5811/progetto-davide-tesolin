@@ -114,12 +114,19 @@ In ordine di valore.
 
 1. ~~Scaricare il fac-simile PMI di Insurance Advisor~~ — **fatto il 19/08/2026**. Ne sono
    usciti quattro capitoli nuovi nel report e le tre voci ancora aperte qui sotto.
-2. **Titolare effettivo** (endpoint `IT-ubo`): parità con Creditsafe e obbligo
-   antiriciclaggio per l'intermediario. **1,10 € a chiamata, 0,88 € con abbonamento** —
-   verificato sul listino pubblico il 20/08/2026
-   (console.openapi.com/apis/company/pricing), dove compare come «€1.100 / €0.880».
-   Costa dieci volte l'anagrafica estesa perché non è un dato camerale: è una visura sul
-   registro dei titolari effettivi, che ha un proprio costo per accesso.
+2. ~~Titolare effettivo~~ — **fatto il 20/08/2026, senza spendere.** Si ricava dai soci che
+   l'anagrafica estesa già porta: quando sono persone fisiche sopra il 25%, il titolare
+   effettivo è quello, e il prodotto dichiara che la visura **non serve**.
+
+   La visura `IT-ubo` resta giustificata in due casi: catena che si interrompe su società
+   non risalibili, e fascicolo antiriciclaggio che richiede il documento del registro.
+   Costa **1,10 € (0,88 € con abbonamento)** — verificato sul listino pubblico il
+   20/08/2026, `console.openapi.com/apis/company/pricing`, dove compare come «€1.100 /
+   €0.880». Dieci volte l'anagrafica estesa perché non è un dato camerale: è una visura sul
+   registro dei titolari effettivi, che ha un costo per accesso proprio.
+
+   Quando la catena si interrompe su una società, prima della visura conviene **risalirla
+   con un'altra anagrafica estesa a 0,10 €**: un decimo del prezzo per gradino.
 2-bis. **Antiriciclaggio** (endpoint `IT-aml`, **0,20 €** a chiamata, 0,095 € con
    abbonamento) e **cariche collegate** (`IT-stakeholders`, stesso prezzo). Entrambi erano
    segnati come lacune «non offerte dalla fonte dati»: non era vero, e costano meno di un
