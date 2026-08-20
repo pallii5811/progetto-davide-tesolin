@@ -198,14 +198,37 @@ export function costoAnalisi(
   if (livello === 'base') return s.anagraficaBase.costoCentesimi;
   if (livello === 'esteso') return s.anagraficaEstesa.costoCentesimi;
 
+  /*
+    Gli eventi negativi **non** entrano qui.
+
+    Ci entravano, e il numero che ne usciva — cinquantacinque centesimi — era il prezzo
+    di un'analisi che comprava d'ufficio anche la verifica protesti. Chi premeva
+    «Analizza» credeva di spendere i dieci centesimi dell'anagrafica e ne spendeva
+    cinquantacinque, cioè cinque volte tanto, su ogni prospect anche solo sfiorato.
+
+    Ora quella verifica è un acquisto a parte, con il suo pulsante e il suo prezzo
+    scritto sopra: si somma a questo quando la si chiede, e non prima.
+  */
   const completo =
     s.anagraficaEstesa.costoCentesimi +
-    (s.eventiNegativi.verificato ? s.eventiNegativi.costoCentesimi : 0) +
     (s.bilancioDettagliato.verificato ? s.bilancioDettagliato.costoCentesimi : 0);
 
   // L'approfondimento **si somma**: il profilo completo non contiene i bilanci sintetici
   // decennali, quindi non sostituisce l'anagrafica estesa, la affianca.
   return livello === 'profondito' ? completo + s.profiloCompleto.costoCentesimi : completo;
+}
+
+/**
+ * Quanto costa aggiungere la verifica di protesti, pregiudizievoli e procedure.
+ *
+ * Esposto a parte perché è un pulsante a parte: il prezzo che l'intermediario legge deve
+ * venire dal listino, non da una cifra scritta a mano in una pagina. Sul pulsante
+ * dell'approfondimento c'era «+0,48 €» per un servizio che ne costa trenta.
+ */
+export function costoEventiNegativi(config: OpenApiConfig = OPENAPI_DEFAULT_CONFIG): number {
+  return config.services.eventiNegativi.verificato
+    ? config.services.eventiNegativi.costoCentesimi
+    : 0;
 }
 
 /** Servizi il cui percorso o autorizzazione non è ancora confermato. */

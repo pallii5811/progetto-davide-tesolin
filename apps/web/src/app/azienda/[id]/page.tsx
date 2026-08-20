@@ -3,6 +3,7 @@ import { IndicatoriArchivio } from './IndicatoriArchivio';
 import Link from 'next/link';
 import {
   analizzaAzienda,
+  statoServizio,
   collegamentiDiAzienda,
   compagnieCensite,
   leggiImmaginiUbicazioni,
@@ -36,21 +37,30 @@ export default async function PaginaAzienda({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ approfondita?: string }>;
+  searchParams: Promise<{ approfondita?: string; negativita?: string }>;
 }) {
   await richiediSessione();
   const { id } = await params;
 
   /*
-    L'approfondimento è una scelta esplicita, e passa dall'indirizzo perché sia
-    **visibile**: chi arriva su questa pagina da un collegamento sa, guardando la barra
-    del browser, se sta per spendere dieci centesimi o cinquantotto.
+    Ogni acquisto facoltativo è una scelta esplicita e passa dall'indirizzo, perché sia
+    **visibile**: chi arriva qui da un collegamento sa, guardando la barra del browser,
+    che cosa sta per spendere.
+
+    La verifica protesti in particolare **non** è più compresa nell'analisi. Costava
+    quarantacinque centesimi contro i dieci dell'anagrafica e veniva comprata d'ufficio:
+    aprire un prospect per dargli un'occhiata costava cinquantacinque centesimi, e da
+    nessuna parte c'era scritto.
   */
-  const approfondita = (await searchParams).approfondita === '1';
+  const parametri = await searchParams;
+  const approfondita = parametri.approfondita === '1';
+  const conNegativita = parametri.negativita === '1';
+
+  const listino = await statoServizio().catch(() => null);
 
   let analisi: AnalisiDto;
   try {
-    analisi = await analizzaAzienda(id, { approfondita });
+    analisi = await analizzaAzienda(id, { approfondita, eventiNegativi: conNegativita });
   } catch (errore) {
     return (
       <Avviso tono="critico" titolo="Analisi non disponibile">
@@ -101,7 +111,13 @@ export default async function PaginaAzienda({
 
   return (
     <>
-      <Intestazione analisi={analisi} identificativo={id} approfondita={approfondita} />
+      <Intestazione
+        analisi={analisi}
+        identificativo={id}
+        approfondita={approfondita}
+        conNegativita={conNegativita}
+        listino={listino}
+      />
 
       {/* ── Completezza: l'invito ad agire, non un semplice avviso ────────── */}
       {analisi.completezza.percentuale < 0.65 && (
@@ -1077,14 +1093,24 @@ function NavigazioneSezioni() {
   );
 }
 
+/** Il prezzo come lo legge chi paga, o niente se il listino non è raggiungibile. */
+function prezzo(centesimi: number | undefined): string {
+  if (centesimi === undefined) return '';
+  return `+${(centesimi / 100).toFixed(2).replace('.', ',')} €`;
+}
+
 function Intestazione({
   analisi,
   identificativo,
   approfondita,
+  conNegativita,
+  listino,
 }: {
   analisi: AnalisiDto;
   identificativo: string;
   approfondita: boolean;
+  conNegativita: boolean;
+  listino: { costoEventiNegativiCentesimi: number; costoApprofondimentoCentesimi: number } | null;
 }) {
   const { azienda, sintesi } = analisi;
   return (
@@ -1098,16 +1124,27 @@ function Intestazione({
 
         <div className="flex flex-wrap gap-2">
           {/*
-            L'approfondimento è una scelta economica dichiarata: cariche, sedi operative e
-            gruppo costano 48 centesimi in più, e su un prospect da scartare sono denaro
-            buttato. Il prezzo sta scritto sul pulsante, non in una nota a piè di pagina.
+            Ogni pulsante che spende dichiara il proprio prezzo, e il prezzo arriva dal
+            listino del fornitore — non da una cifra scritta qui dentro. Qui c'era
+            «+0,48 €» su un servizio che ne costa trenta: un numero rimasto indietro, che
+            nessuno poteva accorgersi fosse sbagliato perché non veniva da nessuna parte.
           */}
-          {!approfondita && (
+          {!conNegativita && (
             <Link
-              href={`/azienda/${identificativo}?approfondita=1`}
+              href={`/azienda/${identificativo}?negativita=1${approfondita ? '&approfondita=1' : ''}`}
               className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"
             >
-              Analisi approfondita <span className="text-testo-debole">+0,48 €</span>
+              Verifica protesti e procedure{' '}
+              <span className="text-testo-debole">{prezzo(listino?.costoEventiNegativiCentesimi)}</span>
+            </Link>
+          )}
+          {!approfondita && (
+            <Link
+              href={`/azienda/${identificativo}?approfondita=1${conNegativita ? '&negativita=1' : ''}`}
+              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            >
+              Analisi approfondita{' '}
+              <span className="text-testo-debole">{prezzo(listino?.costoApprofondimentoCentesimi)}</span>
             </Link>
           )}
           <Link

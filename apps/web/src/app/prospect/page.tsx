@@ -35,6 +35,7 @@ export default async function PaginaProspect({
     addettiMax: parametri['addettiMax'] ?? '',
     fatturatoMinEuro: parametri['fatturatoMinEuro'] ?? '',
     fatturatoMaxEuro: parametri['fatturatoMaxEuro'] ?? '',
+    socioCodiceFiscale: parametri['socioCodiceFiscale'] ?? '',
     // Quante aziende scaricare: il prezzo è **a record**, non a ricerca, e senza un lotto
     // dichiarato un elenco su una provincia intera costerebbe centinaia di euro.
     limite: parametri['limite'] ?? '25',
@@ -72,7 +73,7 @@ export default async function PaginaProspect({
       </div>
 
       <Scheda className="mb-6">
-        <form method="get" className="space-y-4">
+        <form method="get" id="ricerca-prospect" className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Campo
               nome="provincia"
@@ -127,6 +128,23 @@ export default async function PaginaProspect({
             />
 
             {/*
+              Il filtro che un intermediario usa più di tutti, una volta che sa che c'è:
+              dal codice fiscale di una persona escono **tutte le società in cui ha una
+              quota**. Un cliente che ne possiede quattro è quattro rapporti, non uno, e
+              nessuna ricerca per territorio o settore li mette mai in fila insieme.
+
+              L'API lo accetta da sempre; mancava solo il campo per scriverlo.
+            */}
+            <Campo
+              nome="socioCodiceFiscale"
+              etichetta="Codice fiscale del socio"
+              valore={criteri.socioCodiceFiscale}
+              segnaposto="RSSGNN70A01A944X"
+              maiuscolo
+              nota="Tutte le società partecipate dalla stessa persona."
+            />
+
+            {/*
               Il lotto è una scelta economica, non tecnica: il servizio si paga a record,
               e questa tendina è il punto in cui l'utente decide quanto spendere.
             */}
@@ -165,11 +183,48 @@ export default async function PaginaProspect({
       {risultato !== null && risultato.soloConteggio && (
         <Scheda className="mb-6">
           {risultato.totale === 0 ? (
-            <p className="text-sm text-testo-tenue">
-              Nessuna azienda corrisponde a questi criteri. Sul codice ATECO conviene provare prima
-              le sole due cifre della divisione, poi restringere: il confronto è esatto e una
-              divisione non comprende le sue sottocategorie.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Nessuna azienda corrisponde a questi criteri.</p>
+
+              {/*
+                La diagnosi, non la scusa.
+
+                Due filtri sensati possono avere un'intersezione vuota senza che nessuno dei
+                due sia sbagliato, e da fuori quel caso è identico a un guasto. Qui il
+                servizio ha già ricontato togliendone uno per volta — gratis, in `dryRun` —
+                e dice quale riaprirebbe la ricerca e con quante imprese.
+              */}
+              {risultato.diagnosiZero !== undefined && risultato.diagnosiZero.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-testo-tenue">
+                    Non è un errore: è l’incrocio dei filtri a essere vuoto. Togliendone uno
+                    solo, ecco cosa si troverebbe.
+                  </p>
+                  <ul className="space-y-1">
+                    {risultato.diagnosiZero.map((d) => (
+                      <li key={d.filtro} className="text-sm">
+                        senza <strong>{d.etichetta}</strong> →{' '}
+                        <span className="tabular font-semibold">
+                          {d.totaleSenza.toLocaleString('it-IT')}
+                        </span>{' '}
+                        {d.totaleSenza === 1 ? 'azienda' : 'aziende'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-sm text-testo-tenue">
+                  Nessuno dei filtri, tolto da solo, riapre la ricerca: l’insieme è vuoto in
+                  partenza. Conviene allargare il territorio o la dimensione.
+                </p>
+              )}
+
+              <p className="text-xs text-testo-debole">
+                Sul codice ATECO il confronto è <strong>esatto</strong>, e l’archivio usa due
+                cifre oppure quattro: «25» e «2562» sono insiemi diversi e disgiunti, mentre
+                «256» non trova mai nulla.
+              </p>
+            </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4">
               {/*
@@ -190,13 +245,28 @@ export default async function PaginaProspect({
                   <span className="text-testo-debole"> · 5 centesimi ad azienda</span>
                 </p>
               </div>
-              <Link
-                href={`/prospect?${queryScarica.toString()}`}
+              {/*
+                Il pulsante che spende **invia il modulo**, non un indirizzo costruito a parte.
+
+                Prima era un collegamento composto dai parametri dell'indirizzo. Bastava che
+                il browser ripristinasse i campi dopo un «indietro» — cosa che fa da solo —
+                perché a schermo comparissero i filtri di prima e l'indirizzo fosse vuoto:
+                si vedeva «Brescia, ATECO 2562» e si comprava un elenco di tutta Italia.
+                Venticinque aziende a caso, un euro e venticinque, e nessun modo di capire
+                perché.
+
+                Inviando il modulo, ciò che si paga è per costruzione ciò che si è scritto.
+              */}
+              <button
+                type="submit"
+                form="ricerca-prospect"
+                name="scarica"
+                value="1"
                 data-testid="scarica-elenco"
                 className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
               >
                 Scarica l&apos;elenco
-              </Link>
+              </button>
             </div>
           )}
         </Scheda>

@@ -148,6 +148,20 @@ export interface RisultatoProspezione {
   /** Vuoto quando si è chiesto il solo conteggio. */
   readonly aziende: readonly CompanySearchResult[];
   readonly soloConteggio: boolean;
+  /**
+   * Quando il conteggio è zero: quale filtro lo ha azzerato.
+   *
+   * Un «nessun risultato» senza spiegazione è il modo più veloce di far credere che il
+   * servizio sia rotto. Quasi sempre non lo è: è l'incrocio di due filtri ragionevoli a
+   * essere vuoto, e da fuori non si vede quale dei due. Qui si ricontano gli stessi
+   * criteri togliendone uno per volta — il conteggio non costa nulla, quindi la diagnosi
+   * è gratuita — e si riporta quali riaprirebbero la ricerca.
+   */
+  readonly diagnosiZero?: readonly {
+    readonly filtro: string;
+    readonly etichetta: string;
+    readonly totaleSenza: number;
+  }[];
 }
 
 export interface SearchCriteria {
@@ -182,7 +196,23 @@ export interface CompanyDataProvider {
     criteri: CriteriProspezione,
     opzioni?: { readonly soloConteggio?: boolean | undefined },
   ): Promise<RisultatoProspezione>;
-  fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile>;
+  /**
+   * @param opzioni.conEventiNegativi acquista anche protesti, pregiudizievoli e procedure.
+   *
+   * È **falso** per definizione, e non è un dettaglio: quella verifica costa 45 centesimi
+   * contro i 10 dell'anagrafica, cioè l'ottantadue per cento del prezzo di un'analisi.
+   * Comprarla ogni volta significa spendere cinquantacinque centesimi per guardare un
+   * prospect che magari si scarta al primo sguardo — e chi preme «Analizza» credendo di
+   * spenderne dieci non capisce dove finisca il credito.
+   *
+   * Su un cliente vero serve eccome: pesa il venti per cento dello score ed è l'unica
+   * cosa che rileva una procedura aperta. Ma è una decisione, e va presa da chi paga.
+   */
+  fetchProfile(
+    identifier: string,
+    level: FetchLevel,
+    opzioni?: { readonly conEventiNegativi?: boolean | undefined },
+  ): Promise<CompanyProfile>;
 }
 
 /** Errori di provider distinti per poter reagire in modo diverso: ritentare, degradare, fallire. */

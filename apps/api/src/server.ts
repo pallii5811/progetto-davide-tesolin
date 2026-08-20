@@ -27,6 +27,7 @@ import {
   OPENAPI_DEFAULT_CONFIG,
   ProviderError,
   costoAnalisi,
+  costoEventiNegativi,
   createCompanyProvider,
   verificaAutorizzazioni,
 } from '@aegis/providers';
@@ -412,6 +413,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     */
     costoAnalisiCentesimi: costoAnalisi('completo'),
     costoAnalisiApprofonditaCentesimi: costoAnalisi('profondito'),
+    // I due acquisti facoltativi, col prezzo preso dal listino e non da una cifra scritta
+    // a mano in una pagina: è così che «+0,48 €» è finito su un pulsante da trenta.
+    costoEventiNegativiCentesimi: costoEventiNegativi(),
+    costoApprofondimentoCentesimi: costoAnalisi('profondito') - costoAnalisi('completo'),
     persistenza: persistenza?.descrizione ?? 'in memoria (i dati non sopravvivono al riavvio)',
     datiPersistenti: persistenza !== undefined,
     autenticazione: autenticazioneRichiesta,
@@ -1203,6 +1208,13 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
        * cinque volte tanto e va chiesto, non subito.
        */
       livello?: 'completo' | 'profondito' | undefined;
+      /**
+       * Acquista anche protesti, pregiudizievoli e procedure: **45 centesimi**.
+       *
+       * Predefinito falso. Prima veniva comprato a ogni analisi senza dirlo, e un
+       * «Analizza» che l'utente credeva da 10 centesimi ne costava 55.
+       */
+      conEventiNegativi?: boolean | undefined;
     } = {},
   ) => {
     const contesto = contestoDi(request);
@@ -1216,7 +1228,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const profilo = await caricaProfilo(provider, identificativo, opzioni.livello ?? 'completo');
+    const profilo = await caricaProfilo(provider, identificativo, opzioni.livello ?? 'completo', {
+      conEventiNegativi: opzioni.conEventiNegativi === true,
+    });
     if (profilo === null) return null;
 
     const dossier = await contesto.dossier.get(identificativo);
@@ -1310,6 +1324,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         // L'approfondimento si chiede esplicitamente: costa quasi cinque volte l'analisi
         // ordinaria, e nessuno deve trovarselo addebitato per una svista.
         ...(parsed.data.approfondita === true ? { livello: 'profondito' as const } : {}),
+        // Anche questa è una spesa dichiarata, non un automatismo.
+        conEventiNegativi: parsed.data.eventiNegativi === true,
       }),
     );
 
@@ -2187,9 +2203,10 @@ async function caricaProfilo(
   provider: CompanyDataProvider,
   identificativo: string,
   livello: FetchLevel,
+  opzioni: { readonly conEventiNegativi?: boolean | undefined } = {},
 ): Promise<CompanyProfile | null> {
   try {
-    return await provider.fetchProfile(identificativo, livello);
+    return await provider.fetchProfile(identificativo, livello, opzioni);
   } catch (error) {
     if (error instanceof ProviderError && error.kind === 'non-trovato') return null;
     throw error;

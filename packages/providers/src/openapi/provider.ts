@@ -237,6 +237,8 @@ export class OpenApiProvider implements CompanyDataProvider {
         aziende: [],
         soloConteggio: true,
         lotto: Math.min(limite, totali.count),
+        // Zero senza spiegazione fa sembrare rotto un servizio che sta funzionando.
+        ...(totali.count === 0 ? { diagnosiZero: await this.#diagnosticaZero(filtri) } : {}),
       };
     }
 
@@ -276,6 +278,53 @@ export class OpenApiProvider implements CompanyDataProvider {
     };
   }
 
+  /**
+   * Perché la ricerca non ha trovato nulla.
+   *
+   * Si riconta togliendo un filtro per volta e si riportano quelli che, da soli, stavano
+   * chiudendo l'insieme. Sono tutte chiamate in `dryRun`: gratuite, quindi la diagnosi si
+   * può fare sempre, senza chiedere permesso e senza far pagare una risposta vuota.
+   *
+   * Serve perché l'incrocio di due filtri sensati può essere vuoto senza che nessuno dei
+   * due sia sbagliato — diciassette imprese in un settore, nessuna delle quali abbia anche
+   * venti addetti — e da fuori quel caso non si distingue da un guasto. È la differenza
+   * fra «non funziona» e «questo settore, in questa provincia, non ha imprese di quella
+   * dimensione»: la seconda è un'informazione commerciale, la prima fa chiudere il
+   * programma.
+   */
+  async #diagnosticaZero(
+    filtri: Record<string, unknown>,
+  ): Promise<readonly { filtro: string; etichetta: string; totaleSenza: number }[]> {
+    const ETICHETTE: Record<string, string> = {
+      companyName: 'denominazione',
+      province: 'provincia',
+      atecoCode: 'codice ATECO',
+      minEmployees: 'addetti da',
+      maxEmployees: 'addetti a',
+      minTurnover: 'fatturato da',
+      maxTurnover: 'fatturato a',
+      shareHolderTaxCode: 'codice fiscale del socio',
+    };
+
+    const attivi = Object.keys(filtri).filter(
+      (k) => k in ETICHETTE && filtri[k] !== undefined && filtri[k] !== '',
+    );
+    // Con un filtro solo non c'è nulla da diagnosticare: è quello, e si vede.
+    if (attivi.length < 2) return [];
+
+    const esiti = await Promise.all(
+      attivi.map(async (chiave) => {
+        const senza = { ...filtri };
+        delete senza[chiave];
+        const { count } = await this.#contaProspect(senza);
+        return { filtro: chiave, etichetta: ETICHETTE[chiave] ?? chiave, totaleSenza: count };
+      }),
+    );
+
+    // Solo quelli che riaprirebbero davvero la ricerca, dal più generoso.
+    return esiti.filter((e) => e.totaleSenza > 0).sort((a, b) => b.totaleSenza - a.totaleSenza);
+  }
+
   /** Conteggio in modalità `dryRun`: non scarica nulla, non addebita nulla. */
   async #contaProspect(query: Record<string, unknown>): Promise<{ count: number; costoCentesimi: number }> {
     const raw = await this.#company.request<unknown>({
@@ -296,7 +345,11 @@ export class OpenApiProvider implements CompanyDataProvider {
     };
   }
 
-  async fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile> {
+  async fetchProfile(
+    identifier: string,
+    level: FetchLevel,
+    opzioni: { readonly conEventiNegativi?: boolean | undefined } = {},
+  ): Promise<CompanyProfile> {
     const osservatoIl = this.#now();
     const services = this.#config.services;
 
@@ -371,7 +424,8 @@ export class OpenApiProvider implements CompanyDataProvider {
     // Un percorso non confermato produrrebbe una chiamata a vuoto — pagata comunque.
     const [bilanci, eventiNegativi, profilo] = await Promise.all([
       services.bilancioDettagliato.verificato ? this.#fetchBilanci(identifier) : Promise.resolve([]),
-      services.eventiNegativi.verificato
+      // Solo se richiesto: 45 centesimi non si addebitano per un valore predefinito.
+      services.eventiNegativi.verificato && opzioni.conEventiNegativi === true
         ? this.#fetchEventiNegativi(identifier, osservatoIl)
         : Promise.resolve(null),
       approfondito ? this.#fetchProfiloCompleto(identifier) : Promise.resolve(null),

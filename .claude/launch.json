@@ -16,7 +16,19 @@
     {
       "name": "aegis-api-demo",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:api:demo"],
+      "runtimeArgs": [
+        "run",
+        "dev:api:demo"
+      ],
+      "port": 3001
+    },
+    {
+      "name": "aegis-api-reale",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:api"
+      ],
       "port": 3001
     },
     {

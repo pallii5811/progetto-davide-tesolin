@@ -745,6 +745,8 @@ export interface RisultatoProspezione {
   aziende: RisultatoRicerca[];
   soloConteggio: boolean;
   provider: string;
+  /** Quando il totale è zero: quali filtri lo stanno azzerando, e cosa si troverebbe senza. */
+  diagnosiZero?: { filtro: string; etichetta: string; totaleSenza: number }[];
 }
 
 /**
@@ -786,13 +788,23 @@ export async function leggiStudio(): Promise<DatiStudio | { errore: string }> {
  * @param approfondita Aggiunge cariche, sedi operative e struttura del gruppo. Costa quasi
  *   cinque volte l'analisi ordinaria: si chiede, non si dà per scontato.
  */
+/**
+ * @param opzioni.eventiNegativi acquista protesti, pregiudizievoli e procedure (45 cent).
+ *
+ * Falso per definizione. Veniva comprato d'ufficio a ogni analisi: chi premeva
+ * «Analizza» credendo di spendere i dieci centesimi dell'anagrafica ne spendeva
+ * cinquantacinque, su ogni prospect anche solo aperto per curiosità.
+ */
 export async function analizzaAzienda(
   identificativo: string,
-  opzioni: { approfondita?: boolean } = {},
+  opzioni: { approfondita?: boolean; eventiNegativi?: boolean } = {},
 ): Promise<AnalisiDto> {
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/analisi`, {
     method: 'POST',
-    body: JSON.stringify(opzioni.approfondita === true ? { approfondita: true } : {}),
+    body: JSON.stringify({
+      ...(opzioni.approfondita === true ? { approfondita: true } : {}),
+      ...(opzioni.eventiNegativi === true ? { eventiNegativi: true } : {}),
+    }),
   });
 }
 
@@ -802,6 +814,9 @@ export async function statoServizio(): Promise<{
   datiReali: boolean;
   costoAnalisiCentesimi: number;
   costoAnalisiApprofonditaCentesimi: number;
+  /** Prezzi dei due acquisti facoltativi, dal listino del fornitore. */
+  costoEventiNegativiCentesimi: number;
+  costoApprofondimentoCentesimi: number;
 }> {
   return chiama('/health');
 }

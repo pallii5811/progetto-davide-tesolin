@@ -152,6 +152,14 @@ export const analisiRequestSchema = z.object({
    * nessuno deve trovarselo addebitato per una svista.
    */
   approfondita: z.boolean().optional(),
+  /**
+   * Verifica protesti, pregiudizievoli e procedure concorsuali: **45 centesimi**.
+   *
+   * Separata dall'analisi e falsa per definizione. Costa quattro volte e mezzo
+   * l'anagrafica, e comprarla in automatico faceva sì che «Analizza» ne costasse
+   * cinquantacinque invece di dieci — senza che da nessuna parte lo si dicesse.
+   */
+  eventiNegativi: z.boolean().optional(),
 });
 
 export type AnalisiRequest = z.infer<typeof analisiRequestSchema>;
