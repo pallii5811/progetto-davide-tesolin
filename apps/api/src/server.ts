@@ -14,6 +14,9 @@ import {
   Money,
   RISK_CATALOG,
   analyzeCompany,
+  applicaFiltroPortafoglio,
+  esportaPortafoglioCsv,
+  nomeFileEsportazione,
   parsePartitaIva,
   valutaCompletezza,
 } from '@aegis/core';
@@ -1274,6 +1277,40 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       },
     };
   });
+
+  /*
+    Esportazione dell'elenco, in CSV per Excel italiano.
+
+    È il gesto opposto alla presa in carico e ha lo stesso scopo: il broker non lavora solo
+    dentro la piattaforma. Porta la lista in riunione, la passa al collega che fa le
+    telefonate, la incrocia col proprio gestionale. Una piattaforma da cui i dati non
+    escono è una piattaforma di cui non ci si fida.
+
+    Il filtro è **lo stesso** che applica la pagina, perché la funzione arriva dal dominio:
+    scaricare una lista diversa da quella che si sta guardando è il tipo di sorpresa che si
+    scopre davanti al cliente.
+  */
+  app.get<{ Querystring: { filtro?: string } }>(
+    '/api/portafoglio/esporta',
+    async (request, reply) => {
+      const voci = await contestoDi(request).portafoglio.elenco();
+      const filtrate = applicaFiltroPortafoglio(voci, request.query.filtro);
+      const csv = esportaPortafoglioCsv(filtrate);
+
+      /*
+        `text/csv` con l'accento dichiarato, e il nome del file nell'intestazione: senza
+        `Content-Disposition` il browser mostrerebbe il CSV a schermo invece di salvarlo,
+        e con i punti e virgola sarebbe illeggibile.
+      */
+      return reply
+        .header('Content-Type', 'text/csv; charset=utf-8')
+        .header(
+          'Content-Disposition',
+          `attachment; filename="${nomeFileEsportazione(new Date(), request.query.filtro)}"`,
+        )
+        .send(csv);
+    },
+  );
 
   // ── Presa in carico massiva del portafoglio ────────────────────────────────
 

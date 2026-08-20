@@ -50,6 +50,7 @@ export * from './coverage/metriche-impatto.js';
 
 // ── Portafoglio ──────────────────────────────────────────────────────────────
 export * from './portfolio/import.js';
+export * from './portfolio/export.js';
 
 // ── Monitoraggio ─────────────────────────────────────────────────────────────
 export * from './monitoring/events.js';

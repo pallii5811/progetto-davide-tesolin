@@ -2,6 +2,7 @@ import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
 import { leggiPortafoglio } from '@/lib/api';
 import type { VocePortafoglio } from '@/lib/api';
+import { applicaFiltroPortafoglio } from '@aegis/core';
 import { Avviso, Metrica, Scheda } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -48,12 +49,14 @@ export default async function PaginaPortafoglio({
     );
   }
 
-  const aziende =
-    filtro === 'catnat'
-      ? portafoglio.aziende.filter((a) => !a.catNatConforme)
-      : filtro === 'scoperte'
-        ? portafoglio.aziende.filter((a) => a.coperturaAssente > 0)
-        : portafoglio.aziende;
+  /*
+    Il filtro arriva dal dominio, non è scritto qui.
+
+    L'elenco ora si può anche esportare, e la stessa regola serve in due punti: se le due
+    copie divergessero, il broker scaricherebbe una lista diversa da quella che sta
+    guardando — e se ne accorgerebbe davanti al cliente, non prima.
+  */
+  const aziende = applicaFiltroPortafoglio(portafoglio.aziende, filtro);
 
   const { riepilogo } = portafoglio;
   const quotaNonConformi =
@@ -63,12 +66,27 @@ export default async function PaginaPortafoglio({
     <>
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Portafoglio</h1>
-        <Link
-          href="/portafoglio/importa"
-          className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-        >
-          Importa elenco clienti
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            Un collegamento e non un pulsante: è una navigazione verso un file, e come tale
+            deve poter essere aperta in una scheda nuova o copiata. `download` chiede al
+            browser di salvare invece di mostrare, e il filtro corrente viaggia con
+            l'indirizzo — si scarica ciò che si sta guardando.
+          */}
+          <a
+            href={filtro === undefined ? '/portafoglio/esporta' : `/portafoglio/esporta?filtro=${filtro}`}
+            download
+            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+          >
+            Esporta in CSV
+          </a>
+          <Link
+            href="/portafoglio/importa"
+            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+          >
+            Importa elenco clienti
+          </Link>
+        </div>
       </div>
       <p className="mb-6 max-w-3xl text-sm leading-relaxed text-testo-tenue">
         Ordinato per urgenza: prima le posizioni non conformi a un obbligo di legge, poi per esposizione

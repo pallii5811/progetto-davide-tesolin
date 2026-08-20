@@ -59,6 +59,48 @@ test.describe('Portafoglio', () => {
 
     await expect(scheda.getByRole('link', { name: 'Apri' })).toBeVisible();
   });
+
+  test('l’elenco si scarica in CSV, e scarica quello che si sta guardando', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto('/portafoglio');
+
+    /*
+      Lo scaricamento attraversa tre confini che le prove unitarie non toccano: il gestore
+      di rotta di Next, la chiamata all'API con il cookie di sessione, e le intestazioni con
+      cui il browser decide se salvare o mostrare a schermo. Se una sola sbaglia, il broker
+      ottiene una pagina di punti e virgola invece di un file — e conclude che non funziona.
+    */
+    const [scaricamento] = await Promise.all([
+      page.waitForEvent('download', { timeout: 90_000 }),
+      page.getByRole('link', { name: 'Esporta in CSV' }).click(),
+    ]);
+
+    expect(scaricamento.suggestedFilename()).toMatch(/^portafoglio-\d{4}-\d{2}-\d{2}\.csv$/);
+
+    const percorso = await scaricamento.path();
+    const { readFileSync } = await import('node:fs');
+    const contenuto = readFileSync(percorso, 'utf8');
+
+    // Il BOM e il punto e virgola sono ciò che rende il file apribile in Italia: senza,
+    // Excel mostra una colonna sola con gli accenti rotti.
+    expect(contenuto.startsWith('﻿')).toBe(true);
+    expect(contenuto).toContain('Denominazione";"Partita IVA');
+    expect(contenuto.trimEnd().split('\r\n').length).toBeGreaterThan(1);
+  });
+
+  test('il file segue il filtro attivo, e lo dichiara nel nome', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto('/portafoglio?filtro=catnat');
+
+    const [scaricamento] = await Promise.all([
+      page.waitForEvent('download', { timeout: 90_000 }),
+      page.getByRole('link', { name: 'Esporta in CSV' }).click(),
+    ]);
+
+    // Scaricare tutto mentre a schermo c'è un sottoinsieme è la sorpresa che si scopre
+    // davanti al cliente, non prima.
+    expect(scaricamento.suggestedFilename()).toContain('portafoglio-catnat-');
+  });
 });
 
 test.describe('Modulo di accesso', () => {

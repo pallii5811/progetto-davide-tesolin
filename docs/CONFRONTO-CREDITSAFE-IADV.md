@@ -37,7 +37,7 @@ con i loro *documenti*, non con le loro schermate.
 | Monitoraggio con avvisi sui cambiamenti | **sì** | dieci tipi di evento, fra cui obblighi normativi |
 | Vista di portafoglio con segnalazione delle criticità | **sì** | ordinata per urgenza di intervento, non per punteggio |
 | Report internazionali (48 paesi) | **no** | solo Italia |
-| Esportazione di elenchi | **no** | da fare |
+| Esportazione di elenchi | **sì** | CSV per Excel italiano, con il filtro attivo e l'azione prioritaria in colonna |
 
 ### Il vuoto che non si chiude
 
@@ -116,8 +116,8 @@ In ordine di valore.
 2. **Titolare effettivo**: il servizio esiste (1,10 € a chiamata, 0,88 € a volume). È
    parità con Creditsafe ed è un obbligo antiriciclaggio per l'intermediario.
 3. **Sessione con il broker**, con il prodotto in mano e nessuna spiegazione preventiva.
-4. Poi, in ordine decrescente: esportazione elenchi, tre livelli di profondità,
-   condivisione del questionario, selezione dei contenuti del report.
+4. Poi, in ordine decrescente: ~~esportazione elenchi~~ (**fatta il 20/08/2026**), tre
+   livelli di profondità, condivisione del questionario, selezione dei contenuti del report.
 
 ### Le due voci del loro report ancora aperte
 
