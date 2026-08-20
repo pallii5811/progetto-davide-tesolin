@@ -40,6 +40,8 @@ import type { RiskAssessment } from '../risk/engine.js';
 import { computeSumsInsured } from '../coverage/sums-insured.js';
 import { stimaDannoMassimo } from '../coverage/danno-massimo.js';
 import { calcolaMetricheDiImpatto } from '../coverage/metriche-impatto.js';
+import { componiSchemaMargine } from '../company/schema-margine.js';
+import type { SchemaMargineDiContribuzione } from '../company/schema-margine.js';
 import type { MetricheDiImpatto } from '../coverage/metriche-impatto.js';
 import { valutaRitenzione } from '../risk/ritenzione.js';
 import { raccomandaPrevenzione } from '../risk/prevenzione.js';
@@ -103,6 +105,20 @@ export interface CompanyAnalysis {
    * dove sono i gradini, tradotti in giorni di fermo.
    */
   readonly metricheDiImpatto: Explained<MetricheDiImpatto | null>;
+  /**
+   * Da quali voci di bilancio nasce il margine di contribuzione, e con quali quote.
+   *
+   * È il numero su cui si costruisce la garanzia danni indiretti: l’imprenditore lo porta
+   * al proprio commercialista, e senza le righe non si può verificare.
+   */
+  readonly schemaMargine: SchemaMargineDiContribuzione | null;
+  /**
+   * Andamento pluriennale: valore della produzione, utile e costo del personale.
+   *
+   * Un esercizio solo è una fotografia; tre sono una direzione, ed è la direzione a dire
+   * se l’impresa può permettersi il programma assicurativo che le si propone.
+   */
+  readonly andamentoPluriennale: readonly AndamentoEsercizio[];
   /**
    * Misure che abbasserebbero il rischio, con l'effetto che avrebbero.
    *
@@ -295,6 +311,24 @@ export function analyzeCompany(
     liquidità, EBITDA, patrimonio e capitale sociale, e inventarle su un'impresa che
     deposita in forma abbreviata darebbe numeri che sembrano misurati e non lo sono.
   */
+  const schemaMargine = bilancio === null ? null : componiSchemaMargine(bilancio);
+
+  /*
+    L’andamento si legge dai bilanci sintetici, che coprono fino a dieci esercizi e
+    arrivano senza costo con l’anagrafica estesa. I dettagliati sono al massimo due, e su
+    due punti non si vede una tendenza.
+  */
+  const andamentoPluriennale: AndamentoEsercizio[] = profile.bilanciSintetici
+    .slice(0, 5)
+    .map((b) => ({
+      anno: b.value.anno,
+      valoreDellaProduzione: b.value.fatturato,
+      patrimonioNetto: b.value.patrimonioNetto,
+      costoDelPersonale: b.value.costoDelPersonale,
+      dipendenti: b.value.dipendenti,
+      retribuzioneMediaLorda: b.value.retribuzioneMediaLorda,
+    }));
+
   const metricheDiImpatto =
     bilancio === null
       ? explain('Metriche di impatto economico')
@@ -340,6 +374,8 @@ export function analyzeCompany(
     dannoMassimo,
     ritenzione,
     metricheDiImpatto,
+    schemaMargine,
+    andamentoPluriennale,
     prevenzione,
     catNat,
     gap,
@@ -390,4 +426,20 @@ export function incidenzaGapSuPatrimonio(analysis: CompanyAnalysis): number | nu
   const pn = analysis.bilancio?.sp.patrimonioNetto ?? null;
   if (pn === null || !Money.isPositive(pn)) return null;
   return Money.toEuro(analysis.gap.esposizioneNonAssicurata) / Money.toEuro(pn);
+}
+
+/**
+ * Un esercizio nella serie storica.
+ *
+ * Gli importi restano `null` quando il registro non li porta: su bilanci depositati in
+ * forma abbreviata mancano spesso proprio il costo del personale e la retribuzione media,
+ * e riempirli di zeri farebbe leggere come «crollo» ciò che è solo un dato assente.
+ */
+export interface AndamentoEsercizio {
+  readonly anno: number;
+  readonly valoreDellaProduzione: Euro | null;
+  readonly patrimonioNetto: Euro | null;
+  readonly costoDelPersonale: Euro | null;
+  readonly dipendenti: number | null;
+  readonly retribuzioneMediaLorda: Euro | null;
 }

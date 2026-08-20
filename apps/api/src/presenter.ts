@@ -156,6 +156,28 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     dannoMassimo: presentDannoMassimo(analisi),
     ritenzione: presentRitenzione(analisi),
     metricheDiImpatto: presentMetricheDiImpatto(analisi),
+    schemaMargine:
+      analisi.schemaMargine === null
+        ? null
+        : {
+            righe: analisi.schemaMargine.righe.map((r) => ({
+              voce: r.voce,
+              importoDiBilancio: money(r.importoDiBilancio),
+              quotaVariabile: r.quotaVariabile,
+              effetto: money(r.effetto),
+              motivazione: r.motivazione,
+            })),
+            margineDiContribuzione: money(analisi.schemaMargine.margineDiContribuzione),
+            incidenzaSuRicavi: analisi.schemaMargine.incidenzaSuRicavi,
+          },
+    andamentoPluriennale: analisi.andamentoPluriennale.map((e) => ({
+      anno: e.anno,
+      valoreDellaProduzione: moneyOrNull(e.valoreDellaProduzione),
+      patrimonioNetto: moneyOrNull(e.patrimonioNetto),
+      costoDelPersonale: moneyOrNull(e.costoDelPersonale),
+      dipendenti: e.dipendenti,
+      retribuzioneMediaLorda: moneyOrNull(e.retribuzioneMediaLorda),
+    })),
     prevenzione: analisi.prevenzione,
     catNat: presentCatNat(analisi),
     assetto: presentAssetto(analisi),

@@ -2,6 +2,7 @@ import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
 import { analizzaAzienda, leggiStudio } from '@/lib/api';
 import type { AnalisiDto, DatiStudio, GapDto } from '@/lib/api';
+import { AnalisiEconomica } from './AnalisiEconomica';
 import { MetricheDiImpatto } from './MetricheDiImpatto';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
@@ -357,6 +358,17 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         {/* ── 3. Capitali da assicurare ──────────────────────────────────── */}
         <Capitolo
           numero="3"
+          titolo="Analisi economica"
+          nota="Andamento degli esercizi depositati e determinazione del margine di contribuzione, che è la base della somma assicuranda per i danni indiretti."
+        >
+          <AnalisiEconomica
+            andamento={analisi.andamentoPluriennale}
+            schema={analisi.schemaMargine}
+          />
+        </Capitolo>
+
+        <Capitolo
+          numero="4"
           titolo="Metriche di impatto economico"
           nota="Soglie ancorate ai dati dell'ultimo bilancio depositato. La soglia critica corrisponde alla perdita che fa scattare gli obblighi degli artt. 2446 e 2447 c.c."
         >
@@ -364,7 +376,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         </Capitolo>
 
         <Capitolo
-          numero="4"
+          numero="5"
           titolo="Determinazione dei capitali da assicurare"
           nota="I capitali sono determinati dai dati di bilancio depositati e dalle rilevazioni di intervista. Per ciascuno è indicata la base di calcolo adottata."
         >
@@ -438,7 +450,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
 
         {/* ── 4. Coperture proposte e motivazione ────────────────────────── */}
         <Capitolo
-          numero="5"
+          numero="6"
           titolo="Coperture proposte e motivazione dell’adeguatezza"
           nota="Per ciascuna copertura è indicata la ragione per cui è ritenuta adeguata alle richieste e alle esigenze rilevate, in conformità all’Allegato 4-ter del Reg. IVASS n. 40/2018."
         >
@@ -553,7 +565,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         {/* ── 5. Obbligo CAT NAT ─────────────────────────────────────────── */}
         {catNat.soggetta && (
           <Capitolo
-            numero="6"
+            numero="7"
             titolo="Obbligo assicurativo contro le calamità naturali"
             nota="L. 213/2023 art. 1 cc. 101-111 · DM MEF-MIMIT n. 18 del 30/01/2025."
           >
@@ -601,7 +613,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         )}
 
         {/* ── 6. Limiti ─────────────────────────────────────────────────── */}
-        <Capitolo numero={catNat.soggetta ? '7' : '6'} titolo="Limiti e avvertenze">
+        <Capitolo numero={catNat.soggetta ? '8' : '7'} titolo="Limiti e avvertenze">
           <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed">
             <li>
               I capitali indicati sono determinati con criteri di stima documentati e vanno confermati, per
@@ -649,6 +661,37 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
                 Firma per presa visione
               </div>
             </div>
+          </div>
+
+          {/*
+            Note legali e riservatezza.
+
+            Non è formalismo: questo documento contiene bilanci, esposizioni patrimoniali e
+            coperture in essere di un'impresa terza. Senza una clausola di riservatezza
+            circola come un allegato qualsiasi, e senza i riferimenti normativi puntuali un
+            ispettore deve dedurre da sé sotto quale disciplina è stato redatto.
+
+            Gli articoli sono quelli esatti, non un rinvio generico al regolamento: l'art. 58
+            disciplina la rilevazione di richieste ed esigenze, il 59 la coerenza della
+            proposta, e l'art. 119-ter del Codice delle assicurazioni private è la norma
+            primaria da cui entrambi discendono.
+          */}
+          <div className="mt-8 space-y-3 border-t border-bordo pt-4 text-xs leading-relaxed text-testo-debole">
+            <p>
+              <strong className="text-testo-tenue">Note legali.</strong> Il presente elaborato è
+              redatto secondo le disposizioni degli artt. 58 e 59 del Regolamento IVASS n. 40 del
+              2 agosto 2018 e dell&apos;art. 119-ter del Codice delle assicurazioni private (D.Lgs.
+              209/2005). Ogni valutazione, indice, punteggio e somma assicurata qui indicati
+              costituiscono indicazione a supporto della consulenza: non sono vincolanti e non
+              costituiscono stima né perizia.
+            </p>
+            <p>
+              <strong className="text-testo-tenue">Riservatezza.</strong> Le informazioni contenute
+              in questo documento sono riservate e destinate al solo contraente indicato. La
+              riproduzione e la diffusione a terzi non sono consentite senza autorizzazione scritta
+              dell&apos;intermediario. Chi lo ricevesse per errore è pregato di distruggerlo e di
+              darne comunicazione.
+            </p>
           </div>
         </footer>
       </article>

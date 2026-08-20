@@ -306,6 +306,10 @@ export interface AnalisiDto {
   accertamentiInCorso: boolean;
   /** Le quattro fasce di impatto, con importo e giorni di fermo equivalenti. */
   metricheDiImpatto: MetricheDiImpattoDto;
+  /** Da quali voci nasce il margine di contribuzione, e con quali quote. */
+  schemaMargine: SchemaMargineDto | null;
+  /** Serie storica: un esercizio è una fotografia, tre sono una direzione. */
+  andamentoPluriennale: AndamentoEsercizioDto[];
   /** Indicatori e qualifiche già elaborati dall'archivio camerale, compresi nel prezzo. */
   indicatoriArchivio: IndicatoriArchivioDto;
   arricchimentiPossibili: { dato: string; sbloccherebbe: string[] }[];
@@ -999,3 +1003,24 @@ export type MetricheDiImpattoDto =
       confidenza: string;
       spiegazione: ExplanationDto;
     };
+
+export interface SchemaMargineDto {
+  righe: {
+    voce: string;
+    importoDiBilancio: MoneyDto;
+    quotaVariabile: number | null;
+    effetto: MoneyDto;
+    motivazione: string;
+  }[];
+  margineDiContribuzione: MoneyDto;
+  incidenzaSuRicavi: number | null;
+}
+
+export interface AndamentoEsercizioDto {
+  anno: number;
+  valoreDellaProduzione: MoneyDto | null;
+  patrimonioNetto: MoneyDto | null;
+  costoDelPersonale: MoneyDto | null;
+  dipendenti: number | null;
+  retribuzioneMediaLorda: MoneyDto | null;
+}

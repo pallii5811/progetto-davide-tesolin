@@ -16,6 +16,7 @@ export * from './shared/math.js';
 // ── Azienda ──────────────────────────────────────────────────────────────────
 export * from './company/profile.js';
 export * from './company/financials.js';
+export * from './company/schema-margine.js';
 export * from './company/indicators.js';
 export * from './company/indicatori-fornitore.js';
 export * from './company/size.js';
