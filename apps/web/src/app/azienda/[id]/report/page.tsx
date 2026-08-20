@@ -6,6 +6,7 @@ import { AnalisiEconomica } from './AnalisiEconomica';
 import { MetricheDiImpatto } from './MetricheDiImpatto';
 import { ContestoUbicazioni } from './ContestoUbicazioni';
 import { ImmaginiUbicazioni } from './ImmaginiUbicazioni';
+import { SelezioneRischi } from './SelezioneRischi';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 
@@ -19,9 +20,32 @@ export const dynamic = 'force-dynamic';
  * poi coperture proposte, poi motivazione per ciascuna — e non l'ordine con cui i dati sono
  * comodi da mostrare a schermo.
  */
-export default async function PaginaReport({ params }: { params: Promise<{ id: string }> }) {
+export default async function PaginaReport({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ escludi?: string }>;
+}) {
   await richiediSessione();
   const { id } = await params;
+
+  /*
+    Quali rischi lasciare fuori dal documento, presi dall'indirizzo.
+
+    Nell'indirizzo e non in archivio, deliberatamente. La selezione è una scelta di
+    **questa** consegna — «al cliente porto la parte property, la RC la vediamo la
+    settimana prossima» — non una proprietà dell'azienda: memorizzarla significherebbe
+    che il report successivo esce mutilato senza che nessuno se lo ricordi. Così invece
+    l'indirizzo è il documento: si copia, si rifà identico, e ricaricando senza parametri
+    si torna al report intero.
+  */
+  const esclusi = new Set(
+    ((await searchParams).escludi ?? '')
+      .split(',')
+      .map((r) => r.trim())
+      .filter((r) => r !== ''),
+  );
 
   let analisi: AnalisiDto;
   try {
@@ -34,7 +58,22 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
     );
   }
 
-  const { azienda, sintesi, catNat, gap, rischi, assetto, ubicazioni } = analisi;
+  const { azienda, sintesi, catNat, gap, rischi: tuttiIRischi, assetto, ubicazioni } = analisi;
+
+  /*
+    La selezione **si dichiara sempre nel documento**, e questa è la differenza che conta.
+
+    Questo report è la documentazione di adeguatezza ai sensi dell'art. 58 del Reg. IVASS
+    40/2018: è la carta che difende l'intermediario davanti a una contestazione e davanti
+    a un'ispezione. Poter togliere dei rischi è comodo e le piattaforme concorrenti lo
+    permettono; toglierli **in silenzio** trasformerebbe quella carta in un documento che
+    sembra completo e non lo è — contro l'intermediario stesso, il giorno in cui il
+    cliente chiede perché di quel rischio non si è mai parlato.
+
+    Quindi: si escludono, e il documento scrive quali e quanti.
+  */
+  const rischi = tuttiIRischi.filter((r) => !esclusi.has(r.id));
+  const rischiEsclusi = tuttiIRischi.filter((r) => esclusi.has(r.id));
 
   /*
     Chi ha redatto il documento.
@@ -84,6 +123,16 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         </Link>
         <BottoneStampa />
       </div>
+
+      <SelezioneRischi
+        rischi={tuttiIRischi.map((r) => ({
+          id: r.id,
+          etichetta: r.etichetta,
+          categoriaEtichetta: r.categoriaEtichetta,
+          livelloResiduo: r.livelloResiduo,
+        }))}
+        esclusi={[...esclusi]}
+      />
 
       <article className="mx-auto max-w-[52rem] leading-relaxed">
         {/* ── Frontespizio ───────────────────────────────────────────────── */}
@@ -182,22 +231,21 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
                 Rispetto alle coperture attualmente in essere restano{' '}
                 <strong>
                   {sintesi.coperturaDaQuantificare}{' '}
-                  {sintesi.coperturaDaQuantificare === 1 ? 'garanzia' : 'garanzie'} il cui capitale
-                  non è determinabile
+                  {sintesi.coperturaDaQuantificare === 1 ? 'garanzia' : 'garanzie'} il cui capitale non è
+                  determinabile
                 </strong>{' '}
-                con i dati oggi disponibili: l&apos;entità dell&apos;esposizione residua sarà
-                quantificata al completamento della rilevazione.
+                con i dati oggi disponibili: l&apos;entità dell&apos;esposizione residua sarà quantificata
+                al completamento della rilevazione.
               </>
             ) : (
               <>
-                Rispetto alle coperture attualmente in essere residua un&apos;esposizione non
-                assicurata di <strong>{sintesi.esposizioneNonAssicurata.formattato}</strong>
+                Rispetto alle coperture attualmente in essere residua un&apos;esposizione non assicurata di{' '}
+                <strong>{sintesi.esposizioneNonAssicurata.formattato}</strong>
                 {sintesi.incidenzaEsposizioneSuPatrimonio !== null && (
                   <>
                     , pari al{' '}
                     <strong>
-                      {Math.round(sintesi.incidenzaEsposizioneSuPatrimonio * 100)}% del patrimonio
-                      netto
+                      {Math.round(sintesi.incidenzaEsposizioneSuPatrimonio * 100)}% del patrimonio netto
                     </strong>{' '}
                     aziendale
                   </>
@@ -256,9 +304,8 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
                 <p className="mb-2">
                   {ubicazioni.unicoComplesso ? (
                     <>
-                      Le ubicazioni esaminate costituiscono un <strong>unico complesso</strong>: un
-                      singolo evento può raggiungerle tutte, e i capitali sono stati considerati
-                      cumulativamente.
+                      Le ubicazioni esaminate costituiscono un <strong>unico complesso</strong>: un singolo
+                      evento può raggiungerle tutte, e i capitali sono stati considerati cumulativamente.
                     </>
                   ) : (
                     <>
@@ -267,8 +314,8 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
                       {ubicazioni.distanzaMassimaKm !== null && (
                         <> , fino a {ubicazioni.distanzaMassimaKm} km di distanza</>
                       )}
-                      : il danno massimo è stato stimato sul complesso più esposto e non sulla
-                      somma dei capitali.
+                      : il danno massimo è stato stimato sul complesso più esposto e non sulla somma dei
+                      capitali.
                     </>
                   )}
                 </p>
@@ -306,16 +353,14 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
                           }`,
                       )
                       .join(', ')}
-                    .
-                    {!assetto.compagineCompleta && ' Le quote note non coprono l’intero capitale.'}
+                    .{!assetto.compagineCompleta && ' Le quote note non coprono l’intero capitale.'}
                   </>
                 )}
               </p>
 
               {assetto.implicazioni.map((implicazione) => (
                 <p key={implicazione.titolo} className="mb-2">
-                  <strong>{implicazione.titolo}.</strong> {implicazione.conseguenza}{' '}
-                  {implicazione.azione}
+                  <strong>{implicazione.titolo}.</strong> {implicazione.conseguenza} {implicazione.azione}
                   {implicazione.riferimento !== null && (
                     <span className="text-testo-tenue"> ({implicazione.riferimento})</span>
                   )}
@@ -324,9 +369,8 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
 
               {!assetto.caricheDisponibili && (
                 <p className="text-testo-tenue">
-                  Le cariche sociali non sono comprese nei dati acquisiti: l&apos;individuazione
-                  nominativa degli amministratori assicurati dalla D&amp;O richiede la loro
-                  rilevazione.
+                  Le cariche sociali non sono comprese nei dati acquisiti: l&apos;individuazione nominativa
+                  degli amministratori assicurati dalla D&amp;O richiede la loro rilevazione.
                 </p>
               )}
             </div>
@@ -345,6 +389,36 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
             misure di prevenzione e protezione già adottate dall&apos;impresa, ed è il solo oggetto della
             proposta assicurativa.
           </p>
+
+          {/*
+            L'esclusione è dichiarata **dentro** il documento, non solo a schermo.
+
+            Questo report è la documentazione di adeguatezza dell'art. 58 del Reg. IVASS
+            40/2018. Una selezione taciuta produrrebbe una carta che sembra completa e non
+            lo è: sembrerebbe che quei rischi non siano stati rilevati, invece che non
+            riportati. Il giorno in cui il cliente chiede perché di quel rischio non si è
+            mai parlato, la differenza fra le due cose è tutto ciò che l'intermediario ha.
+          */}
+          {rischiEsclusi.length > 0 && (
+            <div className="print-keep mb-4 border-l-2 border-attenzione pl-3">
+              <p className="text-sm font-semibold">
+                Documento parziale: {rischiEsclusi.length}{' '}
+                {rischiEsclusi.length === 1 ? 'rischio rilevato non è' : 'rischi rilevati non sono'}{' '}
+                riportati in questa copia
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-testo-tenue">
+                Su richiesta dell&apos;intermediario questa copia espone{' '}
+                {tuttiIRischi.length - rischiEsclusi.length} dei {tuttiIRischi.length} rischi rilevati.{' '}
+                <strong>L&apos;esclusione riguarda la presentazione, non la valutazione</strong>: i rischi
+                qui sotto elencati sono stati identificati e valutati, e restano nel fascicolo
+                dell&apos;analisi.
+              </p>
+              <p className="mt-1.5 text-sm">
+                <span className="text-testo-tenue">Non riportati: </span>
+                {rischiEsclusi.map((r) => r.etichetta).join(' · ')}
+              </p>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -387,10 +461,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           titolo="Analisi economica"
           nota="Andamento degli esercizi depositati e determinazione del margine di contribuzione, che è la base della somma assicuranda per i danni indiretti."
         >
-          <AnalisiEconomica
-            andamento={analisi.andamentoPluriennale}
-            schema={analisi.schemaMargine}
-          />
+          <AnalisiEconomica andamento={analisi.andamentoPluriennale} schema={analisi.schemaMargine} />
         </Capitolo>
 
         <Capitolo
@@ -734,19 +805,17 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
           */}
           <div className="mt-8 space-y-3 border-t border-bordo pt-4 text-xs leading-relaxed text-testo-debole">
             <p>
-              <strong className="text-testo-tenue">Note legali.</strong> Il presente elaborato è
-              redatto secondo le disposizioni degli artt. 58 e 59 del Regolamento IVASS n. 40 del
-              2 agosto 2018 e dell&apos;art. 119-ter del Codice delle assicurazioni private (D.Lgs.
-              209/2005). Ogni valutazione, indice, punteggio e somma assicurata qui indicati
-              costituiscono indicazione a supporto della consulenza: non sono vincolanti e non
-              costituiscono stima né perizia.
+              <strong className="text-testo-tenue">Note legali.</strong> Il presente elaborato è redatto
+              secondo le disposizioni degli artt. 58 e 59 del Regolamento IVASS n. 40 del 2 agosto 2018 e
+              dell&apos;art. 119-ter del Codice delle assicurazioni private (D.Lgs. 209/2005). Ogni
+              valutazione, indice, punteggio e somma assicurata qui indicati costituiscono indicazione a
+              supporto della consulenza: non sono vincolanti e non costituiscono stima né perizia.
             </p>
             <p>
-              <strong className="text-testo-tenue">Riservatezza.</strong> Le informazioni contenute
-              in questo documento sono riservate e destinate al solo contraente indicato. La
-              riproduzione e la diffusione a terzi non sono consentite senza autorizzazione scritta
-              dell&apos;intermediario. Chi lo ricevesse per errore è pregato di distruggerlo e di
-              darne comunicazione.
+              <strong className="text-testo-tenue">Riservatezza.</strong> Le informazioni contenute in
+              questo documento sono riservate e destinate al solo contraente indicato. La riproduzione e la
+              diffusione a terzi non sono consentite senza autorizzazione scritta dell&apos;intermediario.
+              Chi lo ricevesse per errore è pregato di distruggerlo e di darne comunicazione.
             </p>
           </div>
         </footer>
@@ -790,8 +859,7 @@ function TabellaSintesi({ analisi }: { analisi: AnalisiDto }) {
     ['Patrimonio esposto', analisi.sintesi.patrimonioEsposto?.formattato ?? 'da rilevare'],
     [
       'Esposizione non assicurata',
-      analisi.sintesi.esposizioneNonAssicurata.euro === 0 &&
-      analisi.sintesi.coperturaDaQuantificare > 0
+      analisi.sintesi.esposizioneNonAssicurata.euro === 0 && analisi.sintesi.coperturaDaQuantificare > 0
         ? 'da quantificare'
         : analisi.sintesi.esposizioneNonAssicurata.formattato,
     ],

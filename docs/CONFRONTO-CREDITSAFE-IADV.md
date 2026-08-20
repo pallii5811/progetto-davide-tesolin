@@ -60,7 +60,7 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 | Mappatura per aree con scelta delle priorità | **sì** | registro rischi con priorità e piano d'azione |
 | **Tre livelli di profondità per area di rischio** | **no** | l'analisi ha una profondità sola |
 | **Condivisione del questionario con il cliente** | **no** | l'intervista la compila solo l'intermediario |
-| **Selezione di quali rischi portare nel report** | **no** | il report contiene tutto |
+| **Selezione di quali rischi portare nel report** | **sì** | e ogni esclusione è dichiarata nel documento: loro non lo fanno |
 | Scala di impatto economico a quattro fasce, con giorni di fermo | **sì** | e le soglie sono motivate: la più grave è l'art. 2446 c.c. Loro non le motivano |
 | Analisi economica pluriennale e schema del margine di contribuzione | **sì** | lo schema quadra col totale per costruzione, non per riimplementazione |
 | **Analisi del contesto per ubicazione** (soccorso, attività confinanti) | **sì** | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap |
@@ -116,8 +116,9 @@ In ordine di valore.
 2. **Titolare effettivo**: il servizio esiste (1,10 € a chiamata, 0,88 € a volume). È
    parità con Creditsafe ed è un obbligo antiriciclaggio per l'intermediario.
 3. **Sessione con il broker**, con il prodotto in mano e nessuna spiegazione preventiva.
-4. Poi, in ordine decrescente: ~~esportazione elenchi~~ (**fatta il 20/08/2026**), tre
-   livelli di profondità, condivisione del questionario, selezione dei contenuti del report.
+4. Poi, in ordine decrescente: ~~esportazione elenchi~~ e ~~selezione dei contenuti del
+   report~~ (**fatte il 20/08/2026**), tre livelli di profondità, condivisione del
+   questionario.
 
 ### Le due voci del loro report ancora aperte
 
