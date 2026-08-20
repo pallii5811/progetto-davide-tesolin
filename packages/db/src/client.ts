@@ -287,6 +287,21 @@ const DDL: readonly string[] = [
     aggiornato_il timestamptz NOT NULL DEFAULT now()
   )`,
 
+  `CREATE TABLE IF NOT EXISTS inviti_questionario (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    azienda_id uuid NOT NULL REFERENCES aziende(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    impronta text NOT NULL,
+    creato_da uuid REFERENCES utenti(id),
+    creato_il timestamptz NOT NULL DEFAULT now(),
+    scade_il timestamptz NOT NULL,
+    compilato_il timestamptz,
+    revocato_il timestamptz
+  )`,
+
+  `CREATE UNIQUE INDEX IF NOT EXISTS inviti_per_impronta ON inviti_questionario (impronta)`,
+  `CREATE INDEX IF NOT EXISTS inviti_per_azienda ON inviti_questionario (azienda_id)`,
+
   `CREATE TABLE IF NOT EXISTS immagini_ubicazione (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     azienda_id uuid NOT NULL REFERENCES aziende(id) ON DELETE CASCADE,

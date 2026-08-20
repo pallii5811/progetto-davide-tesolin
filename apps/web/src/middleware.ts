@@ -15,7 +15,20 @@ import type { NextRequest } from 'next/server';
  * accerta l'API, che resta il vero cancello. Tre strati, nessuno dei quali si fida
  * dell'altro — ed è così che deve essere.
  */
-const PUBBLICI = ['/accedi'];
+/*
+  Le due porte che si aprono senza sessione.
+
+  `/questionario/` è il collegamento che l'intermediario manda al proprio cliente: chi lo
+  apre **non ha e non deve avere** un accesso alla piattaforma. L'autorizzazione è il token
+  nell'indirizzo, e a verificarla è l'API — che dal token ricava l'azienda e
+  l'intermediario, e non espone nient'altro.
+
+  Dimenticarlo qui non produce un guasto visibile dal lato dell'intermediario: il
+  collegamento si genera, sembra tutto a posto, e il cliente riceve una schermata di
+  accesso a un prodotto che non ha mai comprato. Nessuna prova sull'API se ne accorge,
+  perché l'API funzionava.
+*/
+const PUBBLICI = ['/accedi', '/questionario'];
 
 export function middleware(request: NextRequest): NextResponse {
   const percorso = request.nextUrl.pathname;

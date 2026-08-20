@@ -290,6 +290,60 @@ export const dossier = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Inviti a compilare il questionario
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Il collegamento con cui il cliente compila da sé la propria intervista.
+ *
+ * Oggi il questionario lo compila l'intermediario, al telefono o in visita, e i campi che
+ * richiedono un dato che solo l'azienda conosce — le scorte in magazzino, i veicoli, se si
+ * lavora in cantiere — restano vuoti. Mandare il collegamento al cliente sposta la
+ * compilazione su chi ha la risposta.
+ *
+ * ## Perché somiglia a una sessione, e non a una chiave
+ *
+ * Questo collegamento apre una porta **senza autenticazione**: chi ce l'ha entra. Valgono
+ * quindi le stesse tre difese delle sessioni:
+ *
+ *  - in tabella c'è l'**impronta** del token, mai il token. Chi legge una copia
+ *    dell'archivio non ottiene collegamenti funzionanti;
+ *  - **scade**, perché un collegamento in fondo a una casella di posta non deve restare
+ *    valido per sempre;
+ *  - si **revoca**, perché un indirizzo sbagliato o un cliente che cambia referente sono
+ *    situazioni normali, non incidenti.
+ *
+ * ## Perché non è fra le tabelle con isolamento per intermediario
+ *
+ * L'esclusione è **deliberata**, come per `sessioni`: il collegamento va risolto *prima* di
+ * sapere per conto di chi si sta lavorando — è il token stesso a dirlo. Una policy che
+ * filtrasse per `app.tenant_id` renderebbe la riga invisibile proprio nel momento in cui
+ * serve. L'isolamento è garantito dopo: dal token si ricava il tenant, e da lì in poi ogni
+ * accesso passa dal contesto giusto.
+ */
+export const invitiQuestionario = pgTable(
+  'inviti_questionario',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    aziendaId: uuid('azienda_id')
+      .notNull()
+      .references(() => aziende.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** `sha256` del token. Il token esiste una volta sola, nella risposta che lo crea. */
+    impronta: text('impronta').notNull(),
+    creatoDa: uuid('creato_da').references(() => utenti.id),
+    creatoIl: timestamp('creato_il', { withTimezone: true }).notNull().defaultNow(),
+    scadeIl: timestamp('scade_il', { withTimezone: true }).notNull(),
+    /** Ultima compilazione da parte del cliente: dice all'intermediario se aspettare. */
+    compilatoIl: timestamp('compilato_il', { withTimezone: true }),
+    revocatoIl: timestamp('revocato_il', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('inviti_per_impronta').on(t.impronta), index('inviti_per_azienda').on(t.aziendaId)],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Immagini delle ubicazioni
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -57,3 +57,67 @@ export async function salvaDossier(
     };
   }
 }
+
+/**
+ * Genera il collegamento da mandare al cliente.
+ *
+ * Il token torna **una volta sola**, in questa risposta: in archivio ne resta l'impronta.
+ * Chi non lo copia adesso non lo recupera — ne genera un altro, e il precedente decade.
+ */
+export async function creaInvitoQuestionario(
+  identificativo: string,
+): Promise<{ ok: boolean; messaggio: string; token?: string; scadeIl?: string }> {
+  try {
+    const risposta = await chiamaApiConSessione(
+      `/api/aziende/${encodeURIComponent(identificativo)}/questionario/invito`,
+      { metodo: 'POST', corpo: {} },
+    );
+
+    const corpo = (await risposta.json().catch(() => ({}))) as {
+      errore?: string;
+      token?: string;
+      scadeIl?: string;
+    };
+
+    if (!risposta.ok || corpo.token === undefined) {
+      return { ok: false, messaggio: corpo.errore ?? `Errore ${risposta.status}` };
+    }
+
+    revalidatePath(`/azienda/${identificativo}/dati`);
+    return {
+      ok: true,
+      messaggio: 'Collegamento generato.',
+      token: corpo.token,
+      ...(corpo.scadeIl === undefined ? {} : { scadeIl: corpo.scadeIl }),
+    };
+  } catch (errore) {
+    return {
+      ok: false,
+      messaggio: errore instanceof Error ? errore.message : 'Impossibile contattare il servizio',
+    };
+  }
+}
+
+export async function revocaInvitoQuestionario(
+  identificativo: string,
+): Promise<{ ok: boolean; messaggio: string }> {
+  try {
+    const risposta = await chiamaApiConSessione(
+      `/api/aziende/${encodeURIComponent(identificativo)}/questionario/invito`,
+      { metodo: 'DELETE' },
+    );
+
+    if (!risposta.ok) {
+      const corpo = (await risposta.json().catch(() => ({}))) as { errore?: string };
+      return { ok: false, messaggio: corpo.errore ?? `Errore ${risposta.status}` };
+    }
+
+    revalidatePath(`/azienda/${identificativo}/dati`);
+    return { ok: true, messaggio: 'Collegamento revocato: non apre più nulla.' };
+  } catch (errore) {
+    return {
+      ok: false,
+      messaggio: errore instanceof Error ? errore.message : 'Impossibile contattare il servizio',
+    };
+  }
+}

@@ -76,11 +76,20 @@ import {
 } from './schemas.js';
 // L'anagrafe delle compagnie è condivisa fra intermediari: non passa dal contesto tenant.
 import {
+  assicuraAzienda,
+  chiaveAzienda,
+  creaInvito,
   elencoSolidita,
+  invitoAttivo,
+  registraAudit,
+  revocaInviti,
+  risolviInvito,
   salvaSolidita,
+  segnaInvitoCompilato,
   spesaComplessiva,
   spesaOdierna,
   spesaOdiernaComplessiva,
+  trovaAziendaPerChiave,
 } from '@aegis/db';
 import { MemoryDossierStore, MemoryImmaginiStore, MemoryPortafoglioStore } from './store.js';
 import type { DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
@@ -335,9 +344,23 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   // ── Guardia di autenticazione ──────────────────────────────────────────────
   const ROTTE_PUBBLICHE = new Set(['/health', '/api/auth/login', '/api/auth/stato']);
 
+  /*
+    Il questionario compilato dal cliente è l'unica famiglia di rotte pubbliche con un
+    prefisso variabile: il token sta nell'indirizzo.
+
+    Il confronto è su `/api/questionario/` con la barra finale, non su `/api/questionario`:
+    senza, un domani una rotta `/api/questionario-interno` sarebbe pubblica per un
+    accidente di prefisso. Chi entra da qui non è autenticato, quindi ogni rotta sotto
+    questo prefisso deve esporre **solo** il questionario dell'azienda a cui il token si
+    riferisce — mai l'analisi, mai il portafoglio, mai un'altra azienda.
+  */
+  const PREFISSO_QUESTIONARIO_PUBBLICO = '/api/questionario/';
+
   app.addHook('preHandler', async (request, reply) => {
     if (!autenticazioneRichiesta) return;
-    if (ROTTE_PUBBLICHE.has(request.url.split('?')[0] ?? '')) return;
+    const percorso = request.url.split('?')[0] ?? '';
+    if (ROTTE_PUBBLICHE.has(percorso)) return;
+    if (percorso.startsWith(PREFISSO_QUESTIONARIO_PUBBLICO)) return;
 
     const token = request.cookies[NOME_COOKIE_SESSIONE];
     if (token === undefined || token === '') {
@@ -1290,27 +1313,24 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     scaricare una lista diversa da quella che si sta guardando è il tipo di sorpresa che si
     scopre davanti al cliente.
   */
-  app.get<{ Querystring: { filtro?: string } }>(
-    '/api/portafoglio/esporta',
-    async (request, reply) => {
-      const voci = await contestoDi(request).portafoglio.elenco();
-      const filtrate = applicaFiltroPortafoglio(voci, request.query.filtro);
-      const csv = esportaPortafoglioCsv(filtrate);
+  app.get<{ Querystring: { filtro?: string } }>('/api/portafoglio/esporta', async (request, reply) => {
+    const voci = await contestoDi(request).portafoglio.elenco();
+    const filtrate = applicaFiltroPortafoglio(voci, request.query.filtro);
+    const csv = esportaPortafoglioCsv(filtrate);
 
-      /*
+    /*
         `text/csv` con l'accento dichiarato, e il nome del file nell'intestazione: senza
         `Content-Disposition` il browser mostrerebbe il CSV a schermo invece di salvarlo,
         e con i punti e virgola sarebbe illeggibile.
       */
-      return reply
-        .header('Content-Type', 'text/csv; charset=utf-8')
-        .header(
-          'Content-Disposition',
-          `attachment; filename="${nomeFileEsportazione(new Date(), request.query.filtro)}"`,
-        )
-        .send(csv);
-    },
-  );
+    return reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header(
+        'Content-Disposition',
+        `attachment; filename="${nomeFileEsportazione(new Date(), request.query.filtro)}"`,
+      )
+      .send(csv);
+  });
 
   // ── Presa in carico massiva del portafoglio ────────────────────────────────
 
@@ -1507,6 +1527,206 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         polizze: [],
       }
     );
+  });
+
+  // ── Questionario compilato dal cliente ─────────────────────────────────────
+  /*
+    Oggi l'intervista la compila l'intermediario, e i campi che richiedono un dato che solo
+    l'azienda conosce — le scorte, i veicoli, se si lavora in cantiere — restano vuoti. Il
+    collegamento sposta la compilazione su chi ha la risposta.
+
+    Il token viaggia **una volta sola**, nella risposta che lo crea: in archivio ne resta
+    l'impronta. È la stessa regola delle password iniziali, e per la stessa ragione — se un
+    domani qualcuno legge una copia del database, non ottiene collegamenti funzionanti.
+  */
+  const DURATA_INVITO_MS = 30 * 24 * 60 * 60 * 1000;
+
+  app.post<{ Params: { id: string } }>('/api/aziende/:id/questionario/invito', async (request, reply) => {
+    if (persistenza === undefined) {
+      return reply
+        .status(503)
+        .send({ errore: 'Il questionario condiviso richiede la persistenza su database.' });
+    }
+
+    const sessione = request.sessione;
+    const tenantId = sessione?.tenantId ?? persistenza.tenantPredefinito;
+
+    const aziendaId = await assicuraAzienda(persistenza.db, tenantId, {
+      partitaIva: request.params.id,
+      codiceFiscale: null,
+      denominazione: request.params.id,
+      providerId: request.params.id,
+      provincia: null,
+      atecoPrimario: null,
+    });
+
+    const token = generaTokenSessione();
+    const invito = await creaInvito(persistenza.db, {
+      aziendaId,
+      tenantId,
+      impronta: improntaToken(token),
+      scadeIl: new Date(Date.now() + DURATA_INVITO_MS),
+      creatoDa: sessione?.utenteId ?? null,
+    });
+
+    await registraAudit(persistenza.db, {
+      tenantId,
+      azione: 'questionario.invito-creato',
+      entita: 'azienda',
+      entitaId: aziendaId,
+      dettagli: { invitoId: invito.id, scadeIl: invito.scadeIl.toISOString() },
+    });
+
+    // Il token compare qui e mai più: chi non lo copia adesso ne genera un altro.
+    return reply.status(201).send({ token, scadeIl: invito.scadeIl.toISOString() });
+  });
+
+  app.get<{ Params: { id: string } }>('/api/aziende/:id/questionario/invito', async (request) => {
+    if (persistenza === undefined) return { invito: null };
+
+    const tenantId = request.sessione?.tenantId ?? persistenza.tenantPredefinito;
+    const aziendaId = await trovaAziendaPerChiave(persistenza.db, tenantId, request.params.id);
+    if (aziendaId === null) return { invito: null };
+
+    const invito = await invitoAttivo(persistenza.db, aziendaId);
+    return {
+      invito:
+        invito === null
+          ? null
+          : {
+              creatoIl: invito.creatoIl.toISOString(),
+              scadeIl: invito.scadeIl.toISOString(),
+              compilatoIl: invito.compilatoIl?.toISOString() ?? null,
+            },
+    };
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/aziende/:id/questionario/invito', async (request, reply) => {
+    if (persistenza === undefined) return reply.status(404).send({ errore: 'Nessun invito' });
+
+    const tenantId = request.sessione?.tenantId ?? persistenza.tenantPredefinito;
+    const aziendaId = await trovaAziendaPerChiave(persistenza.db, tenantId, request.params.id);
+    if (aziendaId === null) return reply.status(404).send({ errore: 'Nessun invito' });
+
+    const revocati = await revocaInviti(persistenza.db, tenantId, aziendaId);
+    if (revocati > 0) {
+      await registraAudit(persistenza.db, {
+        tenantId,
+        azione: 'questionario.invito-revocato',
+        entita: 'azienda',
+        entitaId: aziendaId,
+        dettagli: { quanti: revocati },
+      });
+    }
+    return { revocati };
+  });
+
+  /*
+    ── Porta pubblica ────────────────────────────────────────────────────────
+
+    Da qui entra chi ha il collegamento, e nessun altro controllo lo protegge. Due regole
+    che non vanno allentate:
+
+     1. **Si espone solo il questionario** dell'azienda a cui il token si riferisce: la
+        denominazione, i dati di intervista e le polizze dichiarate. Mai lo score, mai
+        l'analisi, mai il portafoglio, mai un'altra azienda.
+     2. **Invito assente, scaduto e revocato danno la stessa risposta.** Distinguerli
+        direbbe a chi prova collegamenti a caso quando ne ha trovato uno che è esistito.
+  */
+  const invitoDa = async (token: string) => {
+    if (persistenza === undefined) return null;
+    const invito = await risolviInvito(persistenza.db, improntaToken(token));
+    if (invito === null) return null;
+
+    const azienda = await chiaveAzienda(persistenza.db, invito.aziendaId);
+    if (azienda === null) return null;
+
+    /*
+      Il database viaggia insieme al risultato.
+
+      Dentro questo ramo la persistenza esiste per costruzione, ma affermarlo più avanti
+      con un punto esclamativo sarebbe una promessa non verificata: fra sei mesi qualcuno
+      sposta il controllo e resta l'asserzione.
+    */
+    return {
+      invito,
+      azienda,
+      db: persistenza.db,
+      contesto: persistenza.perTenant(invito.tenantId),
+    };
+  };
+
+  app.get<{ Params: { token: string } }>('/api/questionario/:token', async (request, reply) => {
+    const risolto = await invitoDa(request.params.token);
+    if (risolto === null) {
+      return reply.status(404).send({ errore: 'Collegamento non valido o scaduto' });
+    }
+
+    const [dossier, studio] = await Promise.all([
+      risolto.contesto.dossier.get(risolto.azienda.chiave),
+      risolto.contesto.studio.leggi().catch(() => null),
+    ]);
+
+    /*
+      La pagina la apre il cliente **dell'intermediario**, non il nostro.
+
+      Deve quindi portare il marchio dello studio, come il report: senza, chi compila si
+      trova davanti il nome di un fornitore che non ha mai scelto e non sa se fidarsi. Sono
+      dati che l'intermediario mette su ogni documento — denominazione e numero RUI — non
+      informazioni riservate.
+    */
+    return {
+      denominazione: risolto.azienda.denominazione,
+      scadeIl: risolto.invito.scadeIl.toISOString(),
+      studio:
+        studio === null
+          ? null
+          : {
+              denominazione: studio.denominazione,
+              logo: studio.logo,
+              numeroRui: studio.numeroRui,
+            },
+      datiDichiarati: dossier?.datiDichiarati ?? null,
+      polizze: dossier?.polizze ?? [],
+    };
+  });
+
+  app.put<{ Params: { token: string } }>('/api/questionario/:token', async (request, reply) => {
+    const risolto = await invitoDa(request.params.token);
+    if (risolto === null) {
+      return reply.status(404).send({ errore: 'Collegamento non valido o scaduto' });
+    }
+
+    const parsed = analisiRequestSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi', dettagli: parsed.error.issues });
+    }
+
+    const dossier = await risolto.contesto.dossier.upsert(risolto.azienda.chiave, {
+      ...(parsed.data.datiDichiarati === undefined
+        ? {}
+        : { datiDichiarati: toDatiDichiarati(parsed.data.datiDichiarati) }),
+      ...(parsed.data.polizze === undefined ? {} : { polizze: parsed.data.polizze.map(toPolizza) }),
+    });
+
+    await segnaInvitoCompilato(risolto.db, risolto.invito.id);
+
+    /*
+      A verbale che ha compilato **il cliente**, non l'intermediario.
+
+      È una distinzione che conta davanti a una contestazione: un dato dichiarato
+      dall'assicurato e uno rilevato dall'intermediario hanno un peso diverso, e a
+      distanza di anni nessuno se lo ricorda.
+    */
+    await registraAudit(risolto.db, {
+      tenantId: risolto.invito.tenantId,
+      azione: 'questionario.compilato-dal-cliente',
+      entita: 'azienda',
+      entitaId: risolto.invito.aziendaId,
+      dettagli: { invitoId: risolto.invito.id },
+    });
+
+    return { salvato: true, completezza: valutaCompletezza(dossier.datiDichiarati) };
   });
 
   // ── Immagini delle ubicazioni ──────────────────────────────────────────────

@@ -57,6 +57,13 @@
       "when": 1787223573714,
       "tag": "0007_immagini_ubicazione",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787229260897,
+      "tag": "0008_inviti_questionario",
+      "breakpoints": true
     }
   ]
 }

@@ -59,7 +59,7 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 | Report personalizzato con il proprio marchio | **sì** | logo, denominazione e numero RUI in testata |
 | Mappatura per aree con scelta delle priorità | **sì** | registro rischi con priorità e piano d'azione |
 | **Tre livelli di profondità per area di rischio** | **no** | l'analisi ha una profondità sola |
-| **Condivisione del questionario con il cliente** | **no** | l'intervista la compila solo l'intermediario |
+| **Condivisione del questionario con il cliente** | **sì** | collegamento con scadenza e revoca, con il marchio dello studio; resta a verbale che ha compilato il cliente |
 | **Selezione di quali rischi portare nel report** | **sì** | e ogni esclusione è dichiarata nel documento: loro non lo fanno |
 | Scala di impatto economico a quattro fasce, con giorni di fermo | **sì** | e le soglie sono motivate: la più grave è l'art. 2446 c.c. Loro non le motivano |
 | Analisi economica pluriennale e schema del margine di contribuzione | **sì** | lo schema quadra col totale per costruzione, non per riimplementazione |
@@ -116,9 +116,9 @@ In ordine di valore.
 2. **Titolare effettivo**: il servizio esiste (1,10 € a chiamata, 0,88 € a volume). È
    parità con Creditsafe ed è un obbligo antiriciclaggio per l'intermediario.
 3. **Sessione con il broker**, con il prodotto in mano e nessuna spiegazione preventiva.
-4. Poi, in ordine decrescente: ~~esportazione elenchi~~ e ~~selezione dei contenuti del
-   report~~ (**fatte il 20/08/2026**), tre livelli di profondità, condivisione del
-   questionario.
+4. ~~Esportazione elenchi~~, ~~selezione dei contenuti del report~~ e ~~condivisione del
+   questionario~~: **fatte il 20/08/2026**. Resta la profondità a tre livelli per area di
+   rischio.
 
 ### Le due voci del loro report ancora aperte
 

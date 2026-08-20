@@ -1,38 +1,25 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
-import { analizzaAzienda, leggiDossier } from '@/lib/api';
+import { analizzaAzienda, leggiDossier, leggiInvitoQuestionario } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { EditorDossier } from './EditorDossier';
-import type { DatiForm, ImmobileForm, PolizzaForm } from './EditorDossier';
+import { convertiPolizze, unisciDati } from './modulo';
 import { salvaDossier } from './actions';
+import { CollegamentoQuestionario } from './CollegamentoQuestionario';
 
 export const dynamic = 'force-dynamic';
-
-const DATI_VUOTI: DatiForm = {
-  immobili: [],
-  numeroVeicoli: null,
-  numeroDipendenti: null,
-  quotaExportPercentuale: null,
-  esportaVersoUsaCanada: null,
-  trattaDatiPersonali: null,
-  trattaDatiParticolari: null,
-  haSitoEcommerce: null,
-  haModello231: null,
-  certificazioni: [],
-  concentrazionePrimoCliente: null,
-  lavoraInCantiere: null,
-  produceBeniFinali: null,
-  trasportaMerciProprie: null,
-  periodoIndennizzoMesi: null,
-};
 
 export default async function PaginaDati({ params }: { params: Promise<{ id: string }> }) {
   await richiediSessione();
   const { id } = await params;
 
-  const [dossier, analisi] = await Promise.all([
+  const [dossier, analisi, invito] = await Promise.all([
     leggiDossier(id).catch(() => null),
     analizzaAzienda(id).catch(() => null),
+    // Senza persistenza non esistono inviti: la pagina resta intera, senza il riquadro.
+    leggiInvitoQuestionario(id)
+      .then((r) => r.invito)
+      .catch(() => null),
   ]);
 
   if (analisi === null) {
@@ -46,7 +33,7 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
     );
   }
 
-  const datiIniziali = unisci(dossier?.datiDichiarati ?? null, analisi);
+  const datiIniziali = unisciDati(dossier?.datiDichiarati ?? null, analisi.azienda.addetti);
   const polizzeIniziali = convertiPolizze(dossier?.polizze ?? []);
   const { completezza } = analisi;
 
@@ -129,6 +116,10 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
         )}
       </Scheda>
 
+      <div className="mb-6">
+        <CollegamentoQuestionario identificativo={id} invito={invito} />
+      </div>
+
       <EditorDossier
         identificativo={id}
         datiIniziali={datiIniziali}
@@ -137,118 +128,4 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
       />
     </>
   );
-}
-
-/**
- * Precompila il modulo con quanto già noto.
- * I dati salvati dall'intermediario prevalgono; in loro assenza si usa ciò che l'analisi
- * ha già dedotto, così che il broker confermi invece di ridigitare.
- */
-function unisci(
-  salvati: Record<string, unknown> | null,
-  analisi: { azienda: { addetti: number | null } },
-): DatiForm {
-  const base: DatiForm = {
-    ...DATI_VUOTI,
-    numeroDipendenti: analisi.azienda.addetti,
-  };
-
-  if (salvati === null) return base;
-
-  const immobili = Array.isArray(salvati['immobili'])
-    ? (salvati['immobili'] as Record<string, unknown>[]).map((i): ImmobileForm => ({
-        descrizione: testoOrVuoto(i['descrizione']),
-        superficieMq: numeroOrNull(i['superficieMq']),
-        titolo: unoDi(i['titolo'], TITOLI_VALIDI) ?? 'proprieta',
-        tipologiaCostruttiva: unoDi(i['tipologiaCostruttiva'], TIPOLOGIE_VALIDE),
-        annoCostruzione: numeroOrNull(i['annoCostruzione']),
-        presenzaImpiantoAntincendio: booleanOrNull(i['presenzaImpiantoAntincendio']),
-        presenzaAllarme: booleanOrNull(i['presenzaAllarme']),
-      }))
-    : [];
-
-  return {
-    ...base,
-    immobili,
-    numeroVeicoli: numeroOrNull(salvati['numeroVeicoli']) ?? base.numeroVeicoli,
-    numeroDipendenti: numeroOrNull(salvati['numeroDipendenti']) ?? base.numeroDipendenti,
-    quotaExportPercentuale: numeroOrNull(salvati['quotaExportPercentuale']),
-    esportaVersoUsaCanada: booleanOrNull(salvati['esportaVersoUsaCanada']),
-    trattaDatiPersonali: booleanOrNull(salvati['trattaDatiPersonali']),
-    trattaDatiParticolari: booleanOrNull(salvati['trattaDatiParticolari']),
-    haSitoEcommerce: booleanOrNull(salvati['haSitoEcommerce']),
-    haModello231: booleanOrNull(salvati['haModello231']),
-    certificazioni: Array.isArray(salvati['certificazioni']) ? (salvati['certificazioni'] as string[]) : [],
-    concentrazionePrimoCliente: numeroOrNull(salvati['concentrazionePrimoCliente']),
-    lavoraInCantiere: booleanOrNull(salvati['lavoraInCantiere']),
-    produceBeniFinali: booleanOrNull(salvati['produceBeniFinali']),
-    trasportaMerciProprie: booleanOrNull(salvati['trasportaMerciProprie']),
-    periodoIndennizzoMesi: numeroOrNull(salvati['periodoIndennizzoMesi']),
-  };
-}
-
-/** Gli importi arrivano dal dominio in centesimi e vanno mostrati in euro. */
-function convertiPolizze(
-  polizze: {
-    id: string;
-    coverage: string;
-    compagnia: string;
-    numeroPolizza: string | null;
-    sommaAssicurata: number | null;
-    massimale: number | null;
-    franchigia: number | null;
-    premioAnnuo: number | null;
-    dataEffetto: string;
-    dataScadenza: string;
-    formaGaranzia: string | null;
-  }[],
-): PolizzaForm[] {
-  return polizze.map((p) => ({
-    id: p.id,
-    coverage: p.coverage,
-    compagnia: p.compagnia,
-    numeroPolizza: p.numeroPolizza,
-    sommaAssicurataEuro: p.sommaAssicurata === null ? null : p.sommaAssicurata / 100,
-    massimaleEuro: p.massimale === null ? null : p.massimale / 100,
-    franchigiaEuro: p.franchigia === null ? null : p.franchigia / 100,
-    premioAnnuoEuro: p.premioAnnuo === null ? null : p.premioAnnuo / 100,
-    dataEffetto: p.dataEffetto.slice(0, 10),
-    dataScadenza: p.dataScadenza.slice(0, 10),
-    formaGaranzia: p.formaGaranzia as PolizzaForm['formaGaranzia'],
-  }));
-}
-
-const TITOLI_VALIDI = ['proprieta', 'locazione', 'comodato', 'leasing', 'misto'] as const;
-const TIPOLOGIE_VALIDE = [
-  'muratura',
-  'cemento-armato',
-  'prefabbricato',
-  'acciaio',
-  'legno',
-  'misto',
-] as const;
-
-/**
- * Verifica invece di asserire.
- *
- * Il dossier arriva come JSON: un `as` direbbe al compilatore «fidati», e un valore
- * legacy o corrotto entrerebbe nel modulo producendo un menu a tendina vuoto senza che
- * nessuno se ne accorga. Qui un valore non riconosciuto diventa `null`, cioè «da rilevare».
- */
-function unoDi<T extends string>(valore: unknown, ammessi: readonly T[]): T | null {
-  return typeof valore === 'string' && (ammessi as readonly string[]).includes(valore)
-    ? (valore as T)
-    : null;
-}
-
-function testoOrVuoto(valore: unknown): string {
-  return typeof valore === 'string' ? valore : '';
-}
-
-function numeroOrNull(valore: unknown): number | null {
-  return typeof valore === 'number' && Number.isFinite(valore) ? valore : null;
-}
-
-function booleanOrNull(valore: unknown): boolean | null {
-  return typeof valore === 'boolean' ? valore : null;
 }

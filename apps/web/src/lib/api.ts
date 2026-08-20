@@ -1065,3 +1065,17 @@ export async function leggiImmaginiUbicazioni(
 ): Promise<{ immagini: ImmagineUbicazioneDto[] }> {
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/immagini`);
 }
+
+/** Lo stato del collegamento con cui il cliente compila da sé il questionario. */
+export interface InvitoQuestionarioDto {
+  creatoIl: string;
+  scadeIl: string;
+  /** Quando il cliente ha salvato l'ultima volta. `null` se non ha ancora aperto. */
+  compilatoIl: string | null;
+}
+
+export async function leggiInvitoQuestionario(
+  identificativo: string,
+): Promise<{ invito: InvitoQuestionarioDto | null }> {
+  return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/questionario/invito`);
+}

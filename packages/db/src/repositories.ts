@@ -11,7 +11,7 @@
  *    non riproducibile è indifendibile davanti a una contestazione.
  */
 
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -303,6 +303,190 @@ export async function leggiPolizze(db: Database, aziendaId: string): Promise<rea
     dataScadenza: r.dataScadenza,
     note: r.note,
   }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inviti a compilare il questionario
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface InvitoQuestionario {
+  readonly id: string;
+  readonly aziendaId: string;
+  readonly tenantId: string;
+  readonly creatoIl: Date;
+  readonly scadeIl: Date;
+  readonly compilatoIl: Date | null;
+  readonly revocatoIl: Date | null;
+}
+
+/**
+ * Crea l'invito, **revocando quelli precedenti** per la stessa azienda.
+ *
+ * Un collegamento per volta: se l'intermediario ne genera un altro è perché il primo non
+ * va bene — indirizzo sbagliato, referente cambiato, sospetto che sia finito altrove. In
+ * quel caso lasciarlo valido sarebbe esattamente il contrario di ciò che si sta facendo.
+ */
+export async function creaInvito(
+  db: Database,
+  dati: {
+    readonly aziendaId: string;
+    readonly tenantId: string;
+    readonly impronta: string;
+    readonly scadeIl: Date;
+    readonly creatoDa: string | null;
+  },
+): Promise<InvitoQuestionario> {
+  await db
+    .update(schema.invitiQuestionario)
+    .set({ revocatoIl: new Date() })
+    .where(
+      and(
+        eq(schema.invitiQuestionario.aziendaId, dati.aziendaId),
+        isNull(schema.invitiQuestionario.revocatoIl),
+      ),
+    );
+
+  const [riga] = await db
+    .insert(schema.invitiQuestionario)
+    .values({
+      aziendaId: dati.aziendaId,
+      tenantId: dati.tenantId,
+      impronta: dati.impronta,
+      scadeIl: dati.scadeIl,
+      creatoDa: dati.creatoDa,
+    })
+    .returning();
+
+  if (riga === undefined) throw new Error('Creazione dell’invito non riuscita');
+  return daRigaInvito(riga);
+}
+
+/**
+ * Risolve un invito dalla sua impronta.
+ *
+ * **Senza contesto di intermediario**, perché è il token stesso a dire di chi è: è la
+ * ragione per cui questa tabella non ha una policy di isolamento. Restituisce `null` se
+ * l'invito non esiste, è scaduto o è stato revocato — tre casi che a chi bussa devono
+ * apparire identici, altrimenti si può capire se un collegamento è esistito.
+ */
+export async function risolviInvito(
+  db: Database,
+  impronta: string,
+  adesso = new Date(),
+): Promise<InvitoQuestionario | null> {
+  const righe = await db
+    .select()
+    .from(schema.invitiQuestionario)
+    .where(eq(schema.invitiQuestionario.impronta, impronta))
+    .limit(1);
+
+  const riga = righe[0];
+  if (riga === undefined) return null;
+  if (riga.revocatoIl !== null) return null;
+  if (riga.scadeIl.getTime() <= adesso.getTime()) return null;
+
+  return daRigaInvito(riga);
+}
+
+/** L'invito attivo di un'azienda, per dire all'intermediario se c'è e a che punto è. */
+export async function invitoAttivo(
+  db: Database,
+  aziendaId: string,
+  adesso = new Date(),
+): Promise<InvitoQuestionario | null> {
+  const righe = await db
+    .select()
+    .from(schema.invitiQuestionario)
+    .where(
+      and(eq(schema.invitiQuestionario.aziendaId, aziendaId), isNull(schema.invitiQuestionario.revocatoIl)),
+    )
+    .orderBy(desc(schema.invitiQuestionario.creatoIl))
+    .limit(1);
+
+  const riga = righe[0];
+  if (riga === undefined) return null;
+  if (riga.scadeIl.getTime() <= adesso.getTime()) return null;
+  return daRigaInvito(riga);
+}
+
+export async function revocaInviti(db: Database, tenantId: string, aziendaId: string): Promise<number> {
+  const righe = await db
+    .update(schema.invitiQuestionario)
+    .set({ revocatoIl: new Date() })
+    .where(
+      and(
+        eq(schema.invitiQuestionario.aziendaId, aziendaId),
+        eq(schema.invitiQuestionario.tenantId, tenantId),
+        isNull(schema.invitiQuestionario.revocatoIl),
+      ),
+    )
+    .returning({ id: schema.invitiQuestionario.id });
+
+  return righe.length;
+}
+
+export async function segnaInvitoCompilato(db: Database, invitoId: string): Promise<void> {
+  await db
+    .update(schema.invitiQuestionario)
+    .set({ compilatoIl: new Date() })
+    .where(eq(schema.invitiQuestionario.id, invitoId));
+}
+
+/** L'identificativo di riga di un'azienda, dentro un intermediario. `null` se non c'è. */
+export async function trovaAziendaPerChiave(
+  db: Database,
+  tenantId: string,
+  chiave: string,
+): Promise<string | null> {
+  const righe = await db
+    .select({ id: schema.aziende.id })
+    .from(schema.aziende)
+    .where(and(eq(schema.aziende.tenantId, tenantId), eq(schema.aziende.partitaIva, chiave)))
+    .limit(1);
+
+  return righe[0]?.id ?? null;
+}
+
+/**
+ * Denominazione e chiave di un'azienda dal suo identificativo di riga.
+ *
+ * Serve al percorso pubblico del questionario: il token porta a un `aziendaId`, ma il
+ * dossier si indirizza con la partita IVA. Restituisce **solo** questi due campi, perché
+ * è tutto ciò che una pagina senza autenticazione ha diritto di sapere.
+ */
+export async function chiaveAzienda(
+  db: Database,
+  aziendaId: string,
+): Promise<{ readonly chiave: string; readonly denominazione: string } | null> {
+  const righe = await db
+    .select({
+      partitaIva: schema.aziende.partitaIva,
+      providerId: schema.aziende.providerId,
+      denominazione: schema.aziende.denominazione,
+    })
+    .from(schema.aziende)
+    .where(eq(schema.aziende.id, aziendaId))
+    .limit(1);
+
+  const riga = righe[0];
+  if (riga === undefined) return null;
+
+  const chiave = riga.partitaIva ?? riga.providerId;
+  if (chiave === null) return null;
+
+  return { chiave, denominazione: riga.denominazione };
+}
+
+function daRigaInvito(riga: typeof schema.invitiQuestionario.$inferSelect): InvitoQuestionario {
+  return {
+    id: riga.id,
+    aziendaId: riga.aziendaId,
+    tenantId: riga.tenantId,
+    creatoIl: riga.creatoIl,
+    scadeIl: riga.scadeIl,
+    compilatoIl: riga.compilatoIl,
+    revocatoIl: riga.revocatoIl,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
