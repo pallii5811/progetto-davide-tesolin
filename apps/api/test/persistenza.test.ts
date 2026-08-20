@@ -79,6 +79,63 @@ describe('Persistenza su database', () => {
   it('restituisce null per un’azienda mai vista', async () => {
     expect(await contesto.dossier.get('99999999999')).toBeNull();
   });
+
+  it('conserva le fotografie di un’ubicazione e le tiene fuori dal dossier', async () => {
+    const salvata = await contesto.immagini.aggiungi(
+      '03158460174',
+      {
+        ubicazioneId: 'adro|dellindustria|42',
+        didascalia: 'Prospetto nord',
+        tipoMime: 'image/jpeg',
+        dati: 'data:image/jpeg;base64,AAAA',
+        dimensioneByte: 3,
+      },
+      null,
+    );
+
+    const elenco = await contesto.immagini.elenca('03158460174');
+    expect(elenco.map((i) => i.id)).toContain(salvata.id);
+
+    /*
+      Il dossier si legge a ogni analisi: se le fotografie vi finissero dentro, ogni
+      calcolo di uno score si porterebbe appresso megabyte che non servono a nessun
+      calcolo. Qui si misura che i due archivi restino separati.
+    */
+    const dossier = await contesto.dossier.get('03158460174');
+    expect(JSON.stringify(dossier)).not.toContain('data:image');
+  });
+
+  it('un intermediario non vede né cancella le fotografie di un altro', async () => {
+    const { schema } = await import('@aegis/db');
+    const creati = await persistenza.db
+      .insert(schema.tenants)
+      .values({ denominazione: 'Studio Concorrente' })
+      .returning({ id: schema.tenants.id });
+    const altro = persistenza.perTenant(creati[0]!.id);
+
+    const mia = await contesto.immagini.aggiungi(
+      '03158460174',
+      {
+        ubicazioneId: 'riservata',
+        didascalia: null,
+        tipoMime: 'image/jpeg',
+        dati: 'data:image/jpeg;base64,BBBB',
+        dimensioneByte: 3,
+      },
+      null,
+    );
+
+    /*
+      Queste sono fotografie degli stabilimenti di un cliente, dentro il fascicolo di un
+      broker. Che un concorrente possa cancellarle indovinando un identificativo non è un
+      difetto di comodità: è un incidente da segnalare al Garante.
+    */
+    expect(await altro.immagini.rimuovi('03158460174', mia.id)).toBe(false);
+    expect(await altro.immagini.elenca('03158460174')).toHaveLength(0);
+
+    // E il proprietario invece sì.
+    expect(await contesto.immagini.rimuovi('03158460174', mia.id)).toBe(true);
+  });
 });
 
 describe('Analisi congelate e portafoglio', () => {

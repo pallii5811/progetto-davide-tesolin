@@ -50,6 +50,13 @@
       "when": 1787177338306,
       "tag": "0006_logo_studio",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787223573714,
+      "tag": "0007_immagini_ubicazione",
+      "breakpoints": true
     }
   ]
 }

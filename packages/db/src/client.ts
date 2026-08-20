@@ -287,6 +287,21 @@ const DDL: readonly string[] = [
     aggiornato_il timestamptz NOT NULL DEFAULT now()
   )`,
 
+  `CREATE TABLE IF NOT EXISTS immagini_ubicazione (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    azienda_id uuid NOT NULL REFERENCES aziende(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    ubicazione_id text NOT NULL,
+    didascalia text,
+    tipo_mime text NOT NULL,
+    dati text NOT NULL,
+    dimensione_byte integer NOT NULL,
+    caricata_da uuid REFERENCES utenti(id),
+    caricata_il timestamptz NOT NULL DEFAULT now()
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS immagini_per_ubicazione ON immagini_ubicazione (azienda_id, ubicazione_id)`,
+
   `CREATE TABLE IF NOT EXISTS compagnie (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     denominazione text NOT NULL,

@@ -30,6 +30,51 @@ export interface DossierStore {
   upsert(identificativo: string, patch: PatchDossier): Promise<DossierAzienda>;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Immagini delle ubicazioni
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Una fotografia allegata a un'ubicazione.
+ *
+ * Non entra nell'analisi: non modifica un punteggio, non muove un capitale. Serve al
+ * documento — un capannone si descrive male a parole, e struttura, copertura, distanza
+ * dal confine e ordine del piazzale un assuntore li legge in due secondi da una foto.
+ * Per questo vive in un archivio suo e si legge **solo quando si compone il report**.
+ */
+export interface ImmagineUbicazione {
+  readonly id: string;
+  /** Chiave stabile dell'ubicazione, la stessa che produce `analizzaUbicazioni`. */
+  readonly ubicazioneId: string;
+  readonly didascalia: string | null;
+  readonly tipoMime: string;
+  /** L'immagine come data URI. */
+  readonly dati: string;
+  /** Dimensione del file originale, prima della codifica. */
+  readonly dimensioneByte: number;
+  readonly caricataIl: Date;
+}
+
+export interface NuovaImmagine {
+  readonly ubicazioneId: string;
+  readonly didascalia: string | null;
+  readonly tipoMime: string;
+  readonly dati: string;
+  readonly dimensioneByte: number;
+}
+
+export interface ImmaginiStore {
+  elenca(identificativo: string): Promise<readonly ImmagineUbicazione[]>;
+  quante(identificativo: string, ubicazioneId: string): Promise<number>;
+  aggiungi(
+    identificativo: string,
+    immagine: NuovaImmagine,
+    utenteId: string | null,
+  ): Promise<ImmagineUbicazione>;
+  /** `false` se l'immagine non esiste o appartiene a un altro intermediario. */
+  rimuovi(identificativo: string, immagineId: string): Promise<boolean>;
+}
+
 /**
  * Sintesi dell'ultima analisi per azienda.
  *
@@ -106,6 +151,55 @@ export class MemoryDossierStore implements DossierStore {
 
     this.#dossier.set(chiave, aggiornato);
     return Promise.resolve(aggiornato);
+  }
+}
+
+export class MemoryImmaginiStore implements ImmaginiStore {
+  readonly #per = new Map<string, ImmagineUbicazione[]>();
+  #contatore = 0;
+
+  elenca(identificativo: string): Promise<readonly ImmagineUbicazione[]> {
+    return Promise.resolve(this.#per.get(normalizza(identificativo)) ?? []);
+  }
+
+  async quante(identificativo: string, ubicazioneId: string): Promise<number> {
+    const tutte = await this.elenca(identificativo);
+    return tutte.filter((i) => i.ubicazioneId === ubicazioneId).length;
+  }
+
+  aggiungi(
+    identificativo: string,
+    immagine: NuovaImmagine,
+    _utenteId: string | null,
+  ): Promise<ImmagineUbicazione> {
+    const chiave = normalizza(identificativo);
+    this.#contatore += 1;
+    const salvata: ImmagineUbicazione = {
+      id: `img-${this.#contatore}`,
+      ubicazioneId: immagine.ubicazioneId,
+      didascalia: immagine.didascalia,
+      tipoMime: immagine.tipoMime,
+      dati: immagine.dati,
+      dimensioneByte: immagine.dimensioneByte,
+      caricataIl: new Date(),
+    };
+
+    const elenco = this.#per.get(chiave) ?? [];
+    elenco.push(salvata);
+    this.#per.set(chiave, elenco);
+    return Promise.resolve(salvata);
+  }
+
+  rimuovi(identificativo: string, immagineId: string): Promise<boolean> {
+    const chiave = normalizza(identificativo);
+    const elenco = this.#per.get(chiave);
+    if (elenco === undefined) return Promise.resolve(false);
+
+    const indice = elenco.findIndex((i) => i.id === immagineId);
+    if (indice === -1) return Promise.resolve(false);
+
+    elenco.splice(indice, 1);
+    return Promise.resolve(true);
   }
 }
 

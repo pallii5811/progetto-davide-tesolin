@@ -18,6 +18,7 @@ const TABELLE_CON_TENANT: readonly string[] = [
   'aziende',
   'snapshot_azienda',
   'dossier',
+  'immagini_ubicazione',
   'polizze',
   'analisi',
   'gap_coperture',

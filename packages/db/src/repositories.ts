@@ -306,6 +306,132 @@ export async function leggiPolizze(db: Database, aziendaId: string): Promise<rea
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Immagini delle ubicazioni
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RigaImmagine {
+  readonly id: string;
+  readonly ubicazioneId: string;
+  readonly didascalia: string | null;
+  readonly tipoMime: string;
+  readonly dati: string;
+  readonly dimensioneByte: number;
+  readonly caricataIl: Date;
+}
+
+/**
+ * Le immagini di un'azienda, in ordine di caricamento.
+ *
+ * Si legge **solo quando si compone il documento**: sono l'unica cosa in archivio che pesa
+ * megabyte, e trascinarle dietro a ogni analisi sarebbe uno spreco per un dato che non
+ * entra in nessun calcolo.
+ */
+export async function leggiImmagini(db: Database, aziendaId: string): Promise<readonly RigaImmagine[]> {
+  const righe = await db
+    .select()
+    .from(schema.immaginiUbicazione)
+    .where(eq(schema.immaginiUbicazione.aziendaId, aziendaId))
+    .orderBy(schema.immaginiUbicazione.caricataIl);
+
+  return righe.map((r) => ({
+    id: r.id,
+    ubicazioneId: r.ubicazioneId,
+    didascalia: r.didascalia,
+    tipoMime: r.tipoMime,
+    dati: r.dati,
+    dimensioneByte: r.dimensioneByte,
+    caricataIl: r.caricataIl,
+  }));
+}
+
+/** Quante immagini ha già una singola ubicazione: serve a far rispettare il tetto. */
+export async function contaImmagini(
+  db: Database,
+  aziendaId: string,
+  ubicazioneId: string,
+): Promise<number> {
+  const righe = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.immaginiUbicazione)
+    .where(
+      and(
+        eq(schema.immaginiUbicazione.aziendaId, aziendaId),
+        eq(schema.immaginiUbicazione.ubicazioneId, ubicazioneId),
+      ),
+    );
+
+  return righe[0]?.n ?? 0;
+}
+
+export async function salvaImmagine(
+  db: Database,
+  tenantId: string,
+  aziendaId: string,
+  immagine: {
+    readonly ubicazioneId: string;
+    readonly didascalia: string | null;
+    readonly tipoMime: string;
+    readonly dati: string;
+    readonly dimensioneByte: number;
+    readonly caricataDa: string | null;
+  },
+): Promise<RigaImmagine> {
+  const [riga] = await db
+    .insert(schema.immaginiUbicazione)
+    .values({
+      aziendaId,
+      tenantId,
+      ubicazioneId: immagine.ubicazioneId,
+      didascalia: immagine.didascalia,
+      tipoMime: immagine.tipoMime,
+      dati: immagine.dati,
+      dimensioneByte: immagine.dimensioneByte,
+      caricataDa: immagine.caricataDa,
+    })
+    .returning();
+
+  if (riga === undefined) throw new Error('Inserimento immagine non riuscito');
+
+  return {
+    id: riga.id,
+    ubicazioneId: riga.ubicazioneId,
+    didascalia: riga.didascalia,
+    tipoMime: riga.tipoMime,
+    dati: riga.dati,
+    dimensioneByte: riga.dimensioneByte,
+    caricataIl: riga.caricataIl,
+  };
+}
+
+/**
+ * Cancella un'immagine, **vincolata all'azienda e all'intermediario**.
+ *
+ * L'identificativo da solo non basta: arriva dall'esterno, e senza il vincolo un
+ * intermediario potrebbe cancellare la fotografia nel fascicolo di un concorrente
+ * indovinando un UUID. Restituisce `false` quando non c'è nulla da cancellare — che è
+ * anche la risposta giusta da dare a chi ci sta provando.
+ */
+export async function cancellaImmagine(
+  db: Database,
+  tenantId: string,
+  aziendaId: string,
+  immagineId: string,
+): Promise<boolean> {
+  const righe = await db
+    .delete(schema.immaginiUbicazione)
+    .where(
+      and(
+        eq(schema.immaginiUbicazione.id, immagineId),
+        eq(schema.immaginiUbicazione.aziendaId, aziendaId),
+        eq(schema.immaginiUbicazione.tenantId, tenantId),
+      ),
+    )
+    .returning({ id: schema.immaginiUbicazione.id });
+
+  return righe.length > 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Analisi congelate
 // ─────────────────────────────────────────────────────────────────────────────
 

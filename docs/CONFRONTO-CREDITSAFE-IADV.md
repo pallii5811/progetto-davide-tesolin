@@ -66,7 +66,7 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 | **Analisi del contesto per ubicazione** (soccorso, attività confinanti) | **sì** | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap |
 | **Valori di ricostruzione degli edifici** | **no** | la superficie si ricava da OSM; i parametri CRESME sono commerciali |
 | **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) con probabilità di superamento soglia | **no** | Open-Meteo copre pioggia e vento, **non** grandine e fulmini; uso commerciale a pagamento |
-| **Immagini per ubicazione** | **no** | nessuna fonte esterna necessaria: è caricamento file |
+| **Immagini per ubicazione** | **sì** | caricamento per ubicazione, con didascalia; capitolo dedicato nel report |
 | Linea Condomini | **no** | fuori perimetro: il prodotto è sulle imprese |
 | Linea Famiglia | **no** | fuori perimetro |
 
@@ -119,10 +119,11 @@ In ordine di valore.
 4. Poi, in ordine decrescente: esportazione elenchi, tre livelli di profondità,
    condivisione del questionario, selezione dei contenuti del report.
 
-### Le tre voci del loro report ancora aperte
+### Le due voci del loro report ancora aperte
 
-Tutte e tre sono **decisioni di prodotto** prima che compiti di sviluppo, perché ognuna
-porta con sé un costo o un limite da accettare consapevolmente.
+Entrambe sono **decisioni di prodotto** prima che compiti di sviluppo, perché ognuna porta
+con sé un costo o un limite da accettare consapevolmente. La terza — le immagini per
+ubicazione — è stata fatta il 20/08/2026.
 
 - **Storico meteo georiferito.** Open-Meteo dà dieci anni di precipitazioni e raffiche di
   vento, gratis per uso non commerciale (~29 €/mese per l'uso commerciale). **Grandine e
@@ -132,5 +133,8 @@ porta con sé un costo o un limite da accettare consapevolmente.
   parametri di costo CRESME sono commerciali. Senza, serve un costo al metro cubo
   configurabile dall'intermediario — che è difendibile, purché sia dichiarato come sua
   assunzione e non come un dato di mercato.
-- **Immagini per ubicazione.** Nessuna fonte esterna: è caricamento di file, con le
-  attenzioni che i file caricati richiedono. È la più semplice delle tre.
+- ~~Immagini per ubicazione~~ — **fatto il 20/08/2026.** Caricamento per ubicazione con
+  didascalia, tetto di 1 MB per scatto e 6 per ubicazione, capitolo dedicato nel report.
+  Il tetto è misurato: nel documento ogni fotografia costa circa 2,7 volte la propria
+  dimensione, perché base64 aggiunge un terzo e Next scrive il data URI due volte. Per
+  alzarlo servirebbe servire le immagini da una rotta dedicata invece che inline.

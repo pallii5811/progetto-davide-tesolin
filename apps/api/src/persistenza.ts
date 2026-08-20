@@ -15,8 +15,12 @@ import type { CompanyAnalysis, CoverageId, DatiDichiarati, PolizzaInEssere } fro
 import {
   assicuraAzienda,
   assicuraTenantPredefinito,
+  cancellaImmagine,
   connetti,
+  contaImmagini,
   elencoPortafoglio,
+  leggiImmagini,
+  salvaImmagine,
   leggiDatiDichiarati,
   leggiPolizze,
   registraAudit,
@@ -35,6 +39,9 @@ import type { Connessione, DatiStudio, Database, ModificheStudio, RigaPolizza } 
 import type {
   DossierAzienda,
   DossierStore,
+  ImmagineUbicazione,
+  ImmaginiStore,
+  NuovaImmagine,
   PatchDossier,
   PortafoglioStore,
   VoceportafoglioAzienda,
@@ -53,6 +60,8 @@ export interface ContestoTenant {
   readonly tenantId: string;
   readonly dossier: DossierStore;
   readonly portafoglio: PortafoglioStore;
+  /** Le fotografie delle ubicazioni: si leggono solo quando si compone il report. */
+  readonly immagini: ImmaginiStore;
   /** Chi ha redatto i documenti: intesta il report e adempie al Reg. IVASS 40/2018. */
   readonly studio: {
     leggi(): Promise<DatiStudio | null>;
@@ -256,11 +265,92 @@ function creaContesto(db: Database, tenantId: string): ContestoTenant {
     aggiorna: (dati: ModificheStudio) => aggiornaStudio(db, tenantId, dati),
   };
 
+  const immagini: ImmaginiStore = {
+    async elenca(identificativo: string): Promise<readonly ImmagineUbicazione[]> {
+      const aziendaId = await trovaAzienda(db, tenantId, identificativo);
+      if (aziendaId === null) return [];
+      return leggiImmagini(db, aziendaId);
+    },
+
+    async quante(identificativo: string, ubicazioneId: string): Promise<number> {
+      const aziendaId = await trovaAzienda(db, tenantId, identificativo);
+      if (aziendaId === null) return 0;
+      return contaImmagini(db, aziendaId, ubicazioneId);
+    },
+
+    async aggiungi(
+      identificativo: string,
+      immagine: NuovaImmagine,
+      utenteId: string | null,
+    ): Promise<ImmagineUbicazione> {
+      const chiave = normalizza(identificativo);
+      /*
+        `assicuraAzienda` e non `trovaAzienda`: si possono allegare fotografie a
+        un'azienda che non è ancora stata analizzata — è anzi il momento in cui
+        l'intermediario torna dal sopralluogo, prima di sedersi a fare i conti.
+      */
+      const aziendaId = await assicuraAzienda(db, tenantId, {
+        partitaIva: chiave,
+        codiceFiscale: null,
+        denominazione: chiave,
+        providerId: chiave,
+        provincia: null,
+        atecoPrimario: null,
+      });
+
+      const salvata = await salvaImmagine(db, tenantId, aziendaId, {
+        ubicazioneId: immagine.ubicazioneId,
+        didascalia: immagine.didascalia,
+        tipoMime: immagine.tipoMime,
+        dati: immagine.dati,
+        dimensioneByte: immagine.dimensioneByte,
+        caricataDa: utenteId,
+      });
+
+      /*
+        Nell'audit trail finiscono i riferimenti, **mai i byte**: quel registro è
+        append-only e conservarci dentro una copia di ogni fotografia lo farebbe crescere
+        senza limite, per giunta duplicando un dato che è già nella sua tabella.
+      */
+      await registraAudit(db, {
+        tenantId,
+        azione: 'immagine.caricata',
+        entita: 'azienda',
+        entitaId: aziendaId,
+        dettagli: {
+          immagineId: salvata.id,
+          ubicazioneId: salvata.ubicazioneId,
+          dimensioneByte: salvata.dimensioneByte,
+        },
+      });
+
+      return salvata;
+    },
+
+    async rimuovi(identificativo: string, immagineId: string): Promise<boolean> {
+      const aziendaId = await trovaAzienda(db, tenantId, identificativo);
+      if (aziendaId === null) return false;
+
+      const rimossa = await cancellaImmagine(db, tenantId, aziendaId, immagineId);
+      if (rimossa) {
+        await registraAudit(db, {
+          tenantId,
+          azione: 'immagine.rimossa',
+          entita: 'azienda',
+          entitaId: aziendaId,
+          dettagli: { immagineId },
+        });
+      }
+      return rimossa;
+    },
+  };
+
   return {
     tenantId,
     dossier,
     portafoglio,
     studio,
+    immagini,
 
     async registraAnalisi(identificativo, analisi, provider): Promise<void> {
       const chiave = normalizza(identificativo);

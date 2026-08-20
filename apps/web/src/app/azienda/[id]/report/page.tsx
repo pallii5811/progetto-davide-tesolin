@@ -1,10 +1,11 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
-import { analizzaAzienda, leggiStudio } from '@/lib/api';
+import { analizzaAzienda, leggiImmaginiUbicazioni, leggiStudio } from '@/lib/api';
 import type { AnalisiDto, DatiStudio, GapDto } from '@/lib/api';
 import { AnalisiEconomica } from './AnalisiEconomica';
 import { MetricheDiImpatto } from './MetricheDiImpatto';
 import { ContestoUbicazioni } from './ContestoUbicazioni';
+import { ImmaginiUbicazioni } from './ImmaginiUbicazioni';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 
@@ -53,6 +54,12 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
 
   const interventi = gap.voci.filter((v) => v.stato !== 'adeguata');
 
+  // Le fotografie stanno fuori dall'analisi — pesano e non entrano in alcun calcolo — e un
+  // guasto nel leggerle non deve togliere all'intermediario il documento da consegnare.
+  const immagini = await leggiImmaginiUbicazioni(id)
+    .then((r) => r.immagini)
+    .catch(() => []);
+
   /*
     Numerazione dei capitoli: contata, non scritta.
 
@@ -96,8 +103,10 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
                   impedisce la deformazione, che su un marchio si nota subito.
                 */}
                 {studio.logo !== null && studio.logo !== '' && (
-                  // eslint-disable-next-line @next/next/no-img-element -- data URI: nessuna
-                  // ottimizzazione possibile, e `next/image` richiederebbe un dominio noto.
+                  // Data URI: nessuna ottimizzazione possibile, e `next/image`
+                  // richiederebbe un dominio noto. (Il commento di disabilitazione che
+                  // stava qui nominava una regola non caricata, ed era lui a far fallire
+                  // il lint.)
                   <img
                     src={studio.logo}
                     alt={`Logo di ${studio.denominazione}`}
@@ -407,6 +416,18 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
             nota="Tempo di soccorso e attività confinanti: i due fattori che i questionari incendio chiedono e che nessun bilancio contiene. Rilevati su fonte cartografica libera, mai usati per escludere un rischio."
           >
             <ContestoUbicazioni ubicazioni={ubicazioni.elenco} />
+          </Capitolo>
+        )}
+
+        {/* Il capitolo compare solo se qualcosa è stato allegato: un titolo seguito da
+            «nessuna immagine» non informa, allunga. */}
+        {immagini.length > 0 && (
+          <Capitolo
+            numero={cap()}
+            titolo="Documentazione fotografica delle ubicazioni"
+            nota="Stato dei luoghi rilevato dall'intermediario. È la parte del fascicolo che non invecchia in modo discutibile: un capitale ricalcolato si contesta, una fotografia datata dice com'era."
+          >
+            <ImmaginiUbicazioni ubicazioni={ubicazioni.elenco} immagini={immagini} />
           </Capitolo>
         )}
 

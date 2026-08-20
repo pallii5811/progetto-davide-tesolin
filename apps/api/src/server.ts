@@ -60,9 +60,13 @@ declare module 'fastify' {
 import { presentAnalysis, presentaSolidita } from './presenter.js';
 import { z } from 'zod';
 import {
+  LIMITE_IMMAGINE_BYTE,
+  MAX_IMMAGINI_PER_UBICAZIONE,
   analisiRequestSchema,
+  byteDiDataUri,
   compagniaSchema,
   fetchLevelSchema,
+  immagineSchema,
   searchQuerySchema,
   toDatiDichiarati,
   toPolizza,
@@ -75,8 +79,8 @@ import {
   spesaOdierna,
   spesaOdiernaComplessiva,
 } from '@aegis/db';
-import { MemoryDossierStore, MemoryPortafoglioStore } from './store.js';
-import type { DossierStore, PortafoglioStore } from './store.js';
+import { MemoryDossierStore, MemoryImmaginiStore, MemoryPortafoglioStore } from './store.js';
+import type { DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
 import type { Persistenza } from './persistenza.js';
 
 export interface BuildServerOptions {
@@ -139,14 +143,14 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   */
   const modoContesto = process.env['CONTESTO_TERRITORIALE'] ?? 'auto';
   const contestoAttivo =
-    modoContesto === 'sempre' ||
-    (modoContesto !== 'mai' && !provider.name.startsWith('Demo'));
+    modoContesto === 'sempre' || (modoContesto !== 'mai' && !provider.name.startsWith('Demo'));
 
   // Senza persistenza il servizio lavora in memoria e non richiede autenticazione:
   // è la modalità dei test di dominio e della dimostrazione locale. Con la persistenza
   // attiva, invece, ogni rotta è protetta e ogni dato è legato a un intermediario.
   const storeInMemoria = options.store ?? new MemoryDossierStore();
   const portafoglioInMemoria = options.portafoglio ?? new MemoryPortafoglioStore();
+  const immaginiInMemoria = new MemoryImmaginiStore();
   const autenticazioneRichiesta = persistenza !== undefined;
 
   const app = Fastify({ logger: options.logger ?? false });
@@ -289,10 +293,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           `${euro(esito.limite)} €. ${ripresa}`;
   };
 
-  const registraSpese = async (
-    request: FastifyRequest,
-    eventi: readonly CostEvent[],
-  ): Promise<void> => {
+  const registraSpese = async (request: FastifyRequest, eventi: readonly CostEvent[]): Promise<void> => {
     if (eventi.length === 0 || persistenza === undefined) return;
     const sessione = request.sessione;
     if (sessione === undefined) return;
@@ -301,16 +302,31 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
   const contestoDi = (
     request: FastifyRequest,
-  ): { dossier: DossierStore; portafoglio: PortafoglioStore; tenant: ContestoTenant | null } => {
+  ): {
+    dossier: DossierStore;
+    portafoglio: PortafoglioStore;
+    immagini: ImmaginiStore;
+    tenant: ContestoTenant | null;
+  } => {
     if (persistenza === undefined) {
-      return { dossier: storeInMemoria, portafoglio: portafoglioInMemoria, tenant: null };
+      return {
+        dossier: storeInMemoria,
+        portafoglio: portafoglioInMemoria,
+        immagini: immaginiInMemoria,
+        tenant: null,
+      };
     }
     const sessione = request.sessione;
     if (sessione === undefined) {
       throw new ProviderError('Sessione assente', 'autenticazione');
     }
     const tenant = persistenza.perTenant(sessione.tenantId);
-    return { dossier: tenant.dossier, portafoglio: tenant.portafoglio, tenant };
+    return {
+      dossier: tenant.dossier,
+      portafoglio: tenant.portafoglio,
+      immagini: tenant.immagini,
+      tenant,
+    };
   };
 
   // ── Guardia di autenticazione ──────────────────────────────────────────────
@@ -791,9 +807,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       anno: parsed.data.anno,
       solvencyRatio: parsed.data.solvencyRatio ?? null,
       quotaTier1Unrestricted: parsed.data.quotaTier1Unrestricted ?? null,
-      fondiPropriCentesimi: parsed.data.fondiPropriEuro === undefined ? null : Math.round(parsed.data.fondiPropriEuro * 100),
+      fondiPropriCentesimi:
+        parsed.data.fondiPropriEuro === undefined ? null : Math.round(parsed.data.fondiPropriEuro * 100),
       scrCentesimi: parsed.data.scrEuro === undefined ? null : Math.round(parsed.data.scrEuro * 100),
-      premiLordiCentesimi: parsed.data.premiLordiEuro === undefined ? null : Math.round(parsed.data.premiLordiEuro * 100),
+      premiLordiCentesimi:
+        parsed.data.premiLordiEuro === undefined ? null : Math.round(parsed.data.premiLordiEuro * 100),
       reclamiAnno: parsed.data.reclamiAnno ?? null,
       ratingAgenzia: parsed.data.ratingAgenzia ?? null,
       ratingValore: parsed.data.ratingValore ?? null,
@@ -1328,7 +1346,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const esito = await oltreIlTetto(request);
     if (esito !== null) {
       return reply.status(429).send({
-        errore: messaggioTetto(esito, 'L’importazione riprende domani. Le aziende già acquisite restano in portafoglio.'),
+        errore: messaggioTetto(
+          esito,
+          'L’importazione riprende domani. Le aziende già acquisite restano in portafoglio.',
+        ),
       });
     }
 
@@ -1450,6 +1471,115 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       }
     );
   });
+
+  // ── Immagini delle ubicazioni ──────────────────────────────────────────────
+  /*
+    Le fotografie di sopralluogo, allegate alla singola ubicazione.
+
+    Sono in rotte a sé e non dentro l'analisi per una ragione di peso: l'analisi si esegue
+    e si congela di continuo, le immagini si leggono solo quando si compone il documento.
+    Tenerle insieme significherebbe trascinare megabyte a ogni calcolo di uno score.
+  */
+  app.get<{ Params: { id: string } }>('/api/aziende/:id/immagini', async (request) => {
+    const immagini = await contestoDi(request).immagini.elenca(request.params.id);
+    return {
+      immagini: immagini.map((i) => ({
+        id: i.id,
+        ubicazioneId: i.ubicazioneId,
+        didascalia: i.didascalia,
+        tipoMime: i.tipoMime,
+        dati: i.dati,
+        dimensioneByte: i.dimensioneByte,
+        caricataIl: i.caricataIl.toISOString(),
+      })),
+    };
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/api/aziende/:id/immagini',
+    {
+      /*
+        Il tetto predefinito di Fastify per un corpo è **un megabyte**: sotto la dimensione
+        di una fotografia una volta codificata in base64, che cresce di circa un terzo.
+        Senza questa riga ogni caricamento un po' grande verrebbe respinto dal telaio prima
+        di arrivare al codice, con un messaggio che non nomina né le immagini né il limite
+        vero — e chi carica concluderebbe che il prodotto è rotto.
+
+        Il margine sta sopra `LIMITE_IMMAGINE_BYTE` perché il rifiuto per «troppo grande»
+        deve arrivare dalla nostra validazione, che dice quanti megabyte sono ammessi.
+      */
+      bodyLimit: Math.ceil(LIMITE_IMMAGINE_BYTE * 1.5) + 1024,
+    },
+    async (request, reply) => {
+      const parsed = immagineSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ errore: 'Immagine non valida', dettagli: parsed.error.issues });
+      }
+
+      /*
+      Il peso si misura **qui**, sui byte decodificati, non sulla lunghezza del testo che
+      arriva. Il controllo nel browser è una cortesia verso chi carica: chiunque può
+      chiamare questa rotta senza passare dalla pagina, e il tetto esiste perché un
+      documento di venti pagine resti stampabile e spedibile.
+    */
+      const byte = byteDiDataUri(parsed.data.dati);
+      if (byte > LIMITE_IMMAGINE_BYTE) {
+        return reply.status(413).send({
+          errore: `L'immagine supera ${Math.round(LIMITE_IMMAGINE_BYTE / (1024 * 1024))} MB.`,
+        });
+      }
+
+      // Il tipo dichiarato deve combaciare con quello del contenuto: due campi che dicono
+      // cose diverse sono un campo che mente, e uno dei due finirebbe in un `src`.
+      if (!parsed.data.dati.startsWith(`data:${parsed.data.tipoMime};base64,`)) {
+        return reply.status(400).send({ errore: 'Il tipo dichiarato non corrisponde al contenuto.' });
+      }
+
+      const immagini = contestoDi(request).immagini;
+      const gia = await immagini.quante(request.params.id, parsed.data.ubicazioneId);
+      if (gia >= MAX_IMMAGINI_PER_UBICAZIONE) {
+        return reply.status(409).send({
+          errore: `Massimo ${MAX_IMMAGINI_PER_UBICAZIONE} immagini per ubicazione. Rimuoverne una per aggiungerne un'altra.`,
+        });
+      }
+
+      const salvata = await immagini.aggiungi(
+        request.params.id,
+        {
+          ubicazioneId: parsed.data.ubicazioneId,
+          didascalia: parsed.data.didascalia,
+          tipoMime: parsed.data.tipoMime,
+          dati: parsed.data.dati,
+          dimensioneByte: byte,
+        },
+        request.sessione?.utenteId ?? null,
+      );
+
+      return reply.status(201).send({
+        id: salvata.id,
+        ubicazioneId: salvata.ubicazioneId,
+        didascalia: salvata.didascalia,
+        tipoMime: salvata.tipoMime,
+        dati: salvata.dati,
+        dimensioneByte: salvata.dimensioneByte,
+        caricataIl: salvata.caricataIl.toISOString(),
+      });
+    },
+  );
+
+  app.delete<{ Params: { id: string; immagineId: string } }>(
+    '/api/aziende/:id/immagini/:immagineId',
+    async (request, reply) => {
+      const rimossa = await contestoDi(request).immagini.rimuovi(
+        request.params.id,
+        request.params.immagineId,
+      );
+      // 404 anche quando l'immagine esiste ma è di un altro intermediario: distinguere i
+      // due casi direbbe a chi prova a indovinare un identificativo che ha indovinato.
+      if (!rimossa) return reply.status(404).send({ errore: 'Immagine non trovata' });
+      return { rimossa: true };
+    },
+  );
 
   // ── Cataloghi ──────────────────────────────────────────────────────────────
   app.get('/api/catalogo/rischi', async () => ({

@@ -1,7 +1,13 @@
 import { richiediSessione } from '@/lib/sessione';
 import { IndicatoriArchivio } from './IndicatoriArchivio';
 import Link from 'next/link';
-import { analizzaAzienda, collegamentiDiAzienda, compagnieCensite } from '@/lib/api';
+import {
+  analizzaAzienda,
+  collegamentiDiAzienda,
+  compagnieCensite,
+  leggiImmaginiUbicazioni,
+} from '@/lib/api';
+import { ImmaginiUbicazione } from './ImmaginiUbicazione';
 import type {
   AnalisiDto,
   IndicatoriArchivioDto,
@@ -58,6 +64,18 @@ export default async function PaginaAzienda({
   }
 
   const { azienda, sintesi, catNat, gap, assetto, ubicazioni } = analisi;
+
+  /*
+    Le fotografie si leggono a parte, dopo l'analisi.
+
+    Sono l'unica cosa in archivio che pesa megabyte, e non entrano in nessun calcolo:
+    tenerle dentro il risultato dell'analisi le farebbe viaggiare a ogni esecuzione e
+    duplicare in ogni congelamento. Un guasto qui non deve far cadere la pagina — senza
+    fotografie l'analisi resta intera.
+  */
+  const immagini = await leggiImmaginiUbicazioni(id)
+    .then((r) => r.immagini)
+    .catch(() => []);
 
   // I collegamenti dipendono dal resto del portafoglio, non da questa azienda: se la
   // rotta non risponde l'analisi resta leggibile, e questa sezione semplicemente manca.
@@ -337,6 +355,12 @@ export default async function PaginaAzienda({
                 </ul>
               </Scheda>
             )}
+
+            <ImmaginiUbicazione
+              identificativo={id}
+              ubicazioni={ubicazioni.elenco.map((u) => ({ id: u.id, etichetta: u.etichetta }))}
+              immagini={immagini}
+            />
 
             <ul className="mt-3 space-y-1 text-xs text-testo-debole">
               {ubicazioni.note.map((n) => (

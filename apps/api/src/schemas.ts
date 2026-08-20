@@ -18,9 +18,7 @@ export const searchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
-export const fetchLevelSchema = z
-  .enum(['base', 'esteso', 'completo', 'profondito'])
-  .default('completo');
+export const fetchLevelSchema = z.enum(['base', 'esteso', 'completo', 'profondito']).default('completo');
 
 const indirizzoSchema = z.object({
   via: z.string(),
@@ -188,4 +186,73 @@ export function toDatiDichiarati(input: z.infer<typeof datiDichiaratiSchema>): P
     ...input,
     ...(immobili === undefined ? {} : { immobili }),
   } as Partial<DatiDichiarati>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Immagini delle ubicazioni
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Formati ammessi: solo fotografie raster.
+ *
+ * Niente SVG, a differenza del logo dello studio. Un SVG è un documento, non una
+ * fotografia: può contenere script e riferimenti esterni, e qui il file arriva da chi
+ * carica in un fascicolo che poi qualcun altro apre. Per la facciata di un capannone non
+ * serve, quindi non si concede.
+ */
+export const TIPI_IMMAGINE_AMMESSI = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/**
+ * Tetto per singola immagine, sul file originale.
+ *
+ * **Un megabyte, e il numero è misurato, non scelto a sentimento.** Nel report ogni
+ * fotografia costa circa **2,7 volte** la propria dimensione: la codifica base64 aggiunge
+ * un terzo, e Next scrive il data URI due volte — una nell'attributo `src` e una nel
+ * payload di idratazione. Verificato il 20/08/2026 contando le occorrenze nell'HTML
+ * servito: dodici per sei immagini.
+ *
+ * Con questo tetto un fascicolo generoso — tre ubicazioni, quattro scatti ciascuna —
+ * produce un documento intorno ai trenta megabyte: pesante ma stampabile e spedibile, che
+ * è il modo in cui questo report viaggia davvero. A due megabyte per scatto lo stesso
+ * fascicolo ne produrrebbe sessanta, e diventerebbe inutilizzabile proprio nel momento in
+ * cui serve.
+ *
+ * Un megabyte è comunque abbondante: una fotografia 1600×1200 in JPEG di buona qualità
+ * pesa fra i quattrocento e i seicento kilobyte.
+ *
+ * Per alzarlo davvero non basta cambiare questo numero: andrebbero servite le immagini da
+ * una rotta dedicata invece che come data URI, così che l'HTML porti indirizzi e non byte.
+ */
+export const LIMITE_IMMAGINE_BYTE = 1024 * 1024;
+
+/** Quante immagini può avere una singola ubicazione. */
+export const MAX_IMMAGINI_PER_UBICAZIONE = 6;
+
+/*
+  La codifica base64 cresce di circa un terzo, più l'intestazione del data URI. Il
+  controllo vero si fa **sui byte decodificati**, non su questa soglia: qui si respinge
+  presto un corpo abnorme, prima di decodificarlo.
+*/
+const LIMITE_DATI_URI = Math.ceil(LIMITE_IMMAGINE_BYTE * 1.4) + 100;
+
+export const immagineSchema = z.object({
+  ubicazioneId: z.string().trim().min(1).max(200),
+  didascalia: z.string().trim().max(200).nullable().default(null),
+  tipoMime: z.enum(TIPI_IMMAGINE_AMMESSI),
+  /*
+    Il data URI deve dichiarare **lo stesso tipo** del campo accanto e usare base64.
+    Accettare una forma qualunque significherebbe conservare un contenuto arbitrario in
+    un campo che poi finisce nell'attributo `src` di un documento consegnato a un cliente.
+  */
+  dati: z
+    .string()
+    .max(LIMITE_DATI_URI, 'Immagine troppo grande')
+    .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/, 'Formato immagine non valido'),
+});
+
+/** Byte reali di un data URI base64, senza decodificarlo per intero. */
+export function byteDiDataUri(dataUri: string): number {
+  const base64 = dataUri.slice(dataUri.indexOf(',') + 1);
+  const riempimento = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - riempimento;
 }

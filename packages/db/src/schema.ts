@@ -290,6 +290,66 @@ export const dossier = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Immagini delle ubicazioni
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Le fotografie che l'intermediario allega a una singola ubicazione.
+ *
+ * Un capannone si descrive male a parole. La struttura portante, la copertura, la
+ * distanza dal confine, l'ordine del piazzale: sono cose che un assuntore vede in due
+ * secondi da una fotografia e che nessun questionario riesce a farsi raccontare. È anche
+ * ciò che rende il report difendibile a distanza di anni — «così era il 20 agosto 2026».
+ *
+ * ## Perché una tabella a sé
+ *
+ * Non nel dossier: quello viene letto a **ogni** analisi, e trascinarsi dietro qualche
+ * megabyte di fotografie per calcolare uno score è uno spreco che si paga a ogni
+ * esecuzione.
+ *
+ * Non dentro l'analisi congelata: quella si riscrive intera a ogni riesecuzione, e le
+ * stesse immagini finirebbero duplicate in archivio una volta per analisi.
+ *
+ * Qui invece si leggono **solo quando servono**, cioè quando si compone il documento.
+ *
+ * Il legame con l'ubicazione è la sua chiave stabile (`Ubicazione.id`, derivata
+ * dall'indirizzo normalizzato) e non un identificativo di riga: le ubicazioni sono
+ * **calcolate** dal profilo a ogni analisi, non righe di tabella. Se un'ubicazione sparisce
+ * dalla visura, le sue immagini restano orfane invece di sparire in silenzio — ed è il
+ * comportamento voluto: una fotografia scattata resta una prova di com'era.
+ */
+export const immaginiUbicazione = pgTable(
+  'immagini_ubicazione',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    aziendaId: uuid('azienda_id')
+      .notNull()
+      .references(() => aziende.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** Chiave stabile dell'ubicazione, non un id di riga: vedi la nota sopra. */
+    ubicazioneId: text('ubicazione_id').notNull(),
+    /** Cosa mostra: senza, in un report di venti pagine è una figura senza scopo. */
+    didascalia: text('didascalia'),
+    tipoMime: text('tipo_mime').notNull(),
+    /**
+     * L'immagine come data URI, come già il logo dello studio.
+     *
+     * Testo e non `bytea`: la stessa forma serve al browser e al report, e una colonna
+     * binaria costringerebbe a una rotta che serve i byte con il proprio tipo e la propria
+     * autorizzazione — superficie in più per un guadagno di un terzo di spazio.
+     */
+    dati: text('dati').notNull(),
+    /** Dimensione del file originale, prima della codifica: è il numero da mostrare. */
+    dimensioneByte: integer('dimensione_byte').notNull(),
+    caricataDa: uuid('caricata_da').references(() => utenti.id),
+    caricataIl: timestamp('caricata_il', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('immagini_per_ubicazione').on(t.aziendaId, t.ubicazioneId)],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Polizze
 // ─────────────────────────────────────────────────────────────────────────────
 

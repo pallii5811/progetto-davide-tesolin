@@ -996,7 +996,6 @@ export interface IndicatoriArchivioDto {
   } | null;
 }
 
-
 /**
  * Le fasce di impatto economico.
  *
@@ -1042,4 +1041,27 @@ export interface AndamentoEsercizioDto {
   costoDelPersonale: MoneyDto | null;
   dipendenti: number | null;
   retribuzioneMediaLorda: MoneyDto | null;
+}
+
+/**
+ * Le fotografie allegate alle ubicazioni.
+ *
+ * Lettura separata dall'analisi, e non un campo del suo risultato: l'analisi si esegue di
+ * continuo e le immagini pesano megabyte. Chi non le mostra non le paga.
+ */
+export interface ImmagineUbicazioneDto {
+  id: string;
+  ubicazioneId: string;
+  didascalia: string | null;
+  tipoMime: string;
+  /** L'immagine come data URI, pronta per l'attributo `src`. */
+  dati: string;
+  dimensioneByte: number;
+  caricataIl: string;
+}
+
+export async function leggiImmaginiUbicazioni(
+  identificativo: string,
+): Promise<{ immagini: ImmagineUbicazioneDto[] }> {
+  return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/immagini`);
 }
