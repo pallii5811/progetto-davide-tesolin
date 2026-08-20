@@ -1157,6 +1157,15 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           cache: cacheContesto,
           baseUrl: process.env['OVERPASS_URL'],
           userAgent: process.env['OVERPASS_USER_AGENT'],
+          /*
+            Lo storico meteo si accende da configurazione, e resta spento finché nessuno lo
+            accende. La fonte è gratuita per uso non commerciale e a pagamento per un
+            prodotto venduto: è una decisione con un costo, e il codice non la prende al
+            posto di chi installa.
+          */
+          meteoAttivo: process.env['METEO_STORICO'] === 'attivo',
+          cacheMeteo: cacheContesto,
+          baseUrlMeteo: process.env['METEO_URL'],
         })
       : undefined;
 

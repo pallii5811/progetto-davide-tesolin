@@ -27,7 +27,7 @@
 
 import { analizzaUbicazioni } from '@aegis/core';
 import type { CompanyProfile, ContestoTerritoriale } from '@aegis/core';
-import { leggiEsitoContesto } from '@aegis/providers';
+import { leggiEsitoContesto, leggiStoricoMeteo } from '@aegis/providers';
 import type { Cache } from '@aegis/providers';
 
 /** Quante ubicazioni interrogare al massimo per una singola analisi. */
@@ -45,6 +45,16 @@ export interface OpzioniContesto {
   readonly userAgent?: string | undefined;
   /** Iniettabile per i collaudi: evita di dipendere da un servizio esterno in prova. */
   readonly leggi?: typeof leggiEsitoContesto | undefined;
+  /**
+   * Se raccogliere anche lo storico meteo.
+   *
+   * Spento di default: la fonte è gratuita per uso non commerciale e a pagamento per un
+   * prodotto venduto. È una decisione con un costo, non un'impostazione tecnica.
+   */
+  readonly meteoAttivo?: boolean | undefined;
+  readonly cacheMeteo?: Cache | undefined;
+  readonly baseUrlMeteo?: string | undefined;
+  readonly leggiMeteo?: typeof leggiStoricoMeteo | undefined;
   readonly maxUbicazioni?: number | undefined;
   readonly budgetMs?: number | undefined;
   /** Orologio iniettabile: i collaudi non devono attendere davvero. */
@@ -117,8 +127,28 @@ export async function raccogliConEsito(
       timeoutMs: TIMEOUT_SINGOLA_MS,
     });
 
-    if (esito.esito === 'osservato') contesti.set(u.id, esito.contesto);
-    else if (esito.esito === 'occupato') occupate += 1;
+    if (esito.esito === 'osservato') {
+      /*
+        Lo storico meteo si innesta qui, e **solo se acceso**.
+
+        È una fonte diversa da quella cartografica e con una licenza diversa: gratuita per
+        uso non commerciale, a pagamento per un prodotto venduto. Spenta di default perché
+        accenderla è una decisione con un costo, non un'impostazione tecnica — e chi la
+        accende sa cosa sta accettando.
+
+        Se la lettura fallisce il contesto resta intero senza meteo: una fonte accessoria
+        che cade non deve portarsi via anche caserme e vicinanze.
+      */
+      const meteo = opzioni.meteoAttivo
+        ? await (opzioni.leggiMeteo ?? leggiStoricoMeteo)(latitudine, longitudine, {
+            cache: opzioni.cacheMeteo,
+            baseUrl: opzioni.baseUrlMeteo,
+            timeoutMs: TIMEOUT_SINGOLA_MS,
+          })
+        : null;
+
+      contesti.set(u.id, meteo === null ? esito.contesto : { ...esito.contesto, meteo });
+    } else if (esito.esito === 'occupato') occupate += 1;
     else nonRaggiunte += 1;
 
     /*

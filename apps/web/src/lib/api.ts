@@ -409,6 +409,15 @@ export interface AnalisiDto {
         attivitaCheAggravano: number;
         raggioAnalizzatoMetri: number;
         fonte: string;
+        fabbricati: { quanti: number; superficieCopertaMq: number; maggioreMq: number } | null;
+        meteo: {
+          anni: number;
+          dal: string;
+          al: string;
+          soglie: { descrizione: string; giorni: number; anniConEvento: number; massimo: string }[];
+          fonte: string;
+          fenomeniNonCoperti: string[];
+        } | null;
       } | null;
     }[];
     complessiIncendio: { ubicazioni: string[]; motivo: string }[];

@@ -281,6 +281,22 @@ interface ContestoDto {
   readonly raggioAnalizzatoMetri: number;
   /** Attribuzione della fonte: viaggia col dato perché la licenza ODbL la impone. */
   readonly fonte: string;
+  /** Impronta a terra dei fabbricati, quando la cartografia li ha mappati. */
+  readonly fabbricati: { quanti: number; superficieCopertaMq: number; maggioreMq: number } | null;
+  /** Serie storica degli eventi atmosferici. `null` se la raccolta non è attiva. */
+  readonly meteo: {
+    readonly anni: number;
+    readonly dal: string;
+    readonly al: string;
+    readonly soglie: readonly {
+      readonly descrizione: string;
+      readonly giorni: number;
+      readonly anniConEvento: number;
+      readonly massimo: string;
+    }[];
+    readonly fonte: string;
+    readonly fenomeniNonCoperti: readonly string[];
+  } | null;
 }
 
 interface GruppoDto {
@@ -346,6 +362,30 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
               attivitaCheAggravano: x.contesto.attivitaCheAggravano,
               raggioAnalizzatoMetri: x.contesto.raggioAnalizzatoMetri,
               fonte: x.contesto.fonte,
+              fabbricati:
+                x.contesto.fabbricati === null
+                  ? null
+                  : {
+                      quanti: x.contesto.fabbricati.quanti,
+                      superficieCopertaMq: x.contesto.fabbricati.superficieCopertaMq,
+                      maggioreMq: x.contesto.fabbricati.maggioreMq,
+                    },
+              meteo:
+                x.contesto.meteo === null
+                  ? null
+                  : {
+                      anni: x.contesto.meteo.anni,
+                      dal: x.contesto.meteo.dal,
+                      al: x.contesto.meteo.al,
+                      soglie: x.contesto.meteo.soglie.map((s) => ({
+                        descrizione: s.descrizione,
+                        giorni: s.giorni,
+                        anniConEvento: s.anniConEvento,
+                        massimo: s.massimo,
+                      })),
+                      fonte: x.contesto.meteo.fonte,
+                      fenomeniNonCoperti: x.contesto.meteo.fenomeniNonCoperti,
+                    },
             },
     })),
     complessiIncendio: gruppo(u.complessiIncendio),
@@ -711,7 +751,6 @@ function presentGap(gap: CoverageGap) {
     insidie: gap.insidie,
   };
 }
-
 
 /**
  * Solidità di una compagnia, con il punteggio ricalcolato al momento.

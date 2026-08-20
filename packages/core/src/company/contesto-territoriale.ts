@@ -57,11 +57,49 @@ export interface ImprontaFabbricati {
   readonly maggioreMq: number;
 }
 
+/**
+ * Quante volte, in dieci anni, il tempo ha superato una soglia su quel punto.
+ *
+ * Serve a togliere una discussione dal terreno delle impressioni. «Qui non è mai
+ * successo niente» è la frase con cui si rinuncia a una garanzia allagamento, e spesso è
+ * vera solo perché nessuno ha guardato: sette anni su dieci con almeno un giorno oltre i
+ * cinquanta millimetri sono un fatto, e cambiano la conversazione.
+ */
+export interface SogliaSuperata {
+  /** Cosa si è misurato: «pioggia oltre 50 mm in un giorno». */
+  readonly descrizione: string;
+  /** Quanti giorni, nell'intero periodo, hanno superato la soglia. */
+  readonly giorni: number;
+  /** In quanti anni distinti è successo almeno una volta. */
+  readonly anniConEvento: number;
+  /** Il valore peggiore registrato, con la sua unità. */
+  readonly massimo: string;
+}
+
+export interface StoricoMeteo {
+  readonly anni: number;
+  readonly dal: string;
+  readonly al: string;
+  readonly soglie: readonly SogliaSuperata[];
+  readonly fonte: string;
+  /**
+   * I fenomeni che questa fonte **non** copre.
+   *
+   * Va stampato accanto ai dati, sempre. Un capitolo intitolato «storico degli eventi
+   * atmosferici» che tace di non contenere grandine e fulmini fa concludere a chi legge
+   * che su quel punto non ne siano mai caduti — che è esattamente l'opposto di ciò che i
+   * dati dicono, cioè nulla.
+   */
+  readonly fenomeniNonCoperti: readonly string[];
+}
+
 export interface ContestoTerritoriale {
   readonly vigiliDelFuoco: readonly CasermaVigiliDelFuoco[];
   readonly attivitaVicine: readonly PuntoDiInteresse[];
   /** Impronta a terra dei fabbricati entro pochi metri dalla coordinata. */
   readonly fabbricati: ImprontaFabbricati | null;
+  /** Serie storica degli eventi atmosferici sul punto. `null` se non raccolta. */
+  readonly meteo: StoricoMeteo | null;
   /** Quante fra le vicine aggravano il rischio: è il numero che va in prima pagina. */
   readonly attivitaCheAggravano: number;
   readonly raggioAnalizzatoMetri: number;

@@ -432,6 +432,13 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
             superficieCopertaMq: Math.round(areeFabbricati.reduce((s, a) => s + a, 0)),
             maggioreMq: Math.round(areeFabbricati[0] ?? 0),
           },
+    /*
+      Lo storico meteo non arriva da qui: è una fonte diversa, con una licenza diversa, e
+      si raccoglie a parte. Il campo resta però nello stesso oggetto perché ha lo stesso
+      ciclo di vita — si congela con l'analisi e compare nello stesso capitolo — e chi lo
+      raccoglie lo innesta prima di passarlo al motore.
+    */
+    meteo: null,
     // Le venticinque più vicine: un elenco più lungo non si legge e non aggiunge nulla.
     attivitaVicine: vicine.slice(0, 25),
     attivitaCheAggravano: vicine.filter((v) => v.aggravaIlRischio).length,

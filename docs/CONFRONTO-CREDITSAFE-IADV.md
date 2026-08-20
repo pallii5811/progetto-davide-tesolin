@@ -65,7 +65,7 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 | Analisi economica pluriennale e schema del margine di contribuzione | **sì** | lo schema quadra col totale per costruzione, non per riimplementazione |
 | **Analisi del contesto per ubicazione** (soccorso, attività confinanti) | **sì** | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap |
 | **Valori di ricostruzione degli edifici** | **sì** | già calcolati per tipologia costruttiva; ora la superficie arriva dalla cartografia quando l'intervista non l'ha misurata |
-| **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) con probabilità di superamento soglia | **no** | Open-Meteo copre pioggia e vento, **non** grandine e fulmini; uso commerciale a pagamento |
+| **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) | **parziale** | pioggia e raffiche sì, con giorni e anni oltre soglia; grandine e fulmini **no**, e il report lo dichiara. Spento di default: uso commerciale a pagamento |
 | **Immagini per ubicazione** | **sì** | caricamento per ubicazione, con didascalia; capitolo dedicato nel report |
 | Linea Condomini | **no** | fuori perimetro: il prodotto è sulle imprese |
 | Linea Famiglia | **no** | fuori perimetro |

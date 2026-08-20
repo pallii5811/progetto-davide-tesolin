@@ -245,6 +245,47 @@ OPENAPI_AMBIENTE=produzione
 viaggia **solo** su HTTPS. Il servizio va quindi messo dietro un proxy con certificato
 valido — senza, nessuno riesce più ad accedere, ed è il comportamento voluto.
 
+#### Fonti territoriali
+
+Sono **gratuite**, ma nessuna delle due è gratuita *per un prodotto venduto* alle stesse
+condizioni con cui lo è per una prova. Vanno lette prima di andare in esercizio.
+
+```
+CONTESTO_TERRITORIALE=auto      # auto (predefinito) · sempre · mai
+OVERPASS_URL=https://…/api/interpreter
+OVERPASS_USER_AGENT=NomeProdotto/1.0 (contatto: tecnico@studio.it)
+
+METEO_STORICO=spento            # spento (predefinito) · attivo
+METEO_URL=https://…/v1/archive
+```
+
+**Contesto territoriale** (caserme dei vigili del fuoco, attività confinanti, impronta a
+terra dei fabbricati). Fonte: OpenStreetMap via Overpass. Tre cose da sapere:
+
+- i dati sono **ODbL**: l'attribuzione «© contributori OpenStreetMap» compare già nel
+  report e non va rimossa;
+- l'istanza pubblica di Overpass è **volontaria**, concede **due slot per indirizzo IP** e
+  rifiuta con 429 quando sono occupati. Per un prodotto venduto va sostituita con
+  un'istanza propria o a pagamento: si imposta `OVERPASS_URL` e null'altro cambia;
+- `OVERPASS_USER_AGENT` va personalizzato con un recapito vero. Chi gestisce il servizio
+  deve poter contattare chi ne fa un uso eccessivo invece di doverlo bloccare.
+
+`CONTESTO_TERRITORIALE=auto` raccoglie solo sui dati reali; in modalità dimostrativa le
+coordinate sono inventate e il vicinato di un'azienda che non esiste è rumore. `sempre`
+serve a guardare la resa del capitolo senza acquistare un'anagrafica, `mai` a spegnere
+tutto — utile dietro una rete chiusa, o quando la fonte è ferma e si preferisce un report
+senza quel capitolo a uno che attende invano.
+
+**Storico degli eventi atmosferici** (giorni oltre soglia di pioggia e raffica negli ultimi
+dieci anni). Fonte: Open-Meteo, archivio di rianalisi ERA5. **Spento di default**, e la
+ragione è la licenza: l'uso è gratuito per scopi non commerciali, mentre un prodotto
+venduto richiede un abbonamento. Accenderlo è una decisione con un costo, non
+un'impostazione tecnica — e il codice non la prende al posto di chi installa.
+
+⚠ La fonte **non copre grandine né fulmini**, e la grandine è il fenomeno che produce più
+sinistri sui capannoni. Il report lo dichiara accanto ai dati: quella riga non va tolta,
+perché senza chi legge conclude che su quel punto non ne siano mai caduti.
+
 ### 6.3 Avvio
 
 ```bash

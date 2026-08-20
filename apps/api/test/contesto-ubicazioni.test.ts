@@ -19,9 +19,16 @@ import { raccogliContesti, raccogliConEsito } from '../src/contesto-ubicazioni.j
 const CONTESTO: ContestoTerritoriale = {
   vigiliDelFuoco: [{ nome: 'Distaccamento di prova', distanzaKm: 3.1, minutiStimati: 9 }],
   attivitaVicine: [
-    { nome: 'Carrozzeria Tal dei Tali', categoria: 'autofficina', distanzaMetri: 120, aggravaIlRischio: true },
+    {
+      nome: 'Carrozzeria Tal dei Tali',
+      categoria: 'autofficina',
+      distanzaMetri: 120,
+      aggravaIlRischio: true,
+    },
   ],
   attivitaCheAggravano: 1,
+  fabbricati: null,
+  meteo: null,
   raggioAnalizzatoMetri: 300,
   fonte: '© contributori OpenStreetMap (ODbL)',
 };
@@ -175,5 +182,74 @@ describe('Raccolta del contesto territoriale', () => {
     // L'attribuzione della fonte è un obbligo di licenza: deve comparire da sola, senza
     // che chi costruisce la pagina debba ricordarsene.
     expect(note.some((n) => n.includes('OpenStreetMap'))).toBe(true);
+  });
+
+  it('lo storico meteo è spento se nessuno lo accende', async () => {
+    const profilo = demoCompanyProfile();
+    const finto = lettoreFinto();
+    let chiamateMeteo = 0;
+
+    const contesti = await raccogliContesti(profilo, {
+      leggi: finto.leggi,
+      leggiMeteo: async () => {
+        chiamateMeteo += 1;
+        return Promise.resolve(null);
+      },
+    });
+
+    /*
+      La fonte è gratuita per uso non commerciale e a pagamento per un prodotto venduto:
+      accenderla è una decisione con un costo, e il codice non deve prenderla al posto di
+      chi installa. Il predefinito è quindi «spenta», e si vede da qui.
+    */
+    expect(chiamateMeteo).toBe(0);
+    for (const c of contesti.values()) expect(c.meteo).toBeNull();
+  });
+
+  it('acceso, lo storico si innesta nel contesto senza sostituirlo', async () => {
+    const profilo = demoCompanyProfile();
+    const finto = lettoreFinto();
+
+    const contesti = await raccogliContesti(profilo, {
+      leggi: finto.leggi,
+      meteoAttivo: true,
+      leggiMeteo: async () =>
+        Promise.resolve({
+          anni: 10,
+          dal: '2016-08-15',
+          al: '2026-08-15',
+          soglie: [
+            {
+              descrizione: 'Pioggia oltre 50 mm in un giorno',
+              giorni: 4,
+              anniConEvento: 3,
+              massimo: '118 mm',
+            },
+          ],
+          fonte: 'prova',
+          fenomeniNonCoperti: ['grandine'],
+        }),
+    });
+
+    const primo = [...contesti.values()][0];
+    expect(primo?.meteo?.soglie[0]?.giorni).toBe(4);
+    // Il resto del contesto deve restare intero: il meteo si aggiunge, non sostituisce.
+    expect(primo?.vigiliDelFuoco).toHaveLength(1);
+  });
+
+  it('se il meteo cade, caserme e vicinanze restano', async () => {
+    const profilo = demoCompanyProfile();
+    const finto = lettoreFinto();
+
+    const contesti = await raccogliContesti(profilo, {
+      leggi: finto.leggi,
+      meteoAttivo: true,
+      leggiMeteo: async () => Promise.resolve(null),
+    });
+
+    // Una fonte accessoria che cade non deve portarsi via anche quella che ha risposto.
+    const primo = [...contesti.values()][0];
+    expect(primo?.meteo).toBeNull();
+    expect(primo?.vigiliDelFuoco).toHaveLength(1);
   });
 });
