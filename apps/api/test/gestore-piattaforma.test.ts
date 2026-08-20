@@ -66,7 +66,7 @@ describe('Separazione fra gestore della piattaforma e studi clienti', () => {
     });
 
     expect(risposta.statusCode).toBe(200);
-    const corpo = risposta.json() as { studi: { denominazione: string; gestore: boolean }[] };
+    const corpo = risposta.json();
     expect(corpo.studi.find((s) => s.denominazione === 'Studio del gestore')?.gestore).toBe(true);
     expect(corpo.studi.find((s) => s.denominazione === 'Studio cliente')?.gestore).toBe(false);
   });
@@ -100,7 +100,7 @@ describe('Separazione fra gestore della piattaforma e studi clienti', () => {
     });
 
     expect(creazione.statusCode).toBe(201);
-    const { passwordIniziale } = creazione.json() as { passwordIniziale: string };
+    const { passwordIniziale } = creazione.json();
     expect(passwordIniziale.length).toBeGreaterThan(12);
 
     const accesso = await app.inject({
@@ -244,7 +244,7 @@ describe('Sospensione di uno studio', () => {
 
   it('il gestore non può sospendere sé stesso', async () => {
     const studi = await app.inject({ method: 'GET', url: '/api/studi', headers: { cookie: cookieGestore } });
-    const corpo = studi.json() as { studi: { id: string; gestore: boolean }[] };
+    const corpo = studi.json();
     const proprio = corpo.studi.find((s) => s.gestore);
 
     const risposta = await app.inject({
@@ -321,7 +321,7 @@ describe('Fornitura dati: credito residuo e tetto complessivo', () => {
     });
 
     expect(risposta.statusCode).toBe(200);
-    const corpo = risposta.json() as { residuoCentesimi: number; consumatoTotaleCentesimi: number };
+    const corpo = risposta.json();
     expect(corpo.consumatoTotaleCentesimi).toBe(120);
     expect(corpo.residuoCentesimi).toBe(5000 - 120);
   });
@@ -344,7 +344,7 @@ describe('Fornitura dati: credito residuo e tetto complessivo', () => {
 
     // Il gestore ha speso zero: se il totale fosse filtrato per studio direbbe 0, e il
     // credito si esaurirebbe senza che nessuno lo veda arrivare.
-    const corpo = risposta.json() as { consumatoOggiCentesimi: number };
+    const corpo = risposta.json();
     expect(corpo.consumatoOggiCentesimi).toBe(200);
   });
 
@@ -367,7 +367,7 @@ describe('Fornitura dati: credito residuo e tetto complessivo', () => {
     });
 
     expect(risposta.statusCode).toBe(429);
-    const { errore } = risposta.json() as { errore: string };
+    const { errore } = risposta.json();
     // Il rifiuto deve dire che è il servizio ad aver raggiunto il limite: mandare
     // l'intermediario a cercare fra le proprie impostazioni lo farebbe sbattere contro
     // un numero che non c'entra e che non può cambiare.

@@ -109,5 +109,28 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
 
+  /*
+    Gli strumenti in `strumenti/` sono JavaScript puro, fuori da ogni tsconfig.
+    L'analisi con le informazioni di tipo non può quindi essere applicata — il parser
+    fallisce con «file not found in any of the provided projects», e quel fallimento
+    contava come errore: bastava a tenere rosso `npm run verifica` per tutti.
+    Si continuano a controllare le regole che non richiedono i tipi, e stampano
+    a terminale perché è il loro scopo.
+  */
+  {
+    files: ['strumenti/**/*.mjs'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      // Le opzioni del parser vanno **conservate**, non sostituite: è lì dentro che
+      // `disableTypeChecked` spegne il progetto TypeScript. Rimpiazzare l'intero blocco
+      // riporterebbe l'errore di analisi che si stava togliendo.
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      // Senza i tipi si perdono anche i globali di Node: dichiarati a mano, i due che
+      // servono davvero, per non dipendere da un pacchetto che nessuno ha richiesto.
+      globals: { console: 'readonly', process: 'readonly' },
+    },
+    rules: { ...tseslint.configs.disableTypeChecked.rules, 'no-console': 'off' },
+  },
+
   prettier,
 );

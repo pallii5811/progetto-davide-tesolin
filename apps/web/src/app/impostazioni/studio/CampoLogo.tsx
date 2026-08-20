@@ -21,7 +21,9 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
   const [logo, setLogo] = useState(iniziale ?? '');
   const [errore, setErrore] = useState<string | null>(null);
 
-  async function carica(file: File): Promise<void> {
+  // Non è asincrona: `FileReader` lavora a richiami, non a promesse. Dichiararla `async`
+  // senza mai attendere nulla prometteva un'attesa che non c'era.
+  function carica(file: File): void {
     setErrore(null);
 
     if (!TIPI_AMMESSI.includes(file.type)) {
@@ -41,7 +43,13 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
     }
 
     const lettore = new FileReader();
-    lettore.onload = () => setLogo(String(lettore.result));
+    lettore.onload = () => {
+      // `readAsDataURL` produce sempre una stringa, ma il tipo ammette anche un
+      // ArrayBuffer: convertirlo con String() darebbe «[object ArrayBuffer]» dentro un
+      // attributo `src`, cioè un logo rotto invece di un errore.
+      if (typeof lettore.result === 'string') setLogo(lettore.result);
+      else setErrore('Non è stato possibile leggere il file.');
+    };
     lettore.onerror = () => setErrore('Non è stato possibile leggere il file.');
     lettore.readAsDataURL(file);
   }
@@ -61,8 +69,9 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
             nessun logo
           </div>
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- data URI locale: non c'è
-          // nulla da ottimizzare, e `next/image` richiederebbe un dominio noto.
+          // Data URI locale: non c'è nulla da ottimizzare, e `next/image` richiederebbe un
+          // dominio noto. (Il commento di disabilitazione che stava qui nominava una regola
+          // non caricata in questa configurazione, ed era lui a far fallire il lint.)
           <img
             src={logo}
             alt="Logo attualmente impostato"
@@ -76,7 +85,7 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
             accept={TIPI_AMMESSI.join(',')}
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file !== undefined) void carica(file);
+              if (file !== undefined) carica(file);
             }}
             className="block text-sm text-testo-tenue file:mr-3 file:rounded file:border-0 file:bg-azione file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-azione-testo hover:file:opacity-90"
           />

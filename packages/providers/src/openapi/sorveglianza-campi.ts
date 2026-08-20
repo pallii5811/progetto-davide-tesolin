@@ -62,7 +62,7 @@ export class SorveglianzaCampi {
 
   constructor(
     conosciuti: Iterable<string>,
-    onNuovo?: ((campo: CampoIgnoto) => void) | undefined,
+    onNuovo?: ((campo: CampoIgnoto) => void)  ,
   ) {
     this.#conosciuti = new Set(conosciuti);
     this.#onNuovo = onNuovo;

@@ -1,7 +1,5 @@
 import { richiediSessione } from '@/lib/sessione';
-import Link from 'next/link';
 import { INDIRIZZO_API, cercaAziende, statoServizio } from '@/lib/api';
-import type { RisultatoRicerca } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { ModuloRicerca } from './ModuloRicerca';
 import { SchedaRisultato } from './SchedaRisultato';

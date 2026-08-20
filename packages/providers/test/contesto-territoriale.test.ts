@@ -50,7 +50,7 @@ function fetchFinto(risposta: unknown, stato = 200): typeof fetch {
         headers: { 'Content-Type': 'application/json' },
       }),
     ),
-  ) as unknown as typeof fetch;
+  );
 }
 
 describe('Contesto territoriale', () => {
@@ -106,7 +106,7 @@ describe('Contesto territoriale', () => {
   it('un guasto del servizio non fa cadere l’analisi', async () => {
     for (const scenario of [
       { nome: 'rifiuto HTTP', impl: fetchFinto({}, 429) },
-      { nome: 'risposta illeggibile', impl: fetchFinto('non json' as unknown) },
+      { nome: 'risposta illeggibile', impl: fetchFinto('non json') },
       {
         nome: 'rete assente',
         impl: vi.fn(async () => Promise.reject(new Error('ENOTFOUND'))) as unknown as typeof fetch,

@@ -59,7 +59,7 @@ function providerCheSpende(ledger: CostLedger): CompanyDataProvider {
         return vero.search(criteri);
       };
     },
-  }) as CompanyDataProvider;
+  });
 }
 
 describe('La ricerca annota quello che spende', () => {
@@ -107,7 +107,7 @@ describe('La ricerca annota quello che spende', () => {
       headers: { cookie },
     });
 
-    const corpo = risposta.json() as { costoCentesimi: number };
+    const corpo = risposta.json();
     expect(corpo.costoCentesimi).toBe(COSTO_RICERCA);
   }, 180_000);
 
