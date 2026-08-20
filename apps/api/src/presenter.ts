@@ -181,6 +181,31 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     prevenzione: analisi.prevenzione,
     catNat: presentCatNat(analisi),
     assetto: presentAssetto(analisi),
+    /*
+      Il titolare effettivo passa **con la sua azione consigliata**, non solo con i nomi.
+
+      È l'unica parte del prodotto in cui il risultato più utile può essere «non comprare
+      niente»: senza quella riga, chi legge un elenco di titolari non sa se sia completo, e
+      nel dubbio compra la visura da 1,10 € che nella maggioranza dei casi non serve.
+    */
+    titolareEffettivo: {
+      titolari: analisi.titolareEffettivo.titolari.map((t) => ({
+        nominativo: t.nominativo,
+        codiceFiscale: t.codiceFiscale,
+        quotaPercentuale: t.quotaPercentuale,
+        criterio: t.criterio,
+        motivazione: t.motivazione,
+      })),
+      catenaChiusa: analisi.titolareEffettivo.catenaChiusa,
+      daRisalire: analisi.titolareEffettivo.daRisalire.map((s) => ({
+        denominazione: s.denominazione,
+        codiceFiscale: s.codiceFiscale,
+        quotaPercentuale: s.quotaPercentuale,
+      })),
+      confidenza: analisi.titolareEffettivo.confidenza,
+      azione: analisi.titolareEffettivo.azione,
+      note: analisi.titolareEffettivo.note,
+    },
     ubicazioni: presentUbicazioni(analisi),
     /*
       Gli indicatori che l'archivio camerale ha già calcolato.

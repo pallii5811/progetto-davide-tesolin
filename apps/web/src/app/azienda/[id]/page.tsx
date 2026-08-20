@@ -8,6 +8,7 @@ import {
   leggiImmaginiUbicazioni,
 } from '@/lib/api';
 import { ImmaginiUbicazione } from './ImmaginiUbicazione';
+import { TitolareEffettivo } from './TitolareEffettivo';
 import type {
   AnalisiDto,
   IndicatoriArchivioDto,
@@ -135,11 +136,10 @@ export default async function PaginaAzienda({
       {analisi.accertamentiInCorso && (
         <div className="mb-6">
           <Avviso tono="informativo" titolo="Accertamento protesti in corso">
-            La verifica di protesti, pregiudizievoli e procedure concorsuali è stata avviata
-            ed è già stata pagata: si completa in circa un minuto.{' '}
-            <strong>Ricaricare questa pagina</strong> per includerla — il ricaricamento non
-            consuma credito. Fino ad allora il fattore vale il 20% dello score e resta non
-            valutabile.
+            La verifica di protesti, pregiudizievoli e procedure concorsuali è stata avviata ed è già stata
+            pagata: si completa in circa un minuto. <strong>Ricaricare questa pagina</strong> per includerla
+            — il ricaricamento non consuma credito. Fino ad allora il fattore vale il 20% dello score e
+            resta non valutabile.
           </Avviso>
         </div>
       )}
@@ -178,9 +178,7 @@ export default async function PaginaAzienda({
         */}
         <Metrica
           etichetta="Esposizione non assicurata"
-          valore={
-            esposizioneIgnota ? 'da quantificare' : sintesi.esposizioneNonAssicurata.formattato
-          }
+          valore={esposizioneIgnota ? 'da quantificare' : sintesi.esposizioneNonAssicurata.formattato}
           nota={
             esposizioneIgnota
               ? `${sintesi.coperturaDaQuantificare} coperture senza capitale ricavabile dai dati disponibili`
@@ -263,9 +261,7 @@ export default async function PaginaAzienda({
       >
         {ubicazioni.elenco.length === 0 ? (
           <Scheda>
-            <p className="text-sm text-testo-tenue">
-              Nessuna ubicazione risulta dai dati disponibili.
-            </p>
+            <p className="text-sm text-testo-tenue">Nessuna ubicazione risulta dai dati disponibili.</p>
           </Scheda>
         ) : (
           <>
@@ -381,6 +377,10 @@ export default async function PaginaAzienda({
             : ` · ${assetto.numeroSoci} ${assetto.numeroSoci === 1 ? 'socio' : 'soci'}`
         }`}
       >
+        <div className="mb-4">
+          <TitolareEffettivo dati={analisi.titolareEffettivo} />
+        </div>
+
         <div className="grid gap-4 lg:grid-cols-2">
           <Scheda>
             <div className="mb-3 flex items-center justify-between">
@@ -442,10 +442,7 @@ export default async function PaginaAzienda({
                     </Link>
                   )}
                   {assetto.capogruppo.quotaPercentuale !== null && (
-                    <span className="text-testo-tenue">
-                      {' '}
-                      · {assetto.capogruppo.quotaPercentuale}%
-                    </span>
+                    <span className="text-testo-tenue"> · {assetto.capogruppo.quotaPercentuale}%</span>
                   )}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-testo-tenue">
@@ -455,8 +452,8 @@ export default async function PaginaAzienda({
                 </p>
                 {assetto.capogruppo.partitaIva !== null && (
                   <p className="mt-2 text-xs text-testo-debole">
-                    Analizzabile: l&apos;analisi della controllante consuma credito come qualunque
-                    altra azienda.
+                    Analizzabile: l&apos;analisi della controllante consuma credito come qualunque altra
+                    azienda.
                   </p>
                 )}
               </Scheda>
@@ -486,8 +483,8 @@ export default async function PaginaAzienda({
               <Scheda>
                 <h3 className="mb-2 text-sm font-semibold">Cariche</h3>
                 <p className="text-sm text-testo-tenue">
-                  Gli amministratori non sono compresi nell&apos;anagrafica acquisita: vanno
-                  rilevati in intervista. Dalla carica dipende chi è assicurato dalla D&amp;O.
+                  Gli amministratori non sono compresi nell&apos;anagrafica acquisita: vanno rilevati in
+                  intervista. Dalla carica dipende chi è assicurato dalla D&amp;O.
                 </p>
               </Scheda>
             )}
@@ -499,9 +496,7 @@ export default async function PaginaAzienda({
             {assetto.implicazioni.map((implicazione) => (
               <Scheda key={implicazione.titolo}>
                 <h3 className="text-sm font-semibold">{implicazione.titolo}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-testo-tenue">
-                  {implicazione.conseguenza}
-                </p>
+                <p className="mt-1 text-sm leading-relaxed text-testo-tenue">{implicazione.conseguenza}</p>
                 <p className="mt-2 border-l-2 border-marchio/40 pl-2 text-sm leading-relaxed">
                   {implicazione.azione}
                 </p>
@@ -553,8 +548,8 @@ export default async function PaginaAzienda({
               ))}
             </ul>
             <p className="mt-3 text-xs text-testo-debole">
-              Il collegamento è rilevato per codice fiscale fra le aziende già analizzate: non
-              è una visura delle partecipazioni nazionali.
+              Il collegamento è rilevato per codice fiscale fra le aziende già analizzate: non è una visura
+              delle partecipazioni nazionali.
             </p>
           </Scheda>
         )}
@@ -581,11 +576,7 @@ export default async function PaginaAzienda({
       >
         <div className="space-y-3">
           {gap.voci.map((voce) => (
-            <VoceGap
-              key={voce.copertura}
-              voce={voce}
-              compagnia={compagniaDi(voce, compagnie)}
-            />
+            <VoceGap key={voce.copertura} voce={voce} compagnia={compagniaDi(voce, compagnie)} />
           ))}
         </div>
       </Sezione>
@@ -1048,13 +1039,7 @@ function normalizzaNome(valore: string): string {
     .trim();
 }
 
-function VoceGap({
-  voce,
-  compagnia,
-}: {
-  voce: GapDto;
-  compagnia: SoliditaCompagnia | null;
-}) {
+function VoceGap({ voce, compagnia }: { voce: GapDto; compagnia: SoliditaCompagnia | null }) {
   return (
     <Scheda className={voce.stato === 'adeguata' ? 'opacity-70' : ''}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">

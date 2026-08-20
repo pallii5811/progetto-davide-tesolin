@@ -75,4 +75,26 @@ test.describe('Assetto proprietario e gruppo', () => {
     const sezione = page.locator('#assetto');
     await expect(sezione.locator(`a[href="/azienda/${SECONDA_AZIENDA}"]`).first()).toBeVisible();
   });
+
+  test('il titolare effettivo compare, col criterio e con la decisione se comprare', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
+
+    const riquadro = page.locator('#assetto').getByText('Titolare effettivo', { exact: true });
+    await expect(riquadro).toBeVisible({ timeout: 90_000 });
+
+    /*
+      Il riferimento normativo accanto al titolo non è decorazione: un titolare effettivo
+      indicato senza dire con quale criterio è stato individuato non si difende davanti a
+      un’ispezione, ed è proprio il documento che serve a difendersi.
+    */
+    await expect(page.getByText('art. 20 D.Lgs. 231/2007')).toBeVisible();
+
+    /*
+      La riga che fa risparmiare: dice se la visura da 1,10 € serva o no. Senza, chi legge
+      un elenco di titolari resta nel dubbio — e nel dubbio compra un dato che ha già.
+    */
+    const azione = page.locator('#assetto').getByText(/visura sul registro/);
+    await expect(azione.first()).toBeVisible();
+  });
 });

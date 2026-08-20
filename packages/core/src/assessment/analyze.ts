@@ -58,6 +58,8 @@ import { analizzaUbicazioni } from '../company/ubicazioni.js';
 import type { AnalisiUbicazioni } from '../company/ubicazioni.js';
 import type { ContestoTerritoriale } from '../company/contesto-territoriale.js';
 import { analizzaAssetto } from '../governance/assetto.js';
+import { analizzaTitolareEffettivo } from '../governance/titolare-effettivo.js';
+import type { AnalisiTitolareEffettivo } from '../governance/titolare-effettivo.js';
 import type { AssettoProprietario } from '../governance/assetto.js';
 
 export interface AnalyzeOptions {
@@ -148,6 +150,14 @@ export interface CompanyAnalysis {
    * all'imprenditore e non all'azienda.
    */
   readonly assetto: AssettoProprietario;
+  /**
+   * Chi possiede davvero, ai sensi dell'art. 20 del D.Lgs. 231/2007.
+   *
+   * Ricavato dai soci **già acquistati**: quando sono persone fisiche il titolare
+   * effettivo è già lì, e la visura dedicata — undici volte il prezzo dell'anagrafica —
+   * non serve. Il risultato dichiara quando invece serve davvero.
+   */
+  readonly titolareEffettivo: AnalisiTitolareEffettivo;
   /**
    * Dove l'impresa sta davvero.
    *
@@ -377,6 +387,7 @@ export function analyzeCompany(
   });
 
   const assetto = analizzaAssetto(profile.assetti?.value ?? null, facts);
+  const titolareEffettivo = analizzaTitolareEffettivo(assetto);
 
   return {
     asOf,
@@ -400,6 +411,7 @@ export function analyzeCompany(
     catNat,
     gap,
     assetto,
+    titolareEffettivo,
     ubicazioni,
     completezza: valutaCompletezza(profile.datiDichiarati, facts),
     livelloDatiEconomici: livelloDati,

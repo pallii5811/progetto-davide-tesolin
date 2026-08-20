@@ -38,6 +38,7 @@ export * from './risk/rules.js';
 export * from './risk/engine.js';
 export * from './risk/ritenzione.js';
 export * from './governance/assetto.js';
+export * from './governance/titolare-effettivo.js';
 export * from './risk/prevenzione.js';
 
 // ── Coperture ────────────────────────────────────────────────────────────────

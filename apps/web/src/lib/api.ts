@@ -432,6 +432,28 @@ export interface AnalisiDto {
   };
 
   /** Chi possiede e chi risponde: presupposto di D&O e key man. */
+  /**
+   * Chi possiede davvero (art. 20 D.Lgs. 231/2007), ricavato dai soci già acquistati.
+   *
+   * `azione` è il campo che conta: dice se la visura dedicata da 1,10 € serva davvero o
+   * se il dato sia già in mano. È l'unica parte del prodotto in cui il risultato migliore
+   * può essere «non comprare niente».
+   */
+  titolareEffettivo: {
+    titolari: {
+      nominativo: string;
+      codiceFiscale: string | null;
+      quotaPercentuale: number | null;
+      criterio: 'partecipazione' | 'controllo' | 'residuale-amministratore' | 'non-determinato';
+      motivazione: string;
+    }[];
+    catenaChiusa: boolean;
+    daRisalire: { denominazione: string; codiceFiscale: string | null; quotaPercentuale: number | null }[];
+    confidenza: string;
+    azione: string;
+    note: string[];
+  };
+
   assetto: {
     tipoControllo:
       | 'socio-unico-persona-fisica'
