@@ -212,11 +212,23 @@ export interface Pregiudizievole {
 export type TipoProcedura =
   | 'fallimento'
   | 'liquidazione-giudiziale'
+  /**
+   * Stato di insolvenza accertato dal tribunale.
+   *
+   * Non è «altro»: è il **presupposto** della liquidazione giudiziale (art. 2 CCII), cioè
+   * la condizione in cui l'impresa non è più in grado di soddisfare regolarmente le proprie
+   * obbligazioni. Osservato su una risposta reale il 20/08/2026, dove finiva nel secchio
+   * generico — su un prodotto che valuta il merito di credito è la classificazione peggiore
+   * che si possa sbagliare.
+   */
+  | 'stato-insolvenza'
   | 'concordato-preventivo'
   | 'composizione-negoziata'
   | 'liquidazione-coatta'
   | 'amministrazione-straordinaria'
   | 'accordo-ristrutturazione'
+  /** Misure cautelari o protettive concesse dal tribunale (art. 54 CCII). */
+  | 'misure-protettive'
   | 'scioglimento'
   | 'altro';
 
@@ -224,8 +236,36 @@ export interface ProceduraConcorsuale {
   readonly tipo: TipoProcedura;
   readonly dataApertura: Date;
   readonly dataChiusura: Date | null;
+  /**
+   * Data di **revoca** del provvedimento, quando c'è.
+   *
+   * Una procedura revocata è finita esattamente come una chiusa, ma il registro la segnala
+   * su un campo diverso e lascia `data_chiusura` vuota. Osservato il 20/08/2026: misure
+   * cautelari revocate il 29/02/2024 risultavano ancora aperte, e `aperta` è il flag che
+   * **azzera il punteggio di credito**. Su un'impresa il cui unico provvedimento fosse
+   * stato revocato, il prodotto avrebbe negato il fido a un'azienda risanata.
+   */
+  readonly dataRevoca: Date | null;
+  /**
+   * Data di **omologa**, per le procedure che la prevedono.
+   *
+   * Un concordato omologato dal tribunale e uno ancora in attesa sono due rischi diversi:
+   * il primo ha un piano approvato e vincolante, il secondo può ancora finire in
+   * liquidazione giudiziale.
+   */
+  readonly dataOmologa: Date | null;
   readonly tribunale: string | null;
+  /** Vera solo se il provvedimento non è né chiuso né revocato. */
   readonly aperta: boolean;
+  /**
+   * La dicitura del registro, testuale.
+   *
+   * Veniva scartata, e con essa l'unica formulazione che si possa citare senza
+   * interpretarla. La classificazione serve al calcolo; questa serve al documento — «STATO
+   * DI INSOLVENZA» detto dal registro vale più di qualunque etichetta nostra, e davanti a
+   * una contestazione è ciò che si mostra.
+   */
+  readonly descrizione: string | null;
 }
 
 export interface EventiNegativi {

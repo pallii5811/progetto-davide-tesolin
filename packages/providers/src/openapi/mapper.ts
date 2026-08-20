@@ -30,10 +30,10 @@ import type {
   Socio,
   Sourced,
   StatoAttivita,
-  TipoProcedura,
   TipoUnitaLocale,
   UnitaLocale,
 } from '@aegis/core';
+import { classificaProcedura } from './negativita.js';
 import { asArray, atecoOf, bool, date, money, moneyOrZero, num, percent, pick, str } from './parse.js';
 
 const PROVIDER = 'OpenAPI.com';
@@ -85,20 +85,6 @@ function normalizzaTipoUnitaLocale(valore: string | null): TipoUnitaLocale {
   if (testo.includes('vendita') || testo.includes('negozio')) return 'punto-vendita';
   if (testo.includes('ufficio')) return 'ufficio';
   if (testo.includes('operativ')) return 'sede-operativa';
-  return 'altro';
-}
-
-function normalizzaProcedura(valore: string | null): TipoProcedura {
-  if (valore === null) return 'altro';
-  const testo = valore.toLowerCase();
-  if (testo.includes('liquidazione giudiziale')) return 'liquidazione-giudiziale';
-  if (testo.includes('fallim')) return 'fallimento';
-  if (testo.includes('concordato')) return 'concordato-preventivo';
-  if (testo.includes('composizione negoziata')) return 'composizione-negoziata';
-  if (testo.includes('coatta')) return 'liquidazione-coatta';
-  if (testo.includes('straordinaria')) return 'amministrazione-straordinaria';
-  if (testo.includes('ristrutturazione')) return 'accordo-ristrutturazione';
-  if (testo.includes('scioglimento')) return 'scioglimento';
   return 'altro';
 }
 
@@ -566,15 +552,22 @@ export function mappaEventiNegativi(
 
   const procedure = asArray(pick(rawPregiudizievoli, 'procedures', 'procedure', 'insolvencyProcedures'))
     .map((p) => {
-      const dataApertura = date(p, 'openingDate', 'dataApertura', 'data');
+      // Gli stessi nomi del servizio dedicato, nello stesso ordine: i `data_*` in
+      // snake_case sono quelli osservati sulle risposte vere.
+      const dataApertura = date(p, 'data_provvedimento', 'openingDate', 'dataApertura', 'data');
       if (dataApertura === null) return null;
-      const dataChiusura = date(p, 'closingDate', 'dataChiusura');
+      const dataChiusura = date(p, 'data_chiusura', 'closingDate', 'dataChiusura');
+      const dataRevoca = date(p, 'data_revoca', 'dataRevoca', 'revocationDate');
+      const descrizione = str(p, 'descrizione_procedura', 'type', 'tipo', 'descrizione');
       return {
-        tipo: normalizzaProcedura(str(p, 'type', 'tipo', 'descrizione')),
+        tipo: classificaProcedura(descrizione),
+        descrizione,
         dataApertura,
         dataChiusura,
-        tribunale: str(p, 'court', 'tribunale'),
-        aperta: dataChiusura === null,
+        dataRevoca,
+        dataOmologa: date(p, 'data_omologa', 'dataOmologa', 'approvalDate'),
+        tribunale: str(p, 'tribunale', 'court'),
+        aperta: dataChiusura === null && dataRevoca === null,
       };
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);

@@ -118,16 +118,65 @@ function mappaProcedure(radice: unknown): readonly ProceduraConcorsuale[] {
 
   return elenco
     .map((p): ProceduraConcorsuale | null => {
-      const dataApertura = date(p, 'dataApertura', 'openingDate', 'data', 'date');
+      /*
+        I nomi veri vengono per primi, e sono in **snake_case**.
+
+        Osservati il 20/08/2026 su una risposta reale — Acciaierie d'Italia S.p.A., quattro
+        procedure fra cui uno stato di insolvenza del 29/02/2024. Prima di allora questa
+        funzione cercava `dataApertura` e `openingDate`: nomi plausibili e mai verificati.
+        Nessuno corrispondeva, ogni voce veniva scartata per data mancante, e il prodotto
+        dichiarava «procedure presenti senza dettaglio» **avendo il dettaglio in mano**.
+
+        Su un'impresa in insolvenza è la differenza fra un documento che dice «risulta una
+        procedura, da verificare» e uno che dice «stato di insolvenza, 29 febbraio 2024».
+      */
+      const dataApertura = date(
+        p,
+        'data_provvedimento',
+        'dataApertura',
+        'openingDate',
+        'data',
+        'date',
+      );
       if (dataApertura === null) return null;
-      const dataChiusura = date(p, 'dataChiusura', 'closingDate');
+
+      const dataChiusura = date(p, 'data_chiusura', 'dataChiusura', 'closingDate');
+      /*
+        La revoca chiude una procedura quanto la chiusura, ma su un campo diverso.
+
+        Osservato sulla stessa risposta reale: misure cautelari e protettive con
+        `data_chiusura` vuota e `data_revoca` al 29/02/2024. Guardando la sola chiusura
+        risultavano **aperte**, ed `aperta` è il flag che azzera il punteggio di credito.
+        Qui l'impresa era comunque in insolvenza, quindi non cambiava l'esito; su un'impresa
+        il cui unico provvedimento fosse stato revocato, avremmo negato il fido a un'azienda
+        risanata — senza che nessun collaudo potesse accorgersene.
+      */
+      const dataRevoca = date(p, 'data_revoca', 'dataRevoca', 'revocationDate');
+      const dataOmologa = date(p, 'data_omologa', 'dataOmologa', 'approvalDate');
+      const descrizione = str(
+        p,
+        'descrizione_procedura',
+        'tipo',
+        'type',
+        'descrizione',
+        'description',
+      );
       return {
-        tipo: classificaProcedura(str(p, 'tipo', 'type', 'descrizione', 'description')),
+        tipo: classificaProcedura(descrizione),
+        // La dicitura del registro viene conservata testuale accanto alla classificazione:
+        // «STATO DI INSOLVENZA» vale più di qualunque etichetta nostra, e in una
+        // contestazione è quella che si mostra.
+        descrizione,
         dataApertura,
         dataChiusura,
+        dataRevoca,
+        dataOmologa,
+        // Il campo `tribunale` esiste ma può arrivare **vuoto**, come sulla risposta
+        // osservata: `str` restituisce `null` e la sezione lo dichiara, invece di
+        // stampare un tribunale inesistente.
         tribunale: str(p, 'tribunale', 'court', 'sede'),
-        // Nessuna data di chiusura significa procedura ancora aperta: forza lo score a ≤ 10.
-        aperta: dataChiusura === null,
+        // Aperta solo se non è né chiusa né revocata: forza lo score a ≤ 10.
+        aperta: dataChiusura === null && dataRevoca === null,
       };
     })
     .filter((p): p is ProceduraConcorsuale => p !== null);
@@ -180,7 +229,14 @@ function classificaPregiudizievole(descrizione: string): Pregiudizievole['tipo']
   return 'altro';
 }
 
-function classificaProcedura(valore: string | null): ProceduraConcorsuale['tipo'] {
+/**
+ * La dicitura del registro tradotta in categoria.
+ *
+ * Esportata perché esisteva **due volte**, qui e in `mapper.ts`, riga per riga identica.
+ * Due copie della stessa regola sono due regole: la correzione dello stato di insolvenza
+ * sarebbe valsa da una porta sola, e l'altra avrebbe continuato a chiamarlo «altro».
+ */
+export function classificaProcedura(valore: string | null): ProceduraConcorsuale['tipo'] {
   if (valore === null) return 'altro';
   const testo = valore.toLowerCase();
   if (testo.includes('liquidazione giudiziale')) return 'liquidazione-giudiziale';
@@ -191,6 +247,12 @@ function classificaProcedura(valore: string | null): ProceduraConcorsuale['tipo'
   if (testo.includes('straordinaria')) return 'amministrazione-straordinaria';
   if (testo.includes('ristrutturazione')) return 'accordo-ristrutturazione';
   if (testo.includes('scioglimento')) return 'scioglimento';
+  // Le due voci che seguono sono state osservate su una risposta reale il 20/08/2026 e
+  // finivano entrambe in «altro». Lo stato di insolvenza in particolare è il presupposto
+  // della liquidazione giudiziale: confonderlo col secchio generico su un prodotto che
+  // valuta il merito di credito è l'errore di classificazione più grave possibile.
+  if (testo.includes('insolvenza')) return 'stato-insolvenza';
+  if (testo.includes('cautelar') || testo.includes('protettiv')) return 'misure-protettive';
   return 'altro';
 }
 

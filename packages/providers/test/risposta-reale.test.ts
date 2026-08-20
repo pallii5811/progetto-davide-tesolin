@@ -592,3 +592,195 @@ describe('Eventi negativi sulla risposta reale', () => {
     expect(eventi.source.kind).toBe('provider');
   });
 });
+
+/*
+  Una risposta reale con procedure **davvero presenti**.
+
+  Acciaierie d'Italia S.p.A., 20 agosto 2026, quarantacinque centesimi. Il campione
+  precedente aveva tutti gli elenchi vuoti: confermava che «nessun evento» venisse letto
+  bene, e non poteva dire nulla su come vengono letti gli eventi che ci sono. Bastava,
+  finché non è arrivata questa — e questa ha fatto emergere tre difetti in una volta.
+
+  Le persone coinvolte e gli indirizzi di residenza, che la risposta vera riporta, sono
+  stati tolti: sono dati personali di persone fisiche e non hanno motivo di stare in un
+  archivio di codice. Il mappatore non li legge, quindi il valore del collaudo non cambia.
+*/
+const NEGATIVITA_CON_PROCEDURE = {
+    "data": {
+      "presenzaPregiudizievoli": false,
+      "pregiudizievoli": null,
+      "presenzaProcedure": true,
+      "procedure": [
+        {
+          "identificativo_procedura": "3828317",
+          "cciaa": "MI",
+          "numero_rea": "2525101",
+          "progressivo_procedura": 4,
+          "domanda_ammissione_concordato": false,
+          "accordo_ristrutturazione_debiti": false,
+          "codice_procedura": "SI",
+          "descrizione_procedura": "STATO DI INSOLVENZA",
+          "codice_natura_giuridica": "SP",
+          "natura_giuridica": "SOCIETA' PER AZIONI",
+          "data_provvedimento": "2024-02-29",
+          "data_chiusura": null,
+          "data_revoca": null,
+          "data_esecuzione": null,
+          "data_omologa": null,
+          "data_caricamento": "2024-02-29",
+          "denominazione": "ACCIAIERIE D'ITALIA S.P.A.",
+          "codice_fiscale": "10354890963",
+          "codice_comune_tribunale": null,
+          "tribunale": "",
+          "provincia_tribunale": null,
+          "riferimento_sentenza": "",
+          "commento": ""
+        },
+        {
+          "identificativo_procedura": "3821336",
+          "cciaa": "MI",
+          "numero_rea": "2525101",
+          "progressivo_procedura": 3,
+          "domanda_ammissione_concordato": false,
+          "accordo_ristrutturazione_debiti": false,
+          "codice_procedura": "AM",
+          "descrizione_procedura": "AMMINISTRAZIONE STRAORDINARIA GRANDI IMPRESE",
+          "codice_natura_giuridica": "SP",
+          "natura_giuridica": "SOCIETA' PER AZIONI",
+          "data_provvedimento": "2024-02-20",
+          "data_chiusura": null,
+          "data_revoca": null,
+          "data_esecuzione": null,
+          "data_omologa": null,
+          "data_caricamento": "2024-02-22",
+          "denominazione": "ACCIAIERIE D'ITALIA S.P.A.",
+          "codice_fiscale": "10354890963",
+          "codice_comune_tribunale": null,
+          "tribunale": "",
+          "provincia_tribunale": null,
+          "riferimento_sentenza": "",
+          "commento": ""
+        },
+        {
+          "identificativo_procedura": "3817499",
+          "cciaa": "MI",
+          "numero_rea": "2525101",
+          "progressivo_procedura": 1,
+          "domanda_ammissione_concordato": false,
+          "accordo_ristrutturazione_debiti": false,
+          "codice_procedura": "PU",
+          "descrizione_procedura": "PROCEDIMENTO UNITARIO",
+          "codice_natura_giuridica": "SP",
+          "natura_giuridica": "SOCIETA' PER AZIONI",
+          "data_provvedimento": "2024-02-17",
+          "data_chiusura": "2024-02-29",
+          "data_revoca": null,
+          "data_esecuzione": null,
+          "data_omologa": null,
+          "data_caricamento": "2024-02-19",
+          "denominazione": "ACCIAIERIE D'ITALIA S.P.A.",
+          "codice_fiscale": "10354890963",
+          "codice_comune_tribunale": null,
+          "tribunale": null,
+          "provincia_tribunale": "",
+          "riferimento_sentenza": "",
+          "commento": null
+        },
+        {
+          "identificativo_procedura": "3817502",
+          "cciaa": "MI",
+          "numero_rea": "2525101",
+          "progressivo_procedura": 2,
+          "domanda_ammissione_concordato": false,
+          "accordo_ristrutturazione_debiti": false,
+          "codice_procedura": "WZ",
+          "descrizione_procedura": "MISURE CAUTELARI E PROTETTIVE",
+          "codice_natura_giuridica": "SP",
+          "natura_giuridica": "SOCIETA' PER AZIONI",
+          "data_provvedimento": "2024-02-17",
+          "data_chiusura": null,
+          "data_revoca": "2024-02-29",
+          "data_esecuzione": null,
+          "data_omologa": null,
+          "data_caricamento": "2024-02-19",
+          "denominazione": "ACCIAIERIE D'ITALIA S.P.A.",
+          "codice_fiscale": "10354890963",
+          "codice_comune_tribunale": null,
+          "tribunale": null,
+          "provincia_tribunale": "",
+          "riferimento_sentenza": "",
+          "commento": null
+        }
+      ],
+      "presenzaProtesti": false,
+      "protesti": null
+    },
+    "success": true,
+    "message": "",
+    "error": null
+  };
+
+describe('Procedure concorsuali su una risposta reale che ne contiene', () => {
+  const OSSERVATO_ORA = new Date('2026-08-20T00:00:00Z');
+  const eventi = () => mappaNegativita(NEGATIVITA_CON_PROCEDURE, OSSERVATO_ORA).value;
+
+  it('legge tutte e quattro le procedure invece di scartarle', () => {
+    /*
+      Il primo difetto, e il più grave: i nomi dei campi erano **ipotizzati**.
+
+      La funzione cercava `dataApertura` e `openingDate`; il registro scrive
+      `data_provvedimento`. Nessuna corrispondenza, ogni voce scartata per data mancante,
+      elenco vuoto. E poiché l'indicatore `presenzaProcedure` diceva di sì, il prodotto
+      dichiarava «procedure presenti, dettaglio non fornito» **avendo il dettaglio in mano**.
+
+      Su un'impresa in amministrazione straordinaria è la differenza fra un documento che
+      dice «risulta qualcosa, da verificare» e uno che dice cosa e da quando.
+    */
+    expect(eventi().procedure).toHaveLength(4);
+    expect(eventi().presenzaDichiarataSenzaDettaglio).toEqual([]);
+  });
+
+  it('chiama lo stato di insolvenza col suo nome, non «altro»', () => {
+    /*
+      Il secondo difetto. Lo stato di insolvenza è il presupposto della liquidazione
+      giudiziale: su un prodotto che valuta il merito di credito, finire nel secchio
+      generico è la classificazione peggiore che si possa sbagliare.
+    */
+    const tipi = eventi().procedure.map((p) => p.tipo);
+    expect(tipi).toContain('stato-insolvenza');
+    expect(tipi).toContain('amministrazione-straordinaria');
+    expect(tipi).toContain('misure-protettive');
+  });
+
+  it('non considera aperta una procedura che è stata revocata', () => {
+    /*
+      Il terzo difetto, e il più insidioso: le misure cautelari hanno `data_chiusura`
+      vuota e `data_revoca` al 29 febbraio 2024. Guardando la sola chiusura risultavano
+      aperte, e `aperta` **azzera il punteggio di credito**.
+
+      Qui l'impresa era comunque insolvente, quindi l'esito non cambiava. Su un'impresa il
+      cui unico provvedimento fosse stato revocato, avremmo negato il fido a un'azienda
+      risanata — e nessun collaudo avrebbe potuto accorgersene.
+    */
+    const revocata = eventi().procedure.find((p) => p.dataRevoca !== null);
+    expect(revocata, 'la procedura revocata deve essere riconosciuta come tale').toBeDefined();
+    expect(revocata?.aperta).toBe(false);
+
+    // Le due che sono davvero in corso restano aperte: la correzione non le ha spente.
+    expect(eventi().procedure.filter((p) => p.aperta)).toHaveLength(2);
+  });
+
+  it('conserva la dicitura del registro, parola per parola', () => {
+    // È la formulazione che si cita in un fascicolo: «STATO DI INSOLVENZA» detto dal
+    // registro regge una contestazione, la nostra etichetta no.
+    const insolvenza = eventi().procedure.find((p) => p.tipo === 'stato-insolvenza');
+    expect(insolvenza?.descrizione).toBe('STATO DI INSOLVENZA');
+    expect(insolvenza?.dataApertura).toEqual(new Date('2024-02-29'));
+  });
+
+  it('dichiara il tribunale mancante invece di inventarlo', () => {
+    // Il registro manda `tribunale: ""`. Una stringa vuota stampata in un documento è
+    // peggio di un'assenza dichiarata: sembra un dato, e non lo è.
+    expect(eventi().procedure.every((p) => p.tribunale === null)).toBe(true);
+  });
+});
