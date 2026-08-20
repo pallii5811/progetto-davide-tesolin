@@ -182,7 +182,10 @@ describe('Contesto territoriale', () => {
     const impl = vi.fn(async (url: string | URL | Request) =>
       Promise.resolve(
         (url instanceof Request ? url.url : url.toString()).endsWith('/status')
-          ? new Response('Rate limit: 2\n0 slots available now.\nSlot available after: ..., in 240 seconds.\n', { status: 200 })
+          ? new Response(
+              'Rate limit: 2\n0 slots available now.\nSlot available after: ..., in 240 seconds.\n',
+              { status: 200 },
+            )
           : new Response('{}', { status: 429 }),
       ),
     ) as unknown as typeof fetch;
@@ -205,5 +208,68 @@ describe('Contesto territoriale', () => {
     await leggiContestoTerritoriale(45.622, 9.96, { fetchImpl: chiamata, cache });
 
     expect((chiamata as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(1);
+  });
+
+  it('misura l’area dei fabbricati, tenendo conto della latitudine', async () => {
+    /*
+      Un quadrato di 100 m di lato a Milano. Il fattore di longitudine dipende dalla
+      latitudine — a 45° un grado di longitudine vale circa i due terzi di uno di
+      latitudine — e ignorarlo darebbe una superficie sbagliata di oltre il quaranta per
+      cento: un numero plausibile e falso, che è il tipo peggiore.
+    */
+    const lato = 100;
+    const lat0 = 45.5;
+    const dLat = lato / 110_574;
+    const dLon = lato / (111_320 * Math.cos((lat0 * Math.PI) / 180));
+
+    const risposta = {
+      elements: [
+        {
+          type: 'way',
+          tags: { building: 'industrial' },
+          geometry: [
+            { lat: lat0, lon: 9.2 },
+            { lat: lat0 + dLat, lon: 9.2 },
+            { lat: lat0 + dLat, lon: 9.2 + dLon },
+            { lat: lat0, lon: 9.2 + dLon },
+          ],
+        },
+      ],
+    };
+
+    const c = await leggiContestoTerritoriale(lat0, 9.2, { fetchImpl: fetchFinto(risposta) });
+
+    expect(c?.fabbricati?.quanti).toBe(1);
+    // Diecimila metri quadri, con la tolleranza di una proiezione locale.
+    expect(c?.fabbricati?.superficieCopertaMq ?? 0).toBeGreaterThan(9_800);
+    expect(c?.fabbricati?.superficieCopertaMq ?? 0).toBeLessThan(10_200);
+  });
+
+  it('scarta le costruzioni minime e distingue «nessun fabbricato mappato» da zero', async () => {
+    // Sotto i venti metri quadri è una tettoia, una cabina, un chiosco: sommarle
+    // gonfierebbe il capitale con cose che nessuno assicura come fabbricato.
+    const minuscolo = {
+      elements: [
+        {
+          type: 'way',
+          tags: { building: 'yes' },
+          geometry: [
+            { lat: 45.5, lon: 9.2 },
+            { lat: 45.50002, lon: 9.2 },
+            { lat: 45.50002, lon: 9.20002 },
+            { lat: 45.5, lon: 9.20002 },
+          ],
+        },
+      ],
+    };
+
+    const c = await leggiContestoTerritoriale(45.5, 9.2, { fetchImpl: fetchFinto(minuscolo) });
+
+    /*
+      `null`, e non un totale a zero: la copertura della cartografia collaborativa non è
+      uniforme, e su un capannone recente spesso non c’è ancora nulla. Dire «zero metri
+      quadri di fabbricato» sarebbe un’affermazione; dire «non mappato» è un fatto.
+    */
+    expect(c?.fabbricati).toBeNull();
   });
 });

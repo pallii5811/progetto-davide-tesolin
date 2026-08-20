@@ -290,23 +290,32 @@ export function analyzeCompany(
     includiRischiDaVerificare: options.includiRischiDaVerificare ?? true,
   });
 
-  // ── 4. Somme assicurande ──────────────────────────────────────────────────
-  const sommeAssicurande = computeSumsInsured(facts, bilancio, profile.datiDichiarati.immobili, {
-    ...options.sommeAssicurande,
-    periodoIndennizzoMesi:
-      options.sommeAssicurande?.periodoIndennizzoMesi ??
-      profile.datiDichiarati.periodoIndennizzoMesi ??
-      undefined,
-  });
+  /*
+    Le ubicazioni prima delle somme assicurande, e non dopo.
 
-  // Le ubicazioni prima del danno massimo: è la contiguità misurata a dire se i valori
-  // stiano in un unico complesso, e da quella dipende la maggiorazione della quota.
+    Servono al danno massimo — è la contiguità misurata a dire se i valori stiano in un
+    unico complesso — ma ora servono anche prima: portano con sé l'impronta a terra dei
+    fabbricati, che è la base di ripiego per il capitale sui fabbricati quando l'intervista
+    non ha misurato le superfici.
+  */
   const ubicazioni = analizzaUbicazioni({
     sedeLegale: profile.anagrafica.value.sedeLegale,
     unitaLocali: profile.unitaLocali?.value ?? [],
     immobili: profile.datiDichiarati.immobili,
     contesti: options.contestiTerritoriali,
     esitoContesto: options.esitoContesto,
+  });
+
+  // ── 4. Somme assicurande ──────────────────────────────────────────────────
+  const superficieCartograficaMq = superficieRilevata(ubicazioni);
+
+  const sommeAssicurande = computeSumsInsured(facts, bilancio, profile.datiDichiarati.immobili, {
+    ...options.sommeAssicurande,
+    ...(superficieCartograficaMq === null ? {} : { superficieCartograficaMq }),
+    periodoIndennizzoMesi:
+      options.sommeAssicurande?.periodoIndennizzoMesi ??
+      profile.datiDichiarati.periodoIndennizzoMesi ??
+      undefined,
   });
 
   const dannoMassimo = stimaDannoMassimo(
@@ -331,16 +340,14 @@ export function analyzeCompany(
     arrivano senza costo con l’anagrafica estesa. I dettagliati sono al massimo due, e su
     due punti non si vede una tendenza.
   */
-  const andamentoPluriennale: AndamentoEsercizio[] = profile.bilanciSintetici
-    .slice(0, 5)
-    .map((b) => ({
-      anno: b.value.anno,
-      valoreDellaProduzione: b.value.fatturato,
-      patrimonioNetto: b.value.patrimonioNetto,
-      costoDelPersonale: b.value.costoDelPersonale,
-      dipendenti: b.value.dipendenti,
-      retribuzioneMediaLorda: b.value.retribuzioneMediaLorda,
-    }));
+  const andamentoPluriennale: AndamentoEsercizio[] = profile.bilanciSintetici.slice(0, 5).map((b) => ({
+    anno: b.value.anno,
+    valoreDellaProduzione: b.value.fatturato,
+    patrimonioNetto: b.value.patrimonioNetto,
+    costoDelPersonale: b.value.costoDelPersonale,
+    dipendenti: b.value.dipendenti,
+    retribuzioneMediaLorda: b.value.retribuzioneMediaLorda,
+  }));
 
   const metricheDiImpatto =
     bilancio === null
@@ -455,4 +462,36 @@ export interface AndamentoEsercizio {
   readonly costoDelPersonale: Euro | null;
   readonly dipendenti: number | null;
   readonly retribuzioneMediaLorda: Euro | null;
+}
+
+/**
+ * La superficie coperta dei fabbricati, sommata su ubicazioni **distinte**.
+ *
+ * La deduplicazione per coordinate non è un dettaglio: la visura assegna spesso le stesse
+ * coordinate a due unità locali dello stesso complesso, e il contesto territoriale delle
+ * due è — correttamente — lo stesso. Sommarle conterebbe due volte gli stessi capannoni,
+ * e il capitale sui fabbricati uscirebbe doppio. È il tipo di errore che nessuno nota,
+ * perché il numero resta plausibile.
+ *
+ * `null` quando nessuna ubicazione ha fabbricati mappati: assente, non zero.
+ */
+function superficieRilevata(ubicazioni: AnalisiUbicazioni): number | null {
+  const viste = new Set<string>();
+  let totale = 0;
+
+  for (const u of ubicazioni.ubicazioni) {
+    const impronta = u.contesto?.fabbricati;
+    if (impronta === undefined || impronta === null) continue;
+
+    const { latitudine, longitudine } = u.indirizzo;
+    if (latitudine === null || longitudine === null) continue;
+
+    const chiave = `${latitudine.toFixed(5)}:${longitudine.toFixed(5)}`;
+    if (viste.has(chiave)) continue;
+    viste.add(chiave);
+
+    totale += impronta.superficieCopertaMq;
+  }
+
+  return totale > 0 ? totale : null;
 }

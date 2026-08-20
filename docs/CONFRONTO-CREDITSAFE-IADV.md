@@ -64,7 +64,7 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 | Scala di impatto economico a quattro fasce, con giorni di fermo | **sì** | e le soglie sono motivate: la più grave è l'art. 2446 c.c. Loro non le motivano |
 | Analisi economica pluriennale e schema del margine di contribuzione | **sì** | lo schema quadra col totale per costruzione, non per riimplementazione |
 | **Analisi del contesto per ubicazione** (soccorso, attività confinanti) | **sì** | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap |
-| **Valori di ricostruzione degli edifici** | **no** | la superficie si ricava da OSM; i parametri CRESME sono commerciali |
+| **Valori di ricostruzione degli edifici** | **sì** | già calcolati per tipologia costruttiva; ora la superficie arriva dalla cartografia quando l'intervista non l'ha misurata |
 | **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) con probabilità di superamento soglia | **no** | Open-Meteo copre pioggia e vento, **non** grandine e fulmini; uso commerciale a pagamento |
 | **Immagini per ubicazione** | **sì** | caricamento per ubicazione, con didascalia; capitolo dedicato nel report |
 | Linea Condomini | **no** | fuori perimetro: il prodotto è sulle imprese |

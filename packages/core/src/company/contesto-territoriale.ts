@@ -37,9 +37,31 @@ export interface CasermaVigiliDelFuoco {
   readonly minutiStimati: number;
 }
 
+/**
+ * L'impronta a terra dei fabbricati attorno all'ubicazione.
+ *
+ * Serve a una domanda sola: **quanto costerebbe ricostruire**. La superficie coperta,
+ * moltiplicata per un costo unitario, dà un ordine di grandezza del valore a nuovo del
+ * fabbricato — l'unico modo di accorgersi che una somma assicurata ferma da anni è
+ * diventata metà del necessario.
+ *
+ * `null` significa **nessun fabbricato mappato**, che non è «nessun fabbricato»: la
+ * copertura della cartografia collaborativa non è uniforme, e su un capannone recente
+ * spesso non c'è ancora nulla.
+ */
+export interface ImprontaFabbricati {
+  readonly quanti: number;
+  /** Somma delle aree coperte, in metri quadri. */
+  readonly superficieCopertaMq: number;
+  /** L'edificio più grande: su un lotto industriale è quasi sempre il capannone. */
+  readonly maggioreMq: number;
+}
+
 export interface ContestoTerritoriale {
   readonly vigiliDelFuoco: readonly CasermaVigiliDelFuoco[];
   readonly attivitaVicine: readonly PuntoDiInteresse[];
+  /** Impronta a terra dei fabbricati entro pochi metri dalla coordinata. */
+  readonly fabbricati: ImprontaFabbricati | null;
   /** Quante fra le vicine aggravano il rischio: è il numero che va in prima pagina. */
   readonly attivitaCheAggravano: number;
   readonly raggioAnalizzatoMetri: number;

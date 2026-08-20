@@ -44,17 +44,23 @@ import type { Cache } from '../http.js';
   mentre questo file è solo il modo in cui oggi lo si legge. Tenerne la forma nel motore
   significa che sostituire Overpass con un'altra fonte non tocca né l'analisi né il report.
 */
-import type {
-  CasermaVigiliDelFuoco,
-  ContestoTerritoriale,
-  PuntoDiInteresse,
-} from '@aegis/core';
+import type { CasermaVigiliDelFuoco, ContestoTerritoriale, PuntoDiInteresse } from '@aegis/core';
 
 /** Raggio dell'analisi delle vicinanze: è la distanza entro cui un incendio si propaga. */
 const RAGGIO_VICINANZE_METRI = 300;
 
 /** Raggio entro cui cercare le caserme. Oltre, il soccorso non è più «vicino». */
 const RAGGIO_CASERME_METRI = 25_000;
+
+/**
+ * Raggio entro cui un fabbricato è ancora «quello dell'impresa».
+ *
+ * Ottanta metri: la coordinata della visura cade sul civico, non sul baricentro del
+ * capannone, e su un lotto industriale lo scarto è di qualche decina di metri. Più largo si
+ * prenderebbe il capannone del vicino, che è l'errore peggiore — produrrebbe una superficie
+ * plausibile e sbagliata.
+ */
+const RAGGIO_FABBRICATI_METRI = 80;
 
 /**
  * Minuti per chilometro di percorrenza dei mezzi di soccorso.
@@ -300,7 +306,21 @@ function componiQuery(lat: number, lon: number): string {
   node["amenity"~"^(fuel|restaurant|waste_transfer_station)$"](around:${RAGGIO_VICINANZE_METRI},${lat},${lon});
   way["landuse"="industrial"](around:${RAGGIO_VICINANZE_METRI},${lat},${lon});
 );
-out center tags;`;
+out center tags;
+/*
+  I fabbricati attorno al punto, con la geometria.
+
+  Seconda istruzione di uscita nella **stessa** interrogazione, non una chiamata in più:
+  gli slot di Overpass sono per indirizzo IP, e raddoppiare le chiamate per un dato
+  accessorio è il modo in cui si viene bloccati.
+
+  \`out geom\` serve perché di un fabbricato interessa l'**area**, e per calcolarla ci
+  vogliono i vertici: \`center\` darebbe solo un punto. Il raggio è stretto — un fabbricato
+  a ottanta metri dalla coordinata non è più quello dell'impresa — e la geometria di poche
+  decine di poligoni pesa quanto il resto della risposta.
+*/
+way["building"](around:${RAGGIO_FABBRICATI_METRI},${lat},${lon});
+out geom tags;`;
 }
 
 interface ElementoOverpass {
@@ -308,6 +328,40 @@ interface ElementoOverpass {
   readonly lat?: number | undefined;
   readonly lon?: number | undefined;
   readonly center?: { readonly lat: number; readonly lon: number } | undefined;
+  /** Presente solo sui fabbricati, chiesti con `out geom`: sono i vertici del poligono. */
+  readonly geometry?: readonly { readonly lat: number; readonly lon: number }[] | undefined;
+}
+
+/**
+ * Area di un poligono geografico, in metri quadri.
+ *
+ * Formula dell'allacciamento (shoelace) su coordinate proiettate localmente: alle
+ * dimensioni di un fabbricato la curvatura terrestre è irrilevante, e una proiezione
+ * completa sarebbe precisione promessa e non usata. Il fattore di longitudine dipende
+ * dalla latitudine — a Milano un grado di longitudine vale circa i due terzi di uno di
+ * latitudine — e ignorarlo darebbe superfici sbagliate del quaranta per cento.
+ */
+function areaPoligonoMq(vertici: readonly { readonly lat: number; readonly lon: number }[]): number {
+  if (vertici.length < 3) return 0;
+
+  const latMedia = vertici.reduce((s, v) => s + v.lat, 0) / vertici.length;
+  const metriPerGradoLat = 110_574;
+  const metriPerGradoLon = 111_320 * Math.cos((latMedia * Math.PI) / 180);
+
+  let somma = 0;
+  for (let i = 0; i < vertici.length; i++) {
+    const a = vertici[i];
+    const b = vertici[(i + 1) % vertici.length];
+    if (a === undefined || b === undefined) continue;
+
+    const xa = a.lon * metriPerGradoLon;
+    const ya = a.lat * metriPerGradoLat;
+    const xb = b.lon * metriPerGradoLon;
+    const yb = b.lat * metriPerGradoLat;
+    somma += xa * yb - xb * ya;
+  }
+
+  return Math.abs(somma) / 2;
 }
 
 function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoriale | null {
@@ -316,8 +370,22 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
 
   const caserme: CasermaVigiliDelFuoco[] = [];
   const vicine: PuntoDiInteresse[] = [];
+  const areeFabbricati: number[] = [];
 
   for (const elemento of elementi) {
+    /*
+      I fabbricati arrivano dalla seconda istruzione di uscita, con la geometria: si
+      riconoscono da quella, e vanno trattati prima del resto perché di loro interessa
+      l'area e non la distanza.
+    */
+    if (elemento.tags?.['building'] !== undefined && elemento.geometry !== undefined) {
+      const area = areaPoligonoMq(elemento.geometry);
+      // Sotto i venti metri quadri è una tettoia, una cabina, un chiosco: sommarla
+      // gonfierebbe il conto con cose che nessuno assicura come fabbricato.
+      if (area >= 20) areeFabbricati.push(area);
+      continue;
+    }
+
     const coordinate = elemento.center ?? { lat: elemento.lat, lon: elemento.lon };
     if (typeof coordinate.lat !== 'number' || typeof coordinate.lon !== 'number') continue;
 
@@ -351,9 +419,19 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
   caserme.sort((a, b) => a.distanzaKm - b.distanzaKm);
   vicine.sort((a, b) => a.distanzaMetri - b.distanzaMetri);
 
+  areeFabbricati.sort((a, b) => b - a);
+
   return {
     // Tre caserme bastano: oltre, l'informazione è la stessa e la pagina si allunga.
     vigiliDelFuoco: caserme.slice(0, 3),
+    fabbricati:
+      areeFabbricati.length === 0
+        ? null
+        : {
+            quanti: areeFabbricati.length,
+            superficieCopertaMq: Math.round(areeFabbricati.reduce((s, a) => s + a, 0)),
+            maggioreMq: Math.round(areeFabbricati[0] ?? 0),
+          },
     // Le venticinque più vicine: un elenco più lungo non si legge e non aggiunge nulla.
     attivitaVicine: vicine.slice(0, 25),
     attivitaCheAggravano: vicine.filter((v) => v.aggravaIlRischio).length,
@@ -396,8 +474,7 @@ function distanzaMetri(lat1: number, lon1: number, lat2: number, lon2: number): 
 
   const dLat = rad(lat2 - lat1);
   const dLon = rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
 
   return 2 * RAGGIO_TERRESTRE_M * Math.asin(Math.sqrt(a));
 }
