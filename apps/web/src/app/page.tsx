@@ -53,15 +53,14 @@ export default async function PaginaRicerca({
         <div className="mb-6">
           {process.env.NODE_ENV === 'production' ? (
             <Avviso tono="critico" titolo="Servizio momentaneamente non disponibile">
-              Non è al momento possibile interrogare gli archivi. I dati già acquisiti restano
-              consultabili dal portafoglio. Se la situazione persiste, segnalarlo all&apos;assistenza.
+              Non è al momento possibile interrogare gli archivi. I dati già acquisiti restano consultabili
+              dal portafoglio. Se la situazione persiste, segnalarlo all&apos;assistenza.
             </Avviso>
           ) : (
             <Avviso tono="critico" titolo="Servizio API non raggiungibile">
-              Nessuna risposta da <code className="font-mono">{INDIRIZZO_API}</code>. Avviare il
-              servizio con <code className="font-mono">npm run dev:api</code>, oppure indicare
-              l&apos;indirizzo corretto nella variabile{' '}
-              <code className="font-mono">AEGIS_API_URL</code>.
+              Nessuna risposta da <code className="font-mono">{INDIRIZZO_API}</code>. Avviare il servizio
+              con <code className="font-mono">npm run dev:api</code>, oppure indicare l&apos;indirizzo
+              corretto nella variabile <code className="font-mono">AEGIS_API_URL</code>.
             </Avviso>
           )}
         </div>
@@ -83,13 +82,13 @@ export default async function PaginaRicerca({
       {stato !== null && !stato.datiReali && (
         <div className="mb-6">
           <Avviso tono="informativo" titolo="Modalità dimostrativa">
-            Le aziende che compaiono qui sono <strong>inventate</strong>, per quanto coerenti:
-            servono a provare il percorso e non consumano credito, ma su di esse non si fonda
-            nessuna proposta a un cliente.{' '}
+            Le aziende che compaiono qui sono <strong>inventate</strong>, per quanto coerenti: servono a
+            provare il percorso e non consumano credito, ma su di esse non si fonda nessuna proposta a un
+            cliente.{' '}
             {process.env.NODE_ENV === 'production' ? (
               <>
-                Il collegamento agli archivi camerali non è attivo su questa installazione:
-                segnalarlo all&apos;assistenza.
+                Il collegamento agli archivi camerali non è attivo su questa installazione: segnalarlo
+                all&apos;assistenza.
               </>
             ) : (
               <>
@@ -110,8 +109,8 @@ export default async function PaginaRicerca({
               {(stato.costoAnalisiCentesimi / 100).toFixed(2).replace('.', ',')} € per analisi
             </strong>
             , {(stato.costoAnalisiApprofonditaCentesimi / 100).toFixed(2).replace('.', ',')} € se
-            approfondita. Le aziende già in portafoglio non vengono riacquistate, e la ricerca per
-            provincia conta i risultati senza costo prima di scaricarne uno.
+            approfondita. Le aziende già in portafoglio non vengono riacquistate, e la ricerca per provincia
+            conta i risultati senza costo prima di scaricarne uno.
             {process.env.NODE_ENV !== 'production' && (
               <>
                 {' '}
@@ -136,9 +135,9 @@ export default async function PaginaRicerca({
         */}
         {stato !== null && !stato.datiReali && (
           <p className="mt-3 text-xs text-testo-debole">
-            Esempi in modalità dimostrativa: <code className="font-mono">03158460174</code>{' '}
-            (meccanica, Brescia) · <code className="font-mono">02657870644</code> (costruzioni,
-            Avellino) · <code className="font-mono">02413390390</code> (logistica, Ravenna)
+            Esempi in modalità dimostrativa: <code className="font-mono">03158460174</code> (meccanica,
+            Brescia) · <code className="font-mono">02657870644</code> (costruzioni, Avellino) ·{' '}
+            <code className="font-mono">02413390390</code> (logistica, Ravenna)
           </p>
         )}
       </Scheda>
@@ -166,6 +165,25 @@ export default async function PaginaRicerca({
         ricompra. Dirlo serve a far capire che il passo successivo costa meno di quanto
         sembri, non a giustificare la spesa.
       */}
+      {/*
+        Quando il risultato viene dall'archivio, dirlo cambia due cose.
+
+        La prima è la fiducia: chi ha appena cercato si aspetta di aver speso, e vedere
+        scritto «nessun costo» è l'unico modo di sapere che non è successo. La seconda è la
+        decisione: un dato acquistato mesi fa può essere vecchio, e chi lo sa può scegliere
+        di rinfrescarlo invece di scoprirlo dopo aver fatto una proposta.
+      */}
+      {risultati !== null && risultati.daArchivio === true && risultati.risultati.length > 0 && (
+        <p className="mb-3 rounded border-l-2 border-basso bg-basso/5 py-1.5 pl-3 text-sm leading-relaxed">
+          <strong>Trovata nel suo archivio — nessun costo.</strong> Questi dati sono già stati acquistati
+          {risultati.aggiornatoIl == null
+            ? ''
+            : ` il ${new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(new Date(risultati.aggiornatoIl))}`}
+          : la ricerca non ha consumato credito. Aprendo l&apos;azienda, l&apos;analisi userà gli stessi
+          dati senza ricomprarli.
+        </p>
+      )}
+
       {risultati !== null && risultati.risultati.length > 0 && (
         <div className="mb-3 space-y-4">
           {risultati.risultati.map((azienda) => (
@@ -173,7 +191,6 @@ export default async function PaginaRicerca({
           ))}
         </div>
       )}
-
 
       {/*
         La ricerca per denominazione usa l'elenco camerale, che non porta il settore.

@@ -11,7 +11,7 @@
  *    non riproducibile è indifendibile davanti a una contestazione.
  */
 
-import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNull, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -303,6 +303,89 @@ export async function leggiPolizze(db: Database, aziendaId: string): Promise<rea
     dataScadenza: r.dataScadenza,
     note: r.note,
   }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ricerca fra le aziende già in archivio
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AziendaInArchivio {
+  readonly identificativo: string;
+  readonly denominazione: string;
+  readonly partitaIva: string | null;
+  readonly provincia: string | null;
+  readonly atecoPrimario: string | null;
+  readonly aggiornataIl: Date;
+}
+
+/**
+ * Cerca fra le aziende che questo intermediario ha già in archivio.
+ *
+ * **Non costa nulla e non tocca il fornitore.** È la risposta al difetto più fastidioso del
+ * nostro modello rispetto a Creditsafe: da loro cercare è gratis e illimitato, da noi ogni
+ * ricerca compra un'anagrafica. Un broker che digita tre volte il nome sbagliato prima di
+ * trovare il cliente giusto ha speso trenta centesimi per arrivare a un'azienda che aveva
+ * già in casa.
+ *
+ * ## Perché è limitata al proprio archivio
+ *
+ * Le risposte comprate sono condivise fra gli studi — sono dati pubblici pagati con un
+ * contratto unico — ma **l'elenco di chi si segue no**. Sapere quali aziende un altro studio
+ * ha analizzato significa sapere chi sono i suoi clienti e chi sta cercando di acquisire.
+ * Il risparmio non vale quel prezzo, e la separazione è la stessa che vale per dossier e
+ * portafoglio.
+ */
+export async function cercaAziendeInArchivio(
+  db: Database,
+  tenantId: string,
+  criteri: { readonly denominazione?: string | undefined; readonly partitaIva?: string | undefined },
+  limite = 20,
+): Promise<readonly AziendaInArchivio[]> {
+  const condizioni = [eq(schema.aziende.tenantId, tenantId)];
+
+  if (criteri.partitaIva !== undefined && criteri.partitaIva !== '') {
+    condizioni.push(eq(schema.aziende.partitaIva, criteri.partitaIva));
+  } else if (criteri.denominazione !== undefined && criteri.denominazione.trim() !== '') {
+    /*
+      Ricerca per sottostringa, senza distinzione fra maiuscole e minuscole.
+
+      `ilike` e non `like`: le denominazioni camerali sono tutte in maiuscolo e nessuno le
+      digita così. Cercare «meccanica» e non trovare «MECCANICA BRESCIANA S.R.L.» farebbe
+      concludere che l'azienda non c'è, e si pagherebbe una ricerca per riscoprirlo.
+    */
+    condizioni.push(ilike(schema.aziende.denominazione, `%${criteri.denominazione.trim()}%`));
+  } else {
+    return [];
+  }
+
+  const righe = await db
+    .select({
+      partitaIva: schema.aziende.partitaIva,
+      providerId: schema.aziende.providerId,
+      denominazione: schema.aziende.denominazione,
+      provincia: schema.aziende.provincia,
+      atecoPrimario: schema.aziende.atecoPrimario,
+      aggiornataIl: schema.aziende.aggiornataIl,
+    })
+    .from(schema.aziende)
+    .where(and(...condizioni))
+    .orderBy(desc(schema.aziende.aggiornataIl))
+    .limit(limite);
+
+  return righe.flatMap((r) => {
+    const identificativo = r.partitaIva ?? r.providerId;
+    if (identificativo === null) return [];
+    return [
+      {
+        identificativo,
+        denominazione: r.denominazione,
+        partitaIva: r.partitaIva,
+        provincia: r.provincia,
+        atecoPrimario: r.atecoPrimario,
+        aggiornataIl: r.aggiornataIl,
+      },
+    ];
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

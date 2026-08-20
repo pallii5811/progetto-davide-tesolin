@@ -40,6 +40,26 @@ con i loro *documenti*, non con le loro schermate.
 | Report internazionali (48 paesi) | **no** | solo Italia |
 | Esportazione di elenchi | **sì** | CSV per Excel italiano, con il filtro attivo e l'azione prioritaria in colonna |
 
+### La ricerca: due modelli diversi
+
+Da Creditsafe **cercare è gratis e illimitato** — hanno vent'anni di dati in casa — e a
+consumare è l'apertura del report, che scala dal pacchetto acquistato. Hanno una ricerca
+semplice (P.IVA, denominazione, REA) e una avanzata con oltre venti filtri, compresa la
+selezione di un'area sulla mappa.
+
+Da noi il database non è nostro: ogni ricerca compra un'anagrafica da 0,10 €. Due
+correzioni riducono il divario a quasi nulla:
+
+- **si guarda prima nel proprio archivio**, gratis. Chi cerca un'azienda già analizzata la
+  trova senza spendere, e la pagina lo dichiara. Restano a pagamento solo le ricerche su
+  aziende mai viste;
+- **una volta comprato, un dato non si ripaga**: la cache delle risposte vive su database e
+  sopravvive ai riavvii, condivisa fra gli studi perché il contratto con l'archivio è unico.
+
+Resta indietro la **ricerca su mappa**: la fonte non espone alcun filtro geografico più
+fine della provincia, quindi una selezione per area sarebbe finta. Va risolta con un
+archivio di comuni e coordinate, non con un filtro del fornitore.
+
 ### Il vuoto che non si chiude
 
 Il **comportamento di pagamento** è il vantaggio strutturale di Creditsafe: vent'anni di

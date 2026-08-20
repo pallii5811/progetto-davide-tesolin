@@ -573,7 +573,14 @@ export async function cercaAziende(criteri: {
   denominazione?: string;
   partitaIva?: string;
   provincia?: string;
-}): Promise<{ risultati: RisultatoRicerca[]; provider: string }> {
+}): Promise<{
+  risultati: RisultatoRicerca[];
+  provider: string;
+  /** `true` quando il risultato viene dal proprio archivio: nessuna chiamata, nessun costo. */
+  daArchivio?: boolean;
+  /** Quando quel dato è stato acquistato: dice se convenga rinfrescarlo. */
+  aggiornatoIl?: string | null;
+}> {
   const query = new URLSearchParams();
   // La firma di `Object.entries` è ottimista: dichiara `string` anche per le proprietà
   // opzionali, che a runtime possono benissimo essere `undefined`.

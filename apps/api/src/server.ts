@@ -78,6 +78,7 @@ import {
 // L'anagrafe delle compagnie è condivisa fra intermediari: non passa dal contesto tenant.
 import {
   assicuraAzienda,
+  cercaAziendeInArchivio,
   chiaveAzienda,
   creaInvito,
   elencoSolidita,
@@ -1047,6 +1048,59 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       soldi. Una spesa che non compare nella propria contabilità è peggio di una spesa
       alta: non si può governare.
     */
+    /*
+      Prima si guarda in casa, e non costa nulla.
+
+      È il difetto più fastidioso del nostro modello rispetto a Creditsafe: da loro cercare
+      è gratis e illimitato, da noi ogni ricerca compra un'anagrafica. Un broker che digita
+      tre volte il nome sbagliato prima di trovare il cliente giusto ha speso trenta
+      centesimi per arrivare a un'azienda che aveva già in archivio.
+
+      L'archivio consultato è **il proprio**, non quello di tutti: le risposte comprate si
+      condividono fra gli studi — sono dati pubblici pagati con un contratto unico — ma
+      l'elenco di chi si segue no. Sapere quali aziende un altro studio ha analizzato
+      significa sapere chi sono i suoi clienti.
+    */
+    const sessioneRicerca = request.sessione;
+    const inArchivio =
+      persistenza === undefined
+        ? []
+        : await cercaAziendeInArchivio(
+            persistenza.db,
+            sessioneRicerca?.tenantId ?? persistenza.tenantPredefinito,
+            parsed.data,
+          );
+
+    if (inArchivio.length > 0) {
+      /*
+        Trovata in casa: si restituisce e **non si spende**.
+
+        La ricerca sul fornitore resta a un clic di distanza, con il costo dichiarato: chi
+        cerca un'azienda nuova la trova comunque, chi cerca una che ha già non paga per
+        riscoprirla.
+      */
+      return {
+        risultati: inArchivio.map((a) => ({
+          partitaIva: a.partitaIva,
+          denominazione: a.denominazione,
+          comune: null,
+          provincia: a.provincia,
+          ateco: a.atecoPrimario,
+          attiva: true,
+          statoAttivita: 'attiva' as const,
+          providerId: a.identificativo,
+          sintesi: null,
+          anagrafica: null,
+          bilanciSintetici: [],
+          soci: [],
+        })),
+        provider: 'Archivio locale',
+        costoCentesimi: 0,
+        daArchivio: true,
+        aggiornatoIl: inArchivio[0]?.aggiornataIl.toISOString() ?? null,
+      };
+    }
+
     const esitoTetto = await oltreIlTetto(request);
     if (esitoTetto !== null) {
       return reply.status(429).send({
@@ -1059,7 +1113,13 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     );
     await registraSpese(request, eventi);
 
-    return { risultati, provider: provider.name, costoCentesimi: costoDegliEventi(eventi) };
+    return {
+      risultati,
+      provider: provider.name,
+      costoCentesimi: costoDegliEventi(eventi),
+      daArchivio: false,
+      aggiornatoIl: null,
+    };
   });
 
   /**
