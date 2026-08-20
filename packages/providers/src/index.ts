@@ -16,6 +16,7 @@ export * from './openapi/provider.js';
 export * from './openapi/prezzi.js';
 export * from './openapi/campi-noti.js';
 export * from './openapi/sorveglianza-campi.js';
+export * from './territorio/contesto.js';
 
 import { MockCompanyProvider } from './mock.js';
 import { OpenApiProvider } from './openapi/provider.js';
