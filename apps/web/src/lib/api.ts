@@ -281,6 +281,40 @@ export interface AnalisiDto {
       spiegazione: ExplanationDto;
     };
   };
+  /**
+   * Protesti, pregiudizievoli e procedure concorsuali, in dettaglio.
+   *
+   * `null` quando la verifica non è stata acquistata: è diverso da «nessun evento», e la
+   * pagina lo dice invece di lasciar intendere che l’impresa risulti pulita.
+   */
+  eventiNegativi: {
+    fonte: { descrizione: string; osservatoIl: string } | null;
+    protesti: {
+      data: string;
+      importo: MoneyDto;
+      tipo: string;
+      luogo: string | null;
+      levato: boolean;
+    }[];
+    pregiudizievoli: {
+      data: string;
+      tipo: string;
+      importo: MoneyDto | null;
+      descrizione: string;
+    }[];
+    procedure: {
+      denominazione: string;
+      tipo: string;
+      dataApertura: string;
+      dataChiusura: string | null;
+      dataRevoca: string | null;
+      dataOmologa: string | null;
+      tribunale: string | null;
+      aperta: boolean;
+    }[];
+    /** Il registro dichiara eventi di cui non ha mandato il dettaglio. */
+    dichiaratiSenzaDettaglio: string[];
+  } | null;
   bilancio: {
     anno: number;
     fonte: { descrizione: string; osservatoIl: string } | null;

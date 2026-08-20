@@ -9,8 +9,8 @@
  * la stessa P.IVA restituisca sempre la stessa azienda.
  */
 
-import { DATI_DICHIARATI_VUOTI, demoCompanyProfile, parsePartitaIva } from '@aegis/core';
-import type { AtecoCode, CompanyProfile } from '@aegis/core';
+import { DATI_DICHIARATI_VUOTI, demoCompanyProfile, euro, parsePartitaIva } from '@aegis/core';
+import type { AtecoCode, CompanyProfile, EventiNegativi } from '@aegis/core';
 import { ProviderError } from './port.js';
 import type {
   CompanyDataProvider,
@@ -39,6 +39,16 @@ interface Variante {
    * funzione che distingue la piattaforma.
    */
   readonly conIntervista: boolean;
+  /**
+   * Un quadro di eventi negativi proprio della variante.
+   *
+   * Le aziende dimostrative condividevano tutte lo stesso — un protesto pagato — e
+   * nessuna aveva procedure concorsuali: il percorso che le mostra non si vedeva mai,
+   * e chi prova la piattaforma non poteva farsi un'idea di cosa succede quando
+   * l'impresa è in difficoltà, che è il caso in cui un profilo di credito serve
+   * davvero. Restano aziende inventate.
+   */
+  readonly eventiNegativi?: EventiNegativi;
 }
 
 /** Piccolo catalogo di aziende dimostrative, con settori e territori diversi. */
@@ -72,6 +82,58 @@ const VARIANTI: readonly Variante[] = [
     atecoDescrizione: 'Magazzini di custodia e deposito',
     moltiplicatore: 1.4,
     conIntervista: false,
+    eventiNegativi: {
+      protesti: [
+        {
+          data: new Date('2024-11-08T00:00:00Z'),
+          importo: euro(48_500),
+          tipo: 'Cambiale',
+          luogo: 'Ravenna',
+          levato: false,
+        },
+        {
+          data: new Date('2023-03-21T00:00:00Z'),
+          importo: euro(9_200),
+          tipo: 'Assegno bancario',
+          luogo: 'Ravenna',
+          // Pagato dopo la levata: pesa, ma molto meno di uno insoluto.
+          levato: true,
+        },
+      ],
+      pregiudizievoli: [
+        {
+          data: new Date('2024-06-12T00:00:00Z'),
+          tipo: 'ipoteca-giudiziale',
+          importo: euro(320_000),
+          descrizione: 'Ipoteca giudiziale su immobile strumentale',
+        },
+      ],
+      procedure: [
+        {
+          tipo: 'concordato-preventivo',
+          descrizione: 'CONCORDATO PREVENTIVO',
+          dataApertura: new Date('2022-04-05T00:00:00Z'),
+          dataChiusura: new Date('2023-10-19T00:00:00Z'),
+          dataRevoca: null,
+          dataOmologa: new Date('2023-02-28T00:00:00Z'),
+          tribunale: 'Ravenna',
+          aperta: false,
+        },
+        {
+          // Chiusa per revoca e non per chiusura: il registro lo dice su un campo
+          // diverso, e per un periodo la piattaforma la contava ancora aperta.
+          tipo: 'misure-protettive',
+          descrizione: 'MISURE CAUTELARI E PROTETTIVE',
+          dataApertura: new Date('2022-02-14T00:00:00Z'),
+          dataChiusura: null,
+          dataRevoca: new Date('2022-09-30T00:00:00Z'),
+          dataOmologa: null,
+          tribunale: 'Ravenna',
+          aperta: false,
+        },
+      ],
+      presenzaDichiarataSenzaDettaglio: [],
+    },
   },
 ];
 
@@ -248,6 +310,10 @@ function applicaVariante(base: CompanyProfile, variante: Variante): CompanyProfi
               },
       },
     },
+    eventiNegativi:
+      variante.eventiNegativi === undefined || base.eventiNegativi === null
+        ? base.eventiNegativi
+        : { ...base.eventiNegativi, value: variante.eventiNegativi },
     bilanci: base.bilanci.map((b) => ({
       ...b,
       value: {

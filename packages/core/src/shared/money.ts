@@ -148,11 +148,24 @@ export function commercialRoundUp(m: Money): Money {
   return roundUpTo(m, commercialStep(value));
 }
 
+/*
+  Il separatore delle migliaia si mette **sempre**, anche sotto le cinquemila.
+
+  La regola predefinita di `it-IT` è «min2»: sotto le cinque cifre il gruppo non si
+  separa, e Intl scrive `9200 €` accanto a `48.500 €`. È la convenzione della lingua, ma
+  in una colonna di importi produce due grafie diverse per la stessa cosa, e su una cifra
+  monetaria invita a leggere «92,00».
+
+  Un bilancio, una polizza e un atto giudiziario scrivono tutti «9.200». Un documento che
+  un intermediario consegna a un cliente si adegua a loro, non al comportamento
+  predefinito di una libreria.
+*/
 const FORMATTER = new Intl.NumberFormat('it-IT', {
   style: 'currency',
   currency: 'EUR',
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+  useGrouping: 'always',
 });
 
 const FORMATTER_COMPACT = new Intl.NumberFormat('it-IT', {
@@ -160,6 +173,7 @@ const FORMATTER_COMPACT = new Intl.NumberFormat('it-IT', {
   currency: 'EUR',
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
+  useGrouping: 'always',
 });
 
 export function format(m: Money): string {

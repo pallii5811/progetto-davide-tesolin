@@ -585,7 +585,8 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
       p.tipo === 'ipoteca-giudiziale' || p.tipo === 'pignoramento' || p.tipo === 'sequestro' ? 30 : 15;
     const penalita = base * decadimento;
     punteggio -= penalita;
-    details.push(`${p.tipo} del ${formatDate(p.data)} → −${Math.round(penalita)} punti`);
+    // La descrizione della conservatoria, non la nostra categoria col trattino.
+    details.push(`${p.descrizione} del ${formatDate(p.data)} → −${Math.round(penalita)} punti`);
   }
 
   for (const procedura of eventi.procedure) {

@@ -29,7 +29,7 @@ con i loro *documenti*, non con le loro schermate.
 | Punteggio di merito creditizio 1–100 | **sì** | e ogni fattore è spiegato: peso, punteggio, motivazione |
 | Fido consigliato | **sì** | con il vincolo che lo determina, non solo il numero |
 | Bilanci storici | **sì** | fino a 10 esercizi, più la riclassificazione CEE |
-| Protesti, pregiudizievoli, procedure concorsuali | **sì** | e dichiara quando il registro afferma senza dettagliare |
+| Protesti, pregiudizievoli, procedure concorsuali | **sì** | sezione propria con date, importi, tribunale ed esito; distingue una procedura **chiusa** da una **revocata**, e dichiara quando il registro afferma senza dettagliare |
 | Amministratori, soci, titolare effettivo | **sì** | il titolare effettivo è **ricavato dai soci già acquistati** (art. 20 D.Lgs. 231/2007), senza spendere. La visura `IT-ubo` da 1,10 € si compra solo quando la catena non si chiude |
 | Struttura del gruppo, controllanti e controllate | **sì** | con controllanti/controllate estere |
 | **Comportamento di pagamento (DBT, giorni di ritardo)** | **no** | non acquistabile in Italia da alcun fornitore |

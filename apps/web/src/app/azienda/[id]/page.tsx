@@ -849,6 +849,9 @@ export default async function PaginaAzienda({
         </Scheda>
       </Sezione>
 
+      {/* ── Eventi negativi ───────────────────────────────────────────────── */}
+      <EventiNegativi eventi={analisi.eventiNegativi} />
+
       {/* ── Bilancio ──────────────────────────────────────────────────────── */}
       {analisi.bilancio !== null && (
         <Sezione
@@ -913,6 +916,131 @@ function livelloTerritoriale(livello: 'alta' | 'media' | 'bassa'): LivelloRischi
   return livello === 'alta' ? 'alto' : livello === 'media' ? 'moderato' : 'basso';
 }
 
+/**
+ * Protesti, pregiudizievoli e procedure concorsuali, elencati.
+ *
+ * È la schermata che in un servizio di informazione commerciale sta al centro, e qui non
+ * c’era: gli eventi pesavano il venti per cento del punteggio e comparivano solo come una
+ * riga fra le motivazioni. Un broker che deve dire a un cliente perché il fido è quello
+ * che è, o perché non se ne concede affatto, ha bisogno di date, importi e tribunali —
+ * non di un aggregato.
+ */
+function EventiNegativi({ eventi }: { eventi: AnalisiDto['eventiNegativi'] }) {
+  if (eventi === null) return null;
+
+  const nessuno =
+    eventi.protesti.length === 0 &&
+    eventi.pregiudizievoli.length === 0 &&
+    eventi.procedure.length === 0;
+
+  return (
+    <Sezione
+      id="eventi-negativi"
+      titolo="Eventi negativi"
+      sottotitolo={
+        eventi.fonte === null
+          ? undefined
+          : `${eventi.fonte.descrizione} · accertamento del ${dataBreve(eventi.fonte.osservatoIl)}`
+      }
+    >
+      {eventi.dichiaratiSenzaDettaglio.length > 0 && (
+        <div className="mb-4">
+          <Avviso tono="attenzione" titolo="Il registro dichiara eventi senza fornirne il dettaglio">
+            Risultano <strong>{eventi.dichiaratiSenzaDettaglio.join(', ')}</strong> di cui
+            l’archivio non ha restituito l’elenco. Non è un’assenza: è un’informazione
+            mancante, e finché resta tale il fattore non può essere valutato per intero.
+          </Avviso>
+        </div>
+      )}
+
+      {nessuno && eventi.dichiaratiSenzaDettaglio.length === 0 && (
+        <Scheda>
+          <p className="text-sm">
+            Nessun protesto, nessuna pregiudizievole e nessuna procedura concorsuale
+            risultano a carico dell’impresa alla data dell’accertamento.
+          </p>
+        </Scheda>
+      )}
+
+      {eventi.procedure.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-sm font-medium">Procedure concorsuali</p>
+          <div className="space-y-2">
+            {eventi.procedure.map((p) => (
+              <Scheda key={`${p.denominazione}-${p.dataApertura}`}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <p className="text-sm font-medium">{p.denominazione}</p>
+                  <BadgeStato
+                    stato={p.aperta ? 'assente' : 'adeguata'}
+                    testo={p.aperta ? 'in corso' : esitoProcedura(p)}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-testo-tenue">
+                  Provvedimento del {dataBreve(p.dataApertura)}
+                  {p.dataOmologa !== null && ` · omologata il ${dataBreve(p.dataOmologa)}`}
+                  {p.tribunale === null ? ' · tribunale non indicato' : ` · Tribunale di ${p.tribunale}`}
+                </p>
+              </Scheda>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {eventi.protesti.length > 0 && (
+        <div className="mb-4">
+          <p className="mb-2 text-sm font-medium">Protesti</p>
+          <div className="space-y-2">
+            {eventi.protesti.map((p, i) => (
+              <Scheda key={`${p.data}-${i}`}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <p className="text-sm font-medium">{p.tipo}</p>
+                  <p className="tabular text-sm font-semibold">{p.importo.formattato}</p>
+                </div>
+                <p className="mt-1 text-xs text-testo-tenue">
+                  {dataBreve(p.data)}
+                  {p.luogo !== null && ` · ${p.luogo}`}
+                  {/* Un protesto levato è stato pagato: pesa, ma molto meno. */}
+                  {p.levato && ' · levato'}
+                </p>
+              </Scheda>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {eventi.pregiudizievoli.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-medium">Pregiudizievoli di conservatoria</p>
+          <div className="space-y-2">
+            {eventi.pregiudizievoli.map((p, i) => (
+              <Scheda key={`${p.data}-${i}`}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <p className="text-sm font-medium">{p.descrizione}</p>
+                  {p.importo !== null && (
+                    <p className="tabular text-sm font-semibold">{p.importo.formattato}</p>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-testo-tenue">{dataBreve(p.data)}</p>
+              </Scheda>
+            ))}
+          </div>
+        </div>
+      )}
+    </Sezione>
+  );
+}
+
+/** Chiusa e revocata non sono la stessa cosa, e la data serve a chi legge. */
+function esitoProcedura(p: { dataRevoca: string | null; dataChiusura: string | null }): string {
+  if (p.dataRevoca !== null) return `revocata il ${dataBreve(p.dataRevoca)}`;
+  if (p.dataChiusura !== null) return `chiusa il ${dataBreve(p.dataChiusura)}`;
+  return 'chiusa';
+}
+
+function dataBreve(iso: string): string {
+  return new Date(iso).toLocaleDateString('it-IT');
+}
+
 function NavigazioneSezioni() {
   const sezioni = [
     { id: 'ubicazioni', testo: 'Ubicazioni' },
@@ -924,6 +1052,7 @@ function NavigazioneSezioni() {
     { id: 'ritenzione', testo: 'Ritenzione' },
     { id: 'prevenzione', testo: 'Prevenzione' },
     { id: 'credito', testo: 'Merito creditizio' },
+    { id: 'eventi-negativi', testo: 'Eventi negativi' },
     { id: 'bilancio', testo: 'Bilancio' },
   ];
 

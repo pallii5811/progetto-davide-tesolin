@@ -143,6 +143,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     },
     sintesi: presentSintesi(analisi),
     credito: presentCredito(analisi),
+    eventiNegativi: presentEventiNegativi(analisi),
     bilancio: presentBilancio(analisi),
     rischi: analisi.rischi.risks.map(presentRisk),
     rischiMeta: {
@@ -481,6 +482,55 @@ function presentCredito(analisi: CompanyAnalysis) {
       fattoreScore: analisi.creditLimit.value.fattoreScore,
       spiegazione: explanation(analisi.creditLimit.explanation),
     },
+  };
+}
+
+/**
+ * Gli eventi negativi, in chiaro.
+ *
+ * Venivano calcolati, pesavano il venti per cento dello score e non arrivavano mai a
+ * schermo: comparivano come una riga fra le motivazioni del punteggio — «Procedura
+ * aperta: … → azzeramento» — e nient'altro. Chi consulta un profilo di credito si aspetta
+ * di vedere **quali** protesti, di che importo, di che data, e quali procedure con quale
+ * tribunale: è la schermata centrale di qualunque servizio di informazione commerciale, e
+ * qui non esisteva.
+ *
+ * Si porta a video anche la discordanza — il registro che dichiara eventi e non ne manda
+ * il dettaglio — perché un elenco vuoto e un elenco ignoto sono opposti, e chi legge deve
+ * poterli distinguere senza fidarsi di noi.
+ */
+function presentEventiNegativi(analisi: CompanyAnalysis) {
+  const sourced = analisi.profile.eventiNegativi;
+  if (sourced === null) return null;
+  const e = sourced.value;
+
+  return {
+    fonte: fonte(sourced),
+    protesti: e.protesti.map((p) => ({
+      data: p.data.toISOString(),
+      importo: money(p.importo),
+      tipo: p.tipo,
+      luogo: p.luogo,
+      levato: p.levato,
+    })),
+    pregiudizievoli: e.pregiudizievoli.map((p) => ({
+      data: p.data.toISOString(),
+      tipo: p.tipo,
+      importo: moneyOrNull(p.importo),
+      descrizione: p.descrizione,
+    })),
+    procedure: e.procedure.map((p) => ({
+      // La dicitura del registro quando c’è, l’etichetta interna solo in mancanza.
+      denominazione: p.descrizione ?? p.tipo,
+      tipo: p.tipo,
+      dataApertura: p.dataApertura.toISOString(),
+      dataChiusura: p.dataChiusura?.toISOString() ?? null,
+      dataRevoca: p.dataRevoca?.toISOString() ?? null,
+      dataOmologa: p.dataOmologa?.toISOString() ?? null,
+      tribunale: p.tribunale,
+      aperta: p.aperta,
+    })),
+    dichiaratiSenzaDettaglio: [...e.presenzaDichiarataSenzaDettaglio],
   };
 }
 

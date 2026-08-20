@@ -108,7 +108,20 @@ async function sondaNegativita(chiave: string, cfPiva: string, produzione: boole
   for (const [tentativo, attesa] of attese.entries()) {
     await new Promise((r) => setTimeout(r, attesa));
 
-    const stato = await fetch(`https://${dominio}/IT-request/${idRichiesta}`, { headers: intestazioni });
+    /*
+      Il percorso è quello del dominio **rischio**, e non è una variante ortografica di
+      quello aziendale: qui lo stato si legge su «/IT-richiesta/{id}», in italiano. La
+      sonda interrogava «/IT-request/{id}» — il percorso del dominio aziendale — che su
+      questo host non risponde JSON: `state` restava ignoto, il ciclo non arrivava mai a
+      DONE, e la pratica risultava non conclusa **dopo essere stata pagata**. Il
+      dettaglio andava poi recuperato a mano.
+
+      La configurazione di produzione lo aveva già giusto (`percorsoStatoRichiestaRischio`
+      in `config.ts`): era solo questo strumento a essere rimasto indietro.
+    */
+    const stato = await fetch(`https://${dominio}/IT-richiesta/${idRichiesta}`, {
+      headers: intestazioni,
+    });
     const corpoStato: unknown = await stato.json();
     const statoTestuale = campoTestuale(corpoStato, 'state', 'stato') || 'ignoto';
 
@@ -135,7 +148,7 @@ async function sondaNegativita(chiave: string, cfPiva: string, produzione: boole
   }
 
   console.log('Pratica non conclusa entro il tempo di attesa: riprovare la sola lettura dello stato.');
-  console.log(`  GET https://${dominio}/IT-request/${idRichiesta}`);
+  console.log(`  GET https://${dominio}/IT-richiesta/${idRichiesta}`);
 }
 
 /** Estrae un campo testuale da `data`, provando più alias. Stringa vuota se assente. */
