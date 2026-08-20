@@ -40,6 +40,8 @@ export async function conTenant<T>(
     // `sql.raw` perché `SET LOCAL` non accetta parametri: l'identificativo è già stato
     // validato come UUID da `sqlImpostaTenant`, che solleva su qualunque altra forma.
     await tx.execute(sql.raw(sqlImpostaTenant(tenantId)));
-    return azione(tx as unknown as Database);
+    // La transazione è già un `Database`: drizzle la tipizza come tale, e un'asserzione
+    // qui direbbe al compilatore di fidarsi di una cosa che sa già.
+    return azione(tx);
   });
 }
