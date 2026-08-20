@@ -16,7 +16,14 @@ import {
   fromProvider,
   isBilancioSinteticoUtile,
 } from '@aegis/core';
-import type { Bilancio, CompanyProfile, EventiNegativi, Money as Euro, PartitaIva, Sourced } from '@aegis/core';
+import type {
+  Bilancio,
+  CompanyProfile,
+  EventiNegativi,
+  Money as Euro,
+  PartitaIva,
+  Sourced,
+} from '@aegis/core';
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger } from '../http.js';
 import { ProviderError } from '../port.js';
@@ -270,9 +277,7 @@ export class OpenApiProvider implements CompanyDataProvider {
   }
 
   /** Conteggio in modalità `dryRun`: non scarica nulla, non addebita nulla. */
-  async #contaProspect(
-    query: Record<string, unknown>,
-  ): Promise<{ count: number; costoCentesimi: number }> {
+  async #contaProspect(query: Record<string, unknown>): Promise<{ count: number; costoCentesimi: number }> {
     const raw = await this.#company.request<unknown>({
       service: 'prospezione',
       path: this.#config.services.prospezione.path,
@@ -475,7 +480,7 @@ export class OpenApiProvider implements CompanyDataProvider {
         gli stessi protesti — e succede proprio nel caso peggiore, quando la prima attesa
         è scaduta perché il servizio era lento.
       */
-      const gia = this.#cache?.get(chiavePratica);
+      const gia = await this.#cache?.get(chiavePratica);
       if (gia !== undefined && typeof gia.value === 'string') {
         const risultato = await this.#leggiNegativita(gia.value);
         return risultato === null ? null : mappaNegativita(risultato, osservatoIl);
@@ -495,7 +500,10 @@ export class OpenApiProvider implements CompanyDataProvider {
       // L'identificativo si conserva **anche quando l'attesa è scaduta**: è esattamente
       // il caso in cui evita di ricomprare.
       if (esito.richiestaId !== null) {
-        this.#cache?.set(chiavePratica, {
+        // Attesa e non lasciata correre: con una cache su database, non attenderla
+        // significherebbe che una seconda richiesta partita subito dopo non trova
+        // l'identificativo e riapre la pratica — cioè ricompra ciò che si voleva evitare.
+        await this.#cache?.set(chiavePratica, {
           value: esito.richiestaId,
           expiresAt: Date.now() + servizio.ttlSeconds * 1000,
         });
@@ -523,10 +531,7 @@ export class OpenApiProvider implements CompanyDataProvider {
     try {
       const stato = await this.#risk.request<unknown>({
         service: `${this.#config.services.eventiNegativi.path}/stato`,
-        path: this.#config.percorsoStatoRichiestaRischio.replace(
-          '{id}',
-          encodeURIComponent(richiestaId),
-        ),
+        path: this.#config.percorsoStatoRichiestaRischio.replace('{id}', encodeURIComponent(richiestaId)),
         cacheTtlSeconds: 0,
         costoCentesimi: 0,
       });
@@ -627,9 +632,7 @@ function sintesiDa(raw: unknown): SintesiAzienda | null {
   const ultimo = esercizi[0] ?? null;
 
   const dipendenti =
-    num(raw, 'employees', 'numeroDipendenti', 'addetti', 'employeesNumber') ??
-    ultimo?.dipendenti ??
-    null;
+    num(raw, 'employees', 'numeroDipendenti', 'addetti', 'employeesNumber') ?? ultimo?.dipendenti ?? null;
 
   const euro = (valore: Euro | null | undefined): number | null =>
     valore === null || valore === undefined ? null : Money.toEuro(valore);
@@ -640,9 +643,7 @@ function sintesiDa(raw: unknown): SintesiAzienda | null {
     fatturatoEuro: euro(money(raw, 'turnover', 'fatturato', 'revenue') ?? ultimo?.fatturato),
     patrimonioNettoEuro: euro(ultimo?.patrimonioNetto),
     totaleAttivoEuro: euro(ultimo?.totaleAttivo),
-    capitaleSocialeEuro: euro(
-      money(raw, 'shareCapital', 'capitaleSociale') ?? ultimo?.capitaleSociale,
-    ),
+    capitaleSocialeEuro: euro(money(raw, 'shareCapital', 'capitaleSociale') ?? ultimo?.capitaleSociale),
     retribuzioneMediaEuro: euro(ultimo?.retribuzioneMediaLorda),
     numeroSoci: contaSoci(raw),
     eserciziDisponibili: esercizi.length,

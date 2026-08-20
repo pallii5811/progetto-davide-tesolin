@@ -33,6 +33,7 @@ import {
 import type { CostEvent } from '@aegis/providers';
 import { RegistroPerRichiesta, conCostiDellaRichiesta, costoDegliEventi } from './costi-richiesta.js';
 import { raccogliConEsito } from './contesto-ubicazioni.js';
+import { CachePersistente } from './cache-persistente.js';
 import type { CompanyDataProvider, FetchLevel } from '@aegis/providers';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -117,14 +118,28 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     volo insieme si addebitano all'intermediario sbagliato.
   */
   const registro = new RegistroPerRichiesta(ledger);
+  const persistenza = options.persistenza;
+
+  /*
+    La cache dei dati comprati vive **sul database**, quando c'è.
+
+    In memoria bastava un riavvio a buttare via tutto ciò che si era pagato: rianalizzare
+    la stessa azienda il giorno dopo costava di nuovo cinquantacinque centesimi per dati
+    identici, già in archivio. Sul database il dato resta comprato una volta sola — anche
+    fra due processi, anche dopo un aggiornamento.
+
+    Senza persistenza (dimostrazione, prove di dominio) resta quella in memoria: non c'è
+    nulla da conservare e nulla da spendere.
+  */
+  const cacheDati = persistenza === undefined ? new MemoryCache() : new CachePersistente(persistenza.db);
+
   const provider =
     options.provider ??
     createCompanyProvider({
       openApiToken: process.env['OPENAPI_TOKEN'],
-      cache: new MemoryCache(),
+      cache: cacheDati,
       ledger: registro,
     });
-  const persistenza = options.persistenza;
 
   /*
     Cache del contesto territoriale, separata da quella dei dati d'impresa.

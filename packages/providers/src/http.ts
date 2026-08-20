@@ -19,10 +19,18 @@ export interface CacheEntry {
   readonly expiresAt: number;
 }
 
+/**
+ * La cache può essere sincrona o no, e il chiamante non deve saperlo.
+ *
+ * `MemoryCache` risponde subito; una cache su database no. Ammettere entrambe le forme
+ * evita di dover scegliere fra una cache veloce che si perde a ogni riavvio e una che
+ * sopravvive ma obbliga a riscrivere il client HTTP. La differenza fra le due, in denaro,
+ * è che con la prima ogni riavvio fa **ricomprare** dati già pagati.
+ */
 export interface Cache {
-  get(key: string): CacheEntry | undefined;
-  set(key: string, entry: CacheEntry): void;
-  delete(key: string): void;
+  get(key: string): Promise<CacheEntry | undefined> | CacheEntry | undefined;
+  set(key: string, entry: CacheEntry): Promise<void> | void;
+  delete(key: string): Promise<void> | void;
 }
 
 /** Cache in memoria con sfratto dei più vecchi. In produzione si sostituisce con Redis. */
@@ -167,7 +175,7 @@ export class HttpProviderClient {
     const cacheKey = `${options.method ?? 'GET'} ${url}`;
 
     if (options.cacheTtlSeconds > 0) {
-      const cached = this.#options.cache?.get(cacheKey);
+      const cached = await this.#options.cache?.get(cacheKey);
       if (cached !== undefined) {
         this.#record(options, true);
         return cached.value as T;
@@ -177,7 +185,15 @@ export class HttpProviderClient {
     const payload = await this.#requestWithRetry<T>(url, options);
 
     if (options.cacheTtlSeconds > 0) {
-      this.#options.cache?.set(cacheKey, {
+      /*
+        La scrittura si attende.
+
+        Non attenderla farebbe tornare la risposta un istante prima, ma due analisi lanciate
+        di fila sulla stessa azienda potrebbero partire entrambe prima che la prima abbia
+        scritto — e si pagherebbe due volte lo stesso dato, che è esattamente ciò che questa
+        cache esiste per impedire.
+      */
+      await this.#options.cache?.set(cacheKey, {
         value: payload,
         expiresAt: Date.now() + options.cacheTtlSeconds * 1_000,
       });

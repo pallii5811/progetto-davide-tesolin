@@ -287,6 +287,15 @@ const DDL: readonly string[] = [
     aggiornato_il timestamptz NOT NULL DEFAULT now()
   )`,
 
+  `CREATE TABLE IF NOT EXISTS cache_risposte (
+    chiave text PRIMARY KEY,
+    valore jsonb NOT NULL,
+    scade_il timestamptz NOT NULL,
+    scritta_il timestamptz NOT NULL DEFAULT now()
+  )`,
+
+  `CREATE INDEX IF NOT EXISTS cache_per_scadenza ON cache_risposte (scade_il)`,
+
   `CREATE TABLE IF NOT EXISTS inviti_questionario (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     azienda_id uuid NOT NULL REFERENCES aziende(id) ON DELETE CASCADE,

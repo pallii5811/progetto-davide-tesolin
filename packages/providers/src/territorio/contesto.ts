@@ -184,7 +184,7 @@ export async function leggiEsitoContesto(
     cambia in novanta giorni, e rileggerlo a ogni analisi significherebbe pesare su
     un'infrastruttura volontaria per un dato che si sapeva già.
   */
-  const memorizzato = options.cache?.get(chiave);
+  const memorizzato = await options.cache?.get(chiave);
   if (memorizzato !== undefined && memorizzato.expiresAt > Date.now()) {
     return { esito: 'osservato', contesto: memorizzato.value as ContestoTerritoriale };
   }
@@ -228,7 +228,7 @@ export async function leggiEsitoContesto(
     */
     const contesto = interpreta(dati, latitudine, longitudine);
     if (contesto === null) return { esito: 'non-raggiunto' };
-    options.cache?.set(chiave, { value: contesto, expiresAt: Date.now() + TTL_SECONDI * 1000 });
+    await options.cache?.set(chiave, { value: contesto, expiresAt: Date.now() + TTL_SECONDI * 1000 });
     return { esito: 'osservato', contesto };
   };
 

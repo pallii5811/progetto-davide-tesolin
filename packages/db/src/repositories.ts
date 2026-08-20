@@ -306,6 +306,65 @@ export async function leggiPolizze(db: Database, aziendaId: string): Promise<rea
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cache delle risposte dei fornitori
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Legge una risposta già comprata, se non è scaduta.
+ *
+ * La riga scaduta viene **cancellata alla lettura** invece che da un lavoro periodico: è
+ * il momento in cui si sa con certezza che non serve più, e non richiede un altro processo
+ * che qualcuno dovrà ricordarsi di far girare.
+ */
+export async function leggiCache(
+  db: Database,
+  chiave: string,
+  adesso = new Date(),
+): Promise<{ valore: unknown; scadeIl: Date } | null> {
+  const righe = await db
+    .select({ valore: schema.cacheRisposte.valore, scadeIl: schema.cacheRisposte.scadeIl })
+    .from(schema.cacheRisposte)
+    .where(eq(schema.cacheRisposte.chiave, chiave))
+    .limit(1);
+
+  const riga = righe[0];
+  if (riga === undefined) return null;
+
+  if (riga.scadeIl.getTime() <= adesso.getTime()) {
+    await db.delete(schema.cacheRisposte).where(eq(schema.cacheRisposte.chiave, chiave));
+    return null;
+  }
+
+  return { valore: riga.valore, scadeIl: riga.scadeIl };
+}
+
+/**
+ * Conserva una risposta comprata.
+ *
+ * `onConflictDoUpdate` e non un inserimento semplice: due analisi della stessa azienda
+ * lanciate insieme scriverebbero la stessa chiave, e un vincolo violato farebbe fallire
+ * l'analisi **dopo** aver già pagato il dato.
+ */
+export async function scriviCache(
+  db: Database,
+  chiave: string,
+  valore: unknown,
+  scadeIl: Date,
+): Promise<void> {
+  await db
+    .insert(schema.cacheRisposte)
+    .values({ chiave, valore, scadeIl })
+    .onConflictDoUpdate({
+      target: schema.cacheRisposte.chiave,
+      set: { valore, scadeIl, scrittaIl: new Date() },
+    });
+}
+
+export async function dimenticaCache(db: Database, chiave: string): Promise<void> {
+  await db.delete(schema.cacheRisposte).where(eq(schema.cacheRisposte.chiave, chiave));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inviti a compilare il questionario
 // ─────────────────────────────────────────────────────────────────────────────
 

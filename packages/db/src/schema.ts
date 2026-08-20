@@ -290,6 +290,46 @@ export const dossier = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Cache delle risposte dei fornitori
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Le risposte già comprate, conservate perché non si paghino due volte.
+ *
+ * Finché la cache viveva in memoria, ogni riavvio del servizio buttava via tutto ciò che
+ * era stato acquistato: rianalizzare la stessa azienda il giorno dopo costava di nuovo
+ * cinquantacinque centesimi per dati identici, già presenti in archivio. Un aggiornamento,
+ * un riavvio notturno o un secondo processo bastavano a rifare la spesa.
+ *
+ * ## Perché **non** è isolata per intermediario
+ *
+ * È l'unica tabella del sistema senza `tenant_id`, e la scelta è deliberata: qui non ci sono
+ * dati di un cliente, ci sono **dati pubblici del registro imprese**, comprati con un
+ * contratto unico intestato al gestore della piattaforma. Se due studi analizzano la stessa
+ * azienda, la seconda analisi non deve ricomprarla.
+ *
+ * Ciò che va isolato resta isolato: dossier, analisi, portafoglio e polizze hanno la loro
+ * `tenant_id` e le loro policy. Qui c'è la visura, non il fascicolo.
+ *
+ * ## La chiave è l'indirizzo della richiesta
+ *
+ * Metodo più URL completo. Significa che il livello di acquisizione fa parte della chiave —
+ * un'anagrafica estesa non serve una richiesta di profilo completo — e che la cache non può
+ * restituire un dato per un altro senza che l'indirizzo coincida.
+ */
+export const cacheRisposte = pgTable(
+  'cache_risposte',
+  {
+    chiave: text('chiave').primaryKey(),
+    valore: jsonb('valore').notNull(),
+    /** Oltre questo istante il dato non si serve più: la volatilità la decide chi chiama. */
+    scadeIl: timestamp('scade_il', { withTimezone: true }).notNull(),
+    scrittaIl: timestamp('scritta_il', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('cache_per_scadenza').on(t.scadeIl)],
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inviti a compilare il questionario
 // ─────────────────────────────────────────────────────────────────────────────
 

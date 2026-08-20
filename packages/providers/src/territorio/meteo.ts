@@ -103,7 +103,7 @@ export async function leggiStoricoMeteo(
   const al = giorno(fine);
 
   const chiave = `meteo:${latitudine.toFixed(3)}:${longitudine.toFixed(3)}:${al}`;
-  const memorizzato = options.cache?.get(chiave);
+  const memorizzato = await options.cache?.get(chiave);
   if (memorizzato !== undefined && memorizzato.expiresAt > Date.now()) {
     return memorizzato.value as StoricoMeteo;
   }
@@ -124,7 +124,7 @@ export async function leggiStoricoMeteo(
     const storico = riduci(dati, dal, al);
     if (storico === null) return null;
 
-    options.cache?.set(chiave, { value: storico, expiresAt: Date.now() + TTL_SECONDI * 1000 });
+    await options.cache?.set(chiave, { value: storico, expiresAt: Date.now() + TTL_SECONDI * 1000 });
     return storico;
   } catch {
     return null;

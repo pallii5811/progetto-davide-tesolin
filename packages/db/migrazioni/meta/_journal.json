@@ -64,6 +64,13 @@
       "when": 1787229260897,
       "tag": "0008_inviti_questionario",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787237615778,
+      "tag": "0009_cache_risposte",
+      "breakpoints": true
     }
   ]
 }
