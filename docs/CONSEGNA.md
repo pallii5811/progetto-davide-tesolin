@@ -298,11 +298,40 @@ npm run start --workspace @aegis/web  # frontend, porta 3000
 Il frontend parla con l'API tramite `AEGIS_API_URL`; l'unico processo che deve essere
 raggiungibile dai browser è il frontend.
 
-### 6.4 Row Level Security
+### 6.4 Row Level Security — ⚠ **non applicarla ancora**
 
-Le policy in `packages/db/src/rls.ts` vanno applicate come **secondo strato** dietro
-l'isolamento già garantito dai repository. Su PGlite non mordono, perché l'utente è
-superuser; su PostgreSQL vero sì. Sono la rete che protegge da un errore applicativo futuro.
+Le policy in `packages/db/src/rls.ts` sono scritte ma **inerti**, e vanno lasciate tali
+finché non è completato il punto 2 qui sotto.
+
+**Applicarle oggi manderebbe giù il prodotto.** Le policy filtrano su
+`current_setting('app.tenant_id')`, e l'applicazione **non imposta ancora quella
+variabile**: con `FORCE ROW LEVEL SECURITY` attivo, ogni query di un utente non superuser
+tornerebbe **zero righe** su un archivio pieno di dati — senza un errore che spieghi
+perché. Un portafoglio che appare vuoto è il guasto peggiore che questo prodotto possa
+mostrare.
+
+**L'isolamento oggi in vigore è quello applicativo**, ed è reale: ogni repository filtra
+per `tenant_id` e c'è un collaudo che verifica su due studi distinti che nessuno veda i
+dati dell'altro. Manca il *secondo* strato, quello che regge se un giorno qualcuno
+dimentica un `where`.
+
+Per accenderlo servono, in quest'ordine:
+
+1. un **PostgreSQL vero** su cui verificarlo. PGlite gira come superuser e i superuser
+   scavalcano la Row Level Security anche con `FORCE`: misurato il 20/08/2026 — due righe
+   di due intermediari diversi, entrambe visibili a policy attiva. In sviluppo non si può
+   provare, e una sicurezza non provata non è una sicurezza;
+2. il collegamento di **`conTenant`** (`packages/db/src/tenant.ts`, già pronto) a ogni
+   metodo di `creaContesto`: apre una transazione e vi imposta `app.tenant_id`. È un
+   `SET LOCAL`, quindi il valore muore con la transazione e non resta appiccicato a una
+   connessione che il pool riassegna a un altro studio;
+3. un **ruolo applicativo non superuser** con cui il servizio si collega, altrimenti le
+   policy non mordono nemmeno in produzione;
+4. `sqlAbilitaRls()` eseguito come proprietario delle tabelle.
+
+`cache_risposte` resta **fuori** dalle policy, deliberatamente: contiene dati pubblici del
+registro imprese comprati con un contratto unico, non dati di un cliente. Vedi il commento
+nello schema.
 
 ---
 
