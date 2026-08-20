@@ -2,6 +2,7 @@ import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
 import { analizzaAzienda, leggiStudio } from '@/lib/api';
 import type { AnalisiDto, DatiStudio, GapDto } from '@/lib/api';
+import { MetricheDiImpatto } from './MetricheDiImpatto';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 
@@ -356,6 +357,14 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         {/* ── 3. Capitali da assicurare ──────────────────────────────────── */}
         <Capitolo
           numero="3"
+          titolo="Metriche di impatto economico"
+          nota="Soglie ancorate ai dati dell'ultimo bilancio depositato. La soglia critica corrisponde alla perdita che fa scattare gli obblighi degli artt. 2446 e 2447 c.c."
+        >
+          <MetricheDiImpatto dati={analisi.metricheDiImpatto} />
+        </Capitolo>
+
+        <Capitolo
+          numero="4"
           titolo="Determinazione dei capitali da assicurare"
           nota="I capitali sono determinati dai dati di bilancio depositati e dalle rilevazioni di intervista. Per ciascuno è indicata la base di calcolo adottata."
         >
@@ -429,7 +438,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
 
         {/* ── 4. Coperture proposte e motivazione ────────────────────────── */}
         <Capitolo
-          numero="4"
+          numero="5"
           titolo="Coperture proposte e motivazione dell’adeguatezza"
           nota="Per ciascuna copertura è indicata la ragione per cui è ritenuta adeguata alle richieste e alle esigenze rilevate, in conformità all’Allegato 4-ter del Reg. IVASS n. 40/2018."
         >
@@ -544,7 +553,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         {/* ── 5. Obbligo CAT NAT ─────────────────────────────────────────── */}
         {catNat.soggetta && (
           <Capitolo
-            numero="5"
+            numero="6"
             titolo="Obbligo assicurativo contro le calamità naturali"
             nota="L. 213/2023 art. 1 cc. 101-111 · DM MEF-MIMIT n. 18 del 30/01/2025."
           >
@@ -592,7 +601,7 @@ export default async function PaginaReport({ params }: { params: Promise<{ id: s
         )}
 
         {/* ── 6. Limiti ─────────────────────────────────────────────────── */}
-        <Capitolo numero={catNat.soggetta ? '6' : '5'} titolo="Limiti e avvertenze">
+        <Capitolo numero={catNat.soggetta ? '7' : '6'} titolo="Limiti e avvertenze">
           <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed">
             <li>
               I capitali indicati sono determinati con criteri di stima documentati e vanno confermati, per

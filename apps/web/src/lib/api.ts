@@ -304,6 +304,8 @@ export interface AnalisiDto {
    * include, e non costa nulla perché la pratica resta in memoria.
    */
   accertamentiInCorso: boolean;
+  /** Le quattro fasce di impatto, con importo e giorni di fermo equivalenti. */
+  metricheDiImpatto: MetricheDiImpattoDto;
   /** Indicatori e qualifiche già elaborati dall'archivio camerale, compresi nel prezzo. */
   indicatoriArchivio: IndicatoriArchivioDto;
   arricchimentiPossibili: { dato: string; sbloccherebbe: string[] }[];
@@ -970,3 +972,30 @@ export interface IndicatoriArchivioDto {
     aggiornatoIl: string | null;
   } | null;
 }
+
+
+/**
+ * Le fasce di impatto economico.
+ *
+ *  quando manca il bilancio riclassificato: le soglie sono ancorate a
+ * liquidità, EBITDA, patrimonio e capitale sociale, e inventarle darebbe numeri che
+ * sembrano misurati senza esserlo.
+ */
+export type MetricheDiImpattoDto =
+  | { disponibile: false; spiegazione: ExplanationDto }
+  | {
+      disponibile: true;
+      fasce: {
+        livello: 'trascurabile' | 'gestibile' | 'grave' | 'critico';
+        etichetta: string;
+        descrizione: string;
+        importo: MoneyDto;
+        giorniDiFermoEquivalenti: number | null;
+        ancoraggio: string;
+      }[];
+      margineDiTesoreria: MoneyDto;
+      indiceDiDisponibilita: number | null;
+      margineDiContribuzioneGiornaliero: MoneyDto | null;
+      confidenza: string;
+      spiegazione: ExplanationDto;
+    };

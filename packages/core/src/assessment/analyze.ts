@@ -7,6 +7,7 @@
  * fondava la proposta fatta al cliente.
  */
 
+import { explain } from '../shared/explain.js';
 import type { Explained } from '../shared/explain.js';
 import type { Money as Euro } from '../shared/money.js';
 import { Money } from '../shared/money.js';
@@ -38,6 +39,8 @@ import { assessRisks } from '../risk/engine.js';
 import type { RiskAssessment } from '../risk/engine.js';
 import { computeSumsInsured } from '../coverage/sums-insured.js';
 import { stimaDannoMassimo } from '../coverage/danno-massimo.js';
+import { calcolaMetricheDiImpatto } from '../coverage/metriche-impatto.js';
+import type { MetricheDiImpatto } from '../coverage/metriche-impatto.js';
 import { valutaRitenzione } from '../risk/ritenzione.js';
 import { raccomandaPrevenzione } from '../risk/prevenzione.js';
 import type { RaccomandazioneDiPrevenzione } from '../risk/prevenzione.js';
@@ -94,6 +97,12 @@ export interface CompanyAnalysis {
    * trattamento da calcolo a decisione dell'imprenditore.
    */
   readonly ritenzione: Explained<CapacitaDiRitenzione | null>;
+  /**
+   * La scala di impatto: a che punto un danno comincia a fare male, e a che punto
+   * fa scattare gli obblighi societari. La ritenzione dice quanto si regge; questa dice
+   * dove sono i gradini, tradotti in giorni di fermo.
+   */
+  readonly metricheDiImpatto: Explained<MetricheDiImpatto | null>;
   /**
    * Misure che abbasserebbero il rischio, con l'effetto che avrebbero.
    *
@@ -281,6 +290,19 @@ export function analyzeCompany(
   const prevenzione = raccomandaPrevenzione(rischi.risks, facts);
   const ritenzione = valutaRitenzione(bilancio, profile.datiDichiarati.propensioneAlRischio);
 
+  /*
+    Senza bilancio riclassificato non c'è scala: le quattro soglie sono ancorate a
+    liquidità, EBITDA, patrimonio e capitale sociale, e inventarle su un'impresa che
+    deposita in forma abbreviata darebbe numeri che sembrano misurati e non lo sono.
+  */
+  const metricheDiImpatto =
+    bilancio === null
+      ? explain('Metriche di impatto economico')
+          .note('Non calcolabili: il bilancio riclassificato non è disponibile.')
+          .confidence('bassa')
+          .value<MetricheDiImpatto | null>(null)
+      : calcolaMetricheDiImpatto(bilancio, ultimo?.value.passivo.capitaleSociale ?? Money.ZERO);
+
   // ── 5. CAT NAT ────────────────────────────────────────────────────────────
   const catNat = assessCatNat({
     facts,
@@ -317,6 +339,7 @@ export function analyzeCompany(
     sommeAssicurande,
     dannoMassimo,
     ritenzione,
+    metricheDiImpatto,
     prevenzione,
     catNat,
     gap,

@@ -43,6 +43,7 @@ export * from './coverage/policy.js';
 export * from './coverage/sums-insured.js';
 export * from './coverage/underinsurance.js';
 export * from './coverage/danno-massimo.js';
+export * from './coverage/metriche-impatto.js';
 
 // ── Portafoglio ──────────────────────────────────────────────────────────────
 export * from './portfolio/import.js';

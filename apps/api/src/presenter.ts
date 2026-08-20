@@ -155,6 +155,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     sommeAssicurande: presentSomme(analisi),
     dannoMassimo: presentDannoMassimo(analisi),
     ritenzione: presentRitenzione(analisi),
+    metricheDiImpatto: presentMetricheDiImpatto(analisi),
     prevenzione: analisi.prevenzione,
     catNat: presentCatNat(analisi),
     assetto: presentAssetto(analisi),
@@ -512,6 +513,41 @@ interface RitenzioneDto {
 }
 
 /** Capacità e propensione: quanto l'impresa può e vuole tenersi. */
+/**
+ * La scala di impatto economico.
+ *
+ * Quattro gradini con importo e giorni di fermo equivalenti: è la traduzione che rende
+ * concreto un numero altrimenti astratto. «Un milione e mezzo» non dice nulla a un
+ * imprenditore; «centosette giorni fermo» sì.
+ */
+function presentMetricheDiImpatto(analisi: CompanyAnalysis) {
+  const m = analisi.metricheDiImpatto;
+
+  if (m.value === null) {
+    return { disponibile: false as const, spiegazione: explanation(m.explanation) };
+  }
+
+  return {
+    disponibile: true as const,
+    fasce: m.value.fasce.map((f) => ({
+      livello: f.livello,
+      etichetta: f.etichetta,
+      descrizione: f.descrizione,
+      importo: money(f.importo),
+      giorniDiFermoEquivalenti: f.giorniDiFermoEquivalenti,
+      ancoraggio: f.ancoraggio,
+    })),
+    margineDiTesoreria: money(m.value.margineDiTesoreria),
+    indiceDiDisponibilita: m.value.indiceDiDisponibilita,
+    margineDiContribuzioneGiornaliero:
+      m.value.margineDiContribuzioneGiornaliero === null
+        ? null
+        : money(m.value.margineDiContribuzioneGiornaliero),
+    confidenza: m.confidence,
+    spiegazione: explanation(m.explanation),
+  };
+}
+
 function presentRitenzione(analisi: CompanyAnalysis): RitenzioneDto {
   const r = analisi.ritenzione;
   const dichiarata = analisi.profile.datiDichiarati.propensioneAlRischio !== null;
