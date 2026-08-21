@@ -151,3 +151,27 @@ describe('Cache in memoria', () => {
     expect(cache.get('c')?.value).toBe(3);
   });
 });
+
+describe('Il «non trovata» di questo fornitore', () => {
+  it('riconosce il 406 come partita IVA inesistente, non come guasto', async () => {
+    /*
+      Verificato sul servizio reale il 21/08/2026: una partita IVA inesistente ma con
+      carattere di controllo valido riceve `HTTP 406` con
+      `{"message":"taxCode/vatCode/id not valid","error":304}`.
+
+      Classificarlo «sconosciuto» faceva leggere all'intermediario «il servizio dati non è
+      al momento disponibile» — un guasto nostro — quando la verità è che quel numero non
+      esiste e va ricontrollato. Le due frasi portano ad azioni opposte: aspettare, o
+      correggere le cifre.
+    */
+    const c = client(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ success: false, message: 'taxCode/vatCode/id not valid' }), {
+          status: 406,
+        }),
+      ),
+    );
+
+    await expect(c.request(richiesta)).rejects.toMatchObject({ kind: 'non-trovato' });
+  });
+});

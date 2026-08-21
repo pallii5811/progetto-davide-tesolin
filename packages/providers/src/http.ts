@@ -390,6 +390,16 @@ export const ATTESE_POLLING = [1_500, 2_500, 4_000, 6_000, 10_000, 15_000] as co
 
 function classificaStatus(status: number): ProviderError['kind'] {
   if (status === 404) return 'non-trovato';
+  /*
+    406 è il «non trovata» di questo fornitore.
+
+    Verificato chiamandolo il 21/08/2026 su una partita IVA inesistente ma con carattere di
+    controllo valido: risponde `HTTP 406` con `{"message":"taxCode/vatCode/id not
+    valid","error":304}`. Classificarlo «sconosciuto» faceva leggere all'intermediario «il
+    servizio dati non è al momento disponibile» — cioè un guasto nostro — quando la verità
+    è che quella partita IVA non esiste e va ricontrollata.
+  */
+  if (status === 406) return 'non-trovato';
   if (status === 401 || status === 403) return 'autenticazione';
   if (status === 429) return 'quota';
   if (status >= 500) return 'temporaneo';

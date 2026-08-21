@@ -2028,6 +2028,30 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   });
 
   // ── Gestione degli errori ──────────────────────────────────────────────────
+/**
+ * L'errore del fornitore tradotto per chi lo legge a schermo.
+ *
+ * Ogni voce dice **cosa è successo** e **cosa fare**, e nessuna nomina il fornitore o il
+ * percorso chiamato: un intermediario non deve scoprire da un messaggio d'errore a chi
+ * compriamo i dati, e un cliente che guarda lo schermo ancora meno.
+ */
+function messaggioLeggibile(errore: ProviderError): string {
+  switch (errore.kind) {
+    case 'non-trovato':
+      return 'Nessuna impresa risulta con questa partita IVA nel Registro Imprese. Verificare le undici cifre, oppure cercare per denominazione.';
+    case 'autenticazione':
+      return 'Il servizio dati non ha accettato le credenziali. Controllare la configurazione in Impostazioni → Servizi dati: nessun credito è stato consumato.';
+    case 'quota':
+      return 'Credito esaurito presso il fornitore dei dati, oppure troppe richieste ravvicinate. Riprovare fra qualche minuto o ricaricare il credito.';
+    case 'temporaneo':
+      return 'Il servizio dati non ha risposto in tempo. È una interruzione momentanea: riprovare fra poco, nessun credito è stato consumato.';
+    case 'risposta-non-valida':
+      return 'Il servizio dati ha risposto in un formato inatteso. La segnalazione è stata registrata; riprovare più tardi.';
+    default:
+      return 'Il servizio dati non è al momento disponibile. Riprovare fra qualche minuto.';
+  }
+}
+
   app.setErrorHandler((error, _request, reply) => {
     // Un errore che porta già il proprio codice di stato lo conserva: trasformare un 415
     // o un 413 in un 500 nasconde la causa e manda in caccia al fantasma chi indaga.
@@ -2046,7 +2070,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
             : error.kind === 'quota'
               ? 429
               : 502;
-      return reply.status(status).send({ errore: error.message, tipo: error.kind });
+      /*
+        Il messaggio tecnico non esce di qui.
+
+        Usciva: chi cercava una partita IVA inesistente leggeva «OpenAPI.com ·
+        /IT-advanced/{id}: HTTP 406». Tre danni in una riga — non dice niente a un
+        intermediario, non suggerisce cosa fare, e soprattutto **rivela il fornitore e il
+        percorso interno** a chiunque guardi lo schermo, cliente compreso.
+
+        Il messaggio originale resta nei log, dove serve a chi indaga. A schermo va una
+        frase che dica cosa è successo e cosa fare.
+      */
+      app.log.warn({ err: error }, 'errore dal fornitore dati');
+      return reply.status(status).send({ errore: messaggioLeggibile(error), tipo: error.kind });
     }
     app.log.error(error);
     return reply.status(500).send({ errore: 'Errore interno' });
