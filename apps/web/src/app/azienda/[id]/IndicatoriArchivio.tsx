@@ -219,6 +219,11 @@ export function IndicatoriArchivio({ dati }: { dati: IndicatoriArchivioDto }) {
   );
 }
 
+/** «n.d.» è un'assenza travestita da valore: qui torna a essere un'assenza. */
+function valoreONull(v: string): string | null {
+  return v === 'n.d.' || v === '' ? null : v;
+}
+
 type Voce = readonly [string, number | null | undefined, string];
 
 function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']> }) {
@@ -241,6 +246,35 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
 
   const attive = bandiere.filter(([, valore]) => valore === true);
   const note = bandiere.filter(([, valore]) => valore === false);
+
+
+  /*
+    Le voci del riquadro, divise fra quelle che un valore ce l'hanno e quelle che no.
+    Le seconde non si stampano una per una: si nominano in fondo, una volta sola.
+  */
+  const vociRiquadro: readonly (readonly [string, string | null])[] = [
+    ['Dimensione', q.dimensioneImpresa],
+    ['Fascia di fatturato', q.fasciaDiFatturato],
+    ['Andamento fatturato', valoreONull(percentuale(q.andamentoFatturatoPercentuale))],
+    ['Addetti', valoreONull(intero(q.addetti))],
+    ['Fascia addetti', q.fasciaAddetti],
+    ['Andamento addetti', valoreONull(percentuale(q.andamentoAddettiPercentuale))],
+    ['Unità locali', valoreONull(intero(q.numeroUnitaLocali))],
+    ['Settore RAE', q.settoreRae],
+    ['Settore SAE', q.settoreSae],
+    ['ATECO secondario', q.atecoSecondario],
+    ['NACE', q.codiceNace],
+    ['SIC', [q.codiceSicPrimario, q.codiceSicSecondario].filter(Boolean).join(' / ') || null],
+    ['Sito web', q.sitoWeb],
+    ['Telefono', q.telefono],
+    ['Posta elettronica', q.email],
+  ];
+  const righeValorizzate = vociRiquadro.filter(
+    (v): v is readonly [string, string] => v[1] !== null && v[1] !== '',
+  );
+  const righeMancanti = vociRiquadro
+    .filter((v) => v[1] === null || v[1] === '')
+    .map((v) => v[0]);
 
   return (
     <Scheda className="mb-4">
@@ -269,29 +303,33 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
         </p>
       )}
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-bordo pt-3 sm:grid-cols-3">
-        <Riga etichetta="Dimensione" valore={q.dimensioneImpresa ?? 'n.d.'} />
-        <Riga etichetta="Fascia di fatturato" valore={q.fasciaDiFatturato ?? 'n.d.'} />
-        <Riga
-          etichetta="Andamento fatturato"
-          valore={percentuale(q.andamentoFatturatoPercentuale)}
-        />
-        <Riga etichetta="Addetti" valore={intero(q.addetti)} />
-        <Riga etichetta="Fascia addetti" valore={q.fasciaAddetti ?? 'n.d.'} />
-        <Riga etichetta="Andamento addetti" valore={percentuale(q.andamentoAddettiPercentuale)} />
-        <Riga etichetta="Unità locali" valore={intero(q.numeroUnitaLocali)} />
-        <Riga etichetta="Settore RAE" valore={q.settoreRae ?? 'n.d.'} />
-        <Riga etichetta="Settore SAE" valore={q.settoreSae ?? 'n.d.'} />
-        <Riga etichetta="ATECO secondario" valore={q.atecoSecondario ?? 'n.d.'} />
-        <Riga etichetta="NACE" valore={q.codiceNace ?? 'n.d.'} />
-        <Riga
-          etichetta="SIC"
-          valore={[q.codiceSicPrimario, q.codiceSicSecondario].filter(Boolean).join(' / ') || 'n.d.'}
-        />
-        <Riga etichetta="Sito web" valore={q.sitoWeb ?? 'n.d.'} />
-        <Riga etichetta="Telefono" valore={q.telefono ?? 'n.d.'} />
-        <Riga etichetta="Posta elettronica" valore={q.email ?? 'n.d.'} />
-      </dl>
+      {/*
+        Le righe senza valore non si stampano.
+
+        Erano quindici «n.d.» in fila ogni volta che l'approfondimento non era stato
+        comprato — e su una scheda dove il capitale sociale e il fatturato c'erano davvero,
+        due centimetri più su. Chi legge conclude che il prodotto sia rotto, o che il dato
+        non esista: due conclusioni sbagliate, e la seconda porta a spendere trenta
+        centesimi per riavere qualcosa che era già lì.
+
+        Adesso compare solo ciò che c'è, e in fondo una riga sola dice cosa manca e quanto
+        costa averlo. Un'assenza dichiarata vale più di quindici assenze stampate.
+      */}
+      {righeValorizzate.length > 0 && (
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-bordo pt-3 sm:grid-cols-3">
+          {righeValorizzate.map(([etichetta, valore]) => (
+            <Riga key={etichetta} etichetta={etichetta} valore={valore} />
+          ))}
+        </dl>
+      )}
+
+      {righeMancanti.length > 0 && (
+        <p className="mt-3 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-debole">
+          Non compresi in questa analisi:{' '}
+          <span className="text-testo-tenue">{righeMancanti.join(', ').toLowerCase()}</span>. Si
+          acquistano con l&apos;<strong className="text-testo-tenue">analisi approfondita</strong>.
+        </p>
+      )}
 
       {q.aggiornatoIl !== null && (
         <p className="mt-3 text-xs text-testo-debole">
