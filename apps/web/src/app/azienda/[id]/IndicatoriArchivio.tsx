@@ -365,6 +365,16 @@ function formatta(valore: number | null | undefined, unita: string): string {
 }
 
 function arrotonda(valore: number): string {
+  /*
+    Un valore piccolo ma diverso da zero non si stampa «0».
+
+    «Cassa su debiti a breve: 0» dice che l'impresa non ha liquidità. Il valore vero era
+    0,0048 — poco, ma non niente, e su un indice di liquidità la differenza fra «zero» e
+    «mezzo punto percentuale» è la differenza fra insolvenza e tensione. Arrotondare fino a
+    far sparire un dato pagato è peggio che non mostrarlo: sembra un accertamento.
+  */
+  if (valore !== 0 && Math.abs(valore) < 0.005) return valore > 0 ? '< 0,01' : '> −0,01';
+
   // Due decimali sotto il centinaio, nessuno sopra: su un indice pari a 4766 i decimali
   // sono rumore, su uno pari a 1,79 sono l'informazione.
   return new Intl.NumberFormat('it-IT', {
