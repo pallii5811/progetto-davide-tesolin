@@ -160,7 +160,7 @@ export default async function PaginaAzienda({
         </div>
       )}
 
-      <NavigazioneSezioni />
+      <NavigazioneSezioni analisi={analisi} />
 
       {/* ── Indicatori di sintesi ─────────────────────────────────────────── */}
       <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1168,20 +1168,32 @@ function dataBreve(iso: string | null | undefined): string | null {
   return iso === null || iso === undefined ? null : new Date(iso).toLocaleDateString('it-IT');
 }
 
-function NavigazioneSezioni() {
+/**
+ * Le sezioni dell'analisi, e solo quelle che ci sono davvero.
+ *
+ * L'elenco era fisso: dodici voci sempre. Su un'impresa senza bilancio depositato,
+ * quattro di quelle voci puntavano a sezioni che la pagina non disegna — Ritenzione,
+ * Prevenzione, Eventi negativi, Bilancio. Si cliccava e non succedeva niente.
+ *
+ * Un menu che non porta da nessuna parte è peggio di un menu più corto: chi clicca due
+ * volte e non vede muoversi la pagina non conclude «questa sezione non c'è», conclude
+ * «questo programma è rotto». E ha ragione a concluderlo.
+ */
+function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
   const sezioni = [
-    { id: 'ubicazioni', testo: 'Ubicazioni' },
-    { id: 'assetto', testo: 'Assetto e gruppo' },
-    { id: 'piano', testo: 'Piano d’azione' },
-    { id: 'rischi', testo: 'Rischi' },
-    { id: 'somme', testo: 'Somme assicurande' },
-    { id: 'danno-massimo', testo: 'Danno massimo' },
-    { id: 'ritenzione', testo: 'Ritenzione' },
-    { id: 'prevenzione', testo: 'Prevenzione' },
-    { id: 'credito', testo: 'Merito creditizio' },
-    { id: 'eventi-negativi', testo: 'Eventi negativi' },
-    { id: 'bilancio', testo: 'Bilancio' },
-  ];
+    { id: 'ubicazioni', testo: 'Ubicazioni', presente: analisi.ubicazioni.elenco.length > 0 },
+    { id: 'assetto', testo: 'Assetto e gruppo', presente: true },
+    { id: 'piano', testo: 'Piano d’azione', presente: analisi.gap.voci.length > 0 },
+    { id: 'rischi', testo: 'Rischi', presente: analisi.rischi.length > 0 },
+    { id: 'somme', testo: 'Somme assicurande', presente: true },
+    { id: 'danno-massimo', testo: 'Danno massimo', presente: analisi.dannoMassimo.disponibile },
+    { id: 'ritenzione', testo: 'Ritenzione', presente: analisi.ritenzione.disponibile },
+    { id: 'prevenzione', testo: 'Prevenzione', presente: analisi.prevenzione.length > 0 },
+    { id: 'credito', testo: 'Merito creditizio', presente: true },
+    { id: 'eventi-negativi', testo: 'Eventi negativi', presente: analisi.eventiNegativi !== null },
+    { id: 'bilancio', testo: 'Bilancio', presente: analisi.bilancio !== null },
+    { id: 'record-camerale', testo: 'Record camerale', presente: analisi.registro != null },
+  ].filter((s) => s.presente);
 
   return (
     <nav

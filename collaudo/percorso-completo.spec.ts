@@ -101,3 +101,38 @@ test.describe('Percorso completo dell’intermediario', () => {
     await expect(page.locator('body')).toContainText(/MECCANICA BRESCIANA/i);
   });
 });
+
+test.describe('La navigazione dell’analisi', () => {
+  test.beforeEach(async ({ page }) => {
+    await accedi(page);
+  });
+
+  test('ogni voce del menu porta a una sezione che esiste', async ({ page }) => {
+    /*
+      L'elenco era fisso: dodici voci sempre. Su un'impresa senza bilancio depositato
+      quattro puntavano a sezioni che la pagina non disegna — Ritenzione, Prevenzione,
+      Eventi negativi, Bilancio. Si cliccava e non succedeva niente.
+
+      Chi clicca due volte e non vede muoversi la pagina non conclude «questa sezione non
+      c'è», conclude «questo programma è rotto». E ha ragione.
+    */
+    await page.goto(`/azienda/${AZIENDA}`);
+    await expect(page.getByText(/Score di credito/i).first()).toBeVisible();
+
+    const ancore = await page
+      .locator('nav[aria-label="Sezioni dell’analisi"] a')
+      .evaluateAll((elementi) =>
+        elementi.map((e) => (e as HTMLAnchorElement).getAttribute('href') ?? ''),
+      );
+
+    expect(ancore.length, 'il menu delle sezioni deve esserci').toBeGreaterThan(3);
+
+    for (const href of ancore) {
+      const id = href.replace('#', '');
+      await expect(
+        page.locator(`#${id}`),
+        `la voce «${id}» del menu punta a una sezione che non esiste`,
+      ).toHaveCount(1);
+    }
+  });
+});
