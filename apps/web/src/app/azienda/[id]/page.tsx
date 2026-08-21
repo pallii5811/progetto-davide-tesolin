@@ -1113,9 +1113,22 @@ function RecordCamerale({
   registro,
   fonte,
 }: {
-  registro: AnalisiDto['registro'];
+  registro: AnalisiDto['registro'] | undefined;
   fonte: AnalisiDto['azienda']['fonte'];
 }) {
+  /*
+    Il blocco può non esserci, e non è un caso di scuola.
+
+    Le analisi vengono congelate su archivio: quelle salvate prima che questo blocco
+    esistesse non lo contengono. Leggerlo senza verificarlo fa cadere l'intera pagina —
+    ed è caduta davvero, su un'azienda già pagata, con un messaggio che parlava di una
+    porta di rete e non c'entrava nulla.
+
+    Vale per ogni campo aggiunto a un oggetto che viene conservato: il vecchio, in
+    archivio, resta com'era.
+  */
+  if (registro === undefined) return null;
+
   const voci: { etichetta: string; valore: string }[] = [];
   const aggiungi = (etichetta: string, valore: string | null | undefined) => {
     if (valore !== null && valore !== undefined && valore !== '') voci.push({ etichetta, valore });

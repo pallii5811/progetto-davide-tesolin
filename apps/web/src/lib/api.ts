@@ -227,7 +227,7 @@ export interface AnalisiDto {
    * Ne arrivavano a schermo dodici campi su venti: gli altri venivano letti, usati nei
    * calcoli e mai mostrati. Pagati e invisibili.
    */
-  registro: {
+  registro?: {
     formaGiuridicaDescrizione: string;
     dataCostituzione: string | null;
     dataInizioAttivita: string | null;
