@@ -124,6 +124,37 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
       addetti: analisi.facts.addetti,
       fonte: fonte(analisi.profile.anagrafica),
     },
+    /*
+      Il record camerale per intero, così com'è stato comprato.
+
+      Ne arrivavano a schermo dodici campi su venti. Gli altri — capitale sociale, REA,
+      PEC, ATECO secondari, date di costituzione e inizio attività, codice catastale —
+      venivano letti dal mappatore, usati nei calcoli, e non mostrati mai. Pagati e
+      invisibili, che è il modo più sicuro di far credere a chi paga che il dato non ci
+      sia.
+
+      Il presidio che avevamo verificava che i campi fossero **letti**, non che fossero
+      **mostrati**: due cose diverse, e la differenza è tutta qui.
+    */
+    registro: {
+      formaGiuridicaDescrizione: a.formaGiuridicaDescrizione,
+      dataCostituzione: a.dataCostituzione?.toISOString() ?? null,
+      dataInizioAttivita: a.dataInizioAttivita?.toISOString() ?? null,
+      dataCessazione: a.dataCessazione?.toISOString() ?? null,
+      numeroREA: a.numeroREA,
+      cciaa: a.cciaa,
+      atecoSecondari: [...a.atecoSecondari],
+      capitaleSocialeDeliberato: moneyOrNull(a.capitaleSocialeDeliberato),
+      capitaleSocialeVersato: moneyOrNull(a.capitaleSocialeVersato),
+      fatturatoDichiarato: moneyOrNull(a.fatturatoDichiarato),
+      numeroAddetti: a.numeroAddetti,
+      pec: a.pec,
+      sitoWeb: a.sitoWeb,
+      telefono: a.telefono,
+      codiceCatastale: a.codiceCatastale,
+      codiceFiscaleCessato: a.codiceFiscaleCessato,
+      sedeLegale: a.sedeLegale,
+    },
     livelloDatiEconomici: analisi.livelloDatiEconomici,
     arricchimentiPossibili: analisi.arricchimentiPossibili,
     completezza: {

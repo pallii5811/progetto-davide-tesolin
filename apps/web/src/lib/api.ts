@@ -221,6 +221,38 @@ export interface AnalisiDto {
     addetti: number | null;
     fonte: { descrizione: string; osservatoIl: string } | null;
   };
+  /**
+   * Il record camerale per intero, così com'è stato comprato.
+   *
+   * Ne arrivavano a schermo dodici campi su venti: gli altri venivano letti, usati nei
+   * calcoli e mai mostrati. Pagati e invisibili.
+   */
+  registro: {
+    formaGiuridicaDescrizione: string;
+    dataCostituzione: string | null;
+    dataInizioAttivita: string | null;
+    dataCessazione: string | null;
+    numeroREA: string | null;
+    cciaa: string | null;
+    atecoSecondari: string[];
+    capitaleSocialeDeliberato: MoneyDto | null;
+    capitaleSocialeVersato: MoneyDto | null;
+    fatturatoDichiarato: MoneyDto | null;
+    numeroAddetti: number | null;
+    pec: string | null;
+    sitoWeb: string | null;
+    telefono: string | null;
+    codiceCatastale: string | null;
+    codiceFiscaleCessato: boolean | null;
+    sedeLegale: {
+      via: string;
+      civico: string | null;
+      cap: string | null;
+      comune: string;
+      frazione: string | null;
+      provincia: string;
+    } | null;
+  };
   completezza: {
     percentuale: number;
     livello: 'insufficiente' | 'parziale' | 'buona' | 'completa';

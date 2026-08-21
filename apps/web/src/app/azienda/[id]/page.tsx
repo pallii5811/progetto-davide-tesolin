@@ -259,6 +259,9 @@ export default async function PaginaAzienda({
         trattini comunicherebbero «il software non funziona» invece di «questo servizio
         non è stato chiesto».
       */}
+      {/* ── Record camerale ──────────────────────────────────────────────── */}
+      <RecordCamerale registro={analisi.registro} fonte={analisi.azienda.fonte} />
+
       {haIndicatoriArchivio(analisi.indicatoriArchivio) && (
         <IndicatoriArchivio dati={analisi.indicatoriArchivio} />
       )}
@@ -1053,8 +1056,8 @@ function esitoProcedura(p: { dataRevoca: string | null; dataChiusura: string | n
   return 'chiusa';
 }
 
-function dataBreve(iso: string): string {
-  return new Date(iso).toLocaleDateString('it-IT');
+function dataBreve(iso: string | null | undefined): string | null {
+  return iso === null || iso === undefined ? null : new Date(iso).toLocaleDateString('it-IT');
 }
 
 function NavigazioneSezioni() {
@@ -1090,6 +1093,89 @@ function NavigazioneSezioni() {
         ))}
       </ul>
     </nav>
+  );
+}
+
+/**
+ * Il record camerale, per intero.
+ *
+ * Esiste perché dodici campi su venti non arrivavano mai a schermo: capitale sociale,
+ * REA, PEC, ATECO secondari, date di costituzione e di inizio attività, codice catastale,
+ * fatturato dichiarato. Venivano letti dal mappatore e usati nei calcoli — quindi nessun
+ * collaudo li dava per mancanti — e non venivano mostrati. Pagati e invisibili, che è il
+ * modo più sicuro di far credere a chi paga che il dato non esista.
+ *
+ * Qui si stampa **tutto quello che c'è**, e si tace su quello che non c'è: una riga
+ * assente dice «il registro non lo riporta», e non costringe nessuno a chiedersi se sia
+ * un guasto o una spesa mancata.
+ */
+function RecordCamerale({
+  registro,
+  fonte,
+}: {
+  registro: AnalisiDto['registro'];
+  fonte: AnalisiDto['azienda']['fonte'];
+}) {
+  const voci: { etichetta: string; valore: string }[] = [];
+  const aggiungi = (etichetta: string, valore: string | null | undefined) => {
+    if (valore !== null && valore !== undefined && valore !== '') voci.push({ etichetta, valore });
+  };
+
+  aggiungi('Forma giuridica', registro.formaGiuridicaDescrizione);
+  aggiungi('Numero REA', registro.numeroREA);
+  aggiungi('Camera di commercio', registro.cciaa);
+  aggiungi('Costituita il', dataBreve(registro.dataCostituzione));
+  aggiungi('Attività iniziata il', dataBreve(registro.dataInizioAttivita));
+  aggiungi('Cessata il', dataBreve(registro.dataCessazione));
+  aggiungi('Capitale sociale deliberato', registro.capitaleSocialeDeliberato?.formattato);
+  aggiungi('Capitale sociale versato', registro.capitaleSocialeVersato?.formattato);
+  aggiungi('Fatturato dichiarato', registro.fatturatoDichiarato?.formattato);
+  aggiungi('Addetti', registro.numeroAddetti === null ? null : String(registro.numeroAddetti));
+  aggiungi(
+    'ATECO secondari',
+    registro.atecoSecondari.length > 0 ? registro.atecoSecondari.join(' · ') : null,
+  );
+  aggiungi('PEC', registro.pec);
+  aggiungi('Sito web', registro.sitoWeb);
+  aggiungi('Telefono', registro.telefono);
+  aggiungi('Codice catastale del comune', registro.codiceCatastale);
+  if (registro.sedeLegale !== null) {
+    const s = registro.sedeLegale;
+    aggiungi(
+      'Sede legale',
+      `${s.via}${s.civico === null ? '' : ' ' + s.civico}, ${s.cap ?? ''} ${s.comune} (${s.provincia})${
+        s.frazione === null || s.frazione === '' ? '' : ' — ' + s.frazione
+      }`.replace(/\s+/g, ' '),
+    );
+  }
+
+  if (voci.length === 0) return null;
+
+  return (
+    <Sezione
+      id="record-camerale"
+      titolo="Record camerale"
+      sottotitolo={
+        fonte === null
+          ? 'Tutto quello che il registro riporta su questa impresa.'
+          : `${fonte.descrizione} · aggiornato al ${dataBreve(fonte.osservatoIl)}`
+      }
+    >
+      <Scheda>
+        <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+          {voci.map((v) => (
+            <div key={v.etichetta}>
+              <dt className="text-xs text-testo-debole">{v.etichetta}</dt>
+              <dd className="mt-0.5 break-words text-sm font-medium">{v.valore}</dd>
+            </div>
+          ))}
+        </dl>
+      </Scheda>
+      <p className="mt-2 text-xs text-testo-debole">
+        Le voci che il registro non riporta non compaiono: un&apos;assenza qui significa che il
+        dato non esiste nell&apos;archivio, non che non sia stato acquistato.
+      </p>
+    </Sezione>
   );
 }
 
