@@ -1339,7 +1339,17 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       un minuto invece di chiedere i protesti al cliente — e la pratica resta in memoria,
       quindi il ricaricamento non costa nulla.
     */
+    /*
+      «In corso» solo se qualcuno l'ha davvero chiesta.
+
+      Questa condizione diceva «avviata e già pagata, ricarica la pagina» ogni volta che
+      gli eventi negativi mancavano — cioè, da quando l'acquisto è diventato facoltativo,
+      **sempre**. Annunciava una spesa mai fatta e invitava a ricaricare una pagina che
+      non sarebbe cambiata: la peggiore combinazione possibile su un prodotto dove la
+      fiducia riguarda i soldi di chi lo usa.
+    */
     const accertamentiInCorso =
+      parsed.data.eventiNegativi === true &&
       analisi.profile.eventiNegativi === null &&
       OPENAPI_DEFAULT_CONFIG.services.eventiNegativi.verificato &&
       !provider.name.startsWith('Demo');
