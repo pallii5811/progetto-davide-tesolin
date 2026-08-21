@@ -4,6 +4,7 @@ import { cercaProspect } from '@/lib/api';
 import type { RisultatoProspezione } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { SelettoreLotto } from './SelettoreLotto';
+import { RicordaElenco, UltimoElenco } from './UltimoElenco';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,12 @@ export default async function PaginaProspect({
 
   return (
     <>
+      {/*
+        Si offre il richiamo ogni volta che a schermo non c'è già un elenco: la pagina
+        nuda fa comunque un conteggio, quindi «nessun risultato» non basta a riconoscerla.
+      */}
+      {(risultato === null || risultato.soloConteggio) && <UltimoElenco />}
+
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Ricerca di nuovi clienti</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-testo-tenue">
@@ -323,6 +330,14 @@ export default async function PaginaProspect({
 
       {risultato !== null && !risultato.soloConteggio && (
         <>
+          {/*
+            La ricerca che ha prodotto un acquisto viene ricordata: il tasto «indietro»
+            non deve più far sparire un elenco pagato.
+          */}
+          <RicordaElenco
+            query={new URLSearchParams({ ...criteri, scarica: '1' }).toString()}
+            quante={risultato.aziende.length}
+          />
           <p className="mb-3 text-sm text-testo-tenue">
             {risultato.aziende.length} aziende scaricate ·{' '}
             {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi.

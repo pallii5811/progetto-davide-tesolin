@@ -99,4 +99,28 @@ test.describe('Ricerca di nuovi clienti', () => {
     await page.goto('/prospect');
     await expect(page.getByLabel(/Forma giuridica/i)).toHaveValue('SR');
   });
+
+  test('un elenco pagato non si perde premendo indietro', async ({ page }) => {
+    /*
+      È successo davvero: cinquanta centesimi di aziende scaricate, un clic su «Analizza»,
+      il tasto indietro — e la schermata di ricerca vuota, senza traccia di ciò che era
+      stato comprato.
+
+      Tecnicamente non era perso — l'archivio lo conserva ventiquattro ore e rifare la
+      stessa ricerca non costa nulla — ma «ricomponi a memoria gli stessi sette filtri»
+      non è una risposta, e nessuno sapeva comunque che fosse gratis.
+    */
+    await page.goto('/prospect?provincia=BS&scarica=1');
+    await expect(page.getByRole('table')).toBeVisible();
+
+    // Si torna alla pagina nuda, come dopo un «indietro» finito altrove.
+    await page.goto('/prospect');
+
+    const richiamo = page.getByText(/Hai già scaricato un elenco/i);
+    await expect(richiamo).toBeVisible();
+    await expect(page.getByText(/non consuma credito/i)).toBeVisible();
+
+    await page.getByRole('link', { name: /Riaprilo/i }).click();
+    await expect(page.getByRole('table')).toBeVisible();
+  });
 });
