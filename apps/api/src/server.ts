@@ -151,7 +151,24 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     quello giusto per il secondo farebbe ricomprare il primo — qui non in denaro, ma in
     carico su un servizio donato, che è la valuta con cui lo si paga.
   */
-  const cacheContesto = new MemoryCache();
+  /*
+    Su archivio, non in memoria.
+
+    Stava in RAM, e ne moriva a ogni riavvio. Dietro c'è una fonte gratuita, donata, con
+    due slot per indirizzo IP: perderla dalla memoria significa richiamarla, e ogni
+    richiamo può fallire perché il servizio è occupato.
+
+    Il guaio non è la chiamata sprecata, è il numero che cambia. L'impronta a terra dei
+    fabbricati è l'ingresso del **patrimonio esposto**, cioè della cifra più grande della
+    scheda e del report. Osservato dal vivo: due analisi della stessa impresa a pochi
+    minuti di distanza, una con 7.800.000 € e l'altra con «capitale da rilevare in
+    intervista» — perché nel mezzo Overpass era occupato. Su un documento che si consegna a
+    un cliente, un numero che non si riproduce non è un numero.
+
+    Una caserma e una carrozzeria non si spostano: il dato regge nel tempo, e conservarlo
+    è anche il modo di restituire qualcosa a un servizio che non ci fa pagare.
+  */
+  const cacheContesto = persistenza === undefined ? new MemoryCache() : new CachePersistente(persistenza.db);
 
   /*
     Quando raccogliere il contesto territoriale.
