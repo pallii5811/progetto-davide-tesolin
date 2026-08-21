@@ -38,6 +38,12 @@ import { asArray, atecoOf, bool, date, money, moneyOrZero, num, percent, pick, s
 
 const PROVIDER = 'OpenAPI.com';
 
+/**
+ * Codice fiscale di persona fisica: sei lettere, due cifre, lettera, due cifre, lettera,
+ * tre cifre, lettera. Un soggetto collettivo ne ha undici, tutte numeriche.
+ */
+const CF_PERSONA_FISICA = /^[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z]$/;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Normalizzazioni
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,22 +356,42 @@ export function mappaAssetti(raw: unknown, service: string, osservatoIl: Date): 
     const cognome = str(s, 'surname', 'cognome');
     const nominativo = [cognome, nome].filter((p): p is string => p !== null).join(' ');
 
-    // Se il campo `type` è valorizzato lo si rispetta; altrimenti si deduce dalla forma
-    // dei dati. Servizi diversi dello stesso fornitore usano l'una o l'altra convenzione.
+    /*
+      Il codice fiscale viene prima di tutto, perché è l'unico che non mente.
+
+      La deduzione dalla forma dei dati — «se c'è `companyName` è una società» — sbaglia
+      ogni volta che il fornitore scrive un nome di persona in quel campo, e lo fa: su una
+      risposta reale MARELLA ROBERTO arrivava come `companyName`, con codice fiscale
+      MRLRRT50R05G264N. Risultato: un socio all'88% classificato persona giuridica.
+
+      Non è un'etichetta sbagliata e basta. Il titolare effettivo si determina risalendo la
+      catena fino a una **persona fisica** (art. 20 D.Lgs. 231/2007): con la persona
+      scambiata per società la catena non si chiude mai, il prodotto dichiara il titolare
+      «non determinabile» e propone la visura da un euro e dieci — per un dato che aveva
+      già in mano.
+
+      In Italia il codice fiscale distingue senza ambiguità: sedici caratteri
+      alfanumerici è una persona fisica, undici cifre è un soggetto collettivo.
+    */
+    const codiceFiscale = str(s, 'taxCode', 'codiceFiscale', 'cf');
     const tipoDichiarato = str(s, 'type', 'tipo');
     const tipo =
-      tipoDichiarato !== null
-        ? tipoDichiarato.toLowerCase().includes('giurid')
+      codiceFiscale !== null && CF_PERSONA_FISICA.test(codiceFiscale)
+        ? ('persona-fisica' as const)
+        : codiceFiscale !== null && /^\d{11}$/.test(codiceFiscale)
           ? ('persona-giuridica' as const)
-          : ('persona-fisica' as const)
-        : ragioneSociale === null && nominativo !== ''
-          ? ('persona-fisica' as const)
-          : ('persona-giuridica' as const);
+          : tipoDichiarato !== null
+            ? tipoDichiarato.toLowerCase().includes('giurid')
+              ? ('persona-giuridica' as const)
+              : ('persona-fisica' as const)
+            : ragioneSociale === null && nominativo !== ''
+              ? ('persona-fisica' as const)
+              : ('persona-giuridica' as const);
 
     return {
       denominazione:
         ragioneSociale ?? (nominativo === '' ? (str(s, 'fullName') ?? 'Non specificato') : nominativo),
-      codiceFiscale: str(s, 'taxCode', 'codiceFiscale', 'cf'),
+      codiceFiscale,
       tipo,
       quotaPercentuale: percent(s, 'percentShare', 'sharePercentage', 'quotaPercentuale', 'quota'),
       quotaValore: money(s, 'shareValue', 'valoreQuota', 'quotaValore'),

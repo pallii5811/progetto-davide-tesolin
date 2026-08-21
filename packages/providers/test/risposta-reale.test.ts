@@ -784,3 +784,56 @@ describe('Procedure concorsuali su una risposta reale che ne contiene', () => {
     expect(eventi().procedure.every((p) => p.tribunale === null)).toBe(true);
   });
 });
+
+describe('Persona fisica o società: lo dice il codice fiscale', () => {
+  /*
+    Il fornitore scrive i nomi delle persone nel campo della ragione sociale.
+
+    Osservato su una risposta reale il 21/08/2026: MARELLA ROBERTO, socio all'88% di una
+    S.r.l. bresciana, arrivava come `companyName` con codice fiscale MRLRRT50R05G264N —
+    sedici caratteri, cioè una persona. La regola precedente guardava quale campo fosse
+    valorizzato e lo classificava persona giuridica.
+
+    Non è un'etichetta sbagliata e basta. Il titolare effettivo si determina risalendo la
+    catena fino a una persona fisica (art. 20 D.Lgs. 231/2007): con la persona scambiata
+    per società la catena non si chiude, il prodotto dichiara il titolare «non
+    determinabile» e propone la visura da 1,10 € per un dato che ha già.
+  */
+  const socioDa = async (payload: unknown) => {
+    const { mappaAssetti } = await import('../src/openapi/mapper.js');
+    return mappaAssetti(payload, new Date('2026-08-21T00:00:00Z')).value.soci[0];
+  };
+
+  it('un nome di persona nel campo ragione sociale resta una persona fisica', async () => {
+    const socio = await socioDa({
+      shareHolders: [
+        {
+          companyName: 'MARELLA ROBERTO',
+          name: null,
+          surname: null,
+          taxCode: 'MRLRRT50R05G264N',
+          percentShare: 88,
+        },
+      ],
+    });
+
+    expect(socio?.tipo, 'sedici caratteri alfanumerici sono una persona fisica').toBe('persona-fisica');
+    expect(socio?.codiceFiscale).toBe('MRLRRT50R05G264N');
+  });
+
+  it('undici cifre restano una società, anche senza nome e cognome', async () => {
+    const socio = await socioDa({
+      shareHolders: [
+        {
+          companyName: "ACCIAIERIE D'ITALIA HOLDING S.P.A.",
+          name: null,
+          surname: null,
+          taxCode: '09520030967',
+          percentShare: 100,
+        },
+      ],
+    });
+
+    expect(socio?.tipo).toBe('persona-giuridica');
+  });
+});

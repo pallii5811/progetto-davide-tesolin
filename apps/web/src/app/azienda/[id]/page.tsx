@@ -450,10 +450,21 @@ export default async function PaginaAzienda({
                       <span className="ml-2 text-xs text-testo-debole">
                         {socio.tipo === 'persona-giuridica' ? 'società' : 'persona fisica'}
                       </span>
+                      {/*
+                        Il codice fiscale del socio veniva acquistato, conservato e usato
+                        soltanto come chiave interna della lista: mai stampato. È il dato
+                        che identifica la persona in un fascicolo antiriciclaggio, e senza
+                        di esso «MARELLA ROBERTO» è un omonimo qualunque.
+                      */}
+                      {socio.codiceFiscale !== null && (
+                        <span className="ml-2 font-mono text-xs text-testo-debole">
+                          {socio.codiceFiscale}
+                        </span>
+                      )}
                     </span>
                     <span className="tabular shrink-0 text-sm font-medium">
                       {socio.quotaPercentuale === null
-                        ? 'quota n.d.'
+                        ? 'quota non indicata'
                         : `${socio.quotaPercentuale.toFixed(socio.quotaPercentuale % 1 === 0 ? 0 : 2)}%`}
                     </span>
                   </li>
