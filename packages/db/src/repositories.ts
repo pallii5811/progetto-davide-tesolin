@@ -97,16 +97,28 @@ export async function assicuraAzienda(db: Database, tenantId: string, dati: Dati
 
   const esistente = esistenti[0];
   if (esistente !== undefined) {
-    await db
-      .update(schema.aziende)
-      .set({
-        denominazione: dati.denominazione,
-        providerId: dati.providerId,
-        provincia: dati.provincia,
-        atecoPrimario: dati.atecoPrimario,
-        aggiornataIl: new Date(),
-      })
-      .where(eq(schema.aziende.id, esistente.id));
+    /*
+      Non si sovrascrive ciò che si sa con ciò che non si sa.
+
+      Questa funzione la chiamano anche operazioni che dell'azienda conoscono solo la
+      partita IVA — salvare i dati di intervista, allegare una fotografia — e che passavano
+      quella come denominazione, per non lasciarla vuota. L'aggiornamento la scriveva sopra
+      al nome vero arrivato dall'analisi, e da quel momento l'impresa si chiamava
+      «02072030980»: nel portafoglio, nel monitoraggio, e nel questionario che il cliente
+      riceve. Una perdita di dato provocata da un gesto ordinario.
+
+      Da qui in avanti un campo si aggiorna solo se porta un valore, e la denominazione
+      solo se è un nome — non la chiave con cui l'azienda è archiviata.
+    */
+    const aggiornamento: Record<string, unknown> = { aggiornataIl: new Date() };
+    if (dati.denominazione !== '' && dati.denominazione !== chiave) {
+      aggiornamento['denominazione'] = dati.denominazione;
+    }
+    if (dati.providerId !== null) aggiornamento['providerId'] = dati.providerId;
+    if (dati.provincia !== null) aggiornamento['provincia'] = dati.provincia;
+    if (dati.atecoPrimario !== null) aggiornamento['atecoPrimario'] = dati.atecoPrimario;
+
+    await db.update(schema.aziende).set(aggiornamento).where(eq(schema.aziende.id, esistente.id));
     return esistente.id;
   }
 
