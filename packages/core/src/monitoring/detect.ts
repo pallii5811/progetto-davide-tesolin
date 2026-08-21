@@ -127,16 +127,29 @@ function obbligoCatNat(
   return [
     {
       tipo: 'obbligo-normativo',
+      /*
+        «Non adempiuto» è un accertamento, e la piattaforma non l'ha fatto.
+
+        Sa soltanto che fra le polizze **che le sono state censite** non ce n'è una
+        catastrofale — e se di polizze censite non ce n'è nessuna, quella frase non afferma
+        niente. Qui pesa quanto altrove e forse di più: è la coda di lavoro
+        dell'intermediario, l'elenco di chi chiamare, e «cliente inadempiente a una legge»
+        è una telefonata che si fa una volta sola.
+
+        Il fatto resta e va segnalato — una copertura obbligatoria non risulta —, ma
+        dichiarato per quello che è: una verifica da completare sulle polizze, non una
+        colpa già accertata.
+      */
       titolo: inadempiente
-        ? 'Obbligo assicurativo catastrofale non adempiuto'
+        ? 'Copertura catastrofale non censita: obbligo da verificare'
         : 'Obbligo assicurativo catastrofale in scadenza',
       descrizione: inadempiente
-        ? 'Il termine di legge per la copertura contro terremoto, alluvione e frana è decorso e non risulta una polizza in portafoglio.'
+        ? 'Il termine di legge per la copertura contro terremoto, alluvione e frana è decorso e, fra le polizze censite, non ne risulta alcuna che lo adempia.'
         : 'Il termine di legge per la copertura contro terremoto, alluvione e frana si avvicina.',
       conseguenza:
-        'L’inadempimento è considerato nell’assegnazione di contributi e agevolazioni pubbliche, e in caso di evento calamitoso preclude l’accesso ai sostegni straordinari. Può inoltre rilevare nella valutazione degli assetti organizzativi in capo agli amministratori.',
+        'Se l’obbligo risultasse davvero non adempiuto, l’inadempimento è considerato nell’assegnazione di contributi e agevolazioni pubbliche, e in caso di evento calamitoso preclude l’accesso ai sostegni straordinari. Può inoltre rilevare nella valutazione degli assetti organizzativi in capo agli amministratori.',
       azioneSuggerita:
-        'Presentare una quotazione CAT NAT: è un obbligo di legge, non una proposta commerciale, e va documentato di averlo rappresentato al cliente.',
+        'Verificare con il cliente se la copertura CAT NAT esista già; se non esiste, presentarne una quotazione. È un obbligo di legge, non una proposta commerciale, e va documentato di averlo rappresentato.',
       rilevanza: inadempiente ? 5 : 4,
       valorePrecedente: precedente?.statoCatNat ?? null,
       valoreNuovo: corrente.statoCatNat,
