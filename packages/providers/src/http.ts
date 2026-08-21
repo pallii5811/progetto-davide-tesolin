@@ -170,6 +170,20 @@ export class HttpProviderClient {
     };
   }
 
+  /**
+   * Richieste identiche già in volo, per non comprarle due volte.
+   *
+   * La cache impedisce il secondo acquisto **dopo** che il primo è tornato. Non impedisce
+   * nulla mentre il primo è ancora per aria: due chiamate partite insieme trovano
+   * entrambe la cache vuota, partono entrambe, e si paga due volte.
+   *
+   * Non è un caso di laboratorio. Un doppio clic su «Analizza» o su «Dammi l'elenco»,
+   * un ricaricamento impaziente, un browser che ritenta: sono i gesti normali di chi
+   * aspetta una pagina lenta, e ognuno costava il doppio senza che nessuno lo vedesse —
+   * il registro segnava due chiamate legittime.
+   */
+  readonly #inVolo = new Map<string, Promise<unknown>>();
+
   async request<T>(options: RequestOptions): Promise<T> {
     const url = this.#buildUrl(options);
     const cacheKey = `${options.method ?? 'GET'} ${url}`;
@@ -180,9 +194,25 @@ export class HttpProviderClient {
         this.#record(options, true);
         return cached.value as T;
       }
+
+      // Se la stessa richiesta è già per aria, si attende quella invece di aprirne un'altra.
+      const gia = this.#inVolo.get(cacheKey);
+      if (gia !== undefined) {
+        this.#record(options, true);
+        return (await gia) as T;
+      }
     }
 
-    const payload = await this.#requestWithRetry<T>(url, options);
+    const volo = this.#requestWithRetry<T>(url, options);
+    if (options.cacheTtlSeconds > 0) this.#inVolo.set(cacheKey, volo);
+
+    let payload: T;
+    try {
+      payload = await volo;
+    } finally {
+      // Anche in caso di errore: una richiesta fallita non deve restare in volo per sempre.
+      this.#inVolo.delete(cacheKey);
+    }
 
     if (options.cacheTtlSeconds > 0) {
       /*
