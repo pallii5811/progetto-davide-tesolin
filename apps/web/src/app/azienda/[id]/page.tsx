@@ -1113,7 +1113,7 @@ function RecordCamerale({
   registro,
   fonte,
 }: {
-  registro: AnalisiDto['registro'] | undefined;
+  registro: AnalisiDto['registro'];
   fonte: AnalisiDto['azienda']['fonte'];
 }) {
   /*
@@ -1127,7 +1127,7 @@ function RecordCamerale({
     Vale per ogni campo aggiunto a un oggetto che viene conservato: il vecchio, in
     archivio, resta com'era.
   */
-  if (registro === undefined) return null;
+  if (registro === undefined || registro === null) return null;
 
   const voci: { etichetta: string; valore: string }[] = [];
   const aggiungi = (etichetta: string, valore: string | null | undefined) => {

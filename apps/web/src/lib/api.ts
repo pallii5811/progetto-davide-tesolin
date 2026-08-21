@@ -227,6 +227,14 @@ export interface AnalisiDto {
    * Ne arrivavano a schermo dodici campi su venti: gli altri venivano letti, usati nei
    * calcoli e mai mostrati. Pagati e invisibili.
    */
+  /**
+   * Può mancare **ed essere nullo**, e la differenza non è accademica.
+   *
+   * Le analisi si congelano su archivio: quelle salvate prima che questo blocco esistesse
+   * non lo contengono. Dichiararlo solo `?:` ha portato il compilatore a segnalare come
+   * superfluo il controllo su `null` — l'ho tolto, e la pagina è caduta di nuovo sulla
+   * stessa riga. Il tipo deve descrivere ciò che arriva dalla rete, non ciò che vorremmo.
+   */
   registro?: {
     formaGiuridicaDescrizione: string;
     dataCostituzione: string | null;
@@ -252,7 +260,7 @@ export interface AnalisiDto {
       frazione: string | null;
       provincia: string;
     } | null;
-  };
+  } | null;
   completezza: {
     percentuale: number;
     livello: 'insufficiente' | 'parziale' | 'buona' | 'completa';
