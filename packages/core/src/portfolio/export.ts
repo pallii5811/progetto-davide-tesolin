@@ -109,8 +109,19 @@ const COLONNE: readonly {
   { intestazione: 'Settore', valore: (v) => v.atecoDescrizione ?? '' },
   { intestazione: 'Azione prioritaria', valore: (v) => v.azionePrioritaria ?? '' },
   {
+    /*
+      «DA SANARE (inadempiente)» era un'inadempienza a un obbligo di legge scritta accanto
+      al nome di un cliente, in un file che esce dalla piattaforma e finisce in una casella
+      di posta, in un foglio condiviso, in mano a chi capita.
+
+      La piattaforma quell'inadempienza non l'ha accertata: sa soltanto che fra le
+      coperture che conosce non ce n'è una catastrofale, e le coperture le conosce solo se
+      qualcuno gliele ha censite. La stessa frase era già stata corretta a schermo; qui era
+      rimasta, ed è il posto in cui pesa di più, perché un file lo si rilegge fuori
+      contesto e senza l'avviso che lo accompagnava.
+    */
     intestazione: 'Obbligo CAT NAT',
-    valore: (v) => (v.catNatConforme ? 'conforme' : `DA SANARE (${v.statoCatNat})`),
+    valore: (v) => (v.catNatConforme ? 'conforme' : 'copertura non censita — da verificare'),
   },
   { intestazione: 'Coperture da attivare', valore: (v) => String(v.coperturaAssente) },
   {

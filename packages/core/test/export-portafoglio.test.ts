@@ -93,13 +93,23 @@ describe('Esportazione del portafoglio', () => {
     expect(csv).toContain(`"'=SOMMA(A1:A9)"`);
   });
 
-  it('dichiara «da sanare» accanto allo stato, non solo il nome dello stato', () => {
+  it('non scrive un’inadempienza che non ha accertato', () => {
+    /*
+      Diceva «DA SANARE (inadempiente)»: un'inadempienza a un obbligo di legge scritta
+      accanto al nome di un cliente, in un file che esce dalla piattaforma e si rilegge
+      fuori contesto — in una casella di posta, in un foglio condiviso.
+
+      La piattaforma quell'inadempienza non l'ha accertata: sa soltanto che fra le
+      coperture censite non ce n'è una catastrofale, e censite lo sono solo se qualcuno le
+      ha inserite. Chi apre il file deve trovarci cosa fare, non un'accusa.
+    */
     const conforme = esportaPortafoglioCsv([voce({ catNatConforme: true, statoCatNat: 'adempiente' })]);
     const no = esportaPortafoglioCsv([voce({ catNatConforme: false, statoCatNat: 'inadempiente' })]);
 
-    // Chi apre il file cerca cosa fare, non un'etichetta da interpretare.
     expect(conforme).toContain('"conforme"');
-    expect(no).toContain('DA SANARE');
+    expect(no).toContain('non censita');
+    expect(no, 'nessuna parola che affermi un accertamento mai fatto').not.toContain('inadempiente');
+    expect(no).not.toContain('DA SANARE');
   });
 
   it('tiene distinte le coperture assenti da quelle da quantificare', () => {
