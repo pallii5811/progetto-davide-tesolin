@@ -177,13 +177,23 @@ export default async function PaginaAzienda({
           valore={sintesi.fidoConsigliato.formattato}
           nota={`Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`}
         />
+        {/*
+          La didascalia elenca **ciò che è dentro il numero**, non ciò che il numero
+          dovrebbe contenere.
+
+          Diceva sempre «fabbricati, macchinari e scorte» anche quando macchinari e scorte
+          non erano quantificati — cioè su ogni impresa senza dati d'intervista. Un
+          intermediario leggeva sette milioni e ottocento credendo che comprendessero tutto,
+          mentre erano i soli fabbricati: sottostima dichiarata come completezza, che è il
+          modo esatto in cui nasce una sottoassicurazione.
+        */}
         <Metrica
           etichetta="Patrimonio esposto"
           valore={sintesi.patrimonioEsposto?.formattato ?? 'da rilevare'}
           nota={
             sintesi.patrimonioEsposto === null
               ? 'Il valore dei beni non è ricavabile dai dati economici disponibili'
-              : 'Fabbricati, macchinari e scorte a valore di ricostruzione'
+              : componiNotaPatrimonio(analisi.sommeAssicurande)
           }
         />
         {/*
@@ -1226,6 +1236,33 @@ function RecordCamerale({
       </p>
     </Sezione>
   );
+}
+
+/**
+ * Che cosa c'è davvero dentro il patrimonio esposto, e che cosa manca.
+ *
+ * Le voci non quantificate non si possono nominare come se fossero incluse: un capitale
+ * che dichiara di comprendere scorte e macchinari senza comprenderli è una sottostima
+ * presentata come completezza. Qui si elenca ciò che è dentro, e si dice apertamente ciò
+ * che resta fuori e perché.
+ */
+function componiNotaPatrimonio(somme: AnalisiDto['sommeAssicurande']): string {
+  const dentro: string[] = [];
+  const fuori: string[] = [];
+  const voce = (etichetta: string, valore: { valore: { formattato: string } | null } | null | undefined): void => {
+    if (valore?.valore != null) dentro.push(etichetta);
+    else fuori.push(etichetta);
+  };
+
+  voce('fabbricati', somme.fabbricati);
+  voce('macchinari', somme.contenuto);
+  voce('scorte', somme.scorte);
+
+  if (dentro.length === 0) return 'Nessuna componente quantificata';
+  const inclusi = `${dentro.join(', ')} a valore di ricostruzione`;
+  return fuori.length === 0
+    ? `${inclusi.charAt(0).toUpperCase()}${inclusi.slice(1)}`
+    : `Solo ${inclusi} — ${fuori.join(' e ')} da rilevare in intervista`;
 }
 
 /** Il prezzo come lo legge chi paga, o niente se il listino non è raggiungibile. */
