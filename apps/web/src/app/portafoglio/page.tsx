@@ -100,10 +100,20 @@ export default async function PaginaPortafoglio({
       */}
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metrica etichetta="Aziende analizzate" valore={String(riepilogo.totale)} />
+        {/*
+          «Non conformi» è un accertamento, e su un portafoglio in cui le polizze non sono
+          state censite non lo si può fare: si sa che fra le coperture note non ne risulta
+          una catastrofale, e se di coperture note non ce n'è nessuna quel numero non
+          afferma un'inadempienza — segnala una verifica da fare.
+
+          La differenza pesa: questa è la schermata che un intermediario guarda per decidere
+          chi chiamare, e «sei clienti inadempienti a una legge» è una telefonata diversa da
+          «sei clienti di cui non ho ancora controllato le polizze».
+        */}
         <Metrica
-          etichetta="Non conformi CAT NAT"
+          etichetta="Senza CAT NAT censita"
           valore={String(riepilogo.nonConformiCatNat)}
-          nota={`${quotaNonConformi}% del portafoglio · obbligo di legge`}
+          nota={`${quotaNonConformi}% del portafoglio · obbligo di legge, da verificare sulle polizze`}
           tono={riepilogo.nonConformiCatNat > 0 ? 'critico' : 'positivo'}
         />
         <Metrica
@@ -128,7 +138,7 @@ export default async function PaginaPortafoglio({
           { chiave: undefined, testo: `Tutte (${portafoglio.aziende.length})` },
           {
             chiave: 'catnat',
-            testo: `Non conformi CAT NAT (${riepilogo.nonConformiCatNat})`,
+            testo: `Senza CAT NAT censita (${riepilogo.nonConformiCatNat})`,
           },
           {
             chiave: 'scoperte',
@@ -333,9 +343,14 @@ function StatoCatNat({ azienda }: { azienda: VocePortafoglio }) {
     );
   }
 
+  /*
+    Si dice ciò che risulta, non ciò che si presume: fra le polizze note non ce n'è una
+    catastrofale. Se le polizze note sono zero, «inadempiente» sarebbe una parola messa al
+    posto di una verifica mai fatta.
+  */
   return (
     <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium text-critico">
-      {azienda.statoCatNat}
+      non censita
     </span>
   );
 }
