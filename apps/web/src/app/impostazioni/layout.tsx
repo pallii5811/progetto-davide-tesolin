@@ -35,6 +35,7 @@ export default async function LayoutImpostazioni({ children }: { children: React
         {amministratore && <Scheda href="/impostazioni/utenti">Utenti dello studio</Scheda>}
         <Scheda href="/impostazioni/compagnie">Solidità delle compagnie</Scheda>
         {gestore && <Scheda href="/impostazioni/studi">Studi sulla piattaforma</Scheda>}
+        <Scheda href="/impostazioni/costi">Consumi dei dati</Scheda>
         {gestore && <Scheda href="/impostazioni/servizi">Servizi dati</Scheda>}
       </nav>
 

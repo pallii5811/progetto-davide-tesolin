@@ -840,6 +840,22 @@ export async function analizzaAzienda(
   });
 }
 
+/**
+ * Il registro delle spese.
+ *
+ * Esisteva sul servizio e non era leggibile da nessuna pagina: si poteva conoscere solo
+ * interrogandolo a mano, cosa che un intermediario non farà mai.
+ */
+export async function leggiCosti(): Promise<{
+  totaleEuro: number;
+  risparmioDaCacheEuro: number;
+  chiamate: number;
+  persistente: boolean;
+  perServizio: { servizio: string; chiamate: number; costoEuro: number }[];
+}> {
+  return chiama('/api/costi');
+}
+
 export async function statoServizio(): Promise<{
   stato: string;
   provider: string;
