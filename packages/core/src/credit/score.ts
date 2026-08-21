@@ -202,7 +202,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     .note(`Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`)
     .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
     .input('Data di valutazione', formatDate(asOf))
-    .input('Esercizio di riferimento', bilancio === null ? 'n.d.' : String(bilancio.anno))
+    .input('Esercizio di riferimento', bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno))
     .confidence(confidenza)
     .value({
       value: finale,
@@ -278,9 +278,9 @@ function fattoreSolidita(ind: FinancialIndicators | null): ScoreFactor {
             ? 'Patrimonializzazione nella norma, con dipendenza significativa da fonti di terzi.'
             : 'Patrimonializzazione debole: la struttura finanziaria è esposta a shock di reddito.',
     details: [
-      `Equity ratio: ${ind.equityRatio === null ? 'n.d.' : formatPercent(ind.equityRatio)}`,
-      `Indice di indebitamento: ${ind.indiceIndebitamento === null ? 'n.d.' : `${formatNumber(ind.indiceIndebitamento)}×`}`,
-      `Copertura immobilizzazioni: ${ind.coperturaImmobilizzazioni === null ? 'n.d.' : `${formatNumber(ind.coperturaImmobilizzazioni)}×`}`,
+      `Equity ratio: ${ind.equityRatio === null ? 'da rilevare in intervista' : formatPercent(ind.equityRatio)}`,
+      `Indice di indebitamento: ${ind.indiceIndebitamento === null ? 'da rilevare in intervista' : `${formatNumber(ind.indiceIndebitamento)}×`}`,
+      `Copertura immobilizzazioni: ${ind.coperturaImmobilizzazioni === null ? 'da rilevare in intervista' : `${formatNumber(ind.coperturaImmobilizzazioni)}×`}`,
     ],
   };
 }
@@ -346,9 +346,9 @@ function fattoreRedditivita(ind: FinancialIndicators | null): ScoreFactor {
             ? 'Redditività modesta: margini sufficienti ma poco spazio di assorbimento degli shock.'
             : 'Redditività insufficiente: la gestione operativa non remunera il capitale investito.',
     details: [
-      `ROI: ${ind.roi === null ? 'n.d.' : formatPercent(ind.roi)}`,
-      `EBITDA margin: ${ind.ebitdaMargin === null ? 'n.d.' : formatPercent(ind.ebitdaMargin)}`,
-      `Crescita EBITDA: ${ind.crescitaEbitda === null ? 'n.d.' : formatPercent(ind.crescitaEbitda)}`,
+      `ROI: ${ind.roi === null ? 'da rilevare in intervista' : formatPercent(ind.roi)}`,
+      `EBITDA margin: ${ind.ebitdaMargin === null ? 'da rilevare in intervista' : formatPercent(ind.ebitdaMargin)}`,
+      `Crescita EBITDA: ${ind.crescitaEbitda === null ? 'da rilevare in intervista' : formatPercent(ind.crescitaEbitda)}`,
     ],
   };
 }
@@ -413,9 +413,9 @@ function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
             ? 'Liquidità appena sufficiente: il circolante assorbe cassa in misura rilevante.'
             : 'Tensione di liquidità: gli impegni a breve non sono coperti dalle attività correnti.',
     details: [
-      `Current ratio: ${ind.currentRatio === null ? 'n.d.' : `${formatNumber(ind.currentRatio)}×`}`,
-      `Quick ratio: ${ind.quickRatio === null ? 'n.d.' : `${formatNumber(ind.quickRatio)}×`}`,
-      `Ciclo del circolante: ${ind.cicloCircolante === null ? 'n.d.' : `${ind.cicloCircolante} gg`}`,
+      `Current ratio: ${ind.currentRatio === null ? 'da rilevare in intervista' : `${formatNumber(ind.currentRatio)}×`}`,
+      `Quick ratio: ${ind.quickRatio === null ? 'da rilevare in intervista' : `${formatNumber(ind.quickRatio)}×`}`,
+      `Ciclo del circolante: ${ind.cicloCircolante === null ? 'da rilevare in intervista' : `${ind.cicloCircolante} gg`}`,
     ],
   };
 }
@@ -486,9 +486,9 @@ function fattoreSostenibilitaDebito(ind: FinancialIndicators | null): ScoreFacto
             ? 'Debito sostenibile ma con margini ridotti: sensibile a un calo della marginalità.'
             : 'Debito non sostenibile con la marginalità attuale: rischio di tensione finanziaria.',
     details: [
-      `PFN / EBITDA: ${ind.pfnSuEbitda === null ? 'n.d.' : `${formatNumber(ind.pfnSuEbitda)}×`}`,
-      `Copertura oneri finanziari: ${ind.coperturaOneriFinanziari === null ? 'n.d.' : `${formatNumber(ind.coperturaOneriFinanziari)}×`}`,
-      `Incidenza oneri finanziari sui ricavi: ${ind.incidenzaOneriFinanziari === null ? 'n.d.' : formatPercent(ind.incidenzaOneriFinanziari)}`,
+      `PFN / EBITDA: ${ind.pfnSuEbitda === null ? 'da rilevare in intervista' : `${formatNumber(ind.pfnSuEbitda)}×`}`,
+      `Copertura oneri finanziari: ${ind.coperturaOneriFinanziari === null ? 'da rilevare in intervista' : `${formatNumber(ind.coperturaOneriFinanziari)}×`}`,
+      `Incidenza oneri finanziari sui ricavi: ${ind.incidenzaOneriFinanziari === null ? 'da rilevare in intervista' : formatPercent(ind.incidenzaOneriFinanziari)}`,
     ],
   };
 }
@@ -696,7 +696,7 @@ function fattoreAnzianita(profile: CompanyProfile, asOf: Date): ScoreFactor {
         : anni < 3
           ? `Impresa giovane (${anni} anni): storico insufficiente a consolidare il giudizio.`
           : `Impresa attiva da ${anni} anni, con ${bilanciDepositati} esercizi disponibili.`,
-    details: [`Anni di attività: ${anni ?? 'n.d.'}`, `Bilanci disponibili: ${bilanciDepositati}`],
+    details: [`Anni di attività: ${anni ?? 'da rilevare in intervista'}`, `Bilanci disponibili: ${bilanciDepositati}`],
   };
 }
 

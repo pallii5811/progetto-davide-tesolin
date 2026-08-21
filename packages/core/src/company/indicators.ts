@@ -325,7 +325,7 @@ function growth(current: Euro, previous: Euro): number | null {
 
 /** Formattazione it-IT coerente con l'unità di misura dell'indice. */
 export function formatIndicator(key: keyof FinancialIndicators, value: number | null): string {
-  if (value === null) return 'n.d.';
+  if (value === null) return 'da rilevare in intervista';
   const unit = INDICATOR_META[key].unit;
   switch (unit) {
     case 'percentuale':

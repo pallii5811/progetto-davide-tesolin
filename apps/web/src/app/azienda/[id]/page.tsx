@@ -863,7 +863,15 @@ export default async function PaginaAzienda({
                 <p className="tabular text-sm text-testo-tenue">
                   peso {(fattore.peso * 100).toFixed(0)}% ·{' '}
                   <span className="font-semibold text-testo">
-                    {fattore.punteggio === null ? 'n.d.' : `${Math.round(fattore.punteggio)}/100`}
+                    {/*
+                      «n.d.» accanto a «peso 20%» somiglia a un guasto. Questo fattore non è
+                      mancante: è **non calcolabile** con i dati che l'impresa ha depositato,
+                      e la riga sotto dice quale dato serve. Un punteggio che non c'è va
+                      nominato per quello che è.
+                    */}
+                    {fattore.punteggio === null
+                      ? 'non valutabile'
+                      : `${Math.round(fattore.punteggio)}/100`}
                   </span>
                 </p>
               </div>

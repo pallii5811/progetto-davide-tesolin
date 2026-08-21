@@ -89,7 +89,7 @@ export function MetricheDiImpatto({ dati }: { dati: MetricheDiImpattoDto }) {
           <dt className="text-xs text-testo-debole">Indice di disponibilità</dt>
           <dd className="tabular mt-0.5 font-medium">
             {dati.indiceDiDisponibilita === null
-              ? 'n.d.'
+              ? 'da rilevare'
               : dati.indiceDiDisponibilita.toFixed(2).replace('.', ',')}
             <span className="ml-2 text-xs font-normal text-testo-debole">
               ottimo &gt; 1,20 · critico &lt; 0,50

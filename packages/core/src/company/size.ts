@@ -63,9 +63,9 @@ export function classifySize(input: SizeInput): Explained<CompanySize> {
   const builder = explain('Classificazione dimensionale')
     .formula('Addetti (vincolante) E (Fatturato OPPURE Totale attivo)')
     .reference('Raccomandazione UE 2003/361/CE, art. 2')
-    .input('Addetti', addetti === null ? 'n.d.' : String(addetti))
-    .input('Fatturato', fatturato === null ? 'n.d.' : Money.formatCompact(fatturato))
-    .input('Totale attivo', totaleAttivo === null ? 'n.d.' : Money.formatCompact(totaleAttivo));
+    .input('Addetti', addetti === null ? 'da rilevare in intervista' : String(addetti))
+    .input('Fatturato', fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(fatturato))
+    .input('Totale attivo', totaleAttivo === null ? 'da rilevare in intervista' : Money.formatCompact(totaleAttivo));
 
   if (addetti === null && fatturato === null && totaleAttivo === null) {
     return builder
