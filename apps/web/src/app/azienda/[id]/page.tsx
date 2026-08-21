@@ -661,7 +661,12 @@ export default async function PaginaAzienda({
 
         <div className="space-y-3">
           {gap.voci.map((voce) => (
-            <VoceGap key={voce.copertura} voce={voce} compagnia={compagniaDi(voce, compagnie)} />
+            <VoceGap
+              key={voce.copertura}
+              voce={voce}
+              compagnia={compagniaDi(voce, compagnie)}
+              polizzeCensite={gap.polizzeDichiarate > 0}
+            />
           ))}
         </div>
       </Sezione>
@@ -1405,7 +1410,16 @@ function normalizzaNome(valore: string): string {
     .trim();
 }
 
-function VoceGap({ voce, compagnia }: { voce: GapDto; compagnia: SoliditaCompagnia | null }) {
+function VoceGap({
+  voce,
+  compagnia,
+  polizzeCensite,
+}: {
+  voce: GapDto;
+  compagnia: SoliditaCompagnia | null;
+  /** Falso quando nessuna polizza è stata dichiarata: allora «assente» non è un accertamento. */
+  polizzeCensite: boolean;
+}) {
   return (
     <Scheda className={voce.stato === 'adeguata' ? 'opacity-70' : ''}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -1414,7 +1428,18 @@ function VoceGap({ voce, compagnia }: { voce: GapDto; compagnia: SoliditaCompagn
             {voce.priorita}
           </span>
           <p className="font-medium">{voce.etichetta}</p>
-          <BadgeStato stato={voce.stato} testo={voce.statoEtichetta} />
+          {/*
+            L'avviso in cima diceva «non sono coperture che mancano», e ogni riga qui sotto
+            diceva «Copertura assente»: due frasi che si contraddicono a mezzo centimetro di
+            distanza, e a essere creduta è l'etichetta rossa accanto al nome della garanzia,
+            non il paragrafo sopra. Senza polizze censite la riga dice ciò che si sa.
+          */}
+          <BadgeStato
+            stato={voce.stato}
+            testo={
+              !polizzeCensite && voce.stato === 'assente' ? 'non censita' : voce.statoEtichetta
+            }
+          />
           {voce.obbligoDiLegge && (
             <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium text-critico">
               ⚖ obbligo di legge
