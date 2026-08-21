@@ -164,18 +164,47 @@ export default async function PaginaAzienda({
 
       {/* ── Indicatori di sintesi ─────────────────────────────────────────── */}
       <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/*
+          Senza la verifica di protesti e procedure, punteggio e fido sono provvisori — e
+          va detto **qui**, non fra i fattori.
+
+          Osservato su Acciaierie d'Italia, in amministrazione straordinaria con uno stato
+          di insolvenza aperto: la testata diceva «Fido consigliato 570.000 €». La riga che
+          spiegava «protesti e pregiudizievoli non acquisiti» stava trenta schermate più
+          giù, dentro l'elenco dei fattori. Un intermediario legge i quattro numeri in
+          cima; là sotto non ci arriva.
+
+          Una procedura concorsuale aperta azzera il fido. Consigliarne mezzo milione senza
+          aver guardato è il danno più grande che questo software possa fare, e costa
+          quarantacinque centesimi evitarlo.
+        */}
         <Metrica
           etichetta="Score di credito"
           valore={`${sintesi.scoreCredito}/100`}
-          nota={`Classe ${sintesi.classeCredito} · PD 12 mesi ${(sintesi.probabilitaDefault * 100).toFixed(2)}%`}
+          nota={
+            analisi.eventiNegativi === null
+              ? `Classe ${sintesi.classeCredito} · provvisorio: protesti e procedure non verificati`
+              : `Classe ${sintesi.classeCredito} · PD 12 mesi ${(sintesi.probabilitaDefault * 100).toFixed(2)}%`
+          }
           tono={
-            sintesi.scoreCredito >= 65 ? 'positivo' : sintesi.scoreCredito >= 50 ? 'attenzione' : 'critico'
+            analisi.eventiNegativi === null
+              ? 'attenzione'
+              : sintesi.scoreCredito >= 65
+                ? 'positivo'
+                : sintesi.scoreCredito >= 50
+                  ? 'attenzione'
+                  : 'critico'
           }
         />
         <Metrica
           etichetta="Fido consigliato"
           valore={sintesi.fidoConsigliato.formattato}
-          nota={`Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`}
+          nota={
+            analisi.eventiNegativi === null
+              ? 'Provvisorio: una procedura concorsuale aperta lo azzera, e non è stata verificata'
+              : `Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`
+          }
+          tono={analisi.eventiNegativi === null ? 'attenzione' : 'neutro'}
         />
         {/*
           La didascalia elenca **ciò che è dentro il numero**, non ciò che il numero
