@@ -52,7 +52,10 @@ test.describe('Portafoglio', () => {
 
     // La tabella con scorrimento orizzontale lasciava fuori schermo proprio queste tre
     // cose, senza alcun indizio che ci fosse dell'altro.
-    await expect(scheda.getByText(/inadempiente|conforme|in-scadenza/)).toBeVisible();
+    // «non censita» e non «inadempiente»: senza le polizze in essere il portafoglio non
+    // può accertare un'inadempienza a un obbligo di legge, e non deve scriverla accanto al
+    // nome di un cliente.
+    await expect(scheda.getByText(/non censita|conforme|in-scadenza/)).toBeVisible();
 
     const esposizione = scheda.locator('dd').filter({ hasText: /€/ }).first();
     await expect(esposizione).toBeVisible();
