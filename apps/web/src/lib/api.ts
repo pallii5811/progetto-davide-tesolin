@@ -571,6 +571,8 @@ export interface AnalisiDto {
     coperturaInadeguata: number;
     coperturaAdeguata: number;
     coperturaDaQuantificare: number;
+    /** Zero significa che il confronto non è stato fatto: nessuna polizza è stata inserita. */
+    polizzeDichiarate: number;
     esposizioneNonAssicurata: MoneyDto;
     premioInEssere: MoneyDto | null;
   };

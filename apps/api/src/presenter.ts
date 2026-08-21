@@ -257,6 +257,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
       coperturaInadeguata: analisi.gap.coperturaInadeguata,
       coperturaAdeguata: analisi.gap.coperturaAdeguata,
       coperturaDaQuantificare: analisi.gap.coperturaDaQuantificare,
+      polizzeDichiarate: analisi.gap.polizzeDichiarate,
       esposizioneNonAssicurata: money(analisi.gap.esposizioneNonAssicurata),
       premioInEssere: moneyOrNull(analisi.gap.premioInEssere),
     },

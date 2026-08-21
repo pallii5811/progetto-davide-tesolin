@@ -589,10 +589,38 @@ export default async function PaginaAzienda({
       <Sezione
         id="piano"
         titolo="Piano d’azione sulle coperture"
-        sottotitolo={`${gap.coperturaAssente} assenti · ${gap.coperturaInadeguata} inadeguate · ${gap.coperturaAdeguata} adeguate${
-          gap.premioInEssere === null ? '' : ` · premio in essere ${gap.premioInEssere.formattato}`
-        }`}
+        sottotitolo={
+          gap.polizzeDichiarate === 0
+            ? 'Nessuna polizza in essere dichiarata: qui sotto ci sono le coperture che servono, non quelle che mancano.'
+            : `${gap.coperturaAssente} assenti · ${gap.coperturaInadeguata} inadeguate · ${gap.coperturaAdeguata} adeguate${
+                gap.premioInEssere === null ? '' : ` · premio in essere ${gap.premioInEssere.formattato}`
+              }`
+        }
       >
+        {/*
+          Zero polizze inserite cambia il significato di tutto l'elenco.
+
+          Le voci restano quelle giuste — sono le garanzie che quell'impresa dovrebbe avere
+          — ma senza il portafoglio in essere la piattaforma non sta accertando un'assenza:
+          sta elencando un fabbisogno. Scrivere «copertura assente» accanto a nove voci
+          davanti a un cliente già assicurato è una frase falsa, e chi la legge non ha modo
+          di sapere che nessuno ha ancora detto al programma cosa quel cliente possiede.
+        */}
+        {gap.polizzeDichiarate === 0 && (
+          <div className="mb-4">
+            <Avviso tono="attenzione" titolo="Il confronto con le polizze non è stato fatto">
+              Non è stata inserita nessuna polizza in essere, quindi le voci qui sotto
+              elencano le coperture <strong>necessarie</strong> a questa impresa — non quelle
+              che le mancano. Per avere il confronto vero, e sapere dove è sottoassicurata,
+              inserire il portafoglio in essere nei{' '}
+              <Link href={`/azienda/${id}/dati`} className="text-marchio underline">
+                dati di intervista
+              </Link>
+              .
+            </Avviso>
+          </div>
+        )}
+
         <div className="space-y-3">
           {gap.voci.map((voce) => (
             <VoceGap key={voce.copertura} voce={voce} compagnia={compagniaDi(voce, compagnie)} />
