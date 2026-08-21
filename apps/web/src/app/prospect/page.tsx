@@ -17,6 +17,9 @@ export const dynamic = 'force-dynamic';
  */
 const CENTESIMI_PER_AZIENDA = 5;
 
+/** Con ATECO, addetti e forma giuridica: il doppio, verificato con un preventivo gratuito. */
+const CENTESIMI_PER_AZIENDA_COMPLETO = 10;
+
 /**
  * Ricerca di prospect.
  *
@@ -50,6 +53,9 @@ export default async function PaginaProspect({
     // Predefinito «solo S.r.l.»: è la forma su cui l'analisi è completa, e partire
     // dalle ditte individuali significa pagare righe che non si possono valutare.
     formaGiuridicaCodice: parametri['formaGiuridicaCodice'] ?? 'SR',
+    // Base per definizione: è la metà del prezzo, e per capire se un'impresa interessa
+    // il nome con la sede bastano. Il dettaglio si sceglie quando serve.
+    arricchimento: parametri['arricchimento'] ?? 'start',
     // Quante aziende scaricare: il prezzo è **a record**, non a ricerca, e senza un lotto
     // dichiarato un elenco su una provincia intera costerebbe centinaia di euro.
     /*
@@ -204,12 +210,45 @@ export default async function PaginaProspect({
             </label>
 
             {/*
+              Quanto dettaglio comprare per ogni riga.
+
+              L'elenco base non porta ATECO, addetti né forma giuridica: costava cinque
+              centesimi a riga e lasciava vuote proprio le colonne su cui si era appena
+              filtrato — chi guarda conclude che il filtro non abbia funzionato, mentre ha
+              funzionato eccome, solo che il dettaglio non era compreso nel prezzo.
+
+              Adesso la scelta è dichiarata, col prezzo di entrambe le opzioni.
+            */}
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
+                Dettaglio dell&apos;elenco
+              </span>
+              <select
+                name="arricchimento"
+                defaultValue={criteri.arricchimento}
+                className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio"
+              >
+                <option value="start">Base — nome, P.IVA, sede · 0,05 € ad azienda</option>
+                <option value="advanced">
+                  Completo — con ATECO, addetti, forma giuridica · 0,10 € ad azienda
+                </option>
+              </select>
+              <span className="mt-1 block text-xs text-testo-tenue">
+                Con il base la colonna ATECO resta vuota: quel dato non è compreso.
+              </span>
+            </label>
+
+            {/*
               Il lotto è una scelta economica, non tecnica: il servizio si paga a record,
               e questo campo è il punto in cui l'intermediario decide quanto spendere.
             */}
             <SelettoreLotto
               valoreIniziale={criteri.limite}
-              centesimiPerAzienda={CENTESIMI_PER_AZIENDA}
+              centesimiPerAzienda={
+                criteri.arricchimento === 'advanced'
+                  ? CENTESIMI_PER_AZIENDA_COMPLETO
+                  : CENTESIMI_PER_AZIENDA
+              }
               massimo={100}
             />
           </div>

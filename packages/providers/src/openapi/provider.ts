@@ -202,6 +202,8 @@ export class OpenApiProvider implements CompanyDataProvider {
     const service = this.#config.services.prospezione;
     const soloConteggio = opzioni.soloConteggio ?? false;
     const limite = criteri.limite ?? LOTTO_PREDEFINITO;
+    // Il livello di dettaglio è una scelta di chi paga, non una costante nascosta qui.
+    const arricchimento = criteri.arricchimento ?? ARRICCHIMENTO;
 
     const filtri = {
       companyName: criteri.denominazione,
@@ -229,7 +231,7 @@ export class OpenApiProvider implements CompanyDataProvider {
       */
       const [totali, preventivo] = await Promise.all([
         this.#contaProspect({ ...filtri }),
-        this.#contaProspect({ ...filtri, limit: limite, dataEnrichment: ARRICCHIMENTO }),
+        this.#contaProspect({ ...filtri, limit: limite, dataEnrichment: arricchimento }),
       ]);
 
       return {
@@ -252,7 +254,7 @@ export class OpenApiProvider implements CompanyDataProvider {
         skip: criteri.salta,
         // Senza arricchimento la risposta contiene **soltanto gli identificativi**: un
         // elenco di stringhe opache, inutile da mostrare e comunque da pagare.
-        dataEnrichment: ARRICCHIMENTO,
+        dataEnrichment: arricchimento,
       },
       cacheTtlSeconds: service.ttlSeconds,
       // Stima prudenziale prima della chiamata, corretta subito dopo con il costo che il

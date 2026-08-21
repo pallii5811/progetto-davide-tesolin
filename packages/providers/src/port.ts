@@ -139,6 +139,17 @@ export interface CriteriProspezione {
    * Il fornitore accetta **un codice per volta**: l'elenco separato da virgole risponde
    * zero. Verificato il 21/08/2026.
    */
+  /**
+   * Quanto dettaglio comprare per ogni riga dell'elenco.
+   *
+   * `start` costa cinque centesimi a record e porta denominazione, partita IVA e sede;
+   * **non porta l'ATECO**, né gli addetti, né la forma giuridica — che è il motivo per cui
+   * quelle colonne restavano vuote su un elenco filtrato proprio per settore.
+   *
+   * `advanced` costa dieci centesimi e li porta. Verificato sul servizio reale il
+   * 21/08/2026 con un preventivo gratuito: dieci record 0,50 € contro 1,00 €.
+   */
+  readonly arricchimento?: 'start' | 'advanced' | undefined;
   readonly formaGiuridicaCodice?: string | undefined;
   readonly socioCodiceFiscale?: string | undefined;
   readonly soloAttive?: boolean | undefined;
