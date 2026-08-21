@@ -234,7 +234,9 @@ export default async function PaginaProspect({
                 </option>
               </select>
               <span className="mt-1 block text-xs text-testo-tenue">
-                Con il base la colonna ATECO resta vuota: quel dato non è compreso.
+                Il completo è la stessa anagrafica che compra «Analizza»: se poi analizzi
+                l'azienda la paghi due volte. Conviene solo per scegliere <em>quali</em>
+                analizzare senza analizzarle.
               </span>
             </label>
 
