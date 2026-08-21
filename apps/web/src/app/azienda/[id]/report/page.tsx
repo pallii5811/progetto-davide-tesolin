@@ -246,7 +246,7 @@ export default async function PaginaReport({
             */}
             {sintesi.esposizioneNonAssicurata.euro === 0 && sintesi.coperturaDaQuantificare > 0 ? (
               <>
-                Rispetto alle coperture attualmente in essere restano{' '}
+                {gap.polizzeDichiarate === 0 ? 'Non essendo stata censita alcuna polizza in essere, restano' : 'Rispetto alle coperture attualmente in essere restano'}{' '}
                 <strong>
                   {sintesi.coperturaDaQuantificare}{' '}
                   {sintesi.coperturaDaQuantificare === 1 ? 'garanzia' : 'garanzie'} il cui capitale non è
@@ -257,7 +257,9 @@ export default async function PaginaReport({
               </>
             ) : (
               <>
-                Rispetto alle coperture attualmente in essere residua un&apos;esposizione non assicurata di{' '}
+                {gap.polizzeDichiarate === 0
+                  ? 'Non essendo stata censita alcuna polizza in essere, il patrimonio risulta scoperto per'
+                  : 'Rispetto alle coperture attualmente in essere residua un’esposizione non assicurata di'}{' '}
                 <strong>{sintesi.esposizioneNonAssicurata.formattato}</strong>
                 {sintesi.incidenzaEsposizioneSuPatrimonio !== null && (
                   <>
@@ -274,10 +276,29 @@ export default async function PaginaReport({
           </p>
           {!sintesi.catNatConforme && catNat.soggetta && (
             <p className="mt-3 border-l-4 border-critico bg-critico-fondo p-3">
-              <strong>Adempimento normativo pendente.</strong> L&apos;impresa è soggetta all&apos;obbligo di
-              assicurazione contro le calamità naturali introdotto dalla L. 213/2023 e non risulta averlo
-              adempiuto. L&apos;inadempimento è considerato nell&apos;assegnazione di contributi,
-              sovvenzioni e agevolazioni pubbliche.
+              {/*
+                Su un documento che l'intermediario consegna al cliente, «non risulta averlo
+                adempiuto» è un accertamento. Senza il portafoglio in essere quell'accertamento
+                non è stato fatto: dirlo lo stesso significa mettere per iscritto, con la firma
+                dello studio, un'inadempienza a una legge che nessuno ha verificato.
+              */}
+              {gap.polizzeDichiarate === 0 ? (
+                <>
+                  <strong>Adempimento normativo da verificare.</strong> L&apos;impresa è soggetta
+                  all&apos;obbligo di assicurazione contro le calamità naturali introdotto dalla
+                  L. 213/2023. Non essendo state censite le polizze in essere,{' '}
+                  <strong>il presente documento non accerta se l&apos;obbligo sia stato adempiuto</strong>:
+                  la verifica va completata sulla documentazione assicurativa dell&apos;impresa.
+                </>
+              ) : (
+                <>
+                  <strong>Adempimento normativo pendente.</strong> L&apos;impresa è soggetta
+                  all&apos;obbligo di assicurazione contro le calamità naturali introdotto dalla
+                  L. 213/2023 e, fra le polizze censite, non ne risulta alcuna che lo adempia.
+                  L&apos;inadempimento è considerato nell&apos;assegnazione di contributi,
+                  sovvenzioni e agevolazioni pubbliche.
+                </>
+              )}
             </p>
           )}
 

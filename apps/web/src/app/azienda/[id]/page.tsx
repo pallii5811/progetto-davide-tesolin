@@ -225,11 +225,28 @@ export default async function PaginaAzienda({
       {/* ── Allerta CAT NAT ───────────────────────────────────────────────── */}
       {catNat.stato === 'inadempiente' && (
         <div className="mb-8">
-          <Avviso tono="critico" titolo="⚖ Obbligo assicurativo catastrofale non adempiuto">
+          {/*
+            «Non adempiuto» è un accertamento, e senza il portafoglio in essere non lo si
+            può fare: si sa soltanto che fra le polizze note non ce n'è una catastrofale, e
+            se di polizze note non ce n'è nessuna quella frase non afferma niente. Su un
+            obbligo di legge, dire a un'impresa che è inadempiente quando nessuno ha
+            guardato le sue polizze è l'errore più caro che questo documento possa
+            contenere.
+          */}
+          <Avviso
+            tono="critico"
+            titolo={
+              gap.polizzeDichiarate === 0
+                ? '⚖ Obbligo assicurativo catastrofale: copertura non censita'
+                : '⚖ Obbligo assicurativo catastrofale non adempiuto'
+            }
+          >
             <p>
               Il termine di legge è scaduto
-              {catNat.giorniAlTermine !== null && ` da ${Math.abs(catNat.giorniAlTermine)} giorni`} e non
-              risulta alcuna copertura CAT NAT in portafoglio.{' '}
+              {catNat.giorniAlTermine !== null && ` da ${Math.abs(catNat.giorniAlTermine)} giorni`}
+              {gap.polizzeDichiarate === 0
+                ? ' e non è stata censita alcuna polizza in essere, quindi non è possibile accertare se l’obbligo sia stato adempiuto.'
+                : ' e non risulta alcuna copertura CAT NAT in portafoglio.'}{' '}
               {catNat.baseAssicurabile === null ? (
                 <>Il capitale da assicurare è ancora da quantificare.</>
               ) : (
