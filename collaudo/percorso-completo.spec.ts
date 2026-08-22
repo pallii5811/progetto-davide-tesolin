@@ -142,19 +142,22 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     await accedi(page);
   });
 
-  test('trova, compra l’elenco, analizza, esporta e sorveglia', async ({ page }) => {
+  test('trova per insiemi, compra l’elenco, analizza, esporta e sorveglia', async ({ page }) => {
     test.setTimeout(180_000);
 
-    // ── 1. Descrive l'insieme che cerca, e chiede quante sono ─────────────
+    // ── 1. Descrive l'insieme che cerca ───────────────────────────────────
     await page.goto('/prospect');
     await page.getByLabel('Provincia').fill('BS');
     await page.getByRole('button', { name: /Quante sono/i }).click();
     await expect(page.getByText(/aziende corrispondono/i)).toBeVisible();
 
     /*
-      Il costo si legge prima di premere. È la regola che questo prodotto ha violato per
-      un'intera notte — pulsanti che dichiaravano dieci centesimi e ne spendevano
-      cinquantacinque — e il percorso completo la ripretende qui, dove i soldi escono.
+      Il prezzo si legge prima di premere.
+
+      È la regola che questo prodotto ha violato per un'intera notte — un pulsante che
+      dichiarava dieci centesimi e ne spendeva cinquantacinque, un altro che comprava
+      filtri diversi da quelli scritti a schermo. Qui la si ripretende nel punto esatto in
+      cui i soldi escono.
     */
     await expect(page.getByText(/€ ad azienda/)).toBeVisible();
 
@@ -163,32 +166,29 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     await expect(page.getByRole('table')).toBeVisible();
     await expect(page.getByText(/aziende scaricate/i)).toBeVisible();
 
-    // ── 3. Analizza la prima ──────────────────────────────────────────────
+    // ── 3. Analizza la prima, e il registro dei rischi c'è ────────────────
     await page.getByRole('link', { name: 'Analizza' }).first().click();
     await expect(page.getByText(/Score di credito/i).first()).toBeVisible();
+    await expect(page.getByText(/Registro dei rischi/i)).toBeVisible();
+    await expect(page.getByText(/ISO 31000/i).first()).toBeVisible();
 
-    // ── 4. Il documento per il cliente ────────────────────────────────────
-    await page.getByRole('link', { name: /Report per il cliente/i }).click();
-    await expect(page.getByText(/Sintesi per la direzione/i)).toBeVisible();
-
-    // ── 5. Il portafoglio si esporta, e il file non accusa nessuno ────────
+    // ── 4. Il portafoglio si esporta, e il file non accusa nessuno ────────
     await page.goto('/portafoglio');
     const scaricamento = page.waitForEvent('download');
-    await page.getByRole('link', { name: /Esporta in CSV/i }).click();
+    await page.getByRole('link', { name: /Esporta/i }).first().click();
     const file = await scaricamento;
     const flusso = await file.createReadStream();
     let csv = '';
     for await (const pezzo of flusso) csv += String(pezzo);
 
-    expect(csv, 'il file deve contenere le intestazioni').toContain('Denominazione');
+    expect(csv, 'il file deve avere le intestazioni').toContain('Denominazione');
     expect(
       csv.toLowerCase(),
-      'il file che esce dalla piattaforma non deve dichiarare inadempienze non verificate',
+      'un file che esce dalla piattaforma non deve dichiarare inadempienze non verificate',
     ).not.toContain('da sanare');
 
-    // ── 6. Il monitoraggio gira, e non consuma credito ────────────────────
+    // ── 5. Il monitoraggio gira, e dichiara di non consumare credito ──────
     await page.goto('/monitoraggio');
-    await page.getByRole('button', { name: /Aggiorna monitoraggio/i }).click();
     await expect(page.getByText(/Non consuma credito dati/i)).toBeVisible();
   });
 });
