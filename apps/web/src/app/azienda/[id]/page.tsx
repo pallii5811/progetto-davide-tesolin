@@ -706,6 +706,37 @@ export default async function PaginaAzienda({
         titolo="Registro dei rischi"
         sottotitolo={`ISO 31000:2018 · ${analisi.rischiMeta.totale} rischi identificati · ${analisi.rischiMeta.daTrasferire} da trasferire · catalogo v${analisi.rischiMeta.versioneCatalogo}`}
       >
+        {/*
+          Quando nessuna misura è confermata, residuo e inerente coincidono — e va detto.
+
+          Il modello riduce il rischio solo per i controlli **verificati**: un impianto
+          antincendio dichiarato e mai confermato non abbassa niente, ed è la scelta giusta
+          — accreditare a un'impresa una protezione che nessuno ha visto significa
+          proporle una franchigia che non regge.
+
+          Ma le due colonne restano identiche su tutti i rischi, e chi le guarda non capisce
+          se il modello non funzioni o se non ci sia nulla da scontare. La differenza fra
+          inerente e residuo è ciò che rende difendibile la proposta: se è zero, il motivo
+          va scritto accanto, non lasciato dedurre.
+        */}
+        {analisi.rischi.length > 0 &&
+          analisi.rischi.every((r) => r.punteggioResiduo === r.punteggioInerente) && (
+            <div className="mb-4">
+              <Avviso tono="informativo" titolo="Rischio residuo pari all’inerente">
+                Nessuna misura di prevenzione è stata <strong>confermata</strong> in intervista,
+                quindi nessuna riduzione è stata applicata: il rischio residuo coincide con
+                quello inerente. Le protezioni che l’impresa già possiede — impianto
+                antincendio, allarme, modello 231 — abbassano il punteggio solo quando sono
+                verificate, perché accreditarle senza averle viste significherebbe proporre una
+                franchigia che non regge.{' '}
+                <Link href={`/azienda/${id}/dati`} className="text-marchio underline">
+                  Confermarle nei dati di intervista
+                </Link>
+                .
+              </Avviso>
+            </div>
+          )}
+
         <MatriceRischi rischi={analisi.rischi} />
         <div className="mt-5 space-y-2">
           {analisi.rischi.map((rischio) => (
