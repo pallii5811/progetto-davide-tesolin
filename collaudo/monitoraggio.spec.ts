@@ -19,11 +19,20 @@ test.describe('Monitoraggio continuo', () => {
     await page.goto('/monitoraggio');
     await page.getByRole('button', { name: /aggiorna monitoraggio/i }).click();
 
-    // L'azienda dimostrativa è inadempiente all'obbligo CAT NAT: quell'evento deve esserci.
+    /*
+      Sull'azienda dimostrativa non risulta una copertura CAT NAT: quell'evento deve
+      esserci. Il titolo non dice più «obbligo non adempiuto» — senza le polizze censite
+      quell'inadempienza non è stata accertata, e la coda di lavoro è il posto dove una
+      parola del genere fa più danno: è l'elenco di chi chiamare.
+    */
     const eventi = page.locator('ul > li');
     await expect(eventi.first()).toBeVisible();
-    // Ogni azienda non conforme ne produce uno: si verifica che ci sia, non che sia solo.
-    await expect(page.getByText(/Obbligo assicurativo catastrofale/).first()).toBeVisible();
+    // Ogni azienda senza copertura ne produce uno: si verifica che ci sia, non che sia solo.
+    await expect(page.getByText(/Copertura catastrofale non censita/).first()).toBeVisible();
+    await expect(
+      page.getByText(/obbligo assicurativo catastrofale non adempiuto/i),
+      'la coda non deve dichiarare un’inadempienza mai verificata',
+    ).toHaveCount(0);
 
     // In cima ciò che costa di più non fare.
     await expect(eventi.first().getByText('urgente')).toBeVisible();
