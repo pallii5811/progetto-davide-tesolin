@@ -298,10 +298,23 @@ npm run start --workspace @aegis/web  # frontend, porta 3000
 Il frontend parla con l'API tramite `AEGIS_API_URL`; l'unico processo che deve essere
 raggiungibile dai browser è il frontend.
 
-### 6.4 Row Level Security — ⚠ **non applicarla ancora**
+### 6.4 Row Level Security — ora si può applicare
 
-Le policy in `packages/db/src/rls.ts` sono scritte ma **inerti**, e vanno lasciate tali
-finché non è completato il punto 2 qui sotto.
+Le policy in `packages/db/src/rls.ts` sono scritte e **inerti** finché non le si applica
+come migrazione. Il collegamento applicativo che serviva — l'impostazione di
+`app.tenant_id` a ogni transazione — **è stato fatto il 22/08/2026**: ogni metodo del
+contesto di uno studio passa da `conTenant`, che apre una transazione e vi dichiara
+l'identificativo con `SET LOCAL`.
+
+Resta da fare, e va fatto su un PostgreSQL vero:
+
+1. applicare il SQL delle policy come migrazione, **con il ruolo proprietario**;
+2. far connettere l'applicazione con un ruolo **non superuser**: i superuser scavalcano la
+   Row Level Security anche con `FORCE` — misurato il 20/08/2026, due righe di due
+   intermediari diversi entrambe visibili a policy attiva;
+3. collaudarlo: aprire due studi, analizzare un'azienda col primo, verificare che il
+   secondo non la veda. In sviluppo non si può provare, e una sicurezza non provata non è
+   una sicurezza.
 
 **Applicarle oggi manderebbe giù il prodotto.** Le policy filtrano su
 `current_setting('app.tenant_id')`, e l'applicazione **non imposta ancora quella

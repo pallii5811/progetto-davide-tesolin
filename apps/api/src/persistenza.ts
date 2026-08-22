@@ -34,6 +34,7 @@ import {
   salvaPartecipazioni,
   salvaSnapshot,
   sostituisciPolizze,
+  conTenant,
 } from '@aegis/db';
 import type { Connessione, DatiStudio, Database, ModificheStudio, RigaPolizza } from '@aegis/db';
 import type {
@@ -152,7 +153,66 @@ export async function creaPersistenza(options: PersistenzaOptions = {}): Promise
   };
 }
 
+/**
+ * Il contesto di uno studio, e ogni suo accesso dichiara per conto di chi avviene.
+ *
+ * L'isolamento fra intermediari era garantito **solo dal codice**: ogni lettura filtra per
+ * `tenant_id`, e finché nessuno dimentica un `where` funziona. Le policy di Row Level
+ * Security — il secondo strato, quello che regge quando il primo sbaglia — erano scritte e
+ * inerti, e non potevano essere attivate: senza `app.tenant_id` impostato,
+ * `current_setting` torna vuoto e **ogni query risponde zero righe** su un archivio pieno,
+ * senza un errore che spieghi perché.
+ *
+ * Qui si chiude quel cerchio. Ogni metodo del contesto viene eseguito dentro una
+ * transazione che imposta l'identificativo dello studio, e il contesto vero viene
+ * ricostruito su quella transazione — altrimenti i metodi continuerebbero a usare la
+ * connessione di prima, e la dichiarazione non varrebbe niente.
+ *
+ * `SET LOCAL` e non `SET`: il valore muore con la transazione e non resta appiccicato a una
+ * connessione che il pool riassegna a un altro studio. Sarebbe il modo peggiore di far
+ * fallire un isolamento, perché intermittente e invisibile.
+ *
+ * Su PGlite, dove l'utente è superuser, le policy non mordono e il comportamento non
+ * cambia: è deliberato. Il codice si scrive una volta e vale in entrambi gli ambienti,
+ * invece di funzionare in sviluppo e scoprire in produzione che qualcosa non era collegato.
+ */
 function creaContesto(db: Database, tenantId: string): ContestoTenant {
+  const su = (d: Database): ContestoTenant => creaContestoSu(d, tenantId);
+
+  /** Esegue un metodo del contesto dentro una transazione che dichiara lo studio. */
+  const dentro = <T>(azione: (c: ContestoTenant) => Promise<T>): Promise<T> =>
+    conTenant(db, tenantId, (tx) => azione(su(tx)));
+
+  return {
+    tenantId,
+    dossier: {
+      get: (id) => dentro((c) => c.dossier.get(id)),
+      upsert: (id, patch) => dentro((c) => c.dossier.upsert(id, patch)),
+    },
+    portafoglio: {
+      registra: (voce) => dentro((c) => c.portafoglio.registra(voce)),
+      elenco: () => dentro((c) => c.portafoglio.elenco()),
+      collegamenti: (id) => dentro((c) => c.portafoglio.collegamenti(id)),
+    },
+    studio: {
+      leggi: () => dentro((c) => c.studio.leggi()),
+      aggiorna: (dati) => dentro((c) => c.studio.aggiorna(dati)),
+    },
+    immagini: {
+      elenca: (id) => dentro((c) => c.immagini.elenca(id)),
+      quante: (id, ubicazioneId) => dentro((c) => c.immagini.quante(id, ubicazioneId)),
+      aggiungi: (id, immagine, utenteId) =>
+        dentro((c) => c.immagini.aggiungi(id, immagine, utenteId)),
+      rimuovi: (id, immagineId) => dentro((c) => c.immagini.rimuovi(id, immagineId)),
+    },
+    registraAnalisi: (id, analisi, provider) =>
+      dentro((c) => c.registraAnalisi(id, analisi, provider)),
+    registraCostiDati: (eventi) => dentro((c) => c.registraCostiDati(eventi)),
+    riepilogoCosti: () => dentro((c) => c.riepilogoCosti()),
+  };
+}
+
+function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
   const dossier: DossierStore = {
     async get(identificativo: string): Promise<DossierAzienda | null> {
       const chiave = normalizza(identificativo);
