@@ -550,3 +550,28 @@ export async function applicaSchemaTollerante(connessione: Connessione): Promise
     }
   }
 }
+
+/**
+ * Le righe di un `db.execute(sql\`…\`)`, qualunque driver ci sia sotto.
+ *
+ * Non è una comodità: è la correzione di un guasto che ha impedito al servizio di
+ * avviarsi in produzione. `postgres-js` — il driver usato con PostgreSQL — restituisce
+ * **direttamente l'array** delle righe; PGlite e `node-postgres` restituiscono un oggetto
+ * con dentro `rows`. Chi legge solo `.rows` trova `undefined` e conclude che la query non
+ * abbia prodotto nulla.
+ *
+ * Il controllo che verifica l'esistenza dello schema faceva esattamente questo, e non
+ * poteva accorgersene nessuno: in sviluppo si gira su PGlite, dove quel controllo **non
+ * viene nemmeno eseguito** (lì lo schema si crea all'avvio). Il primo avvio su PostgreSQL
+ * vero è stato anche il primo in cui quella riga di codice veniva eseguita, e ha risposto
+ * «il database non contiene lo schema di AEGIS» su un database con diciotto tabelle
+ * appena create.
+ *
+ * La forma corretta era già scritta in quattro punti del pacchetto, copiata a mano ogni
+ * volta. Il quinto l'ha sbagliata. Ora è una sola.
+ */
+export function righeDi<T>(risultato: unknown): readonly T[] {
+  if (Array.isArray(risultato)) return risultato as T[];
+  const conRows = risultato as { rows?: readonly T[] } | null | undefined;
+  return conRows?.rows ?? [];
+}

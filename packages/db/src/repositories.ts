@@ -12,6 +12,7 @@
  */
 
 import { and, desc, eq, gte, ilike, isNull, sql } from 'drizzle-orm';
+import { righeDi } from './client.js';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -935,9 +936,7 @@ export async function elencoPortafoglio(
     ORDER BY a.id, n.creata_il DESC
   `);
 
-  const righe: RigaGrezza[] = Array.isArray(risultato)
-    ? (risultato as RigaGrezza[])
-    : ((risultato as { rows?: RigaGrezza[] }).rows ?? []);
+  const righe = righeDi<RigaGrezza>(risultato);
 
   return righe.map((r) => ({
     identificativo: r.partita_iva ?? r.denominazione,
@@ -1163,9 +1162,7 @@ export async function collegamentiSocietari(
     ORDER BY mia.socio_denominazione, a.denominazione
   `);
 
-  const righe: Riga[] = Array.isArray(risultato)
-    ? (risultato as Riga[])
-    : ((risultato as { rows?: Riga[] }).rows ?? []);
+  const righe = righeDi<Riga>(risultato);
 
   const perSocio = new Map<string, CollegamentoSocietario>();
   for (const r of righe) {

@@ -12,6 +12,7 @@
  */
 
 import { asc, eq, sql } from 'drizzle-orm';
+import { righeDi } from './client.js';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -143,9 +144,7 @@ export async function elencoSolidita(db: Database): Promise<readonly RigaSolidit
     ORDER BY c.id, s.anno DESC
   `);
 
-  const righe: Riga[] = Array.isArray(risultato)
-    ? (risultato as Riga[])
-    : ((risultato as { rows?: Riga[] }).rows ?? []);
+  const righe = righeDi<Riga>(risultato);
 
   return righe
     .map((r) => ({

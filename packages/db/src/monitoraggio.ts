@@ -7,6 +7,7 @@
  */
 
 import { and, desc, eq, gt, isNull, or, sql } from 'drizzle-orm';
+import { righeDi } from './client.js';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -207,9 +208,7 @@ export async function statiDaConfrontare(
     WHERE ultima.posizione = 1
   `);
 
-  const righe: Riga[] = Array.isArray(risultato)
-    ? (risultato as Riga[])
-    : ((risultato as { rows?: Riga[] }).rows ?? []);
+  const righe = righeDi<Riga>(risultato);
 
   return righe.map((r) => ({
     aziendaId: r.azienda_id,

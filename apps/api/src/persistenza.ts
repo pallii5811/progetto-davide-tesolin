@@ -35,6 +35,7 @@ import {
   salvaSnapshot,
   sostituisciPolizze,
   conTenant,
+  righeDi,
 } from '@aegis/db';
 import type { Connessione, DatiStudio, Database, ModificheStudio, RigaPolizza } from '@aegis/db';
 import type {
@@ -107,13 +108,26 @@ export interface PersistenzaOptions {
  */
 async function verificaSchemaApplicato(connessione: Connessione): Promise<void> {
   const { sql } = await import('drizzle-orm');
-  // `execute` restituisce un risultato non tipizzato: il tipo lo dichiariamo qui, dove
-  // sappiamo cosa abbiamo chiesto.
-  const esito = (await connessione.db.execute(sql`
-    SELECT to_regclass('public.aziende') IS NOT NULL AS presente
-  `)) as { rows?: readonly { presente?: boolean }[] };
 
-  if (esito.rows?.[0]?.presente === true) return;
+  /*
+    `righeDi` e non `.rows`.
+
+    Questo controllo dichiarava «il database non contiene lo schema di AEGIS» su un
+    database con diciotto tabelle appena migrate. Leggeva `esito.rows`, che esiste su
+    PGlite e su node-postgres ma **non** su `postgres-js`, il driver usato proprio con
+    PostgreSQL: lì il risultato è già l'array delle righe, `.rows` è `undefined`, e il
+    controllo concludeva che la tabella non ci fosse.
+
+    Nessun collaudo poteva vederlo: in sviluppo si gira su PGlite, dove questa funzione
+    non viene nemmeno chiamata.
+  */
+  const righe = righeDi<{ presente?: boolean }>(
+    await connessione.db.execute(sql`
+      SELECT to_regclass('public.aziende') IS NOT NULL AS presente
+    `),
+  );
+
+  if (righe[0]?.presente === true) return;
 
   throw new Error(
     'Il database indicato da DATABASE_URL non contiene lo schema di AEGIS.\n' +
