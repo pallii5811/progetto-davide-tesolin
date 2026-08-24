@@ -135,10 +135,28 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   */
   const cacheDati = persistenza === undefined ? new MemoryCache() : new CachePersistente(persistenza.db);
 
+  /*
+    `OPENAPI_AMBIENTE` non la leggeva nessuno.
+
+    Era documentata in `.env.example` — «test usa il sandbox, chiamate gratuite» — e
+    scritta nei file di configurazione, e il codice non la consultava mai: il provider
+    partiva sempre su produzione. Chi l'avesse impostata a `test` per fare prove senza
+    consumare credito avrebbe consumato credito comunque, credendosi al sicuro. Su una
+    fonte a pagamento è la trappola nella direzione peggiore.
+
+    Un valore diverso da `test` significa produzione: davanti a una configurazione
+    incomprensibile si sceglie la lettura che spende — e quindi quella di cui ci si
+    accorge — piuttosto che quella che consegna dati inventati senza dirlo.
+  */
+  const ambiente = process.env['OPENAPI_AMBIENTE']?.trim().toLowerCase() === 'test'
+    ? ('test' as const)
+    : ('produzione' as const);
+
   const provider =
     options.provider ??
     createCompanyProvider({
       openApiToken: process.env['OPENAPI_TOKEN'],
+      ambiente,
       cache: cacheDati,
       ledger: registro,
     });
@@ -421,7 +439,14 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   app.get('/health', async () => ({
     stato: 'ok',
     provider: provider.name,
-    datiReali: !provider.name.startsWith('Demo'),
+    /*
+      `datiReali` diceva solo «non è il provider dimostrativo». Non bastava: il sandbox del
+      fornitore ha lo stesso provider e restituisce anagrafiche inventate, quindi con
+      `OPENAPI_AMBIENTE=test` questo campo avrebbe dichiarato dati reali su dati finti.
+      Sono i due modi di avere numeri inventati a schermo, e vanno esclusi entrambi.
+    */
+    datiReali: !provider.name.startsWith('Demo') && ambiente === 'produzione',
+    ambiente,
     /*
       Il costo di un'analisi lo dichiara il servizio, non lo scrive a mano l'interfaccia.
       Dipende da quali fonti sono attive — collegare gli eventi negativi lo ha portato da
