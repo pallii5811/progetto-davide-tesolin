@@ -1,0 +1,52 @@
+[Unit]
+Description=AEGIS — servizio di analisi
+Documentation=file:/opt/aegis/app/deploy/LEGGIMI.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=aegis
+Group=aegis
+WorkingDirectory=/opt/aegis/app
+
+# I segreti stanno fuori dalla cartella dell'applicazione, che viene sovrascritta a ogni
+# aggiornamento. Le variabili passate da systemd prevalgono su un eventuale `.env` nel
+# repository: è deliberato, così un file dimenticato non scavalca la configurazione vera.
+EnvironmentFile=/opt/aegis/.env
+
+ExecStart=/usr/bin/node apps/api/dist/main.js
+
+Restart=always
+RestartSec=5s
+# Se cade cinque volte in un minuto smette di riprovare: un riavvio continuo nasconde il
+# guasto invece di risolverlo, e riempie il disco di log.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aegis-api
+
+# ── Contenimento ───────────────────────────────────────────────────────────
+# Custodisce portafogli clienti di broker: se una dipendenza avrà una falla, il processo
+# deve poter toccare il meno possibile.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# L'unica cartella scrivibile: la cache su disco e l'archivio PGlite di ripiego.
+ReadWritePaths=/opt/aegis
+
+[Install]
+WantedBy=multi-user.target

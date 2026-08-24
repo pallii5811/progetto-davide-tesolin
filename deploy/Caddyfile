@@ -1,0 +1,43 @@
+# Caddy davanti ad AEGIS.
+#
+# Il segnaposto DOMINIO viene sostituito da deploy/03-applicazione.sh con il dominio
+# passato come argomento. Caddy ottiene e rinnova da solo il certificato da Let's Encrypt.
+#
+# Perché serve davvero: in produzione il cookie di sessione è emesso con `Secure`
+# (apps/api/src/server.ts:511). Senza HTTPS il browser non lo trasmette mai, e l'accesso
+# fallisce in silenzio — password giusta, e si torna alla schermata di ingresso.
+
+DOMINIO {
+	encode zstd gzip
+
+	# Solo l'interfaccia è esposta. L'API resta su 127.0.0.1:3001 e la raggiunge il
+	# frontend, mai il browser: non ha bisogno di una rotta pubblica e non deve averla.
+	reverse_proxy 127.0.0.1:3000
+
+	header {
+		# Il browser non deve indovinare il tipo di un file servito.
+		X-Content-Type-Options nosniff
+		# Nessun sito di terzi può incorniciare la piattaforma: difende dal clickjacking
+		# su un'interfaccia dove si spendono soldi con un clic.
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		# Un anno di HTTPS obbligatorio. Da attivare solo quando il certificato funziona:
+		# se si mette prima e qualcosa va storto, i browser che l'hanno già letto
+		# rifiuteranno di collegarsi in chiaro anche per diagnosticare.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Non dichiarare al mondo quale server sta rispondendo.
+		-Server
+	}
+
+	# I documenti generati per i clienti possono essere pesanti.
+	request_body {
+		max_size 25MB
+	}
+
+	log {
+		output file /var/log/caddy/aegis.log {
+			roll_size 20MB
+			roll_keep 5
+		}
+	}
+}

@@ -1,0 +1,49 @@
+[Unit]
+Description=AEGIS — interfaccia
+Documentation=file:/opt/aegis/app/deploy/LEGGIMI.md
+After=network-online.target aegis-api.service
+Wants=network-online.target aegis-api.service
+
+[Service]
+Type=simple
+User=aegis
+Group=aegis
+WorkingDirectory=/opt/aegis/app/apps/web
+
+EnvironmentFile=/opt/aegis/.env
+
+# ATTENZIONE all'ordine: `PORT` nel file di configurazione vale 3001, che è la porta
+# dell'API. Next.js legge la stessa variabile, e senza questa riga i due processi si
+# contenderebbero la porta — il secondo a partire morirebbe con «address in use».
+# Le direttive `Environment=` dichiarate DOPO `EnvironmentFile=` prevalgono.
+Environment=PORT=3000
+
+# Ascolta solo su localhost: da internet ci arriva Caddy, che mette l'HTTPS davanti.
+ExecStart=/opt/aegis/app/node_modules/.bin/next start --port 3000 --hostname 127.0.0.1
+
+Restart=always
+RestartSec=5s
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aegis-web
+
+# ── Contenimento ───────────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/opt/aegis
+
+[Install]
+WantedBy=multi-user.target
