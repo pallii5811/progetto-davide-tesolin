@@ -1,0 +1,20 @@
+# Fine riga.
+#
+# Lo sviluppo avviene su Windows, la produzione su Linux. Git converte i file di testo in
+# CRLF al checkout su Windows, e uno script shell con i ritorni a capo di Windows non è
+# uno script: bash legge il carattere in più come parte del comando e risponde
+#
+#     /tmp/deploy/01-macchina.sh: line 2: $'\r': command not found
+#
+# che non assomiglia per niente alla sua causa. Stesso discorso per le unità systemd e per
+# il Caddyfile, che vanno letti da programmi Linux.
+#
+# Qui si impone LF a ciò che finisce su un server, indipendentemente da dove è stato
+# scritto.
+
+*.sh            text eol=lf
+*.service       text eol=lf
+deploy/Caddyfile text eol=lf
+
+# Le migrazioni SQL vengono lette da PostgreSQL su Linux.
+*.sql           text eol=lf
