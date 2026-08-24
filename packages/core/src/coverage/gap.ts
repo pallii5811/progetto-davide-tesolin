@@ -1,0 +1,593 @@
+/**
+ * Gap analysis: ciò che serve contro ciò che c'è.
+ *
+ * È il documento che il cliente porta a casa. Per ogni copertura risponde a quattro domande:
+ * *serve? perché? quanto? cosa manca rispetto a oggi?* — e la risposta al «perché» è già
+ * scritta nella forma richiesta dal Reg. IVASS 40/2018 per la motivazione dell'adeguatezza.
+ */
+
+import { explain } from '../shared/explain.js';
+import type { Explained } from '../shared/explain.js';
+import { Money } from '../shared/money.js';
+import type { Money as Euro } from '../shared/money.js';
+import type { AssessedRisk, RiskAssessment } from '../risk/engine.js';
+import { riskLevelRank } from '../risk/assessment.js';
+import type { RiskLevel } from '../risk/assessment.js';
+import type { CatNatAssessment } from './catnat.js';
+import { capitaleDiPolizza, giorniAllaScadenza, indexPolizze, soggettaARegolaProporzionale } from './policy.js';
+import type { PolizzaInEssere } from './policy.js';
+import type { SumsInsured } from './sums-insured.js';
+import { COVERAGE_CATALOG } from './taxonomy.js';
+import type { CoverageDefinition, CoverageId } from './taxonomy.js';
+import { computeUnderinsurance } from './underinsurance.js';
+import type { Underinsurance } from './underinsurance.js';
+
+export type GapStatus =
+  /** Copertura necessaria e completamente assente. */
+  | 'assente'
+  /** Copertura presente ma con capitale insufficiente rispetto al valore reale. */
+  | 'sottoassicurata'
+  /** Copertura presente con massimale inferiore al benchmark consigliato. */
+  | 'massimale-insufficiente'
+  /** Copertura presente e congrua, ma in scadenza ravvicinata. */
+  | 'in-scadenza'
+  /** Copertura presente e congrua. */
+  | 'adeguata'
+  /** Copertura necessaria ma capitale non determinabile con i dati disponibili. */
+  | 'da-quantificare';
+
+export const GAP_STATUS_LABEL: Readonly<Record<GapStatus, string>> = {
+  assente: 'Copertura assente',
+  sottoassicurata: 'Sottoassicurata',
+  'massimale-insufficiente': 'Massimale insufficiente',
+  'in-scadenza': 'In scadenza',
+  adeguata: 'Adeguata',
+  'da-quantificare': 'Da quantificare',
+};
+
+/** Giorni entro i quali una polizza è considerata «in scadenza». */
+export const SOGLIA_SCADENZA_GIORNI = 90;
+
+export interface CoverageGap {
+  readonly definition: CoverageDefinition;
+  readonly status: GapStatus;
+  /** Priorità 0-100 per l'ordinamento del piano d'azione. */
+  readonly priorita: number;
+  readonly rischiServiti: readonly AssessedRisk[];
+  readonly livelloRischioMassimo: RiskLevel | null;
+  readonly capitaleRaccomandato: Explained<Euro | null>;
+  readonly capitaleInEssere: Euro | null;
+  readonly polizza: PolizzaInEssere | null;
+  readonly sottoassicurazione: Explained<Underinsurance | null> | null;
+  readonly obbligoDiLegge: boolean;
+  readonly azione: string;
+  /** Motivazione pronta per il fascicolo di adeguatezza (Reg. IVASS 40/2018, All. 4-ter). */
+  readonly motivazioneAdeguatezza: string;
+  readonly insidie: readonly string[];
+  /** Chi fa cosa ed entro quando: l'ISO 31000 chiede che il trattamento sia un piano. */
+  readonly piano: PianoDiTrattamento;
+}
+
+/**
+ * Il piano di trattamento.
+ *
+ * L'ISO 31000 (§6.5.3) non si accontenta che il trattamento sia scelto: chiede che sia
+ * **pianificato** — chi agisce, entro quando, e perché quel termine. Un'azione scritta bene
+ * ma senza titolare né data è un buon proposito, e davanti a una contestazione dimostra che
+ * si è emesso un documento, non che si è seguita la pratica.
+ *
+ * Il titolare dell'azione non è un dettaglio organizzativo: alcune cose le può fare solo
+ * l'intermediario — chiedere una quotazione, far emettere un'appendice — altre solo il
+ * cliente, come installare una protezione o fornire un dato che nessun bilancio contiene.
+ * Attribuirle tutte all'intermediario significa promettere ciò che non si può mantenere.
+ */
+export interface PianoDiTrattamento {
+  readonly urgenza: 'immediata' | 'entro-30-giorni' | 'alla-scadenza' | 'prossima-revisione';
+  /** Termine entro cui agire. `null` quando dipende da una scadenza non ancora nota. */
+  readonly termine: Date | null;
+  readonly aCura: 'intermediario' | 'cliente' | 'congiunta';
+  readonly motivazioneTermine: string;
+}
+
+export interface GapAnalysis {
+  readonly gaps: readonly CoverageGap[];
+  readonly asOf: Date;
+  readonly coperturaAssente: number;
+  readonly coperturaInadeguata: number;
+  readonly coperturaAdeguata: number;
+  /**
+   * Garanzie il cui capitale non è determinabile con i dati disponibili.
+   *
+   * Vanno contate a parte: la loro esposizione **non entra** in `esposizioneNonAssicurata`,
+   * che altrimenti dichiarerebbe come zero ciò che è soltanto ignoto. Un «0 €» accanto a
+   * sei coperture assenti non è un dato rassicurante, è un dato falso.
+   */
+  readonly coperturaDaQuantificare: number;
+  /**
+   * Quante polizze in essere sono state dichiarate.
+   *
+   * **Zero cambia il significato di tutto il resto.** Senza polizze inserite, «copertura
+   * assente» non è un accertamento: è l'assenza di un'informazione. Il piano continua a
+   * dire quali garanzie servono — che è utile e corretto — ma non può affermare che
+   * manchino, perché nessuno gli ha detto cosa c'è.
+   *
+   * Su un prodotto che un intermediario mostra a un cliente già assicurato, la differenza
+   * fra «non risulta» e «non ce l'hai» è la differenza fra una proposta e una figuraccia.
+   */
+  readonly polizzeDichiarate: number;
+  /**
+   * Capitale complessivo non assicurato sulle garanzie a valore.
+   *
+   * Somma **solo ciò che è stato possibile quantificare**: si legge insieme a
+   * `coperturaDaQuantificare`, mai da solo.
+   */
+  readonly esposizioneNonAssicurata: Euro;
+  /** Premio annuo complessivo delle polizze in essere, ove noto. */
+  readonly premioInEssere: Euro | null;
+}
+
+export interface GapAnalysisInput {
+  readonly assessment: RiskAssessment;
+  readonly sums: SumsInsured;
+  readonly polizze: readonly PolizzaInEssere[];
+  readonly catNat: CatNatAssessment | null;
+  readonly asOf: Date;
+}
+
+export function analyzeGaps(input: GapAnalysisInput): GapAnalysis {
+  const { assessment, sums, polizze, catNat, asOf } = input;
+  const indice = indexPolizze(polizze);
+
+  // Coperture da valutare: quelle richieste dall'analisi dei rischi più quelle
+  // già in portafoglio (vanno comunque verificate, e talvolta risultano superflue).
+  const daValutare = new Set<CoverageId>();
+  for (const risk of assessment.risks) {
+    if (risk.treatment !== 'trasferire') continue;
+    for (const coverage of risk.coverages) daValutare.add(coverage);
+  }
+  for (const polizza of polizze) daValutare.add(polizza.coverage);
+  if (catNat?.soggetta === true) daValutare.add('catastrofali');
+
+  const gaps: CoverageGap[] = [];
+  for (const coverageId of daValutare) {
+    gaps.push(buildGap(coverageId, assessment, sums, indice.get(coverageId) ?? null, catNat, asOf));
+  }
+
+  // Ordinamento totale e deterministico: due esecuzioni sulla stessa azienda devono
+  // produrre lo stesso piano d'azione, altrimenti il confronto storico è impossibile.
+  gaps.sort((a, b) => {
+    if (b.priorita !== a.priorita) return b.priorita - a.priorita;
+    if (a.obbligoDiLegge !== b.obbligoDiLegge) return a.obbligoDiLegge ? -1 : 1;
+    const livelloA = a.livelloRischioMassimo === null ? -1 : riskLevelRank(a.livelloRischioMassimo);
+    const livelloB = b.livelloRischioMassimo === null ? -1 : riskLevelRank(b.livelloRischioMassimo);
+    if (livelloA !== livelloB) return livelloB - livelloA;
+    return a.definition.label.localeCompare(b.definition.label, 'it');
+  });
+
+  const esposizioneNonAssicurata = calcolaEsposizioneNonAssicurata(gaps);
+
+  const premi = polizze.map((p) => p.premioAnnuo).filter((p): p is Euro => p !== null);
+
+  return {
+    gaps,
+    asOf,
+    coperturaAssente: gaps.filter((g) => g.status === 'assente').length,
+    coperturaInadeguata: gaps.filter(
+      (g) => g.status === 'sottoassicurata' || g.status === 'massimale-insufficiente',
+    ).length,
+    coperturaAdeguata: gaps.filter((g) => g.status === 'adeguata' || g.status === 'in-scadenza').length,
+    coperturaDaQuantificare: gaps.filter((g) => g.status === 'da-quantificare').length,
+    esposizioneNonAssicurata,
+    polizzeDichiarate: polizze.length,
+    premioInEssere: premi.length === 0 ? null : Money.add(...premi),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildGap(
+  coverageId: CoverageId,
+  assessment: RiskAssessment,
+  sums: SumsInsured,
+  polizza: PolizzaInEssere | null,
+  catNat: CatNatAssessment | null,
+  asOf: Date,
+): CoverageGap {
+  const definition = COVERAGE_CATALOG[coverageId];
+  const rischiServiti = assessment.risks.filter((r) => r.coverages.includes(coverageId));
+  const livelloRischioMassimo = worstLevel(rischiServiti);
+
+  const capitaleRaccomandato = capitalePerCopertura(coverageId, sums);
+  const capitaleInEssere = polizza === null ? null : capitaleDiPolizza(polizza);
+
+  const { status, sottoassicurazione } = determinaStato(
+    coverageId,
+    capitaleRaccomandato.value,
+    capitaleInEssere,
+    polizza,
+    asOf,
+  );
+
+  const priorita = calcolaPriorita(definition, status, livelloRischioMassimo, catNat);
+
+  return {
+    definition,
+    status,
+    priorita,
+    rischiServiti,
+    livelloRischioMassimo,
+    capitaleRaccomandato,
+    capitaleInEssere,
+    polizza,
+    sottoassicurazione,
+    obbligoDiLegge: definition.obbligoDiLegge,
+    azione: descriviAzione(definition, status, capitaleRaccomandato.value, capitaleInEssere, polizza, asOf),
+    motivazioneAdeguatezza: componiMotivazione(definition, rischiServiti),
+    insidie: definition.insidie,
+    piano: componiPiano(status, definition, livelloRischioMassimo, polizza, catNat, asOf),
+  };
+}
+
+/**
+ * Termine e titolare, dedotti da ciò che rende l'azione urgente.
+ *
+ * L'ordine di precedenza non è estetico: prima gli obblighi di legge già scaduti, poi le
+ * garanzie cessate, poi le scadenze contrattuali, poi la gravità del rischio. È l'ordine
+ * in cui le conseguenze si manifestano.
+ */
+function componiPiano(
+  status: GapStatus,
+  definition: CoverageDefinition,
+  livello: RiskLevel | null,
+  polizza: PolizzaInEssere | null,
+  catNat: CatNatAssessment | null,
+  asOf: Date,
+): PianoDiTrattamento {
+  const fraGiorni = (giorni: number): Date => new Date(asOf.getTime() + giorni * 86_400_000);
+
+  // Obbligo di legge non adempiuto: il termine è già passato, non se ne fissa un altro.
+  if (definition.obbligoDiLegge && status === 'assente') {
+    return {
+      urgenza: 'immediata',
+      termine: catNat?.termine ?? asOf,
+      aCura: 'intermediario',
+      motivazioneTermine:
+        'Obbligo di legge: il termine è fissato dalla norma, non dalla pianificazione. Va documentato di averlo rappresentato al cliente anche se questi decide di non adempiere.',
+    };
+  }
+
+  // Il dato manca: nessun termine ha senso finché il cliente non lo fornisce.
+  if (status === 'da-quantificare') {
+    return {
+      urgenza: 'prossima-revisione',
+      termine: null,
+      aCura: 'cliente',
+      motivazioneTermine:
+        'Il capitale non è determinabile con i dati disponibili: la palla è al cliente, e fissare una scadenza su un dato che non si possiede sarebbe un termine finto.',
+    };
+  }
+
+  if (status === 'in-scadenza' && polizza !== null) {
+    return {
+      urgenza: 'alla-scadenza',
+      termine: polizza.dataScadenza,
+      aCura: 'intermediario',
+      motivazioneTermine:
+        'Il rinnovo è anche l’unico momento in cui i capitali si adeguano senza appendici: accorparvi la revisione evita un secondo passaggio.',
+    };
+  }
+
+  if (status === 'sottoassicurata' || status === 'massimale-insufficiente') {
+    return {
+      urgenza: 'entro-30-giorni',
+      termine: fraGiorni(30),
+      aCura: 'intermediario',
+      motivazioneTermine:
+        'La garanzia c’è ma non è capiente: fino all’appendice ogni sinistro viene indennizzato in misura ridotta. Non è un’attesa che si possa portare alla scadenza.',
+    };
+  }
+
+  if (status === 'assente' && (livello === 'critico' || livello === 'alto')) {
+    return {
+      urgenza: 'entro-30-giorni',
+      termine: fraGiorni(30),
+      aCura: 'intermediario',
+      motivazioneTermine:
+        'Rischio residuo elevato e nessuna copertura: il tempo che passa è tempo in cui il danno resta interamente a carico dell’impresa.',
+    };
+  }
+
+  if (status === 'assente') {
+    return {
+      urgenza: 'prossima-revisione',
+      termine: fraGiorni(180),
+      aCura: 'congiunta',
+      motivazioneTermine:
+        'Rischio presente ma di gravità contenuta: si affronta alla prossima revisione del programma assicurativo, valutandolo insieme alle altre priorità.',
+    };
+  }
+
+  return {
+    urgenza: 'prossima-revisione',
+    termine: polizza?.dataScadenza ?? null,
+    aCura: 'intermediario',
+    motivazioneTermine:
+      'Copertura adeguata: si riesamina alla scadenza, verificando che i capitali siano rimasti allineati.',
+  };
+}
+
+/** Mappa copertura → capitale consigliato, attingendo alle somme assicurande calcolate. */
+function capitalePerCopertura(coverageId: CoverageId, sums: SumsInsured): Explained<Euro | null> {
+  switch (coverageId) {
+    case 'incendio':
+      return widen(sums.patrimonioEsposto);
+    case 'furto-rapina':
+      return widen(sums.scorte);
+    case 'catastrofali':
+      return widen(sums.baseCatNat);
+    case 'guasti-macchine':
+      return widen(sums.contenuto);
+    case 'elettronica':
+      return nonQuantificabile(
+        'Elettronica',
+        'Rilevare il valore a nuovo di server, hardware e strumentazione: la voce non è isolabile dal bilancio.',
+      );
+    case 'danni-indiretti':
+      return widen(sums.danniIndiretti);
+    case 'rct':
+    case 'rc-inquinamento':
+    case 'rc-professionale':
+    case 'tutela-legale':
+      return widen(sums.massimaleRct);
+    case 'rco':
+      return widen(sums.massimaleRcoPerPersona);
+    case 'rc-prodotti':
+      return sums.massimaleRcProdotti;
+    case 'd-and-o':
+      return sums.massimaleDandO;
+    case 'cyber':
+      return widen(sums.massimaleCyber);
+    case 'credito-commerciale':
+      return widen(sums.fidoClienti);
+    case 'infortuni-dipendenti':
+      return widen(sums.monteSalari);
+    case 'merci-trasportate':
+      return nonQuantificabile(
+        'Merci trasportate',
+        'Rilevare il valore massimo trasportato per singolo viaggio e il numero di spedizioni annue.',
+      );
+    case 'rca-flotta':
+    case 'kasko-flotta':
+      return nonQuantificabile(
+        'Flotta',
+        'Rilevare il libro matricola: targhe, valori a nuovo e massimali per veicolo.',
+      );
+    case 'cauzioni':
+      return nonQuantificabile(
+        'Cauzioni',
+        'Dimensionare il plafond sul portafoglio ordini prospettico e sulle gare in programma.',
+      );
+    case 'infortuni-titolare':
+    case 'malattia-key-man':
+    case 'tcm-key-man':
+      return nonQuantificabile(
+        'Persone chiave',
+        'Definire i capitali in funzione del margine attribuibile alla persona e degli impegni finanziari in essere.',
+      );
+  }
+}
+
+function widen(source: Explained<Euro | null>): Explained<Euro | null> {
+  return source;
+}
+
+function nonQuantificabile(label: string, nota: string): Explained<Euro | null> {
+  return explain(`Capitale — ${label}`).note(nota).confidence('bassa').value<Euro | null>(null);
+}
+
+/** Le garanzie a valore sono quelle su cui opera la regola proporzionale. */
+function isGaranziaAValore(coverageId: CoverageId): boolean {
+  return baseEconomica(coverageId) !== null;
+}
+
+/**
+ * Base economica sottostante alla garanzia.
+ *
+ * Serve a non sommare due volte lo stesso patrimonio: incendio, catastrofali, guasti
+ * macchine, elettronica e furto assicurano **gli stessi beni** contro cause diverse.
+ * Sommare i rispettivi capitali mancanti produrrebbe un'esposizione multipla del
+ * patrimonio realmente posseduto — un numero da titolo di giornale, e privo di significato.
+ *
+ * Il furto sta qui, e non in una base propria: la somma assicurata incendio comprende
+ * già le scorte (fabbricati + contenuto + scorte). Trattarle a parte le conterebbe due
+ * volte, gonfiando l'esposizione esattamente del loro valore. Le merci sono un
+ * sottoinsieme dei beni, non un patrimonio aggiuntivo.
+ *
+ * Resta separato il **margine**: i danni indiretti non distruggono beni, misurano il
+ * guadagno perduto mentre l'attività è ferma. Si somma ai beni perché accade insieme
+ * a essi, ed è di norma esattamente ciò che accade.
+ */
+function baseEconomica(coverageId: CoverageId): 'patrimonio-fisico' | 'margine' | null {
+  switch (coverageId) {
+    case 'incendio':
+    case 'catastrofali':
+    case 'guasti-macchine':
+    case 'elettronica':
+    case 'furto-rapina':
+      return 'patrimonio-fisico';
+    case 'danni-indiretti':
+      return 'margine';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Esposizione patrimoniale non coperta, nello scenario di sinistro massimo.
+ *
+ * Per ciascuna base economica si prende il **maggiore** dei capitali mancanti — non la
+ * somma — perché un singolo evento colpisce i beni una volta sola, quale che sia la
+ * causa. Le due basi si sommano fra loro: la distruzione dei beni e il fermo dell'attività
+ * che ne consegue avvengono insieme, ed è di norma esattamente ciò che accade.
+ */
+function calcolaEsposizioneNonAssicurata(gaps: readonly CoverageGap[]): Euro {
+  const perBase = new Map<string, Euro>();
+
+  for (const gap of gaps) {
+    const base = baseEconomica(gap.definition.id);
+    if (base === null) continue;
+    const raccomandato = gap.capitaleRaccomandato.value;
+    if (raccomandato === null) continue;
+
+    const mancante = Money.max(Money.ZERO, Money.subtract(raccomandato, gap.capitaleInEssere ?? Money.ZERO));
+    const attuale = perBase.get(base) ?? Money.ZERO;
+    if (mancante > attuale) perBase.set(base, mancante);
+  }
+
+  return Money.add(...perBase.values());
+}
+
+function determinaStato(
+  coverageId: CoverageId,
+  raccomandato: Euro | null,
+  inEssere: Euro | null,
+  polizza: PolizzaInEssere | null,
+  asOf: Date,
+): { status: GapStatus; sottoassicurazione: Explained<Underinsurance | null> | null } {
+  if (polizza === null) {
+    return { status: raccomandato === null ? 'da-quantificare' : 'assente', sottoassicurazione: null };
+  }
+
+  if (raccomandato === null || inEssere === null || !Money.isPositive(raccomandato)) {
+    return { status: 'da-quantificare', sottoassicurazione: null };
+  }
+
+  if (isGaranziaAValore(coverageId)) {
+    const verifica = computeUnderinsurance(raccomandato, inEssere, {
+      soggettaARegolaProporzionale: soggettaARegolaProporzionale(polizza),
+    });
+    if (verifica.value?.sottoassicurata === true) {
+      return { status: 'sottoassicurata', sottoassicurazione: verifica };
+    }
+    if (giorniAllaScadenza(polizza, asOf) <= SOGLIA_SCADENZA_GIORNI) {
+      return { status: 'in-scadenza', sottoassicurazione: verifica };
+    }
+    return { status: 'adeguata', sottoassicurazione: verifica };
+  }
+
+  // Garanzie a massimale: si confronta con il benchmark, con una tolleranza del 10%.
+  if (inEssere < Money.multiply(raccomandato, 0.9)) {
+    return { status: 'massimale-insufficiente', sottoassicurazione: null };
+  }
+  if (giorniAllaScadenza(polizza, asOf) <= SOGLIA_SCADENZA_GIORNI) {
+    return { status: 'in-scadenza', sottoassicurazione: null };
+  }
+  return { status: 'adeguata', sottoassicurazione: null };
+}
+
+function calcolaPriorita(
+  definition: CoverageDefinition,
+  status: GapStatus,
+  livello: RiskLevel | null,
+  catNat: CatNatAssessment | null,
+): number {
+  const pesoRischio = livello === null ? 0.4 : (riskLevelRank(livello) + 1) / 5;
+
+  const pesoStato =
+    status === 'assente'
+      ? 1
+      : status === 'sottoassicurata'
+        ? 0.85
+        : status === 'massimale-insufficiente'
+          ? 0.7
+          : status === 'da-quantificare'
+            ? 0.55
+            : status === 'in-scadenza'
+              ? 0.35
+              : 0.05;
+
+  // Le priorità di merito si fermano a 99: il gradino 100 è riservato agli obblighi
+  // di legge già scaduti, che devono restare in cima senza pareggi.
+  let priorita = Math.min(99, pesoRischio * pesoStato * 100);
+
+  // Un obbligo di legge non adempiuto viene prima di qualunque valutazione di merito.
+  if (definition.obbligoDiLegge && status !== 'adeguata' && status !== 'in-scadenza') {
+    priorita = Math.max(priorita, 92);
+  }
+  if (definition.id === 'catastrofali' && catNat?.status === 'inadempiente') {
+    priorita = 100;
+  }
+
+  return Math.round(priorita);
+}
+
+function descriviAzione(
+  definition: CoverageDefinition,
+  status: GapStatus,
+  raccomandato: Euro | null,
+  inEssere: Euro | null,
+  polizza: PolizzaInEssere | null,
+  asOf: Date,
+): string {
+  switch (status) {
+    case 'assente':
+      return raccomandato === null
+        ? `Attivare la copertura ${definition.label}: capitale da definire in sede di intervista.`
+        : `Attivare la copertura ${definition.label} con capitale di ${Money.formatCompact(raccomandato)}.`;
+    case 'sottoassicurata': {
+      const delta =
+        raccomandato !== null && inEssere !== null
+          ? Money.subtract(raccomandato, inEssere)
+          : null;
+      return delta === null
+        ? `Adeguare la somma assicurata di ${definition.label}.`
+        : `Integrare la somma assicurata di ${Money.formatCompact(delta)} ` +
+            `(da ${Money.formatCompact(inEssere ?? Money.ZERO)} a ${Money.formatCompact(raccomandato ?? Money.ZERO)}).`;
+    }
+    case 'massimale-insufficiente':
+      return raccomandato === null
+        ? `Elevare il massimale di ${definition.label}.`
+        : `Elevare il massimale a ${Money.formatCompact(raccomandato)} ` +
+            `(attuale: ${Money.formatCompact(inEssere ?? Money.ZERO)}).`;
+    case 'in-scadenza': {
+      const giorni = polizza === null ? 0 : giorniAllaScadenza(polizza, asOf);
+      return `Polizza in scadenza fra ${giorni} giorni: avviare la verifica di rinnovo e la riquotazione.`;
+    }
+    case 'da-quantificare':
+      return `Rilevare i dati necessari a dimensionare ${definition.label}.`;
+    case 'adeguata':
+      return 'Copertura congrua: nessun intervento richiesto in questa fase.';
+  }
+}
+
+/**
+ * Motivazione dell'adeguatezza: catena rischio → esigenza → copertura.
+ * È il testo che l'intermediario deve poter esibire a fronte di una contestazione.
+ */
+function componiMotivazione(
+  definition: CoverageDefinition,
+  rischiServiti: readonly AssessedRisk[],
+): string {
+  if (rischiServiti.length === 0) {
+    return definition.motivazioneTipo;
+  }
+  const principali = [...rischiServiti]
+    .sort((a, b) => b.residualScore - a.residualScore)
+    .slice(0, 3)
+    .map((r) => `${r.definition.label.toLowerCase()} (rischio residuo ${r.residualLevel})`);
+
+  return (
+    `${definition.motivazioneTipo} L'analisi ha rilevato i seguenti rischi residui a carico ` +
+    `dell'impresa: ${principali.join('; ')}.`
+  );
+}
+
+function worstLevel(risks: readonly AssessedRisk[]): RiskLevel | null {
+  let worst: RiskLevel | null = null;
+  for (const risk of risks) {
+    if (worst === null || riskLevelRank(risk.residualLevel) > riskLevelRank(worst)) {
+      worst = risk.residualLevel;
+    }
+  }
+  return worst;
+}

@@ -7,7 +7,17 @@ out/
 .env
 .env.local
 .env.*.local
-coverage/
+# Rapporti di copertura dei test, che vitest scrive nella radice.
+#
+# La barra iniziale è indispensabile. Senza, la regola vale a ogni profondità e ha
+# silenziosamente escluso `packages/core/src/coverage/` — cioè l'intero dominio delle
+# coperture assicurative: tassonomia, gap analysis, somme assicurande, CAT NAT,
+# sottoassicurazione. Ottomila righe che non erano in nessun commit e vivevano su un solo
+# disco. Il guasto non si vedeva finché non si è provato a compilare altrove.
+#
+# `git status` non le mostrava, perché i file ignorati non compaiono fra i non tracciati:
+# il progetto sembrava pulito.
+/coverage/
 .turbo/
 .pglite/
 *.log
