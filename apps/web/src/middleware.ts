@@ -30,6 +30,53 @@ import type { NextRequest } from 'next/server';
 */
 const PUBBLICI = ['/accedi', '/questionario'];
 
+/** Solo un nome di host con porta facoltativa: niente barre, chiocciole, spazi. */
+const HOST_LECITO = /^[A-Za-z0-9.-]+(:\d{1,5})?$/;
+
+/**
+ * L'origine da cui l'utente sta davvero navigando.
+ *
+ * In produzione il prodotto era irraggiungibile: chi apriva `https://<dominio>/` riceveva
+ * un 307 verso `https://localhost:3000/accedi` — cioè verso il proprio computer — e vedeva
+ * un errore di connessione. Il server era in piedi, rispondeva, aveva un certificato
+ * valido: diceva soltanto al browser di andare da un'altra parte.
+ *
+ * La causa, misurata e non dedotta: dietro un proxy inverso `request.nextUrl` **non**
+ * porta l'host pubblico, e non è un difetto di configurazione del proxy. Interrogando il
+ * servizio direttamente: con `Host: <dominio>` la risposta era `http://localhost:3000/accedi`;
+ * aggiungendo `X-Forwarded-Host: <dominio>` restava identica; aggiungendo
+ * `X-Forwarded-Proto: https` diventava `https://localhost:3000/accedi` — protocollo giusto
+ * e destinazione sbagliata, cioè il caso peggiore. Next costruisce quell'oggetto dal
+ * proprio indirizzo di ascolto e onora le intestazioni inoltrate solo per lo schema.
+ *
+ * Le intestazioni però **arrivano**: qui si leggono direttamente, invece di passare da un
+ * oggetto che le scarta.
+ *
+ * Un percorso relativo in `Location` sarebbe la soluzione pulita — è valido per l'RFC e non
+ * dipenderebbe da nessuna intestazione — ma Next lo rifiuta: dà il valore in pasto al
+ * costruttore di `URL` e solleva `ERR_INVALID_URL`, trasformando ogni pagina protetta in un
+ * 500. Provato, e scartato per questo.
+ *
+ * Sull'affidarsi a un'intestazione: `X-Forwarded-Host` è scritto dal proxy, che sovrascrive
+ * qualunque valore mandato dal client, e il servizio ascolta solo su `127.0.0.1` con le sue
+ * porte chiuse dal firewall — al middleware non arriva nulla che non sia passato di lì. Il
+ * controllo su `HOST_LECITO` è comunque una seconda serratura: un host che non sia un nome
+ * di host viene ignorato, e si torna all'origine locale.
+ */
+function origineVisibile(request: NextRequest): string {
+  const primo = (nome: string): string | null => {
+    // Le intestazioni inoltrate possono elencare più valori: vale il primo, l'originale.
+    const valore = request.headers.get(nome)?.split(',')[0]?.trim();
+    return valore === undefined || valore === '' ? null : valore;
+  };
+
+  const host = primo('x-forwarded-host') ?? primo('host');
+  if (host === null || !HOST_LECITO.test(host)) return request.nextUrl.origin;
+
+  const schema = primo('x-forwarded-proto') === 'https' ? 'https' : 'http';
+  return `${schema}://${host}`;
+}
+
 export function middleware(request: NextRequest): Response {
   const percorso = request.nextUrl.pathname;
 
@@ -46,36 +93,9 @@ export function middleware(request: NextRequest): Response {
   // invece di ritrovarsi sulla schermata iniziale e dover ricominciare.
   const ritorno = percorso === '/' ? '' : `?ritorno=${encodeURIComponent(percorso)}`;
 
-  /*
-    Rinvio **relativo**, e non `NextResponse.redirect(request.nextUrl.clone())`.
-
-    Con l'indirizzo assoluto il prodotto era irraggiungibile in produzione: chi apriva
-    https://<dominio>/ riceveva un 307 verso `https://localhost:3000/accedi` — cioè verso
-    il proprio computer — e vedeva un errore di connessione. Il sito era in piedi e
-    rispondeva; semplicemente diceva al browser di andare altrove.
-
-    La causa, misurata e non dedotta: dietro un proxy inverso `request.nextUrl` non porta
-    l'host pubblico. Non basta configurare il proxy — con `Host: <dominio>` e persino con
-    `X-Forwarded-Host: <dominio>` la risposta restava `localhost:3000`. Next costruisce
-    quell'oggetto dal proprio indirizzo di ascolto, e onora le intestazioni inoltrate solo
-    per lo schema: con `X-Forwarded-Proto: https` l'esito diventava `https://localhost:3000`,
-    che è il caso peggiore — protocollo giusto, destinazione sbagliata.
-
-    Un percorso relativo nell'intestazione `Location` è pienamente valido (RFC 9110 §10.2.2)
-    e il browser lo risolve sull'origine da cui sta navigando. Così il rinvio è corretto
-    dietro qualunque proxy, su qualunque dominio, e in sviluppo locale — senza che nulla
-    debba essere configurato da nessuna parte.
-
-    `Response` e non `NextResponse`: quest'ultima passa il valore di `Location` al
-    costruttore di `URL`, che su un percorso relativo solleva `ERR_INVALID_URL`. L'errore
-    non compare in un collaudo unitario — lì la validazione non scatta — ma in esecuzione
-    trasforma ogni pagina protetta in un 500. Vale per tutte e due: il collaudo qui sotto
-    non basta, e la verifica che conta è quella sull'istanza avviata, descritta in
-    `deploy/LEGGIMI.md`.
-  */
-  return new Response(null, {
+  return new NextResponse(null, {
     status: 307,
-    headers: { Location: `/accedi${ritorno}` },
+    headers: { Location: `${origineVisibile(request)}/accedi${ritorno}` },
   });
 }
 
