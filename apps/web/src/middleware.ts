@@ -42,13 +42,34 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.next();
   }
 
-  const destinazione = request.nextUrl.clone();
-  destinazione.pathname = '/accedi';
   // Si conserva la pagina richiesta: dopo l'accesso l'utente torna dove voleva andare,
   // invece di ritrovarsi sulla schermata iniziale e dover ricominciare.
-  destinazione.search = percorso === '/' ? '' : `?ritorno=${encodeURIComponent(percorso)}`;
+  const ritorno = percorso === '/' ? '' : `?ritorno=${encodeURIComponent(percorso)}`;
 
-  return NextResponse.redirect(destinazione);
+  /*
+    Rinvio **relativo**, e non `NextResponse.redirect(request.nextUrl.clone())`.
+
+    Con l'indirizzo assoluto il prodotto era irraggiungibile in produzione: chi apriva
+    https://<dominio>/ riceveva un 307 verso `https://localhost:3000/accedi` — cioè verso
+    il proprio computer — e vedeva un errore di connessione. Il sito era in piedi e
+    rispondeva; semplicemente diceva al browser di andare altrove.
+
+    La causa, misurata e non dedotta: dietro un proxy inverso `request.nextUrl` non porta
+    l'host pubblico. Non basta configurare il proxy — con `Host: <dominio>` e persino con
+    `X-Forwarded-Host: <dominio>` la risposta restava `localhost:3000`. Next costruisce
+    quell'oggetto dal proprio indirizzo di ascolto, e onora le intestazioni inoltrate solo
+    per lo schema: con `X-Forwarded-Proto: https` l'esito diventava `https://localhost:3000`,
+    che è il caso peggiore — protocollo giusto, destinazione sbagliata.
+
+    Un percorso relativo nell'intestazione `Location` è pienamente valido (RFC 9110 §10.2.2)
+    e il browser lo risolve sull'origine da cui sta navigando. Così il rinvio è corretto
+    dietro qualunque proxy, su qualunque dominio, e in sviluppo locale — senza che nulla
+    debba essere configurato da nessuna parte.
+  */
+  return new NextResponse(null, {
+    status: 307,
+    headers: { Location: `/accedi${ritorno}` },
+  });
 }
 
 export const config = {
