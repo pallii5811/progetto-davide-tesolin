@@ -29,8 +29,11 @@ echo "── Controlli preliminari ───────────────
 # Le voci lasciate vuote producono guasti che si scoprono tardi e in modo confondente:
 # senza token si lavora su dati inventati credendoli veri, senza denominazione lo studio
 # consegna al cliente fogli intestati «Intermediario predefinito».
+# `AEGIS_TENANT` non è fra queste: nasce con un segnaposto riconoscibile, e la
+# denominazione vera la mette l'intermediario dall'interfaccia quando comincia a usare il
+# prodotto. Non è una voce che chi installa possa conoscere.
 mancanti=()
-for chiave in OPENAPI_TOKEN AEGIS_TENANT AEGIS_ADMIN_EMAIL; do
+for chiave in OPENAPI_TOKEN AEGIS_ADMIN_EMAIL; do
   valore="$(grep -E "^${chiave}=" "$ENV" | cut -d= -f2- || true)"
   [[ -z "${valore// /}" ]] && mancanti+=("$chiave")
 done

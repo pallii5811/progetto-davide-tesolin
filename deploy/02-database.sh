@@ -76,9 +76,18 @@ AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI=2000
 AEGIS_CREDITO_CARICATO_CENTESIMI=0
 
 # ── DA COMPILARE: primo accesso ─────────────────────────────────────────────
-# Denominazione dello studio. Comparirà sui documenti consegnati ai clienti:
-# lasciarla vuota significa consegnare fogli intestati «Intermediario predefinito».
-AEGIS_TENANT=
+# Denominazione dello studio, FRA VIRGOLETTE se contiene spazi.
+#
+# Le virgolette non sono decorative: systemd legge questo file col proprio formato e
+# tollera i valori non quotati, ma gli script di installazione e di aggiornamento lo
+# leggono con `. .env` prima di applicare le migrazioni — e lì un valore con spazi si
+# spezza in comandi. Il sintomo è una riga come «da: command not found» in mezzo a
+# un'operazione riuscita a metà.
+#
+# La denominazione comparirà sui documenti consegnati ai clienti. Di norma la imposta
+# l'intermediario stesso dall'interfaccia, in Amministratore → Anagrafica studio: qui
+# basta un segnaposto riconoscibile, così se finisce su un documento si nota.
+AEGIS_TENANT="Studio da configurare"
 
 # Indirizzo del primo amministratore. La password viene generata e mostrata UNA VOLTA
 # SOLA all'avvio del servizio.
