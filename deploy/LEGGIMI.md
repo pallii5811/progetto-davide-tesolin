@@ -105,7 +105,22 @@ non viene mostrata una seconda volta.**
 
 ### 4. La prova
 
-Aprire `https://aegis.esempio.it` e accedere con le credenziali stampate.
+Prima del browser, una verifica che **nessun collaudo automatico può fare**: che il rinvio
+alla schermata di accesso resti sul dominio pubblico.
+
+```
+curl -sS -o /dev/null -w '%{redirect_url}\n' https://aegis.esempio.it/
+```
+
+Deve stampare `https://aegis.esempio.it/accedi`. Se stampa `localhost` o un altro host, il
+prodotto è irraggiungibile: il server risponde, ma dice al browser di andare altrove.
+
+Perché va provato qui e non nei collaudi: in sviluppo l'host **è** davvero `localhost`,
+quindi il difetto non esiste; e in un collaudo unitario un rinvio relativo — che in
+esecuzione provoca un 500 — passa senza fare una piega. Solo un'istanza dietro il proxy
+vero lo mostra.
+
+Poi aprire `https://aegis.esempio.it` e accedere con le credenziali stampate.
 
 Poi, subito, tre cose:
 
