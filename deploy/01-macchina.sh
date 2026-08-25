@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Prepara una macchina Ubuntu 24.04 appena creata.
+# Prepara una macchina Ubuntu appena creata (provato su 24.04 e 26.04 LTS).
 #
 # Si esegue una volta sola, come root. È idempotente: rieseguirlo non rompe nulla, il che
 # conta quando la connessione cade a metà e non si sa fino a dove era arrivato.
@@ -25,15 +25,29 @@ fi
 mkdir -p "$RADICE/app"
 chown -R "$UTENTE:$UTENTE" "$RADICE"
 
-echo "── Node 22 ────────────────────────────────────────────────────────────"
-# La versione dei repository Ubuntu è più vecchia di quella richiesta da package.json
-# (>=22): si prende dalla fonte ufficiale.
-if ! command -v node >/dev/null 2>&1 || [[ "$(node --version)" != v22.* ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y -qq nodejs
+echo "── Node ───────────────────────────────────────────────────────────────"
+# Dai depositi di Ubuntu, non da NodeSource.
+#
+# Su 24.04 sarebbe servito NodeSource: la distribuzione si ferma a Node 18 e package.json
+# ne chiede >=22. Dalla 26.04 in poi Ubuntu pacchettizza Node 22, e NodeSource *non* ha un
+# deposito per «resolute» — l'indirizzo risponde 404. Prenderlo da lì avrebbe fatto
+# fallire l'installazione al primo passo.
+#
+# `npm` è un pacchetto a parte: `nodejs` lo indica solo fra i suggeriti, e installare il
+# secondo senza il primo produce un errore alla prima compilazione, non qui.
+apt-get install -y -qq nodejs npm
+
+versione="$(node --version)"
+maggiore="${versione#v}"; maggiore="${maggiore%%.*}"
+if (( maggiore < 22 )); then
+  echo "ERRORE: node $versione, ma package.json richiede >=22." >&2
+  echo "Questa distribuzione non pacchettizza una versione sufficiente." >&2
+  exit 1
 fi
 
 echo "── PostgreSQL ─────────────────────────────────────────────────────────"
+# Si prende la versione della distribuzione, qualunque sia: lo schema usa SQL standard e
+# le migrazioni passano da drizzle, che non dipende da una versione precisa.
 apt-get install -y -qq postgresql postgresql-contrib
 systemctl enable --now postgresql
 

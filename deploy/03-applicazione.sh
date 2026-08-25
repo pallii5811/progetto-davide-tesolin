@@ -94,9 +94,20 @@ sleep 3
 systemctl restart aegis-web
 
 echo "── Caddy ──────────────────────────────────────────────────────────────"
-mkdir -p /var/log/caddy && chown caddy:caddy /var/log/caddy
+mkdir -p /var/log/caddy
 sed "s/DOMINIO/$DOMINIO/" "$APP/deploy/Caddyfile" > /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+# La proprietà si sistema DOPO la validazione, e ricorsivamente.
+#
+# `caddy validate` gira come root e, trovando nella configurazione un log su file, quel
+# file lo **crea** — di proprietà di root, permessi 600. Poi il servizio, che gira come
+# utente `caddy`, non riesce ad aprirlo: si ferma con «permission denied» su un file che
+# sta nella cartella giusta, con l'utente proprietario giusto, in un percorso dove quello
+# stesso utente scrive senza problemi da riga di comando. La causa è a due passi di
+# distanza dal sintomo, ed è costata mezz'ora la prima volta.
+chown -R caddy:caddy /var/log/caddy
+
 systemctl reload caddy || systemctl restart caddy
 
 echo "── Verifica ───────────────────────────────────────────────────────────"
