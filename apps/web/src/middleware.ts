@@ -30,7 +30,7 @@ import type { NextRequest } from 'next/server';
 */
 const PUBBLICI = ['/accedi', '/questionario'];
 
-export function middleware(request: NextRequest): NextResponse {
+export function middleware(request: NextRequest): Response {
   const percorso = request.nextUrl.pathname;
 
   if (PUBBLICI.some((p) => percorso === p || percorso.startsWith(`${p}/`))) {
@@ -65,8 +65,15 @@ export function middleware(request: NextRequest): NextResponse {
     e il browser lo risolve sull'origine da cui sta navigando. Così il rinvio è corretto
     dietro qualunque proxy, su qualunque dominio, e in sviluppo locale — senza che nulla
     debba essere configurato da nessuna parte.
+
+    `Response` e non `NextResponse`: quest'ultima passa il valore di `Location` al
+    costruttore di `URL`, che su un percorso relativo solleva `ERR_INVALID_URL`. L'errore
+    non compare in un collaudo unitario — lì la validazione non scatta — ma in esecuzione
+    trasforma ogni pagina protetta in un 500. Vale per tutte e due: il collaudo qui sotto
+    non basta, e la verifica che conta è quella sull'istanza avviata, descritta in
+    `deploy/LEGGIMI.md`.
   */
-  return new NextResponse(null, {
+  return new Response(null, {
     status: 307,
     headers: { Location: `/accedi${ritorno}` },
   });
