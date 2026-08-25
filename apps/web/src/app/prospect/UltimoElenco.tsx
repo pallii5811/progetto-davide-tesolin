@@ -91,6 +91,95 @@ export function UltimoElenco() {
   );
 }
 
+/** Come si chiamano i filtri quando bisogna dirli a una persona. */
+const ETICHETTE: Readonly<Record<string, string>> = {
+  denominazione: 'denominazione',
+  provincia: 'provincia',
+  ateco: 'codice ATECO',
+  addettiMin: 'addetti da',
+  addettiMax: 'addetti a',
+  fatturatoMinEuro: 'fatturato da',
+  fatturatoMaxEuro: 'fatturato a',
+  socioCodiceFiscale: 'codice fiscale del socio',
+  formaGiuridicaCodice: 'forma giuridica',
+  limite: 'quante aziende',
+};
+
+/**
+ * Prima di spendere: hai già comprato questo elenco?
+ *
+ * È successo, ed è costato venticinque centesimi per niente. Un elenco comprato alle
+ * 18:34 con «addetti a **250**», ricomprato alle 20:52 con «addetti a **200**»: stesse
+ * cinque aziende in risposta, e la convinzione — legittima — di aver rifatto la stessa
+ * identica ricerca. Per l'archivio erano due ricerche diverse, quindi ha richiamato il
+ * fornitore, che fattura a record consegnato.
+ *
+ * Il prodotto aveva ragione e la persona pure: nessuno dei due poteva sapere dell'altro,
+ * perché a schermo non c'era **niente** che dicesse quali filtri avevano prodotto
+ * l'elenco già in archivio. La differenza era una cifra su sette campi.
+ *
+ * Qui quella differenza si vede prima di premere, con accanto il fatto che conta: riaprire
+ * l'elenco che si ha già non consuma credito.
+ */
+export function ConfrontoConElencoComprato({
+  criteri,
+}: {
+  criteri: Readonly<Record<string, string>>;
+}) {
+  const ultimo = useElencoRicordato();
+  if (ultimo === null) return null;
+
+  const precedenti = new URLSearchParams(ultimo.query);
+  const differenze: { etichetta: string; prima: string; adesso: string }[] = [];
+
+  for (const [chiave, etichetta] of Object.entries(ETICHETTE)) {
+    const prima = (precedenti.get(chiave) ?? '').trim();
+    const adesso = (criteri[chiave] ?? '').trim();
+    if (prima !== adesso) differenze.push({ etichetta, prima, adesso });
+  }
+
+  const riapri = (
+    <Link href={`/prospect?${ultimo.query}`} className="text-marchio underline">
+      Riaprilo
+    </Link>
+  );
+
+  if (differenze.length === 0) {
+    return (
+      <div className="mb-4 rounded-lg border border-rilevante/30 bg-rilevante-fondo p-3 text-sm">
+        <strong>Questo elenco l&apos;hai già comprato.</strong> {riapri}{' '}
+        <span className="text-testo-tenue">
+          — è lo stesso, e riaprirlo non consuma credito. Premere «Dammi l&apos;elenco» lo
+          ricomprerebbe.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-bordo bg-superficie p-3 text-sm">
+      <p>
+        <strong>
+          Hai già un elenco di {ultimo.quante}{' '}
+          {ultimo.quante === 1 ? 'azienda' : 'aziende'}
+        </strong>{' '}
+        con filtri quasi uguali. {riapri}{' '}
+        <span className="text-testo-tenue">— riaprirlo non consuma credito.</span>
+      </p>
+      <ul className="mt-2 space-y-0.5 text-testo-tenue">
+        {differenze.map((d) => (
+          <li key={d.etichetta}>
+            {d.etichetta}: <span className="tabular">{d.prima === '' ? '—' : d.prima}</span> →{' '}
+            <span className="tabular font-medium text-testo">
+              {d.adesso === '' ? '—' : d.adesso}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * Il ritorno all'elenco, dalla scheda di un'azienda.
  *

@@ -4,7 +4,7 @@ import { cercaProspect } from '@/lib/api';
 import type { RisultatoProspezione } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { SelettoreLotto } from './SelettoreLotto';
-import { RicordaElenco, UltimoElenco } from './UltimoElenco';
+import { ConfrontoConElencoComprato, RicordaElenco, UltimoElenco } from './UltimoElenco';
 
 export const dynamic = 'force-dynamic';
 
@@ -213,6 +213,18 @@ export default async function PaginaProspect({
               massimo={100}
             />
           </div>
+
+          {/*
+            L'avviso sta **prima** dei pulsanti, non dopo: dopo sarebbe una spiegazione di
+            un addebito già avvenuto.
+
+            È costato venticinque centesimi scoprirlo: un elenco comprato con «addetti a
+            250» e ricomprato poco dopo con «addetti a 200» — stesse cinque aziende in
+            risposta, e la convinzione ragionevole di aver rifatto la stessa ricerca. A
+            schermo non c'era nulla che dicesse con quali filtri era stato comprato quello
+            che si aveva già.
+          */}
+          <ConfrontoConElencoComprato criteri={criteri} />
 
           <div className="flex flex-wrap items-center gap-3">
             <button
