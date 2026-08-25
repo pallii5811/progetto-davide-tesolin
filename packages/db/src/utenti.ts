@@ -6,7 +6,7 @@
  * essere irrobustita senza toccare il database, e il database non vede mai una password.
  */
 
-import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
 
@@ -250,7 +250,22 @@ export async function trovaSessioneValida(
       and(
         eq(schema.sessioni.improntaToken, improntaToken),
         isNull(schema.sessioni.revocataIl),
-        sql`${schema.sessioni.scadeIl} > ${adesso}`,
+        /*
+          `gt` e non un frammento `sql` grezzo.
+
+          Con `sql`${schema.sessioni.scadeIl} > ${adesso}`` il servizio andava in errore 500
+          su ogni richiesta autenticata in produzione: si entrava con la password giusta e si
+          tornava alla schermata di accesso, senza un messaggio che spiegasse perché.
+
+          Dentro un template grezzo drizzle non conosce il tipo della colonna e consegna al
+          driver l’oggetto `Date` così com’è; `postgres-js` non sa serializzarlo e solleva
+          «Received an instance of Date». Il confronto tipizzato invece sa che la colonna è un
+          timestamp e codifica il valore come si deve.
+
+          Su PGlite — l’archivio dello sviluppo — la stessa riga funziona: il suo codificatore
+          accetta le date. È il motivo per cui cinquecento collaudi verdi non l’hanno vista.
+        */
+        gt(schema.sessioni.scadeIl, adesso),
       ),
     )
     .limit(1);
