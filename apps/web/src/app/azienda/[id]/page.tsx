@@ -10,6 +10,7 @@ import {
 } from '@/lib/api';
 import { ImmaginiUbicazione } from './ImmaginiUbicazione';
 import { TitolareEffettivo } from './TitolareEffettivo';
+import { RitornoAllElenco } from '../../prospect/UltimoElenco';
 import type {
   AnalisiDto,
   IndicatoriArchivioDto,
@@ -1392,9 +1393,23 @@ function Intestazione({
   const { azienda, sintesi } = analisi;
   return (
     <div className="mb-6">
-      <Link href="/" className="text-xs text-marchio hover:underline">
-        ← Nuova ricerca
-      </Link>
+      {/*
+        Due vie di ritorno, e la prima è quella che serve più spesso.
+
+        Chi vaglia cinque prospect uno dopo l'altro torna all'elenco cinque volte: finora
+        poteva farlo solo col tasto «indietro» del browser, e chi passava dal menu si
+        ritrovava davanti al modulo di ricerca vuoto — con la sensazione di aver perso
+        l'elenco appena pagato.
+
+        Il collegamento compare solo se un elenco esiste davvero: chi è arrivato qui
+        cercando un'azienda per nome non ha nessun elenco a cui tornare.
+      */}
+      <div className="flex flex-wrap items-center gap-4">
+        <RitornoAllElenco />
+        <Link href="/" className="text-xs text-marchio hover:underline">
+          ← Nuova ricerca
+        </Link>
+      </div>
 
       <div className="mt-1.5 flex flex-wrap items-start justify-between gap-4">
         <h1 className="text-2xl font-bold tracking-tight">{azienda.denominazione}</h1>

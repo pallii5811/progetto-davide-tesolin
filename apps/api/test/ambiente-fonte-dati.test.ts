@@ -22,7 +22,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const CHIAVI = ['OPENAPI_AMBIENTE', 'OPENAPI_TOKEN'] as const;
 
-describe('L’ambiente della fonte dati è dichiarato e ha effetto', () => {
+/*
+  Soglia larga, e non per nascondere una lentezza.
+
+  Ogni caso qui costruisce e chiude un server Fastify intero, perché l'ambiente va deciso
+  **prima** che il provider venga creato: non c'è modo di riusarne uno. Da solo il file
+  passa in meno di due secondi; dentro la suite completa, con cinquanta file in parallelo
+  su una macchina condivisa, supera i cinque secondi predefiniti e diventa rosso a caso.
+
+  Un collaudo intermittente è peggio di un collaudo assente: insegna a ignorare il rosso.
+*/
+describe('L’ambiente della fonte dati è dichiarato e ha effetto', { timeout: 60_000 }, () => {
   let originali: Partial<Record<string, string | undefined>>;
 
   beforeEach(() => {

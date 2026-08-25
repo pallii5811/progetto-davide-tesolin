@@ -37,17 +37,18 @@ const HOST_LECITO = /^[A-Za-z0-9.-]+(:\d{1,5})?$/;
  * L'origine da cui l'utente sta davvero navigando.
  *
  * In produzione il prodotto era irraggiungibile: chi apriva `https://<dominio>/` riceveva
- * un 307 verso `https://localhost:3000/accedi` — cioè verso il proprio computer — e vedeva
- * un errore di connessione. Il server era in piedi, rispondeva, aveva un certificato
- * valido: diceva soltanto al browser di andare da un'altra parte.
+ * un 307 verso l'indirizzo di ascolto interno del servizio — che per il browser è il
+ * computer di chi sta navigando — e vedeva un errore di connessione. Il server era in
+ * piedi, rispondeva, aveva un certificato valido: diceva soltanto al browser di andare da
+ * un'altra parte.
  *
  * La causa, misurata e non dedotta: dietro un proxy inverso `request.nextUrl` **non**
  * porta l'host pubblico, e non è un difetto di configurazione del proxy. Interrogando il
- * servizio direttamente: con `Host: <dominio>` la risposta era `http://localhost:3000/accedi`;
- * aggiungendo `X-Forwarded-Host: <dominio>` restava identica; aggiungendo
- * `X-Forwarded-Proto: https` diventava `https://localhost:3000/accedi` — protocollo giusto
- * e destinazione sbagliata, cioè il caso peggiore. Next costruisce quell'oggetto dal
- * proprio indirizzo di ascolto e onora le intestazioni inoltrate solo per lo schema.
+ * servizio direttamente, con `Host: <dominio>` la destinazione restava quella interna;
+ * aggiungendo `X-Forwarded-Host: <dominio>` non cambiava; aggiungendo
+ * `X-Forwarded-Proto: https` cambiava soltanto lo schema — protocollo giusto e
+ * destinazione sbagliata, cioè il caso peggiore. Next costruisce quell'oggetto dal proprio
+ * indirizzo di ascolto e onora le intestazioni inoltrate solo per lo schema.
  *
  * Le intestazioni però **arrivano**: qui si leggono direttamente, invece di passare da un
  * oggetto che le scarta.
@@ -58,10 +59,11 @@ const HOST_LECITO = /^[A-Za-z0-9.-]+(:\d{1,5})?$/;
  * 500. Provato, e scartato per questo.
  *
  * Sull'affidarsi a un'intestazione: `X-Forwarded-Host` è scritto dal proxy, che sovrascrive
- * qualunque valore mandato dal client, e il servizio ascolta solo su `127.0.0.1` con le sue
- * porte chiuse dal firewall — al middleware non arriva nulla che non sia passato di lì. Il
- * controllo su `HOST_LECITO` è comunque una seconda serratura: un host che non sia un nome
- * di host viene ignorato, e si torna all'origine locale.
+ * qualunque valore mandato dal client, e il servizio ascolta solo sull'interfaccia di
+ * ritorno locale, con le proprie porte chiuse dal firewall: al middleware non arriva nulla
+ * che non sia passato di lì. Il controllo su `HOST_LECITO` è comunque una seconda
+ * serratura: un host che non sia un nome di host viene ignorato, e si torna all'origine
+ * locale.
  */
 function origineVisibile(request: NextRequest): string {
   const primo = (nome: string): string | null => {
