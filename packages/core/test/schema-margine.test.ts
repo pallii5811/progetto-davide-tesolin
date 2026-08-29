@@ -24,26 +24,20 @@ import { Money } from '../src/shared/money.js';
 const BILANCIO = demoCompanyProfile().bilanci[0]!.value;
 
 describe('Schema del margine di contribuzione', () => {
-  it.each([undefined, 0.2, 0.4, 0.6, 0.9, 1])(
-    'quadra con quota servizi variabile %s',
-    (quota) => {
-      /*
+  it.each([undefined, 0.2, 0.4, 0.6, 0.9, 1])('quadra con quota servizi variabile %s', (quota) => {
+    /*
         La quadratura deve reggere a **qualunque** parametrizzazione, non solo a quella
         predefinita. La quota dei servizi variabili è una scelta dell'intermediario e
         cambia da settore a settore: se lo schema torna solo con il valore di fabbrica,
         mentirà su ogni analisi tarata.
       */
-      const bilancio = reclassify(
-        BILANCIO,
-        quota === undefined ? {} : { quotaServiziVariabile: quota },
-      );
-      const schema = componiSchemaMargine(bilancio);
+    const bilancio = reclassify(BILANCIO, quota === undefined ? {} : { quotaServiziVariabile: quota });
+    const schema = componiSchemaMargine(bilancio);
 
-      const somma = schema.righe.reduce((totale, r) => totale + Money.toEuro(r.effetto), 0);
+    const somma = schema.righe.reduce((totale, r) => totale + Money.toEuro(r.effetto), 0);
 
-      expect(somma).toBe(Money.toEuro(schema.margineDiContribuzione));
-    },
-  );
+    expect(somma).toBe(Money.toEuro(schema.margineDiContribuzione));
+  });
 
   it('la quota dei servizi rispecchia quella davvero applicata', () => {
     const bilancio = reclassify(BILANCIO, { quotaServiziVariabile: 0.35 });
@@ -77,9 +71,7 @@ describe('Schema del margine di contribuzione', () => {
     // È il costo che resta dovuto a stabilimento fermo, ed è precisamente ciò che la
     // garanzia danni indiretti deve coprire: trattarlo come variabile azzererebbe la
     // ragione stessa della copertura.
-    const riga = componiSchemaMargine(reclassify(BILANCIO)).righe.find((r) =>
-      r.voce.includes('personale'),
-    );
+    const riga = componiSchemaMargine(reclassify(BILANCIO)).righe.find((r) => r.voce.includes('personale'));
 
     expect(riga?.quotaVariabile).toBe(0);
     expect(Money.toEuro(riga!.effetto)).toBe(0);

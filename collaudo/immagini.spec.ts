@@ -32,9 +32,7 @@ test.describe('Fotografie delle ubicazioni', () => {
     await accedi(page);
   });
 
-  test('una fotografia caricata sopravvive al ricaricamento e arriva nel report', async ({
-    page,
-  }) => {
+  test('una fotografia caricata sopravvive al ricaricamento e arriva nel report', async ({ page }) => {
     test.setTimeout(180_000);
     const sorveglianza = sorvegliaErrori(page);
 

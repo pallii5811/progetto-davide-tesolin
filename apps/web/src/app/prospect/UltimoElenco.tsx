@@ -121,11 +121,7 @@ const ETICHETTE: Readonly<Record<string, string>> = {
  * Qui quella differenza si vede prima di premere, con accanto il fatto che conta: riaprire
  * l'elenco che si ha già non consuma credito.
  */
-export function ConfrontoConElencoComprato({
-  criteri,
-}: {
-  criteri: Readonly<Record<string, string>>;
-}) {
+export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Record<string, string>> }) {
   const ultimo = useElencoRicordato();
   if (ultimo === null) return null;
 
@@ -149,8 +145,7 @@ export function ConfrontoConElencoComprato({
       <div className="mb-4 rounded-lg border border-rilevante/30 bg-rilevante-fondo p-3 text-sm">
         <strong>Questo elenco l&apos;hai già comprato.</strong> {riapri}{' '}
         <span className="text-testo-tenue">
-          — è lo stesso, e riaprirlo non consuma credito. Premere «Dammi l&apos;elenco» lo
-          ricomprerebbe.
+          — è lo stesso, e riaprirlo non consuma credito. Premere «Dammi l&apos;elenco» lo ricomprerebbe.
         </span>
       </div>
     );
@@ -160,8 +155,7 @@ export function ConfrontoConElencoComprato({
     <div className="mb-4 rounded-lg border border-bordo bg-superficie p-3 text-sm">
       <p>
         <strong>
-          Hai già un elenco di {ultimo.quante}{' '}
-          {ultimo.quante === 1 ? 'azienda' : 'aziende'}
+          Hai già un elenco di {ultimo.quante} {ultimo.quante === 1 ? 'azienda' : 'aziende'}
         </strong>{' '}
         con filtri quasi uguali. {riapri}{' '}
         <span className="text-testo-tenue">— riaprirlo non consuma credito.</span>
@@ -170,9 +164,7 @@ export function ConfrontoConElencoComprato({
         {differenze.map((d) => (
           <li key={d.etichetta}>
             {d.etichetta}: <span className="tabular">{d.prima === '' ? '—' : d.prima}</span> →{' '}
-            <span className="tabular font-medium text-testo">
-              {d.adesso === '' ? '—' : d.adesso}
-            </span>
+            <span className="tabular font-medium text-testo">{d.adesso === '' ? '—' : d.adesso}</span>
           </li>
         ))}
       </ul>
@@ -207,8 +199,7 @@ export function RitornoAllElenco() {
       className="text-xs text-marchio hover:underline"
       title="Riaprire l’elenco non consuma credito: resta in archivio per ventiquattro ore."
     >
-      ← Torna all’elenco ({ultimo.quante}{' '}
-      {ultimo.quante === 1 ? 'azienda' : 'aziende'})
+      ← Torna all’elenco ({ultimo.quante} {ultimo.quante === 1 ? 'azienda' : 'aziende'})
     </Link>
   );
 }

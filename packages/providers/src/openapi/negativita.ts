@@ -130,14 +130,7 @@ function mappaProcedure(radice: unknown): readonly ProceduraConcorsuale[] {
         Su un'impresa in insolvenza è la differenza fra un documento che dice «risulta una
         procedura, da verificare» e uno che dice «stato di insolvenza, 29 febbraio 2024».
       */
-      const dataApertura = date(
-        p,
-        'data_provvedimento',
-        'dataApertura',
-        'openingDate',
-        'data',
-        'date',
-      );
+      const dataApertura = date(p, 'data_provvedimento', 'dataApertura', 'openingDate', 'data', 'date');
       if (dataApertura === null) return null;
 
       const dataChiusura = date(p, 'data_chiusura', 'dataChiusura', 'closingDate');
@@ -153,14 +146,7 @@ function mappaProcedure(radice: unknown): readonly ProceduraConcorsuale[] {
       */
       const dataRevoca = date(p, 'data_revoca', 'dataRevoca', 'revocationDate');
       const dataOmologa = date(p, 'data_omologa', 'dataOmologa', 'approvalDate');
-      const descrizione = str(
-        p,
-        'descrizione_procedura',
-        'tipo',
-        'type',
-        'descrizione',
-        'description',
-      );
+      const descrizione = str(p, 'descrizione_procedura', 'tipo', 'type', 'descrizione', 'description');
       return {
         tipo: classificaProcedura(descrizione),
         // La dicitura del registro viene conservata testuale accanto alla classificazione:
@@ -205,10 +191,7 @@ export function soloIndicatori(raw: unknown): { presenti: boolean; quali: readon
   */
   const indicatori: [string, boolean | null][] = [
     ['protesti', bool(radice, 'presenzaProtesti', 'hasProtests', 'protests')],
-    [
-      'pregiudizievoli',
-      bool(radice, 'presenzaPregiudizievoli', 'hasPrejudicials', 'prejudicials'),
-    ],
+    ['pregiudizievoli', bool(radice, 'presenzaPregiudizievoli', 'hasPrejudicials', 'prejudicials')],
     ['procedure concorsuali', bool(radice, 'presenzaProcedure', 'hasProcedures', 'procedures')],
   ];
 

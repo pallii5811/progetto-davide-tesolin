@@ -203,8 +203,7 @@ export function analizzaUbicazioni(input: {
       // Il tipo dichiarato dalla visura prevale su quello assente dell'intervista.
       tipo: s.tipo ?? esistente?.tipo ?? null,
       // Fra due scritture dello stesso indirizzo si tiene quella con le coordinate.
-      indirizzo:
-        esistente !== undefined && esistente.haCoordinate ? esistente.indirizzo : s.indirizzo,
+      indirizzo: esistente !== undefined && esistente.haCoordinate ? esistente.indirizzo : s.indirizzo,
       superficieMq: s.superficieMq ?? esistente?.superficieMq ?? null,
       addetti: s.addetti ?? esistente?.addetti ?? null,
       esposizione: territorialExposure(s.indirizzo.provincia),
@@ -228,7 +227,8 @@ export function analizzaUbicazioni(input: {
     comuni: [...new Set(ubicazioni.map((u) => u.indirizzo.comune))],
     domande: domande(ubicazioni),
     note: note(ubicazioni, input.esitoContesto),
-    confidenza: ubicazioni.length === 0 ? 'bassa' : ubicazioni.every((u) => u.haCoordinate) ? 'alta' : 'media',
+    confidenza:
+      ubicazioni.length === 0 ? 'bassa' : ubicazioni.every((u) => u.haCoordinate) ? 'alta' : 'media',
   };
 }
 
@@ -331,7 +331,9 @@ function peggiore(ubicazioni: readonly Ubicazione[]): {
 }
 
 function distanzaMassima(ubicazioni: readonly Ubicazione[]): number | null {
-  const punti = ubicazioni.map(puntoDi).filter((p): p is { latitudine: number; longitudine: number } => p !== null);
+  const punti = ubicazioni
+    .map(puntoDi)
+    .filter((p): p is { latitudine: number; longitudine: number } => p !== null);
   if (punti.length < 2) return null;
 
   let massima = 0;

@@ -50,7 +50,7 @@ describe('Questionario compilato dal cliente', () => {
       payload: {},
     });
     expect(risposta.statusCode).toBe(201);
-    return (risposta.json()).token;
+    return risposta.json().token;
   }
 
   it('genera un collegamento e in archivio ne conserva solo l’impronta', async () => {

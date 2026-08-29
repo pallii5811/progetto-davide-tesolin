@@ -4,39 +4,26 @@
     {
       "name": "aegis-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--workspace",
-        "@aegis/web"
-      ],
+      "runtimeArgs": ["run", "dev", "--workspace", "@aegis/web"],
       "port": 3000,
       "autoPort": true
     },
     {
       "name": "aegis-api-demo",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev:api:demo"
-      ],
+      "runtimeArgs": ["run", "dev:api:demo"],
       "port": 3001
     },
     {
       "name": "aegis-api-reale",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev:api"
-      ],
+      "runtimeArgs": ["run", "dev:api"],
       "port": 3001
     },
     {
       "name": "veezco-schermate",
       "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "C:/Users/Famiglia/miraxgroupckb-repo/scripts/servi-statico.mjs"
-      ],
+      "runtimeArgs": ["C:/Users/Famiglia/miraxgroupckb-repo/scripts/servi-statico.mjs"],
       "port": 4173,
       "autoPort": true
     }

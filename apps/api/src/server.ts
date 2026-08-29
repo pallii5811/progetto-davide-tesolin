@@ -148,9 +148,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     incomprensibile si sceglie la lettura che spende — e quindi quella di cui ci si
     accorge — piuttosto che quella che consegna dati inventati senza dirlo.
   */
-  const ambiente = process.env['OPENAPI_AMBIENTE']?.trim().toLowerCase() === 'test'
-    ? ('test' as const)
-    : ('produzione' as const);
+  const ambiente =
+    process.env['OPENAPI_AMBIENTE']?.trim().toLowerCase() === 'test'
+      ? ('test' as const)
+      : ('produzione' as const);
 
   const provider =
     options.provider ??
@@ -186,7 +187,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     Una caserma e una carrozzeria non si spostano: il dato regge nel tempo, e conservarlo
     è anche il modo di restituire qualcosa a un servizio che non ci fa pagare.
   */
-  const cacheContesto = persistenza === undefined ? new MemoryCache() : new CachePersistente(persistenza.db);
+  const cacheContesto =
+    persistenza === undefined ? new MemoryCache() : new CachePersistente(persistenza.db);
 
   /*
     Quando raccogliere il contesto territoriale.
@@ -2053,29 +2055,29 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   });
 
   // ── Gestione degli errori ──────────────────────────────────────────────────
-/**
- * L'errore del fornitore tradotto per chi lo legge a schermo.
- *
- * Ogni voce dice **cosa è successo** e **cosa fare**, e nessuna nomina il fornitore o il
- * percorso chiamato: un intermediario non deve scoprire da un messaggio d'errore a chi
- * compriamo i dati, e un cliente che guarda lo schermo ancora meno.
- */
-function messaggioLeggibile(errore: ProviderError): string {
-  switch (errore.kind) {
-    case 'non-trovato':
-      return 'Nessuna impresa risulta con questa partita IVA nel Registro Imprese. Verificare le undici cifre, oppure cercare per denominazione.';
-    case 'autenticazione':
-      return 'Il servizio dati non ha accettato le credenziali. Controllare la configurazione in Impostazioni → Servizi dati: nessun credito è stato consumato.';
-    case 'quota':
-      return 'Credito esaurito presso il fornitore dei dati, oppure troppe richieste ravvicinate. Riprovare fra qualche minuto o ricaricare il credito.';
-    case 'temporaneo':
-      return 'Il servizio dati non ha risposto in tempo. È una interruzione momentanea: riprovare fra poco, nessun credito è stato consumato.';
-    case 'risposta-non-valida':
-      return 'Il servizio dati ha risposto in un formato inatteso. La segnalazione è stata registrata; riprovare più tardi.';
-    default:
-      return 'Il servizio dati non è al momento disponibile. Riprovare fra qualche minuto.';
+  /**
+   * L'errore del fornitore tradotto per chi lo legge a schermo.
+   *
+   * Ogni voce dice **cosa è successo** e **cosa fare**, e nessuna nomina il fornitore o il
+   * percorso chiamato: un intermediario non deve scoprire da un messaggio d'errore a chi
+   * compriamo i dati, e un cliente che guarda lo schermo ancora meno.
+   */
+  function messaggioLeggibile(errore: ProviderError): string {
+    switch (errore.kind) {
+      case 'non-trovato':
+        return 'Nessuna impresa risulta con questa partita IVA nel Registro Imprese. Verificare le undici cifre, oppure cercare per denominazione.';
+      case 'autenticazione':
+        return 'Il servizio dati non ha accettato le credenziali. Controllare la configurazione in Impostazioni → Servizi dati: nessun credito è stato consumato.';
+      case 'quota':
+        return 'Credito esaurito presso il fornitore dei dati, oppure troppe richieste ravvicinate. Riprovare fra qualche minuto o ricaricare il credito.';
+      case 'temporaneo':
+        return 'Il servizio dati non ha risposto in tempo. È una interruzione momentanea: riprovare fra poco, nessun credito è stato consumato.';
+      case 'risposta-non-valida':
+        return 'Il servizio dati ha risposto in un formato inatteso. La segnalazione è stata registrata; riprovare più tardi.';
+      default:
+        return 'Il servizio dati non è al momento disponibile. Riprovare fra qualche minuto.';
+    }
   }
-}
 
   app.setErrorHandler((error, _request, reply) => {
     // Un errore che porta già il proprio codice di stato lo conserva: trasformare un 415

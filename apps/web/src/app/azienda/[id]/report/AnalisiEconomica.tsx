@@ -26,8 +26,8 @@ export function AnalisiEconomica({
       {andamento.length > 0 && (
         <>
           <p className="mb-3">
-            Andamento degli esercizi depositati al Registro Imprese. Le voci non valorizzate sono
-            quelle che il bilancio depositato non riporta, non valori pari a zero.
+            Andamento degli esercizi depositati al Registro Imprese. Le voci non valorizzate sono quelle che
+            il bilancio depositato non riporta, non valori pari a zero.
           </p>
 
           <table className="print-keep mb-6 w-full border-collapse text-sm">
@@ -60,9 +60,7 @@ export function AnalisiEconomica({
               {andamento.map((e) => (
                 <tr key={e.anno} className="border-b border-bordo">
                   <td className="tabular py-2 font-medium">{e.anno}</td>
-                  <td className="tabular py-2 text-right">
-                    {e.valoreDellaProduzione?.formattato ?? '—'}
-                  </td>
+                  <td className="tabular py-2 text-right">{e.valoreDellaProduzione?.formattato ?? '—'}</td>
                   {/*
                     Il patrimonio netto negativo è la soglia degli artt. 2446 e 2447 c.c.:
                     su una serie storica è il segnale che l'impresa ha già attraversato una
@@ -78,9 +76,7 @@ export function AnalisiEconomica({
                   </td>
                   <td className="tabular py-2 text-right">{e.costoDelPersonale?.formattato ?? '—'}</td>
                   <td className="tabular py-2 text-right">{e.dipendenti ?? '—'}</td>
-                  <td className="tabular py-2 text-right">
-                    {e.retribuzioneMediaLorda?.formattato ?? '—'}
-                  </td>
+                  <td className="tabular py-2 text-right">{e.retribuzioneMediaLorda?.formattato ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -94,8 +90,8 @@ export function AnalisiEconomica({
           <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
             Il margine di contribuzione è ciò che resta dei ricavi dopo i costi che cessano con
             l&apos;attività: è quindi la misura dei costi che l&apos;impresa continua a sostenere a
-            stabilimento fermo, e la base della somma assicuranda per i danni indiretti. La colonna
-            «quota variabile» è il punto in cui la stima si lascia discutere.
+            stabilimento fermo, e la base della somma assicuranda per i danni indiretti. La colonna «quota
+            variabile» è il punto in cui la stima si lascia discutere.
           </p>
 
           <table className="print-keep mb-3 w-full border-collapse text-sm">
@@ -142,9 +138,7 @@ export function AnalisiEconomica({
                     ? ''
                     : `${(schema.incidenzaSuRicavi * 100).toFixed(1).replace('.', ',')}% dei ricavi`}
                 </td>
-                <td className="tabular py-2 text-right">
-                  {schema.margineDiContribuzione.formattato}
-                </td>
+                <td className="tabular py-2 text-right">{schema.margineDiContribuzione.formattato}</td>
               </tr>
             </tbody>
           </table>

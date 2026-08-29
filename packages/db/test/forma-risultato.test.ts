@@ -24,10 +24,7 @@ import { righeDi } from '../src/client.js';
 describe('righeDi normalizza la risposta dei driver', () => {
   it('postgres-js: il risultato È già l’array delle righe', () => {
     const daPostgresJs = [{ presente: true }, { presente: false }];
-    expect(righeDi<{ presente: boolean }>(daPostgresJs)).toEqual([
-      { presente: true },
-      { presente: false },
-    ]);
+    expect(righeDi<{ presente: boolean }>(daPostgresJs)).toEqual([{ presente: true }, { presente: false }]);
   });
 
   it('PGlite e node-postgres: le righe stanno dentro `rows`', () => {

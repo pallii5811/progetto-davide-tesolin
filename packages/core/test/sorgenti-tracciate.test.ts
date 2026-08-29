@@ -69,11 +69,10 @@ describe('Il repository contiene tutto il codice', () => {
       `.gitignore` tornando a `coverage/`, il collaudo sopra lo prenderebbe comunque — ma
       questo dice subito quale cartella guardare.
     */
-    const tracciati = execFileSync(
-      'git',
-      ['ls-files', '--', 'packages/core/src/coverage'],
-      { cwd: RADICE, encoding: 'utf8' },
-    )
+    const tracciati = execFileSync('git', ['ls-files', '--', 'packages/core/src/coverage'], {
+      cwd: RADICE,
+      encoding: 'utf8',
+    })
       .split(/\r?\n/)
       .filter((r) => r !== '');
 

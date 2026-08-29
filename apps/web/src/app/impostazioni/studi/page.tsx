@@ -25,9 +25,8 @@ export default async function PaginaStudi() {
     <>
       <h2 className="mb-1 text-lg font-semibold tracking-tight">Studi sulla piattaforma</h2>
       <p className="mb-6 max-w-3xl text-sm leading-relaxed text-testo-tenue">
-        Ogni studio lavora isolato dagli altri: portafoglio, clienti e analisi non attraversano il
-        confine, in nessuna direzione. Qui si aprono e si sospendono gli accessi, non si guarda
-        dentro.
+        Ogni studio lavora isolato dagli altri: portafoglio, clienti e analisi non attraversano il confine,
+        in nessuna direzione. Qui si aprono e si sospendono gli accessi, non si guarda dentro.
       </p>
     </>
   );
@@ -74,8 +73,8 @@ export default async function PaginaStudi() {
                 <td className="px-4 py-3">
                   <p className="font-medium">{studio.denominazione}</p>
                   <p className="text-xs text-testo-debole">
-                    {studio.numeroRui === null ? 'RUI non indicato' : `RUI n. ${studio.numeroRui}`} ·
-                    aperto il {new Date(studio.apertoIl).toLocaleDateString('it-IT')}
+                    {studio.numeroRui === null ? 'RUI non indicato' : `RUI n. ${studio.numeroRui}`} · aperto
+                    il {new Date(studio.apertoIl).toLocaleDateString('it-IT')}
                   </p>
                 </td>
                 <td className="tabular px-4 py-3">{studio.utenti}</td>

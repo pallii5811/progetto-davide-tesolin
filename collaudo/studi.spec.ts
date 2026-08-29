@@ -93,7 +93,9 @@ test.describe('Cosa non vede uno studio cliente', () => {
     await page.getByLabel(/Referente/i).fill('Titolare');
     await page.getByLabel(/Indirizzo di accesso/i).fill(EMAIL);
     await page.getByRole('button', { name: /Apri lo studio/i }).click();
-    await expect(page.getByText(new RegExp(`${DENOMINAZIONE.replace(/\./g, '\\.')} aperto`, 'i'))).toBeVisible({
+    await expect(
+      page.getByText(new RegExp(`${DENOMINAZIONE.replace(/\./g, '\\.')} aperto`, 'i')),
+    ).toBeVisible({
       timeout: 30_000,
     });
 

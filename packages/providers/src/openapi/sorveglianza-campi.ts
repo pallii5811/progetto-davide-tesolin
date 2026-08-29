@@ -60,10 +60,7 @@ export class SorveglianzaCampi {
   readonly #conosciuti: ReadonlySet<string>;
   readonly #onNuovo: ((campo: CampoIgnoto) => void) | undefined;
 
-  constructor(
-    conosciuti: Iterable<string>,
-    onNuovo?: ((campo: CampoIgnoto) => void)  ,
-  ) {
+  constructor(conosciuti: Iterable<string>, onNuovo?: (campo: CampoIgnoto) => void) {
     this.#conosciuti = new Set(conosciuti);
     this.#onNuovo = onNuovo;
   }

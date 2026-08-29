@@ -18,8 +18,8 @@ export function ModuloStudio() {
     <form action={azione} className="rounded-lg border border-bordo bg-superficie p-4">
       <h3 className="mb-1 text-sm font-semibold">Apri uno studio cliente</h3>
       <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
-        Nasce isolato: portafoglio, clienti e analisi non sono visibili da nessun altro studio,
-        compreso questo.
+        Nasce isolato: portafoglio, clienti e analisi non sono visibili da nessun altro studio, compreso
+        questo.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-3">

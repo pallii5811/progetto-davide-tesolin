@@ -39,9 +39,8 @@ export default async function PaginaServizi() {
     <>
       <h2 className="mb-1 text-lg font-semibold tracking-tight">Servizi dati</h2>
       <p className="mb-6 text-sm leading-relaxed text-testo-tenue">
-        I token di OpenAPI.com sono <strong>per servizio, non per account</strong>: avere
-        credito non basta, ogni servizio va autorizzato dalla console. Questa verifica non
-        consuma credito.
+        I token di OpenAPI.com sono <strong>per servizio, non per account</strong>: avere credito non basta,
+        ogni servizio va autorizzato dalla console. Questa verifica non consuma credito.
       </p>
       {fornitura !== null && fornitura.persistenza && <Fornitura stato={fornitura} />}
     </>
@@ -63,9 +62,9 @@ export default async function PaginaServizi() {
       <div className="max-w-3xl">
         {intestazione}
         <Avviso tono="informativo" titolo="Modalità dimostrativa">
-          Nessun token OpenAPI.com configurato: la piattaforma sta lavorando su dati
-          dimostrativi e non consuma credito. Le autorizzazioni si verificano solo quando il
-          token è presente in <code className="font-mono">.env</code>.
+          Nessun token OpenAPI.com configurato: la piattaforma sta lavorando su dati dimostrativi e non
+          consuma credito. Le autorizzazioni si verificano solo quando il token è presente in{' '}
+          <code className="font-mono">.env</code>.
         </Avviso>
       </div>
     );
@@ -103,9 +102,7 @@ export default async function PaginaServizi() {
       </div>
 
       {mancanti.length === 0 && irraggiungibili.length === 0 && (
-        <p className="mt-4 text-sm text-basso">
-          Tutti i servizi configurati sono autorizzati.
-        </p>
+        <p className="mt-4 text-sm text-basso">Tutti i servizi configurati sono autorizzati.</p>
       )}
     </div>
   );
@@ -162,8 +159,8 @@ function Fornitura({ stato }: { stato: StatoFornitura }) {
 
       {(stato.tettoComplessivoCentesimi ?? 0) > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-testo-debole">
-          Limite giornaliero della piattaforma {euro(stato.tettoComplessivoCentesimi ?? 0)} · per
-          singolo studio {euro(stato.tettoPerStudioCentesimi ?? 0)}
+          Limite giornaliero della piattaforma {euro(stato.tettoComplessivoCentesimi ?? 0)} · per singolo
+          studio {euro(stato.tettoPerStudioCentesimi ?? 0)}
         </p>
       )}
     </div>

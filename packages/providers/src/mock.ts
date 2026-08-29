@@ -224,7 +224,7 @@ export class MockCompanyProvider implements CompanyDataProvider {
             providerId: v.partitaIva,
             sintesi: sintesiDimostrativa(v),
             ...recordDimostrativo(v),
-        ...recordDimostrativo(v),
+            ...recordDimostrativo(v),
           })),
     });
   }
@@ -243,12 +243,11 @@ export class MockCompanyProvider implements CompanyDataProvider {
       di ripiego, e la modalità dimostrativa è dichiarata in testa a ogni pagina: nessuno
       può scambiarli per dati reali.
     */
-    const variante: Variante =
-      nota ?? {
-        ...VARIANTI[0]!,
-        partitaIva: normalizzato,
-        denominazione: `AZIENDA DIMOSTRATIVA ${normalizzato}`,
-      };
+    const variante: Variante = nota ?? {
+      ...VARIANTI[0]!,
+      partitaIva: normalizzato,
+      denominazione: `AZIENDA DIMOSTRATIVA ${normalizzato}`,
+    };
 
     const base = demoCompanyProfile();
     const conVariante = applicaVariante(base, variante);
@@ -367,7 +366,6 @@ function sintesiDimostrativa(variante: Variante): SintesiAzienda {
   };
 }
 
-
 /**
  * Il record completo dimostrativo: anagrafica, esercizi e soci.
  *
@@ -375,10 +373,9 @@ function sintesiDimostrativa(variante: Variante): SintesiAzienda {
  * ricerca e l'analisi non raccontino due storie diverse. Una dimostrazione che mostra meno
  * campi di quella reale nasconde proprio i difetti che dovrebbe far emergere.
  */
-function recordDimostrativo(variante: Variante): Pick<
-  CompanySearchResult,
-  'anagrafica' | 'bilanciSintetici' | 'soci'
-> {
+function recordDimostrativo(
+  variante: Variante,
+): Pick<CompanySearchResult, 'anagrafica' | 'bilanciSintetici' | 'soci'> {
   const base = demoCompanyProfile();
   const conVariante = applicaVariante(base, variante);
   return {

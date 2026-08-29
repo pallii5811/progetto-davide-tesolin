@@ -49,9 +49,7 @@ export interface SchemaMargineDiContribuzione {
  * dal bilancio riclassificato, che le ha già applicate. Mostrare una quota diversa da
  * quella impiegata sarebbe peggio che non mostrarla.
  */
-export function componiSchemaMargine(
-  bilancio: BilancioRiclassificato,
-): SchemaMargineDiContribuzione {
+export function componiSchemaMargine(bilancio: BilancioRiclassificato): SchemaMargineDiContribuzione {
   const { ce, origine } = bilancio;
   const c = origine.contoEconomico;
 
@@ -75,19 +73,13 @@ export function componiSchemaMargine(
     Derivandola per differenza, lo schema quadra **per costruzione** con qualunque
     parametrizzazione, presente o futura.
   */
-  const valoreDellaProduzione = Money.add(
-    c.ricaviVendite,
-    c.variazioneRimanenzeProdotti,
-    c.altriRicavi,
-  );
+  const valoreDellaProduzione = Money.add(c.ricaviVendite, c.variazioneRimanenzeProdotti, c.altriRicavi);
   const serviziVariabili = Money.max(
     Money.ZERO,
     Money.subtract(Money.subtract(valoreDellaProduzione, consumi), ce.margineDiContribuzione),
   );
   const quotaServiziVariabile =
-    Money.toEuro(c.costiServizi) === 0
-      ? 0
-      : Money.toEuro(serviziVariabili) / Money.toEuro(c.costiServizi);
+    Money.toEuro(c.costiServizi) === 0 ? 0 : Money.toEuro(serviziVariabili) / Money.toEuro(c.costiServizi);
 
   const righe: readonly RigaSchemaMargine[] = [
     {

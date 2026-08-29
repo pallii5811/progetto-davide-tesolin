@@ -68,8 +68,8 @@ export function ImmaginiUbicazioni({
       ))}
 
       <p className="text-xs leading-relaxed text-testo-debole">
-        Fotografie fornite dall&apos;intermediario e riferite alla data di rilevazione. Documentano
-        lo stato dei luoghi osservato in quel momento e non costituiscono una perizia.
+        Fotografie fornite dall&apos;intermediario e riferite alla data di rilevazione. Documentano lo stato
+        dei luoghi osservato in quel momento e non costituiscono una perizia.
       </p>
     </div>
   );

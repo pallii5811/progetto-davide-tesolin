@@ -30,8 +30,8 @@ export default async function PaginaCosti() {
   if (costi === null) {
     return (
       <Avviso tono="critico" titolo="Registro non disponibile">
-        Non è stato possibile leggere il registro delle spese. Verificare che il servizio di
-        analisi sia attivo.
+        Non è stato possibile leggere il registro delle spese. Verificare che il servizio di analisi sia
+        attivo.
       </Avviso>
     );
   }
@@ -43,8 +43,8 @@ export default async function PaginaCosti() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Consumi dei dati</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-testo-tenue">
-          Ogni chiamata a pagamento verso l&apos;archivio camerale scrive qui. I conteggi di
-          ricerca non compaiono perché non costano nulla.
+          Ogni chiamata a pagamento verso l&apos;archivio camerale scrive qui. I conteggi di ricerca non
+          compaiono perché non costano nulla.
         </p>
       </div>
 
@@ -62,9 +62,7 @@ export default async function PaginaCosti() {
             Risparmiato dall&apos;archivio
           </p>
           <p className="tabular mt-1 text-2xl font-bold">{euro(costi.risparmioDaCacheEuro)}</p>
-          <p className="mt-1 text-xs text-testo-debole">
-            Dati già acquistati e riusati senza ricomprarli.
-          </p>
+          <p className="mt-1 text-xs text-testo-debole">Dati già acquistati e riusati senza ricomprarli.</p>
         </Scheda>
       </div>
 
@@ -91,12 +89,8 @@ export default async function PaginaCosti() {
                   .map((s) => (
                     <tr key={s.servizio} className="border-t border-bordo">
                       <td className="px-4 py-2.5">{s.servizio.replace('OpenAPI.com/', '')}</td>
-                      <td className="tabular px-4 py-2.5 text-right text-testo-tenue">
-                        {s.chiamate}
-                      </td>
-                      <td className="tabular px-4 py-2.5 text-right font-medium">
-                        {euro(s.costoEuro)}
-                      </td>
+                      <td className="tabular px-4 py-2.5 text-right text-testo-tenue">{s.chiamate}</td>
+                      <td className="tabular px-4 py-2.5 text-right font-medium">{euro(s.costoEuro)}</td>
                     </tr>
                   ))}
               </tbody>
@@ -140,9 +134,9 @@ export default async function PaginaCosti() {
         chi confronta i due numeri deve sapere perché non tornano.
       */}
       <p className="mt-6 text-xs leading-relaxed text-testo-debole">
-        Questo registro contiene le chiamate fatte <strong>dalla piattaforma</strong>. Gli
-        strumenti diagnostici da riga di comando spendono senza comparire qui: il totale
-        autorevole resta quello della console del fornitore.
+        Questo registro contiene le chiamate fatte <strong>dalla piattaforma</strong>. Gli strumenti
+        diagnostici da riga di comando spendono senza comparire qui: il totale autorevole resta quello della
+        console del fornitore.
       </p>
     </>
   );
@@ -152,15 +146,7 @@ function centesimi(v: number): string {
   return `${(v / 100).toFixed(2).replace('.', ',')} €`;
 }
 
-function Voce({
-  etichetta,
-  valore,
-  nota,
-}: {
-  etichetta: string;
-  valore: string;
-  nota: string;
-}) {
+function Voce({ etichetta, valore, nota }: { etichetta: string; valore: string; nota: string }) {
   return (
     <div>
       <dt className="text-sm">{etichetta}</dt>

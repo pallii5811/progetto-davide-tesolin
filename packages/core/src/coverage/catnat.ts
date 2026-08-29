@@ -60,7 +60,9 @@ export const TERMINI_CATNAT: Readonly<Record<CompanySize, Date>> = {
  * Proroghe settoriali per micro e piccole imprese (Milleproroghe).
  * Chiave: divisione ATECO. Valore: termine prorogato.
  */
-export const PROROGHE_SETTORIALI: Readonly<Record<string, { readonly termine: Date; readonly settore: string }>> = {
+export const PROROGHE_SETTORIALI: Readonly<
+  Record<string, { readonly termine: Date; readonly settore: string }>
+> = {
   '03': { termine: new Date('2026-12-31T23:59:59Z'), settore: 'pesca e acquacoltura' },
   '55': { termine: new Date('2026-03-31T23:59:59Z'), settore: 'alloggio e strutture turistico-ricettive' },
   '56': { termine: new Date('2026-03-31T23:59:59Z'), settore: 'somministrazione di alimenti e bevande' },
@@ -118,21 +120,18 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
   // ── Esclusioni ────────────────────────────────────────────────────────────
   const esclusione = valutaEsclusione(facts);
   if (esclusione !== null) {
-    return builder
-      .note(`Impresa non soggetta all’obbligo: ${esclusione}`)
-      .confidence('media')
-      .value({
-        status: 'non-soggetta',
-        soggetta: false,
-        motivoEsclusione: esclusione,
-        termine: null,
-        giorniAlTermine: null,
-        baseAssicurabile,
-        beniInclusi: BENI_INCLUSI,
-        eventiCoperti: EVENTI_COPERTI,
-        vincoliDiProdotto: VINCOLI_DI_PRODOTTO,
-        conseguenzeInadempimento: [],
-      });
+    return builder.note(`Impresa non soggetta all’obbligo: ${esclusione}`).confidence('media').value({
+      status: 'non-soggetta',
+      soggetta: false,
+      motivoEsclusione: esclusione,
+      termine: null,
+      giorniAlTermine: null,
+      baseAssicurabile,
+      beniInclusi: BENI_INCLUSI,
+      eventiCoperti: EVENTI_COPERTI,
+      vincoliDiProdotto: VINCOLI_DI_PRODOTTO,
+      conseguenzeInadempimento: [],
+    });
   }
 
   // ── Termine applicabile ───────────────────────────────────────────────────
@@ -171,7 +170,9 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
   } else if (status === 'in-scadenza') {
     builder.note(`Obbligo da adempiere entro ${giorniAlTermine} giorni (${formatDate(termine)}).`);
   } else {
-    builder.note('Copertura catastrofale risultante in portafoglio: verificarne la conformità ai vincoli di legge.');
+    builder.note(
+      'Copertura catastrofale risultante in portafoglio: verificarne la conformità ai vincoli di legge.',
+    );
   }
 
   builder.noteIf(
@@ -180,20 +181,18 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
       'prima di procedere alla quotazione.',
   );
 
-  return builder
-    .confidence(facts.atecoSezione === null ? 'bassa' : 'media')
-    .value({
-      status,
-      soggetta: true,
-      motivoEsclusione: null,
-      termine,
-      giorniAlTermine,
-      baseAssicurabile,
-      beniInclusi: BENI_INCLUSI,
-      eventiCoperti: EVENTI_COPERTI,
-      vincoliDiProdotto: VINCOLI_DI_PRODOTTO,
-      conseguenzeInadempimento: status === 'adempiente' ? [] : CONSEGUENZE_INADEMPIMENTO,
-    });
+  return builder.confidence(facts.atecoSezione === null ? 'bassa' : 'media').value({
+    status,
+    soggetta: true,
+    motivoEsclusione: null,
+    termine,
+    giorniAlTermine,
+    baseAssicurabile,
+    beniInclusi: BENI_INCLUSI,
+    eventiCoperti: EVENTI_COPERTI,
+    vincoliDiProdotto: VINCOLI_DI_PRODOTTO,
+    conseguenzeInadempimento: status === 'adempiente' ? [] : CONSEGUENZE_INADEMPIMENTO,
+  });
 }
 
 function valutaEsclusione(facts: CompanyFacts): string | null {
@@ -208,5 +207,7 @@ function valutaEsclusione(facts: CompanyFacts): string | null {
 }
 
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(
+    date,
+  );
 }

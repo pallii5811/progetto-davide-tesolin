@@ -19,9 +19,10 @@ import { OpenApiProvider } from '../src/openapi/provider.js';
 function servizioLento(chiamate: string[]) {
   return ((url: string, init?: RequestInit): Promise<Response> => {
     chiamate.push(`${init?.method ?? 'GET'} ${String(url)}`);
-    const corpo = String(url).includes('/IT-negativita') && init?.method === 'POST'
-      ? { data: { id: 'pratica-1', status: 'PENDING' } }
-      : { data: { status: 'PENDING' } };
+    const corpo =
+      String(url).includes('/IT-negativita') && init?.method === 'POST'
+        ? { data: { id: 'pratica-1', status: 'PENDING' } }
+        : { data: { status: 'PENDING' } };
     return Promise.resolve(
       new Response(JSON.stringify(corpo), {
         status: 200,

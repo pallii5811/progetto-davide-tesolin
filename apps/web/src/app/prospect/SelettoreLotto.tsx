@@ -58,10 +58,8 @@ export function SelettoreLotto({
         ) : (
           <>
             Costo dell&apos;elenco:{' '}
-            <strong className="tabular text-testo">
-              {costo.toFixed(2).replace('.', ',')} €
-            </strong>{' '}
-            · {(centesimiPerAzienda / 100).toFixed(2).replace('.', ',')} € ad azienda
+            <strong className="tabular text-testo">{costo.toFixed(2).replace('.', ',')} €</strong> ·{' '}
+            {(centesimiPerAzienda / 100).toFixed(2).replace('.', ',')} € ad azienda
           </>
         )}
       </span>

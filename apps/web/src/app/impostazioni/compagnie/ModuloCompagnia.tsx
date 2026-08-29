@@ -32,9 +32,7 @@ export function ModuloCompagnia() {
         <Campo nome="fonte" etichetta="Fonte" segnaposto="SFCR 2025" obbligatorio />
       </div>
 
-      <p className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-testo-debole">
-        Dalla SFCR
-      </p>
+      <p className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-testo-debole">Dalla SFCR</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Campo
           nome="solvencyRatio"
@@ -62,9 +60,7 @@ export function ModuloCompagnia() {
         </button>
 
         {esito !== null && (
-          <span className={`text-sm ${esito.ok ? 'text-basso' : 'text-critico'}`}>
-            {esito.messaggio}
-          </span>
+          <span className={`text-sm ${esito.ok ? 'text-basso' : 'text-critico'}`}>{esito.messaggio}</span>
         )}
       </div>
     </form>

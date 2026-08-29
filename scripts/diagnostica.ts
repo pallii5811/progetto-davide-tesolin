@@ -39,9 +39,7 @@ async function main(): Promise<void> {
   for (const esito of esiti) {
     const simbolo = esito.stato === 'autorizzato' ? '✔' : esito.stato === 'non-autorizzato' ? '✖' : '?';
     console.log(`${simbolo} ${esito.chiave.padEnd(20, ' ')} ${esito.dettaglio}`);
-    console.log(
-      `  ${' '.repeat(20)} ${esito.descrizione} · ${(esito.costoCentesimi / 100).toFixed(2)} €`,
-    );
+    console.log(`  ${' '.repeat(20)} ${esito.descrizione} · ${(esito.costoCentesimi / 100).toFixed(2)} €`);
     console.log('');
   }
 

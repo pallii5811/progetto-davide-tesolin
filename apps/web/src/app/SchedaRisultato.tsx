@@ -76,12 +76,8 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
             Cessazione e codice fiscale chiuso compaiono solo quando ci sono davvero: una
             riga «Cessata il: n.d.» su un'impresa viva è rumore che copre il resto.
           */}
-          {a.dataCessazione !== null && (
-            <Voce etichetta="Cessata il" valore={giorno(a.dataCessazione)} />
-          )}
-          {a.codiceFiscaleCessato === true && (
-            <Voce etichetta="Codice fiscale" valore="cessato" />
-          )}
+          {a.dataCessazione !== null && <Voce etichetta="Cessata il" valore={giorno(a.dataCessazione)} />}
+          {a.codiceFiscaleCessato === true && <Voce etichetta="Codice fiscale" valore="cessato" />}
         </dl>
       )}
 
@@ -143,9 +139,7 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
                     <td className="tabular py-1.5 text-right">{centesimi(b.totaleAttivo)}</td>
                     <td className="tabular py-1.5 text-right">{centesimi(b.costoDelPersonale)}</td>
                     <td className="tabular py-1.5 text-right">{numero(b.dipendenti)}</td>
-                    <td className="tabular py-1.5 text-right">
-                      {centesimi(b.retribuzioneMediaLorda)}
-                    </td>
+                    <td className="tabular py-1.5 text-right">{centesimi(b.retribuzioneMediaLorda)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -183,11 +177,10 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
       )}
 
       <p className="mt-4 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-tenue">
-        Dal Registro Imprese, già compreso nel costo di questa ricerca. Con l&apos;analisi
-        arrivano bilanci riclassificati, merito creditizio, registro dei rischi ISO 31000, somme
-        assicurande e verifica dell&apos;obbligo catastrofale; con l&apos;approfondimento anche
-        amministratori, sedi operative, gruppo societario e gli indicatori già elaborati
-        dall&apos;archivio.
+        Dal Registro Imprese, già compreso nel costo di questa ricerca. Con l&apos;analisi arrivano bilanci
+        riclassificati, merito creditizio, registro dei rischi ISO 31000, somme assicurande e verifica
+        dell&apos;obbligo catastrofale; con l&apos;approfondimento anche amministratori, sedi operative,
+        gruppo societario e gli indicatori già elaborati dall&apos;archivio.
       </p>
     </div>
   );

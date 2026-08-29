@@ -12,13 +12,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sql } from 'drizzle-orm';
-import {
-  applicaSchemaTollerante,
-  connetti,
-  registraCosto,
-  riepilogoCosti,
-  schema,
-} from '../src/index.js';
+import { applicaSchemaTollerante, connetti, registraCosto, riepilogoCosti, schema } from '../src/index.js';
 import type { Connessione } from '../src/index.js';
 
 const OLTRE_INT32 = 2_500_000_000; // 25 milioni di euro in centesimi

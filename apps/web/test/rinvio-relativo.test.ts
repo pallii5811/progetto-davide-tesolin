@@ -89,9 +89,7 @@ describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
     const locale = new NextRequest(new URL('/portafoglio', 'http://localhost:3000'), {
       headers: { host: 'localhost:3000' },
     });
-    expect(destinazioneDi(middleware(locale))).toBe(
-      'http://localhost:3000/accedi?ritorno=%2Fportafoglio',
-    );
+    expect(destinazioneDi(middleware(locale))).toBe('http://localhost:3000/accedi?ritorno=%2Fportafoglio');
   });
 
   it('un host inoltrato malformato viene ignorato', () => {

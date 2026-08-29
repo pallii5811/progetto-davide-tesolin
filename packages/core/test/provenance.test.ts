@@ -77,12 +77,8 @@ describe('Provenienza mostrata al cliente', () => {
   it('le altre provenienze restano descritte come prima', () => {
     // La correzione riguarda solo i dati acquistati: dichiarato, calcolato, ipotesi e norma
     // non passano da nessun distributore e devono continuare a dire ciò che dicevano.
-    expect(describeSource(declared({}, 'il cliente', OSSERVATO).source)).toBe(
-      'Dichiarato da il cliente',
-    );
-    expect(describeSource(assumed({}, 'dato mancante', OSSERVATO).source)).toBe(
-      'Ipotesi: dato mancante',
-    );
+    expect(describeSource(declared({}, 'il cliente', OSSERVATO).source)).toBe('Dichiarato da il cliente');
+    expect(describeSource(assumed({}, 'dato mancante', OSSERVATO).source)).toBe('Ipotesi: dato mancante');
     expect(
       describeSource(sourced({}, { kind: 'norma', riferimento: 'L. 213/2023' }, OSSERVATO).source),
     ).toBe('Riferimento normativo: L. 213/2023');

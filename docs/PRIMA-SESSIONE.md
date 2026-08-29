@@ -50,33 +50,33 @@ Da leggere così come sono scritte, una alla volta. **Nessun'altra parola.**
 
 ### 1. «Entra nel programma»
 
-*Cosa si osserva:* trova la pagina di accesso? Capisce che deve cambiare la password al
+_Cosa si osserva:_ trova la pagina di accesso? Capisce che deve cambiare la password al
 primo ingresso?
 
 ### 2. «Cerca l'azienda con partita IVA 03158460174 e analizzala»
 
-*Cosa si osserva:* usa il campo giusto? Capisce che «Analizza» spende? Nota l'avviso sul
+_Cosa si osserva:_ usa il campo giusto? Capisce che «Analizza» spende? Nota l'avviso sul
 consumo di credito o gli passa sopra?
 
 ### 3. «Dimmi quanto è rischiosa questa azienda e perché»
 
-*È la domanda centrale.* Guarda lo score? Apre «Come è stato calcolato»? Oppure scorre
+_È la domanda centrale._ Guarda lo score? Apre «Come è stato calcolato»? Oppure scorre
 cercando altro? Se non apre mai una spiegazione, l'esplicabilità — che è il nostro
 principale vantaggio competitivo — non sta comunicando.
 
 ### 4. «Il cliente ha una polizza incendio da 500.000 €. Inseriscila e dimmi se basta»
 
-*Cosa si osserva:* trova «Dati di intervista»? Capisce la differenza fra somma assicurata
+_Cosa si osserva:_ trova «Dati di intervista»? Capisce la differenza fra somma assicurata
 e massimale? Legge la simulazione della regola proporzionale, e la capisce?
 
 ### 5. «Prepara qualcosa da lasciare al cliente»
 
-*Cosa si osserva:* trova il report? Lo stamperebbe così com'è o si vergognerebbe di
+_Cosa si osserva:_ trova il report? Lo stamperebbe così com'è o si vergognerebbe di
 consegnarlo? **Chiedi esattamente questo:** «lo daresti a un tuo cliente?».
 
 ### 6. «Trovami dieci aziende metalmeccaniche in provincia di Brescia sopra i venti addetti»
 
-*Cosa si osserva:* trova «Nuovi clienti»? Capisce che contare è gratis e scaricare no?
+_Cosa si osserva:_ trova «Nuovi clienti»? Capisce che contare è gratis e scaricare no?
 Capisce il codice ATECO senza punti — o si ferma lì?
 
 ---

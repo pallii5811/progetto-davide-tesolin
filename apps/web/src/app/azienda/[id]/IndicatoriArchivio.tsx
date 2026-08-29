@@ -133,9 +133,9 @@ export function IndicatoriArchivio({ dati }: { dati: IndicatoriArchivioDto }) {
     <section className="mb-8" id="indicatori-archivio">
       <h2 className="mb-1 text-lg font-semibold tracking-tight">Indicatori dell’archivio camerale</h2>
       <p className="mb-4 max-w-3xl text-sm leading-relaxed text-testo-tenue">
-        Elaborati dal Registro Imprese sul bilancio depositato, e già compresi nell’analisi.
-        Sono <strong>indipendenti</strong> dal punteggio calcolato dalla piattaforma: dove i due
-        divergono, la divergenza è essa stessa un’informazione da approfondire.
+        Elaborati dal Registro Imprese sul bilancio depositato, e già compresi nell’analisi. Sono{' '}
+        <strong>indipendenti</strong> dal punteggio calcolato dalla piattaforma: dove i due divergono, la
+        divergenza è essa stessa un’informazione da approfondire.
       </p>
 
       {q !== null && <Qualifiche q={q} />}
@@ -144,8 +144,8 @@ export function IndicatoriArchivio({ dati }: { dati: IndicatoriArchivioDto }) {
         <Scheda className="mb-4">
           <h3 className="text-sm font-semibold">Gare pubbliche</h3>
           <p className="mt-0.5 text-xs leading-relaxed text-testo-tenue">
-            Chi partecipa ad appalti ha bisogno di cauzioni provvisorie e definitive: è un ramo
-            che non si propone se non si sa che l’impresa va a gara.
+            Chi partecipa ad appalti ha bisogno di cauzioni provvisorie e definitive: è un ramo che non si
+            propone se non si sa che l’impresa va a gara.
           </p>
           <table className="mt-3 w-full text-sm">
             <thead className="text-left text-xs uppercase tracking-wide text-testo-debole">
@@ -188,10 +188,7 @@ export function IndicatoriArchivio({ dati }: { dati: IndicatoriArchivioDto }) {
               valore={percentuale(dati.statisticheAddetti.tempoDeterminato)}
             />
             <Riga etichetta="Tempo pieno" valore={percentuale(dati.statisticheAddetti.tempoPieno)} />
-            <Riga
-              etichetta="Tempo parziale"
-              valore={percentuale(dati.statisticheAddetti.tempoParziale)}
-            />
+            <Riga etichetta="Tempo parziale" valore={percentuale(dati.statisticheAddetti.tempoParziale)} />
           </dl>
         </Scheda>
       )}
@@ -247,7 +244,6 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
   const attive = bandiere.filter(([, valore]) => valore === true);
   const note = bandiere.filter(([, valore]) => valore === false);
 
-
   /*
     Le voci del riquadro, divise fra quelle che un valore ce l'hanno e quelle che no.
     Le seconde non si stampano una per una: si nominano in fondo, una volta sola.
@@ -272,9 +268,7 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
   const righeValorizzate = vociRiquadro.filter(
     (v): v is readonly [string, string] => v[1] !== null && v[1] !== '',
   );
-  const righeMancanti = vociRiquadro
-    .filter((v) => v[1] === null || v[1] === '')
-    .map((v) => v[0]);
+  const righeMancanti = vociRiquadro.filter((v) => v[1] === null || v[1] === '').map((v) => v[0]);
 
   return (
     <Scheda className="mb-4">
@@ -326,15 +320,14 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
       {righeMancanti.length > 0 && (
         <p className="mt-3 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-debole">
           Non compresi in questa analisi:{' '}
-          <span className="text-testo-tenue">{righeMancanti.join(', ').toLowerCase()}</span>. Si
-          acquistano con l&apos;<strong className="text-testo-tenue">analisi approfondita</strong>.
+          <span className="text-testo-tenue">{righeMancanti.join(', ').toLowerCase()}</span>. Si acquistano
+          con l&apos;<strong className="text-testo-tenue">analisi approfondita</strong>.
         </p>
       )}
 
       {q.aggiornatoIl !== null && (
         <p className="mt-3 text-xs text-testo-debole">
-          Record camerale aggiornato al{' '}
-          {new Date(q.aggiornatoIl).toLocaleDateString('it-IT')}.
+          Record camerale aggiornato al {new Date(q.aggiornatoIl).toLocaleDateString('it-IT')}.
         </p>
       )}
     </Scheda>

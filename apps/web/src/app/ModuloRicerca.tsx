@@ -100,12 +100,9 @@ export function ModuloRicerca({
       </button>
 
       {inCorso && aPagamento && (
-        <p
-          role="status"
-          className="text-xs text-testo-tenue sm:col-span-3"
-        >
-          Interrogazione degli archivi camerali in corso. Può richiedere qualche secondo:
-          attendere invece di ripetere la ricerca, perché ogni interrogazione viene pagata.
+        <p role="status" className="text-xs text-testo-tenue sm:col-span-3">
+          Interrogazione degli archivi camerali in corso. Può richiedere qualche secondo: attendere invece
+          di ripetere la ricerca, perché ogni interrogazione viene pagata.
         </p>
       )}
     </form>

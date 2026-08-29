@@ -1,8 +1,12 @@
 name: CI
 
+# Il ramo di questo repository si chiama `master`. Finché qui c'era scritto `main`, la
+# pipeline non è mai partita su un push: nessuno l'ha vista rossa, e nel frattempo
+# settantaquattro file sono usciti dal formato e un collaudo è stato committato rosso.
+# Un controllo che non gira non è un controllo.
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:

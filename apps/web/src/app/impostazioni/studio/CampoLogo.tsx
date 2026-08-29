@@ -104,8 +104,8 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
       {errore !== null && <p className="mt-2 text-sm text-critico">{errore}</p>}
 
       <p className="mt-2 text-xs leading-relaxed text-testo-debole">
-        Compare in testa a ogni report consegnato al cliente, accanto alla denominazione e al
-        numero RUI. Massimo {Math.round(LIMITE_BYTE / 1024)} KB.
+        Compare in testa a ogni report consegnato al cliente, accanto alla denominazione e al numero RUI.
+        Massimo {Math.round(LIMITE_BYTE / 1024)} KB.
       </p>
     </div>
   );

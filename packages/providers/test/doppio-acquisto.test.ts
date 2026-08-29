@@ -23,11 +23,11 @@ describe('Due richieste identiche partite insieme', () => {
       provider: 'Test',
       cache,
       ledger,
-      fetchImpl: (async () => {
+      fetchImpl: async () => {
         chiamate += 1;
         await new Promise((r) => setTimeout(r, 50));
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
-      }),
+      },
     });
 
     const richiesta = {
@@ -57,10 +57,10 @@ describe('Due richieste identiche partite insieme', () => {
       cache: new MemoryCache(),
       ledger: new MemoryCostLedger(),
       maxRetries: 0,
-      fetchImpl: (async () => {
+      fetchImpl: async () => {
         chiamate += 1;
         return new Response('{}', { status: 404 });
-      }),
+      },
     });
 
     const richiesta = {

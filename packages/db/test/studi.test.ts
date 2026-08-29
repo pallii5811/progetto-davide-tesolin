@@ -70,8 +70,7 @@ describe('Elenco degli studi', () => {
     await creaStudio(connessione.db, 'Studio senza nessuno');
 
     const elenco = await elencoStudi(connessione.db);
-    const per = (nome: string): number =>
-      elenco.find((s) => s.denominazione === nome)?.utenti ?? -1;
+    const per = (nome: string): number => elenco.find((s) => s.denominazione === nome)?.utenti ?? -1;
 
     expect(per('Studio gestore')).toBe(1);
     expect(per('Studio cliente')).toBe(2);

@@ -226,9 +226,7 @@ export function costoAnalisi(
  * dell'approfondimento c'era «+0,48 €» per un servizio che ne costa trenta.
  */
 export function costoEventiNegativi(config: OpenApiConfig = OPENAPI_DEFAULT_CONFIG): number {
-  return config.services.eventiNegativi.verificato
-    ? config.services.eventiNegativi.costoCentesimi
-    : 0;
+  return config.services.eventiNegativi.verificato ? config.services.eventiNegativi.costoCentesimi : 0;
 }
 
 /** Servizi il cui percorso o autorizzazione non è ancora confermato. */

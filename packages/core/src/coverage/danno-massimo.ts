@@ -68,7 +68,8 @@ function quotaBase(divisioneAteco: string | null): { quota: number; motivo: stri
   if ([13, 14, 15, 16, 17, 18, 20, 22, 31].includes(divisione)) {
     return {
       quota: 0.9,
-      motivo: 'Materiali ad alto carico d’incendio (legno, carta, plastica, tessile): il fuoco tende a distruggere l’intero contenuto.',
+      motivo:
+        'Materiali ad alto carico d’incendio (legno, carta, plastica, tessile): il fuoco tende a distruggere l’intero contenuto.',
     };
   }
 
@@ -76,7 +77,8 @@ function quotaBase(divisioneAteco: string | null): { quota: number; motivo: stri
   if ([19, 21].includes(divisione)) {
     return {
       quota: 0.95,
-      motivo: 'Lavorazioni chimiche: al carico d’incendio si somma il rischio di esplosione, che vanifica la compartimentazione.',
+      motivo:
+        'Lavorazioni chimiche: al carico d’incendio si somma il rischio di esplosione, che vanifica la compartimentazione.',
     };
   }
 
@@ -135,7 +137,9 @@ export function stimaDannoMassimo(
 
   if (valoreBeni === null || !Money.isPositive(valoreBeni)) {
     return costruttore
-      .note('Il valore dei beni non è quantificabile: senza di esso il danno massimo non ha base di calcolo.')
+      .note(
+        'Il valore dei beni non è quantificabile: senza di esso il danno massimo non ha base di calcolo.',
+      )
       .confidence('bassa')
       .value<DannoMassimo | null>(null);
   }
@@ -204,7 +208,9 @@ export function stimaDannoMassimo(
   } else if (ubicazioni !== null && ubicazioni.complessiIncendio.length > 1) {
     costruttore.note(
       `Valori distribuiti su ${ubicazioni.complessiIncendio.length} complessi separati${
-        ubicazioni.distanzaMassimaKm === null ? '' : ` (fino a ${ubicazioni.distanzaMassimaKm} km di distanza)`
+        ubicazioni.distanzaMassimaKm === null
+          ? ''
+          : ` (fino a ${ubicazioni.distanzaMassimaKm} km di distanza)`
       }: il danno massimo non li comprende tutti.`,
     );
   }

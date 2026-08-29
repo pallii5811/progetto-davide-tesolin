@@ -65,7 +65,10 @@ export function classifySize(input: SizeInput): Explained<CompanySize> {
     .reference('Raccomandazione UE 2003/361/CE, art. 2')
     .input('Addetti', addetti === null ? 'da rilevare in intervista' : String(addetti))
     .input('Fatturato', fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(fatturato))
-    .input('Totale attivo', totaleAttivo === null ? 'da rilevare in intervista' : Money.formatCompact(totaleAttivo));
+    .input(
+      'Totale attivo',
+      totaleAttivo === null ? 'da rilevare in intervista' : Money.formatCompact(totaleAttivo),
+    );
 
   if (addetti === null && fatturato === null && totaleAttivo === null) {
     return builder

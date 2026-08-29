@@ -253,10 +253,7 @@ function leggiQualifiche(dati: unknown): QualificheImpresa | null {
     importatore: bool(estero, 'isImporter'),
     pmiInnovativa: bool(innovativa, 'isInnovativeSme'),
     startUpInnovativa: bool(innovativa, 'isInnovativeStartUp'),
-    impresaArtigiana: bool(
-      pick(dati, 'artisanBusinessRegistry'),
-      'belongsToArtisanBusinessRegistry',
-    ),
+    impresaArtigiana: bool(pick(dati, 'artisanBusinessRegistry'), 'belongsToArtisanBusinessRegistry'),
     numeroUnitaLocali: num(pick(dati, 'branches'), 'numberOfBranches'),
     appartieneAGruppoIva: bool(gruppoIva, 'vatGroupParticipation'),
     capogruppoIva: bool(gruppoIva, 'isVatGroupLeader'),

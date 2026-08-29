@@ -21,10 +21,10 @@ npm run dev:web
 
 Poi si apre **http://localhost:3000**.
 
-| | |
-|---|---|
+|           |                     |
+| --------- | ------------------- |
 | Indirizzo | `admin@aegis.local` |
-| Password | `prova-locale-2026` |
+| Password  | `prova-locale-2026` |
 
 ### Dimostrativo o dati reali
 
@@ -49,11 +49,11 @@ con un riquadro in cima alla pagina di ricerca.
 Sono finte ma coerenti fra loro: settori, territori e dimensioni diverse, scelti perché
 facciano emergere comportamenti diversi del motore.
 
-| Partita IVA | Azienda | Dove | Settore | Cosa mostra |
-|---|---|---|---|---|
-| `03158460174` | MECCANICA BRESCIANA S.R.L. | Adro (BS) | Meccanica generale | **La più completa**: ha l'intervista compilata e le polizze in essere |
-| `02657870644` | COSTRUZIONI IRPINE S.R.L. | Avellino (AV) | Edilizia | Zona **sismica alta**: l'obbligo catastrofale cambia faccia |
-| `02413390390` | ADRIATICA LOGISTICA S.R.L. | Ravenna (RA) | Magazzini e deposito | La più grande, e senza intervista: si vede cosa manca |
+| Partita IVA   | Azienda                    | Dove          | Settore              | Cosa mostra                                                           |
+| ------------- | -------------------------- | ------------- | -------------------- | --------------------------------------------------------------------- |
+| `03158460174` | MECCANICA BRESCIANA S.R.L. | Adro (BS)     | Meccanica generale   | **La più completa**: ha l'intervista compilata e le polizze in essere |
+| `02657870644` | COSTRUZIONI IRPINE S.R.L.  | Avellino (AV) | Edilizia             | Zona **sismica alta**: l'obbligo catastrofale cambia faccia           |
+| `02413390390` | ADRIATICA LOGISTICA S.R.L. | Ravenna (RA)  | Magazzini e deposito | La più grande, e senza intervista: si vede cosa manca                 |
 
 ---
 

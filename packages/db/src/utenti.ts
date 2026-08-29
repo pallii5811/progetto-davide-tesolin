@@ -465,11 +465,7 @@ export interface ModificheStudio {
   readonly logo?: string | null | undefined;
 }
 
-export async function aggiornaStudio(
-  db: Database,
-  tenantId: string,
-  dati: ModificheStudio,
-): Promise<void> {
+export async function aggiornaStudio(db: Database, tenantId: string, dati: ModificheStudio): Promise<void> {
   // Solo i campi effettivamente inviati: un aggiornamento parziale non deve cancellare
   // i recapiti che il modulo non ha toccato.
   const modifiche: Record<string, string | null> = {};

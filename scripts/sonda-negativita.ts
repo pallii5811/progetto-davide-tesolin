@@ -54,7 +54,9 @@ if (!avvio.ok) {
 
 const dati = corpoAvvio.data ?? {};
 const richiestaId = String(dati['id'] ?? '');
-console.log(`  pratica ${richiestaId} · stato iniziale: ${String(dati['status'] ?? dati['state'] ?? '?')}\n`);
+console.log(
+  `  pratica ${richiestaId} · stato iniziale: ${String(dati['status'] ?? dati['state'] ?? '?')}\n`,
+);
 
 if (richiestaId === '') {
   console.log('Nessun identificativo nella risposta:', JSON.stringify(corpoAvvio).slice(0, 300));

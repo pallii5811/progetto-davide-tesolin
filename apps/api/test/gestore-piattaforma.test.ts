@@ -18,7 +18,13 @@ import type { FastifyInstance } from 'fastify';
 import { creaStudio, creaUtente, registraCosto } from '@aegis/db';
 import { derivaPassword, NOME_COOKIE_SESSIONE } from '../src/auth.js';
 import type { Persistenza } from '../src/persistenza.js';
-import { accedi, creaUtenteDiProva, PASSWORD_DI_PROVA, persistenzaDiProva, serverDiProva } from './aiuti.js';
+import {
+  accedi,
+  creaUtenteDiProva,
+  PASSWORD_DI_PROVA,
+  persistenzaDiProva,
+  serverDiProva,
+} from './aiuti.js';
 
 const GESTORE = 'gestore@piattaforma.it';
 const CLIENTE = 'broker@studiocliente.it';
@@ -71,14 +77,17 @@ describe('Separazione fra gestore della piattaforma e studi clienti', () => {
     expect(corpo.studi.find((s) => s.denominazione === 'Studio cliente')?.gestore).toBe(false);
   });
 
-  it.each(RISERVATE)('uno studio cliente non raggiunge %s nemmeno conoscendo l’indirizzo', async (rotta) => {
-    const risposta = await app.inject({ method: 'GET', url: rotta, headers: { cookie: cookieCliente } });
+  it.each(RISERVATE)(
+    'uno studio cliente non raggiunge %s nemmeno conoscendo l’indirizzo',
+    async (rotta) => {
+      const risposta = await app.inject({ method: 'GET', url: rotta, headers: { cookie: cookieCliente } });
 
-    // 404 e non 403: un «riservato» confermerebbe che dietro quell'indirizzo c'è
-    // qualcosa, e a chi non ne ha titolo non si dà nemmeno quella notizia.
-    expect(risposta.statusCode).toBe(404);
-    expect(risposta.body).not.toContain('OpenAPI');
-  });
+      // 404 e non 403: un «riservato» confermerebbe che dietro quell'indirizzo c'è
+      // qualcosa, e a chi non ne ha titolo non si dà nemmeno quella notizia.
+      expect(risposta.statusCode).toBe(404);
+      expect(risposta.body).not.toContain('OpenAPI');
+    },
+  );
 
   it('un amministratore del proprio studio non diventa gestore della piattaforma', async () => {
     // Il cliente è amministratore **nel proprio studio**: il ruolo più alto che esista
@@ -186,7 +195,11 @@ describe('Sospensione di uno studio', () => {
     const cookieCliente = await accedi(app, CLIENTE);
 
     // Prima della sospensione lavora normalmente.
-    const prima = await app.inject({ method: 'GET', url: '/api/portafoglio', headers: { cookie: cookieCliente } });
+    const prima = await app.inject({
+      method: 'GET',
+      url: '/api/portafoglio',
+      headers: { cookie: cookieCliente },
+    });
     expect(prima.statusCode).toBe(200);
 
     await app.inject({
@@ -198,7 +211,11 @@ describe('Sospensione di uno studio', () => {
 
     // Verificare la sospensione al solo accesso lascerebbe lavorare per giorni chi è
     // già entrato: qui la sessione esistente deve smettere di valere subito.
-    const dopo = await app.inject({ method: 'GET', url: '/api/portafoglio', headers: { cookie: cookieCliente } });
+    const dopo = await app.inject({
+      method: 'GET',
+      url: '/api/portafoglio',
+      headers: { cookie: cookieCliente },
+    });
     expect(dopo.statusCode).toBe(401);
   }, 90_000);
 
@@ -243,7 +260,11 @@ describe('Sospensione di uno studio', () => {
   }, 90_000);
 
   it('il gestore non può sospendere sé stesso', async () => {
-    const studi = await app.inject({ method: 'GET', url: '/api/studi', headers: { cookie: cookieGestore } });
+    const studi = await app.inject({
+      method: 'GET',
+      url: '/api/studi',
+      headers: { cookie: cookieGestore },
+    });
     const corpo = studi.json();
     const proprio = corpo.studi.find((s) => s.gestore);
 

@@ -82,10 +82,7 @@ describe('L’ambiente della fonte dati è dichiarato e ha effetto', { timeout: 
     process.env['OPENAPI_AMBIENTE'] = 'test';
     const s = await salute();
     expect(s['ambiente']).toBe('test');
-    expect(
-      s['datiReali'],
-      'il sandbox restituisce anagrafiche inventate: non sono dati reali',
-    ).toBe(false);
+    expect(s['datiReali'], 'il sandbox restituisce anagrafiche inventate: non sono dati reali').toBe(false);
   });
 
   it('un valore incomprensibile vale produzione, non sandbox', async () => {

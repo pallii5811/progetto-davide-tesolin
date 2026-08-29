@@ -88,9 +88,7 @@ test.describe('Percorso completo dell’intermediario', () => {
     */
     const testo = (await page.locator('article').innerText()).toLowerCase();
     for (const frase of ['non risulta averlo adempiuto', 'da sanare']) {
-      expect(testo, `il report non deve affermare «${frase}» senza averlo verificato`).not.toContain(
-        frase,
-      );
+      expect(testo, `il report non deve affermare «${frase}» senza averlo verificato`).not.toContain(frase);
     }
 
     // ── 7. Il portafoglio l'ha registrata ─────────────────────────────────
@@ -121,9 +119,7 @@ test.describe('La navigazione dell’analisi', () => {
 
     const ancore = await page
       .locator('nav[aria-label="Sezioni dell’analisi"] a')
-      .evaluateAll((elementi) =>
-        elementi.map((e) => (e as HTMLAnchorElement).getAttribute('href') ?? ''),
-      );
+      .evaluateAll((elementi) => elementi.map((e) => (e as HTMLAnchorElement).getAttribute('href') ?? ''));
 
     expect(ancore.length, 'il menu delle sezioni deve esserci').toBeGreaterThan(3);
 
@@ -175,7 +171,10 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     // ── 4. Il portafoglio si esporta, e il file non accusa nessuno ────────
     await page.goto('/portafoglio');
     const scaricamento = page.waitForEvent('download');
-    await page.getByRole('link', { name: /Esporta/i }).first().click();
+    await page
+      .getByRole('link', { name: /Esporta/i })
+      .first()
+      .click();
     const file = await scaricamento;
     const flusso = await file.createReadStream();
     let csv = '';

@@ -105,10 +105,10 @@ export function ImmaginiUbicazione({
       <div>
         <h3 className="text-sm font-semibold">Fotografie delle ubicazioni</h3>
         <p className="mt-0.5 text-xs leading-relaxed text-testo-tenue">
-          Struttura, copertura, vicinanze, ordine del piazzale: quello che un assuntore
-          incendio chiede e che nessun questionario riesce a descrivere. Compaiono nel report,
-          accanto alla propria ubicazione. Massimo {MAX_PER_UBICAZIONE} per ubicazione,{' '}
-          {LIMITE_BYTE / (1024 * 1024)} MB ciascuna.
+          Struttura, copertura, vicinanze, ordine del piazzale: quello che un assuntore incendio chiede e
+          che nessun questionario riesce a descrivere. Compaiono nel report, accanto alla propria
+          ubicazione. Massimo {MAX_PER_UBICAZIONE} per ubicazione, {LIMITE_BYTE / (1024 * 1024)} MB
+          ciascuna.
         </p>
       </div>
 

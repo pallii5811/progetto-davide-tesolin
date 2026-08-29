@@ -52,10 +52,7 @@ describe('Nessuna tabella con tenant_id sfugge in silenzio', () => {
       if (schema.slice(m.index, fine).includes('tenantId')) conTenantId.push(m[2]!);
     }
 
-    expect(
-      conTenantId.length,
-      'lo schema deve avere tabelle multi-intermediario',
-    ).toBeGreaterThan(5);
+    expect(conTenantId.length, 'lo schema deve avere tabelle multi-intermediario').toBeGreaterThan(5);
 
     const scoperte = conTenantId.filter(
       (t) => !TABELLE_MULTI_TENANT.includes(t) && !(t in ESCLUSIONI_MOTIVATE),

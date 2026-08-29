@@ -13,11 +13,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { MemoryCostLedger } from '@aegis/providers';
-import {
-  RegistroPerRichiesta,
-  conCostiDellaRichiesta,
-  costoDegliEventi,
-} from '../src/costi-richiesta.js';
+import { RegistroPerRichiesta, conCostiDellaRichiesta, costoDegliEventi } from '../src/costi-richiesta.js';
 
 function evento(servizio: string, costoCentesimi: number, cacheHit = false) {
   return {

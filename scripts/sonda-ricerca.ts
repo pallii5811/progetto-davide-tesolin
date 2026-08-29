@@ -23,7 +23,10 @@ const PROVE: readonly (readonly [string, Record<string, string>])[] = [
   ['start, limite 10', { province: 'BS', atecoCode: '2562', dataEnrichment: 'start', limit: '10' }],
   ['start, limite 25', { province: 'BS', atecoCode: '2562', dataEnrichment: 'start', limit: '25' }],
   ['start, senza limite', { province: 'BS', atecoCode: '2562', dataEnrichment: 'start' }],
-  ['start, limite 10, altra prov.', { province: 'TV', minEmployees: '50', dataEnrichment: 'start', limit: '10' }],
+  [
+    'start, limite 10, altra prov.',
+    { province: 'TV', minEmployees: '50', dataEnrichment: 'start', limit: '10' },
+  ],
 ];
 
 for (const [nome, filtri] of PROVE) {

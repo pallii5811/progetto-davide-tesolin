@@ -18,10 +18,10 @@ export function MetricheDiImpatto({ dati }: { dati: MetricheDiImpattoDto }) {
     <>
       <p className="mb-4">
         Le soglie seguenti misurano a che punto un danno comincia a pesare e a che punto mette in
-        discussione la continuità. Servono a scegliere consapevolmente cosa trattenere e cosa
-        trasferire, in adempimento del dovere di diligenza degli amministratori (artt. 2392 e 2476
-        c.c.) e dell&apos;obbligo di assetti adeguati alla continuità aziendale (art. 2086 c.c., come
-        riformato dal Codice della crisi).
+        discussione la continuità. Servono a scegliere consapevolmente cosa trattenere e cosa trasferire, in
+        adempimento del dovere di diligenza degli amministratori (artt. 2392 e 2476 c.c.) e
+        dell&apos;obbligo di assetti adeguati alla continuità aziendale (art. 2086 c.c., come riformato dal
+        Codice della crisi).
       </p>
 
       <table className="print-keep mb-4 w-full border-collapse text-sm">
@@ -54,9 +54,7 @@ export function MetricheDiImpatto({ dati }: { dati: MetricheDiImpattoDto }) {
               </td>
               <td className="tabular py-2 text-right font-medium">{f.importo.formattato}</td>
               <td className="tabular py-2 text-right">
-                {f.giorniDiFermoEquivalenti === null
-                  ? '—'
-                  : `${f.giorniDiFermoEquivalenti} giorni`}
+                {f.giorniDiFermoEquivalenti === null ? '—' : `${f.giorniDiFermoEquivalenti} giorni`}
               </td>
             </tr>
           ))}
@@ -99,11 +97,10 @@ export function MetricheDiImpatto({ dati }: { dati: MetricheDiImpattoDto }) {
       </dl>
 
       <p className="text-xs leading-relaxed text-testo-tenue">
-        I giorni di fermo si ottengono dividendo l&apos;impatto per la perdita giornaliera da fermo
-        totale. Esprimono l&apos;intervallo entro cui l&apos;impresa può ragionevolmente sostenersi
-        dopo un&apos;interruzione produttiva: <strong>non tengono conto</strong> di effetti di medio
-        periodo come la perdita definitiva di clienti chiave o le conseguenze reputazionali, che li
-        accorciano.
+        I giorni di fermo si ottengono dividendo l&apos;impatto per la perdita giornaliera da fermo totale.
+        Esprimono l&apos;intervallo entro cui l&apos;impresa può ragionevolmente sostenersi dopo
+        un&apos;interruzione produttiva: <strong>non tengono conto</strong> di effetti di medio periodo come
+        la perdita definitiva di clienti chiave o le conseguenze reputazionali, che li accorciano.
       </p>
     </>
   );

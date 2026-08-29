@@ -30,17 +30,16 @@ export default async function PaginaCompagnie() {
     <div className="max-w-3xl">
       <h2 className="mb-1 text-lg font-semibold tracking-tight">Solidità delle compagnie</h2>
       <p className="mb-6 text-sm leading-relaxed text-testo-tenue">
-        Una polizza vale quanto vale chi la sottoscrive. I dati si leggono nella{' '}
-        <strong>SFCR</strong>, che ogni compagnia pubblica per obbligo di legge, e nelle
-        statistiche reclami IVASS.
+        Una polizza vale quanto vale chi la sottoscrive. I dati si leggono nella <strong>SFCR</strong>, che
+        ogni compagnia pubblica per obbligo di legge, e nelle statistiche reclami IVASS.
       </p>
 
       {esito.compagnie.length === 0 ? (
         <div className="mb-6">
           <Avviso tono="informativo" titolo="Nessuna compagnia censita">
-            Il motore di valutazione è pronto, ma senza dati non produce nulla — e non li
-            inventa. Inserire il solvency ratio della prima compagnia dalla sua SFCR:
-            bastano denominazione, anno e solvency ratio per avere un punteggio.
+            Il motore di valutazione è pronto, ma senza dati non produce nulla — e non li inventa. Inserire
+            il solvency ratio della prima compagnia dalla sua SFCR: bastano denominazione, anno e solvency
+            ratio per avere un punteggio.
           </Avviso>
         </div>
       ) : (

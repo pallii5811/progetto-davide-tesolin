@@ -57,8 +57,8 @@ export function ModuloStudio({ studio }: { studio: DatiStudio | null }) {
             className={CAMPO}
           />
           <p id="nota-rui" className="mt-1 text-xs text-testo-debole">
-            Compare in testa a ogni report: il Reg. IVASS 40/2018 chiede che i documenti
-            identifichino l&apos;intermediario che li ha redatti.
+            Compare in testa a ogni report: il Reg. IVASS 40/2018 chiede che i documenti identifichino
+            l&apos;intermediario che li ha redatti.
           </p>
         </div>
 

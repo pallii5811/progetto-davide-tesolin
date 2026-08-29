@@ -110,9 +110,7 @@ export function calcolaMetricheDiImpatto(
 
   const margineAnnuo = ce.margineDiContribuzione;
   const margineGiornaliero =
-    Money.toEuro(margineAnnuo) === 0
-      ? null
-      : Money.euro(Money.toEuro(margineAnnuo) / GIORNI_OPERATIVI);
+    Money.toEuro(margineAnnuo) === 0 ? null : Money.euro(Money.toEuro(margineAnnuo) / GIORNI_OPERATIVI);
 
   const giorni = (importo: Euro): number | null =>
     margineGiornaliero === null || Money.toEuro(margineGiornaliero) === 0

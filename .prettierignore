@@ -2,6 +2,11 @@
 # Riformattarli farebbe apparire modificato un file che descrive una migrazione già applicata.
 packages/db/migrazioni/
 
+# Lo scrive npm, non noi. Riformattarlo lo farebbe tornare com'era al primo
+# `npm install` di chiunque, e da quel momento il repository risulterebbe modificato
+# senza che nessuno abbia toccato niente — con la verifica del formato rossa in CI.
+package-lock.json
+
 dist/
 .next/
 .dati/

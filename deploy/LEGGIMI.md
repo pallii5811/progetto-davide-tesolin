@@ -157,14 +157,14 @@ journalctl -u aegis-api -n 50 --no-pager
 journalctl -u aegis-web -n 50 --no-pager
 ```
 
-| Sintomo | Causa quasi sempre |
-|---|---|
-| l'accesso rimanda alla schermata di ingresso senza errore | HTTPS non attivo, oppure si sta usando l'IP invece del dominio |
-| pagina bianca, 502 | `aegis-web` non è partito: guardare il suo journal |
-| «servizio di analisi non raggiungibile» | `aegis-api` non è partito, oppure `DATABASE_URL` è errata |
-| la compilazione si interrompe senza messaggio | memoria esaurita: `free -h` durante il tentativo lo conferma |
-| Caddy non parte, «permission denied» su `/var/log/caddy/aegis.log` | il file appartiene a root: `chown -R caddy:caddy /var/log/caddy` |
-| il certificato risulta emesso da «Avast» o simili | è l'antivirus del **proprio** computer che ispeziona le connessioni, non un problema del server. Verificare dal server: `curl -v https://dominio/` |
+| Sintomo                                                            | Causa quasi sempre                                                                                                                                 |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| l'accesso rimanda alla schermata di ingresso senza errore          | HTTPS non attivo, oppure si sta usando l'IP invece del dominio                                                                                     |
+| pagina bianca, 502                                                 | `aegis-web` non è partito: guardare il suo journal                                                                                                 |
+| «servizio di analisi non raggiungibile»                            | `aegis-api` non è partito, oppure `DATABASE_URL` è errata                                                                                          |
+| la compilazione si interrompe senza messaggio                      | memoria esaurita: `free -h` durante il tentativo lo conferma                                                                                       |
+| Caddy non parte, «permission denied» su `/var/log/caddy/aegis.log` | il file appartiene a root: `chown -R caddy:caddy /var/log/caddy`                                                                                   |
+| il certificato risulta emesso da «Avast» o simili                  | è l'antivirus del **proprio** computer che ispeziona le connessioni, non un problema del server. Verificare dal server: `curl -v https://dominio/` |
 
 ---
 

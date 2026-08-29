@@ -215,12 +215,10 @@ function creaContesto(db: Database, tenantId: string): ContestoTenant {
     immagini: {
       elenca: (id) => dentro((c) => c.immagini.elenca(id)),
       quante: (id, ubicazioneId) => dentro((c) => c.immagini.quante(id, ubicazioneId)),
-      aggiungi: (id, immagine, utenteId) =>
-        dentro((c) => c.immagini.aggiungi(id, immagine, utenteId)),
+      aggiungi: (id, immagine, utenteId) => dentro((c) => c.immagini.aggiungi(id, immagine, utenteId)),
       rimuovi: (id, immagineId) => dentro((c) => c.immagini.rimuovi(id, immagineId)),
     },
-    registraAnalisi: (id, analisi, provider) =>
-      dentro((c) => c.registraAnalisi(id, analisi, provider)),
+    registraAnalisi: (id, analisi, provider) => dentro((c) => c.registraAnalisi(id, analisi, provider)),
     registraCostiDati: (eventi) => dentro((c) => c.registraCostiDati(eventi)),
     riepilogoCosti: () => dentro((c) => c.riepilogoCosti()),
   };

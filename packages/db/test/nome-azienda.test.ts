@@ -15,7 +15,12 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { assicuraAzienda, assicuraTenantPredefinito, connetti, applicaSchemaTollerante } from '../src/index.js';
+import {
+  assicuraAzienda,
+  assicuraTenantPredefinito,
+  connetti,
+  applicaSchemaTollerante,
+} from '../src/index.js';
 import type { Connessione } from '../src/client.js';
 
 describe('La denominazione sopravvive alle operazioni che non la conoscono', () => {
