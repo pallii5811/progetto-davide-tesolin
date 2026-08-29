@@ -187,8 +187,24 @@ export function analizzaTitolareEffettivo(assetto: AssettoProprietario): Analisi
     ciò che la legge prevede — ma è anche l'esito che un'ispezione guarda con più
     attenzione, perché è quello che si produce anche quando semplicemente non si è
     cercato abbastanza. Scriverlo esplicitamente protegge chi ha fatto il lavoro.
+
+    Questo ramo era **irraggiungibile**. Leggeva `personeChiave`, che allora conteneva i
+    soli soci con quota ≥ 66%; ma qui ci si arriva solo quando nessuna persona fisica
+    supera il 25%, e 66 è maggiore di 25: l'elenco era per costruzione sempre vuoto, e la
+    funzione cadeva ogni volta su «non determinabile», consigliando una visura da 1,10 €
+    anche quando l'amministratore era già stato comprato con il profilo completo.
+
+    Il collaudo che avrebbe dovuto coprirlo costruiva a mano uno stato che il codice di
+    produzione non sapeva produrre — e il nome scelto nella sua fixture, «AMMINISTRATORE
+    UNICO», diceva l'intenzione: `personeChiave` doveva contenere gli amministratori.
+
+    Ora li contiene, e qui si filtra su chi ha davvero poteri di amministrazione: è
+    esattamente ciò che l'art. 20 c. 5 chiede. Un socio di maggioranza che non amministra
+    non è titolare effettivo per via residuale.
   */
-  const amministratori = assetto.personeChiave;
+  const amministratori = assetto.personeChiave.filter(
+    (p) => p.motivo === 'carica' || p.motivo === 'quota-e-carica',
+  );
   if (amministratori.length > 0) {
     return {
       titolari: amministratori.map((p) => ({

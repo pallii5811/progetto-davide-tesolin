@@ -99,6 +99,17 @@ export function valutaRitenzione(
 
   costruttore
     .formula('min(3% patrimonio netto, 10% EBITDA, 15% liquidità immediata) × propensione dichiarata')
+    /*
+      I centesimi restano, e non è una svista.
+
+      In prosa gli importi vanno senza centesimi — lo verifica il collaudo qui accanto —
+      ma queste sono le **voci di calcolo**: sono i tre vincoli fra cui si prende il
+      minimo, e chi apre «come è stato calcolato» lo fa per rifare il conto. Troncarli
+      renderebbe il confronto approssimato proprio dove serve esatto.
+
+      Il valore in testata è un'altra grandezza — la franchigia, arrotondata per difetto —
+      non lo stesso numero scritto in due modi.
+    */
     .input('3% del patrimonio netto', Money.format(patrimonio))
     .input('10% dell’EBITDA', Money.format(redditivita))
     .input('15% della liquidità immediata', Money.format(liquidita))
@@ -125,9 +136,17 @@ export function valutaRitenzione(
 
   return costruttore.value<CapacitaDiRitenzione | null>({
     perSinistro,
-    // Su base annua si ammette un multiplo, non la somma illimitata: più sinistri nello
-    // stesso esercizio si sommano, e la cassa è una sola.
-    annua: Money.multiply(perSinistro, 2.5),
+    /*
+      Su base annua si ammette un multiplo, non la somma illimitata: più sinistri nello
+      stesso esercizio si sommano, e la cassa è una sola.
+
+      Arrotondata come la franchigia. Prima non lo era, e le due cifre comparivano una
+      accanto all'altra nella stessa riga di metriche: «38.000 €» al migliaio e
+      «96.075 €» all'euro — con la seconda che è la stima **meno** certa delle due. Una
+      precisione maggiore sul numero più incerto è il modo più efficace di far credere il
+      contrario.
+    */
+    annua: Money.commercialRound(Money.multiply(perSinistro, 2.5)),
     franchigiaConsigliata: franchigia,
     vincoloAttivo,
     propensione,

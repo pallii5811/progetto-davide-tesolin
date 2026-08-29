@@ -15,7 +15,7 @@ import type { CompanyFacts } from '../company/facts.js';
 import type { CoverageId } from '../coverage/taxonomy.js';
 import { clampImpact, clampLikelihood, riskLevel, riskScore, suggestTreatment } from './assessment.js';
 import type { Impact, Likelihood, RiskLevel, RiskTreatment } from './assessment.js';
-import { RISK_RULES, RULES_VERSION } from './rules.js';
+import { RISK_RULES, RULES_VERSION, risolviRationale } from './rules.js';
 import type { RiskRule, Verdict } from './rules.js';
 import { RISK_CATALOG, RISK_CATALOG_VERSION } from './taxonomy.js';
 import type { RiskCategory, RiskDefinition, RiskId } from './taxonomy.js';
@@ -92,7 +92,7 @@ export function assessRisks(
     const verdict = safeEvaluate(rule, facts);
     if (verdict === false) continue;
 
-    const applied = toAppliedRule(rule, verdict);
+    const applied = toAppliedRule(rule, verdict, facts);
     const bucket =
       rule.kind === 'identifica' ? identificati : rule.kind === 'modula' ? modulazioni : controlli;
     const existing = bucket.get(rule.risk);
@@ -225,12 +225,16 @@ function safeEvaluate(rule: RiskRule, facts: CompanyFacts): Verdict {
   }
 }
 
-function toAppliedRule(rule: RiskRule, verdict: Verdict): AppliedRule {
+function toAppliedRule(rule: RiskRule, verdict: Verdict, facts: CompanyFacts): AppliedRule {
   const suDatoIgnoto = verdict === 'ignoto';
+  // Il motivo può dipendere dai numeri di questa impresa: si risolve qui, dove i fatti ci
+  // sono, invece di lasciare che una soglia si spacci per una misura.
+  const motivo = risolviRationale(rule.rationale, facts);
+
   if (rule.kind === 'identifica') {
     return {
       ruleId: rule.id,
-      rationale: suDatoIgnoto ? `${rule.rationale} (dato da confermare)` : rule.rationale,
+      rationale: suDatoIgnoto ? `${motivo} (dato da confermare)` : motivo,
       likelihoodDelta: 0,
       impactDelta: 0,
       suDatoIgnoto,
@@ -239,7 +243,7 @@ function toAppliedRule(rule: RiskRule, verdict: Verdict): AppliedRule {
   // Su dato ignoto la modulazione non si applica: si segnala soltanto la verifica da fare.
   return {
     ruleId: rule.id,
-    rationale: suDatoIgnoto ? `${rule.rationale} (da verificare)` : rule.rationale,
+    rationale: suDatoIgnoto ? `${motivo} (da verificare)` : motivo,
     likelihoodDelta: suDatoIgnoto ? 0 : (rule.likelihood ?? 0),
     impactDelta: suDatoIgnoto ? 0 : (rule.impact ?? 0),
     suDatoIgnoto,

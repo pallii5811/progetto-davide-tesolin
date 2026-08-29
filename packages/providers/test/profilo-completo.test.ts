@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { mappaProfiloCompleto } from '../src/openapi/mapper.js';
+import { mappaIndicatoriFornitore } from '../src/openapi/indicatori.js';
 
 const RISPOSTA_REALE = {
   managers: [
@@ -170,14 +171,36 @@ describe('Gruppo dal profilo completo', () => {
 
   it('dichiara l’appartenenza al gruppo e chi sta al vertice', () => {
     expect(profilo.gruppo?.appartieneAGruppo).toBe(true);
-    expect(profilo.gruppo?.denominazioneGruppo).toBe('SCURIATTI');
-    // Il vertice è una **persona fisica**, non una società: per la D&O e per la key man
-    // è la differenza fra assicurare una struttura e assicurare un uomo solo.
-    expect(profilo.gruppo?.capogruppo).toBe('LUCA SCURIATTI');
+    expect(profilo.gruppo?.denominazione).toBe('SCURIATTI');
+    /*
+      Il vertice è una **persona fisica**, non una società: per la D&O e per la key man è
+      la differenza fra assicurare una struttura e assicurare un uomo solo.
+
+      Si chiama `verticeDichiarato` e non `capogruppo` proprio per questo: l'altro
+      `capogruppo`, quello dell'assetto proprietario, è la società socia di controllo e
+      porta una partita IVA che l'interfaccia trasforma in un collegamento. Un link verso
+      «LUCA SCURIATTI» produrrebbe una ricerca a vuoto, per giunta a pagamento.
+    */
+    expect(profilo.gruppo?.verticeDichiarato).toBe('LUCA SCURIATTI');
   });
 
-  it('riporta se il controllo viene dall’estero', () => {
-    expect(profilo.gruppo?.controllantiEstere).toBe(false);
+  it('non trasforma un gruppo non dichiarato in un gruppo assente', () => {
+    /*
+      Il campo era scritto con `?? false`: un registro che tace diventava un «no».
+
+      Non era innocuo, perché la stessa risposta espone lo stesso fatto anche fra gli
+      indicatori, dove il tipo è corretto: la scheda avrebbe mostrato un «no» inventato
+      accanto a un «non dichiarato» vero.
+    */
+    const senzaFlag = mappaProfiloCompleto({ corporateGroups: { groupName: 'ALFA' } });
+    expect(senzaFlag.gruppo?.appartieneAGruppo).toBeNull();
+    expect(senzaFlag.gruppo?.denominazione).toBe('ALFA');
+  });
+
+  it('il controllo dall’estero si legge negli indicatori, dove il tipo è giusto', () => {
+    // Era un doppione: lo stesso nodo `corporateGroups` letto due volte, una con il tipo
+    // corretto e una con `?? false`. È rimasta la copia buona, che è già a schermo.
+    expect(mappaIndicatoriFornitore(RISPOSTA_REALE).qualifiche?.haControllantiEstere).toBe(false);
   });
 });
 

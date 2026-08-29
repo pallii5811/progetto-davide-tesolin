@@ -96,7 +96,119 @@ describe('Persona chiave', () => {
 
     expect(analisi.tipoControllo).toBe('socio-unico-persona-fisica');
     expect(analisi.personeChiave).toHaveLength(1);
-    expect(analisi.implicazioni.some((i) => i.titolo === 'Persona chiave')).toBe(true);
+    expect(analisi.personeChiave[0]?.motivo).toBe('quota');
+    // Il titolo porta il nome: le persone chiave possono essere più d'una, e
+    // un'implicazione per ciascuna è più utile di una che le elenca insieme.
+    expect(analisi.implicazioni.some((i) => i.titolo.startsWith('Persona chiave'))).toBe(true);
+  });
+
+  /*
+    I casi che il prodotto non vedeva.
+
+    `personeChiave` guardava solo la compagine: un amministratore non socio — cioè la
+    forma più comune di impresa che ha separato proprietà e gestione — non compariva da
+    nessuna parte, benché le cariche fossero state comprate con il profilo completo.
+  */
+  const carica = (over: Partial<Assetti['cariche'][number]> = {}): Assetti['cariche'][number] => ({
+    nominativo: 'BIANCHI LUCA',
+    codiceFiscale: 'BNCLCU70A01F205X',
+    ruolo: 'Amministratore unico',
+    dataNomina: null,
+    isRappresentanteLegale: true,
+    eta: 54,
+    dataNascita: null,
+    luogoNascita: null,
+    ...over,
+  });
+
+  it('riconosce come chiave l’amministratore che non è socio', () => {
+    const analisi = analizzaAssetto(
+      assetti(
+        [
+          { denominazione: 'A', tipo: 'persona-fisica', quotaPercentuale: 40 },
+          { denominazione: 'B', tipo: 'persona-fisica', quotaPercentuale: 60 },
+        ],
+        [carica()],
+      ),
+      PMI,
+    );
+
+    expect(analisi.personeChiave).toHaveLength(1);
+    expect(analisi.personeChiave[0]?.motivo).toBe('carica');
+    expect(analisi.personeChiave[0]?.quotaPercentuale).toBeNull();
+    expect(analisi.personeChiave[0]?.eta).toBe(54);
+
+    // E la frase non gli attribuisce un capitale che non ha.
+    const implicazione = analisi.implicazioni.find((i) => i.titolo.startsWith('Persona chiave'));
+    expect(implicazione?.conseguenza).not.toContain('capitale');
+    expect(implicazione?.conseguenza).toContain('rappresentanza legale');
+  });
+
+  it('chi è socio totalitario e amministratore compare una volta sola', () => {
+    const analisi = analizzaAssetto(
+      assetti(
+        [
+          {
+            denominazione: 'MARIO ROSSI',
+            codiceFiscale: 'RSSMRA70A01F205X',
+            tipo: 'persona-fisica',
+            quotaPercentuale: 100,
+          },
+        ],
+        [carica({ nominativo: 'MARIO ROSSI', codiceFiscale: 'RSSMRA70A01F205X' })],
+      ),
+      PMI,
+    );
+
+    expect(analisi.personeChiave).toHaveLength(1);
+    expect(analisi.personeChiave[0]?.motivo).toBe('quota-e-carica');
+  });
+
+  it('lo riconosce anche quando il nome è scritto nei due ordini', () => {
+    // Il registro non è coerente: «ROSSI MARIO» fra i soci e «Mario Rossi» fra le
+    // cariche sono la stessa persona, e senza codice fiscale su entrambi i lati
+    // l'unico appiglio è il nome.
+    const analisi = analizzaAssetto(
+      assetti(
+        [{ denominazione: 'ROSSI MARIO', tipo: 'persona-fisica', quotaPercentuale: 100 }],
+        [carica({ nominativo: 'Mario Rossi', codiceFiscale: null })],
+      ),
+      PMI,
+    );
+
+    expect(analisi.personeChiave).toHaveLength(1);
+    expect(analisi.personeChiave[0]?.motivo).toBe('quota-e-carica');
+  });
+
+  it('due omonimi con codici fiscali diversi restano due persone', () => {
+    const analisi = analizzaAssetto(
+      assetti(
+        [
+          {
+            denominazione: 'MARIO ROSSI',
+            codiceFiscale: 'RSSMRA70A01F205X',
+            tipo: 'persona-fisica',
+            quotaPercentuale: 100,
+          },
+        ],
+        [carica({ nominativo: 'MARIO ROSSI', codiceFiscale: 'RSSMRA90A01F205Y' })],
+      ),
+      PMI,
+    );
+
+    expect(analisi.personeChiave).toHaveLength(2);
+  });
+
+  it('un sindaco non diventa persona chiave: risponde, ma non ferma l’impresa', () => {
+    const analisi = analizzaAssetto(
+      assetti(
+        [{ denominazione: 'A', tipo: 'persona-fisica', quotaPercentuale: 60 }],
+        [carica({ nominativo: 'VERDI ANNA', ruolo: 'Sindaco', isRappresentanteLegale: false })],
+      ),
+      PMI,
+    );
+
+    expect(analisi.personeChiave).toHaveLength(0);
   });
 
   it('non segnala come chiave un socio di minoranza', () => {
@@ -187,15 +299,18 @@ describe('Ciò che il fornitore non dice', () => {
 
   it('con le cariche note non fa la domanda inutile', () => {
     const conCariche = analizzaAssetto(
-      assetti([{ denominazione: 'MARIO ROSSI', tipo: 'persona-fisica', quotaPercentuale: 100 }], [
-        {
-          nominativo: 'MARIO ROSSI',
-          codiceFiscale: null,
-          ruolo: 'Amministratore unico',
-          dataNomina: null,
-          isRappresentanteLegale: true,
-        },
-      ]),
+      assetti(
+        [{ denominazione: 'MARIO ROSSI', tipo: 'persona-fisica', quotaPercentuale: 100 }],
+        [
+          {
+            nominativo: 'MARIO ROSSI',
+            codiceFiscale: null,
+            ruolo: 'Amministratore unico',
+            dataNomina: null,
+            isRappresentanteLegale: true,
+          },
+        ],
+      ),
       PMI,
     );
 
@@ -220,7 +335,12 @@ describe('Compagine parziale: ciò che il dato non consente di affermare', () =>
   it('non promuove a controllante una società con quota dichiarata di minoranza', () => {
     const analisi = analizzaAssetto(
       assetti([
-        { denominazione: 'SOCIA S.R.L.', tipo: 'persona-giuridica', quotaPercentuale: 30, codiceFiscale: '12345678903' },
+        {
+          denominazione: 'SOCIA S.R.L.',
+          tipo: 'persona-giuridica',
+          quotaPercentuale: 30,
+          codiceFiscale: '12345678903',
+        },
       ]),
       PMI,
     );

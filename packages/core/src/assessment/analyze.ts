@@ -380,9 +380,11 @@ export function analyzeCompany(
   // ── 6. Gap analysis ───────────────────────────────────────────────────────
   const gap = analyzeGaps({
     assessment: rischi,
+    facts,
     sums: sommeAssicurande,
     polizze,
     catNat: catNat.value,
+    dannoMassimo: dannoMassimo.value,
     asOf,
   });
 

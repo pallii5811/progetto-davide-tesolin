@@ -12,8 +12,24 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { analizzaAssetto } from '../src/governance/assetto.js';
 import { analizzaTitolareEffettivo, SOGLIA_PARTECIPAZIONE } from '../src/governance/titolare-effettivo.js';
-import type { AssettoProprietario, SocioDiRilievo } from '../src/governance/assetto.js';
+import type { AssettoProprietario, PersonaChiave, SocioDiRilievo } from '../src/governance/assetto.js';
+import type { Assetti } from '../src/company/profile.js';
+
+/** Una persona chiave in virtù della sola carica: lo stato che il ramo residuale cerca. */
+function amministratore(p: Partial<PersonaChiave> = {}): PersonaChiave {
+  return {
+    denominazione: 'AMMINISTRATORE UNICO',
+    codiceFiscale: 'MNSNCO70A01H501X',
+    quotaPercentuale: null,
+    ruolo: 'Amministratore unico',
+    rappresentanteLegale: true,
+    eta: null,
+    motivo: 'carica',
+    ...p,
+  };
+}
 
 function socio(p: Partial<SocioDiRilievo> = {}): SocioDiRilievo {
   return {
@@ -37,6 +53,7 @@ function assetto(p: Partial<AssettoProprietario> = {}): AssettoProprietario {
     soggettaADirezioneECoordinamento: false,
     personeChiave: [],
     caricheDisponibili: true,
+    cariche: [],
     implicazioni: [],
     domande: [],
     confidenza: 'alta',
@@ -67,7 +84,7 @@ describe('Titolare effettivo', () => {
         socio({ denominazione: 'D', quotaPercentuale: 20 }),
         socio({ denominazione: 'E', quotaPercentuale: 20 }),
       ],
-      personeChiave: [socio({ denominazione: 'AMMINISTRATORE UNICO', quotaPercentuale: null })],
+      personeChiave: [amministratore()],
     });
 
     const esito = analizzaTitolareEffettivo(frammentata);
@@ -81,6 +98,81 @@ describe('Titolare effettivo', () => {
     expect(esito.titolari[0]?.criterio).toBe('residuale-amministratore');
     expect(esito.confidenza).toBe('bassa');
     expect(esito.azione).toContain('giustificata');
+  });
+
+  /*
+    La prova che quel ramo esiste davvero.
+
+    Quella qui sopra costruisce a mano un `AssettoProprietario`, ed è il motivo per cui il
+    difetto è sopravvissuto: descriveva uno stato che il codice di produzione non sapeva
+    produrre. `personeChiave` conteneva i soli soci con quota ≥ 66%, e a questo punto si
+    arriva solo se nessuno supera il 25% — l'elenco era sempre vuoto e il criterio
+    residuale non si accendeva mai, nemmeno con l'amministratore già comprato.
+
+    Questa parte dal dato grezzo e passa da `analizzaAssetto`: se il ramo tornasse
+    irraggiungibile, fallirebbe.
+  */
+  it('e il criterio residuale si raggiunge dai dati, non da uno stato inventato', () => {
+    const quotaVenti = ['A', 'B', 'C', 'D', 'E'].map((n) => ({
+      denominazione: n,
+      codiceFiscale: null,
+      tipo: 'persona-fisica' as const,
+      quotaPercentuale: 20,
+      quotaValore: null,
+      socioDal: null,
+    }));
+
+    const grezzo: Assetti = {
+      soci: quotaVenti,
+      cariche: [
+        {
+          nominativo: 'BIANCHI LUCA',
+          codiceFiscale: 'BNCLCU70A01F205X',
+          ruolo: 'Amministratore unico',
+          dataNomina: null,
+          isRappresentanteLegale: true,
+          eta: 61,
+          dataNascita: null,
+          luogoNascita: null,
+        },
+      ],
+      controllante: null,
+      controllate: [],
+    };
+
+    const esito = analizzaTitolareEffettivo(
+      analizzaAssetto(grezzo, { formaGiuridica: 'srl', addetti: 20 }),
+    );
+
+    expect(esito.titolari[0]?.criterio).toBe('residuale-amministratore');
+    expect(esito.titolari[0]?.nominativo).toBe('BIANCHI LUCA');
+    // Resta a confidenza bassa: la norma lo prevede, ma è l'esito più contestabile.
+    expect(esito.confidenza).toBe('bassa');
+  });
+
+  it('senza cariche acquisite resta «non determinabile», e la visura serve davvero', () => {
+    // La correzione non deve trasformare un'assenza in una risposta: se gli
+    // amministratori non sono stati comprati, il prodotto non se li inventa.
+    const senzaCariche: Assetti = {
+      soci: ['A', 'B', 'C', 'D', 'E'].map((n) => ({
+        denominazione: n,
+        codiceFiscale: null,
+        tipo: 'persona-fisica' as const,
+        quotaPercentuale: 20,
+        quotaValore: null,
+        socioDal: null,
+      })),
+      cariche: [],
+      controllante: null,
+      controllate: [],
+    };
+
+    const esito = analizzaTitolareEffettivo(
+      analizzaAssetto(senzaCariche, { formaGiuridica: 'srl', addetti: 20 }),
+    );
+
+    expect(esito.titolari).toHaveLength(0);
+    expect(esito.azione).toContain('non determinabile');
   });
 
   it('quando il socio è una società, la catena non si chiude', () => {

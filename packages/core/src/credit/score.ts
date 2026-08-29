@@ -202,7 +202,10 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     .note(`Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`)
     .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
     .input('Data di valutazione', formatDate(asOf))
-    .input('Esercizio di riferimento', bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno))
+    .input(
+      'Esercizio di riferimento',
+      bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno),
+    )
     .confidence(confidenza)
     .value({
       value: finale,
@@ -638,7 +641,20 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
     };
   }
 
-  if (details.length === 0) {
+  /*
+    La frase dice cosa è stato trovato, non quanti punti restano.
+
+    Era decisa dal punteggio: sopra 95 scriveva «nessun evento pregiudizievole a carico
+    della società». Ma un protesto levato di dodicimila euro del 2021 pesa tre punti —
+    è vecchio ed è stato pagato — e lascia il punteggio a 97: la riga diceva «nessun
+    evento» mentre l'elenco sotto, a due centimetri, ne stampava uno con data e importo.
+
+    Un lettore che trova due affermazioni opposte nella stessa scheda non sceglie quella
+    giusta: smette di fidarsi di entrambe. Qui si guarda se qualcosa è stato davvero
+    trovato, e solo allora si parla di gravità.
+  */
+  const qualcosaTrovato = details.length > 0;
+  if (!qualcosaTrovato) {
     details.push('Nessun protesto, pregiudizievole o procedura concorsuale rilevata.');
   }
 
@@ -648,9 +664,10 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
     label: 'Eventi negativi',
     weight: PESI.eventiNegativi,
     score,
-    rationale:
-      score >= 95
-        ? 'Nessun evento pregiudizievole a carico della società.'
+    rationale: !qualcosaTrovato
+      ? 'Nessun protesto, pregiudizievole o procedura concorsuale a carico della società.'
+      : score >= 95
+        ? 'Eventi negativi presenti ma di peso trascurabile: risalenti nel tempo, di importo modesto o già estinti. Restano da citare in sede di quotazione.'
         : score >= 60
           ? 'Presenza di eventi negativi di entità contenuta o risalenti nel tempo.'
           : 'Eventi negativi rilevanti e recenti: forte segnale di deterioramento del merito creditizio.',
@@ -696,7 +713,10 @@ function fattoreAnzianita(profile: CompanyProfile, asOf: Date): ScoreFactor {
         : anni < 3
           ? `Impresa giovane (${anni} anni): storico insufficiente a consolidare il giudizio.`
           : `Impresa attiva da ${anni} anni, con ${bilanciDepositati} esercizi disponibili.`,
-    details: [`Anni di attività: ${anni ?? 'da rilevare in intervista'}`, `Bilanci disponibili: ${bilanciDepositati}`],
+    details: [
+      `Anni di attività: ${anni ?? 'da rilevare in intervista'}`,
+      `Bilanci disponibili: ${bilanciDepositati}`,
+    ],
   };
 }
 

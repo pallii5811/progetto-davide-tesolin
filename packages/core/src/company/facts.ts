@@ -14,6 +14,7 @@ import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import type { AtecoCode } from '../shared/identifiers.js';
 import { atecoDivision, atecoSection } from '../shared/identifiers.js';
+import { QUOTA_SERVIZI_VARIABILE_DEFAULT } from './financials.js';
 import type { BilancioRiclassificato } from './financials.js';
 import type { CompanyProfile, FormaGiuridica, Socio, StatoAttivita } from './profile.js';
 import { FORME_A_RESPONSABILITA_ILLIMITATA, anniDiAttivita, haProceduraAperta } from './profile.js';
@@ -76,11 +77,23 @@ export interface CompanyFacts {
   readonly concentrazionePrimoCliente: number | null;
 
   // Governance
-  readonly numeroAmministratori: number;
+  /**
+   * Quanti amministratori risultano in carica.
+   *
+   * `null` — e non zero — quando l'assetto societario non è stato acquisito. Le cariche
+   * arrivano solo con il profilo completo: sotto quel livello `cariche` è un array vuoto
+   * perché nessuno le ha chieste, non perché la società non abbia amministratori.
+   *
+   * La differenza si leggeva in un documento di adeguatezza: il ragionamento sul
+   * massimale D&O stampava «Amministratori in carica: 0» su ogni analisi non
+   * approfondita. Zero amministratori è un'affermazione impossibile su una società
+   * attiva, ed era un buco travestito da misura.
+   */
+  readonly numeroAmministratori: number | null;
   readonly numeroSoci: number;
   readonly haSociPersonaGiuridica: boolean;
   /**
-   * Appartenenza a un gruppo.
+   * Appartenenza a un gruppo, in qualunque posizione.
    *
    * Non basta guardare `controllante` e `controllate`: l'anagrafica camerale non
    * dichiara quasi mai una capogruppo in modo esplicito, ma **elenca i soci**. Una
@@ -88,8 +101,29 @@ export interface CompanyFacts {
    * campo dedicato o no — ed è il presupposto della responsabilità da direzione e
    * coordinamento. Dedurlo dal solo campo esplicito lasciava fuori praticamente
    * tutte le controllate reali.
+   *
+   * **Non usarlo per attribuire la responsabilità ex art. 2497 c.c.**: quella grava su
+   * chi la direzione la esercita, non su chi la subisce. Per quello ci sono i due fatti
+   * qui sotto.
    */
   readonly appartieneAGruppo: boolean;
+  /**
+   * L'impresa **esercita** direzione e coordinamento: ha società controllate.
+   *
+   * È il presupposto soggettivo dell'art. 2497 c.c., che pone la responsabilità in capo
+   * a chi dirige verso i soci e i creditori delle dirette. Tenerlo distinto dal fatto
+   * speculare non è pignoleria: fusi in un unico booleano, il prodotto diceva alla
+   * controllata — cioè alla parte che la norma protegge — di esserne responsabile.
+   */
+  readonly esercitaDirezioneECoordinamento: boolean;
+  /**
+   * L'impresa **subisce** direzione e coordinamento: qualcuno la controlla.
+   *
+   * Qui gli amministratori rispondono solo se hanno preso parte al fatto lesivo
+   * (art. 2497, comma 2, c.c.), e il tema assicurativo è l'estensione della D&O di
+   * gruppo, non una responsabilità propria.
+   */
+  readonly soggettaADirezioneECoordinamento: boolean;
   /** Quota del socio di controllo, se dichiarata. */
   readonly quotaSocioDiControllo: number | null;
 }
@@ -132,6 +166,52 @@ export function deriveFacts(
 
   const veicoliDaBilancio = null; // il bilancio non isola i veicoli: resta un dato dichiarato
 
+  /*
+    Le due posizioni nel gruppo, tenute separate.
+
+    Chi ha controllate esercita la direzione; chi ha una controllante — o un socio
+    societario di controllo, che nell'anagrafica camerale è il modo in cui il gruppo si
+    manifesta quasi sempre — la subisce. Una società può essere entrambe le cose: è la
+    holding intermedia, e allora rispondono entrambi i fatti.
+  */
+  /*
+    Il margine di contribuzione dai costi variabili dichiarati.
+
+    Ricavi meno materie prime meno la quota variabile dei servizi — la stessa formula che
+    la riclassificazione applica al bilancio CEE, con la stessa quota. Si calcola solo se
+    **entrambe** le voci di costo sono state rilevate: con una sola, il margine uscirebbe
+    gonfiato, e un capitale di business interruption gonfiato è un premio che il cliente
+    paga per niente.
+  */
+  const dic = dichiarati.bilancio;
+  const margineDichiarato =
+    fatturato !== null && dic.costiMateriePrime !== null && dic.costiServizi !== null
+      ? Money.max(
+          Money.ZERO,
+          Money.subtract(
+            fatturato,
+            Money.add(
+              dic.costiMateriePrime,
+              Money.multiply(dic.costiServizi, QUOTA_SERVIZI_VARIABILE_DEFAULT),
+            ),
+          ),
+        )
+      : null;
+
+  /*
+    Impianti e attrezzature arrivano come voce unica dall'intervista.
+
+    Il bilancio CEE le tiene separate (B-II-2 e B-II-3) e il motore le somma comunque:
+    qui la somma è già fatta da chi ha letto il documento, e si attribuisce alla voce
+    impianti lasciando `null` le attrezzature — che è la lettura onesta, perché nessuno
+    ha dichiarato quanto valga ciascuna delle due.
+  */
+  const impiantiDichiarati = dic.impiantiAlCostoStorico === true ? null : dic.impiantiEAttrezzature;
+
+  const esercitaDirezione = (assetti?.controllate.length ?? 0) > 0;
+  const soggettaADirezione =
+    (assetti?.controllante ?? null) !== null || controlloSocietario(assetti?.soci ?? []) !== null;
+
   return {
     denominazione: profile.identity.denominazione,
     formaGiuridica: a.formaGiuridica,
@@ -151,15 +231,33 @@ export function deriveFacts(
     totaleAttivo,
     patrimonioNetto: bilancio?.sp.patrimonioNetto ?? sintetico?.patrimonioNetto ?? null,
     ebitda: bilancio?.ce.ebitda ?? null,
-    margineDiContribuzione: bilancio?.ce.margineDiContribuzione ?? null,
+    margineDiContribuzione: bilancio?.ce.margineDiContribuzione ?? margineDichiarato,
     costoDelPersonale: bilancio?.ce.costoDelPersonale ?? sintetico?.costoDelPersonale ?? null,
-    creditiVersoClienti: bilancio?.origine.attivo.creditiVersoClienti ?? null,
-    rimanenze: bilancio?.sp.rimanenze ?? null,
+    /*
+      Il registro prima, il dichiarato dopo, l'assenza in fondo.
+
+      Queste cinque voci arrivano dallo schema CEE dettagliato, che è un servizio a parte
+      e in produzione non si compra quasi mai: senza, contenuto, scorte, danni indiretti e
+      fido clienti restano tutti «non determinabile» — su ogni impresa reale, mentre il
+      documento dimostrativo li mostra tutti.
+
+      Ma quelle voci stanno nel bilancio depositato che l'imprenditore porta
+      all'appuntamento: si leggono dal suo documento e si rilevano in intervista, senza
+      comprare nulla. Il dichiarato è un **ripiego**, mai un sostituto: se il bilancio
+      dettagliato c'è, vince lui.
+    */
+    creditiVersoClienti:
+      bilancio?.origine.attivo.creditiVersoClienti ?? dichiarati.bilancio.creditiVersoClienti,
+    rimanenze: bilancio?.sp.rimanenze ?? dichiarati.bilancio.rimanenze,
 
     valoreImmobiliNetto: bilancio?.origine.attivo.terreniEFabbricati ?? null,
-    valoreImpiantiNetto: bilancio?.origine.attivo.impiantiEMacchinario ?? null,
+    valoreImpiantiNetto: bilancio?.origine.attivo.impiantiEMacchinario ?? impiantiDichiarati,
     valoreAttrezzatureNetto: bilancio?.origine.attivo.attrezzature ?? null,
-    costoStoricoImmobilizzazioni: bilancio?.origine.attivo.costoStoricoImmobilizzazioniMateriali ?? null,
+    costoStoricoImmobilizzazioni:
+      bilancio?.origine.attivo.costoStoricoImmobilizzazioniMateriali ??
+      (dichiarati.bilancio.impiantiAlCostoStorico === true
+        ? dichiarati.bilancio.impiantiEAttrezzature
+        : null),
     superficieTotaleMq,
     possiedeImmobili,
     numeroUnitaLocali: unitaLocali === null ? null : unitaLocali.length,
@@ -181,13 +279,12 @@ export function deriveFacts(
     trasportaMerciProprie: dichiarati.trasportaMerciProprie,
     concentrazionePrimoCliente: dichiarati.concentrazionePrimoCliente,
 
-    numeroAmministratori: assetti?.cariche.length ?? 0,
+    numeroAmministratori: assetti === null ? null : assetti.cariche.length,
     numeroSoci: assetti?.soci.length ?? 0,
     haSociPersonaGiuridica: assetti?.soci.some((s) => s.tipo === 'persona-giuridica') ?? false,
-    appartieneAGruppo:
-      (assetti?.controllante ?? null) !== null ||
-      (assetti?.controllate.length ?? 0) > 0 ||
-      controlloSocietario(assetti?.soci ?? []) !== null,
+    appartieneAGruppo: esercitaDirezione || soggettaADirezione,
+    esercitaDirezioneECoordinamento: esercitaDirezione,
+    soggettaADirezioneECoordinamento: soggettaADirezione,
     quotaSocioDiControllo: quotaDiControllo(assetti?.soci ?? []),
   };
 }
@@ -232,19 +329,26 @@ function derivePossiedeImmobili(
  *
  * Due criteri, entrambi necessari perché il dato reale è irregolare:
  *
- *  - una società con quota dichiarata pari o superiore alla maggioranza (controllo di
- *    diritto, art. 2359 c.c.);
+ *  - una società la cui quota dichiarata supera la maggioranza (controllo di diritto,
+ *    art. 2359, comma 1, n. 1 c.c.);
  *  - **oppure** l'unico socio, quando è una società: la percentuale può mancare, ma un
  *    socio solo possiede per definizione l'intero capitale.
  *
  * Il secondo criterio non è un dettaglio: nelle risposte reali la quota è spesso assente
  * proprio nelle società interamente controllate, cioè nei casi che contano di più.
+ *
+ * **Il confronto è a esclusione**, come in `governance/assetto.ts`. L'art. 2359 chiede la
+ * *maggioranza* dei voti esercitabili in assemblea ordinaria, e metà esatta non è la
+ * maggioranza: in una joint venture 50/50 nessuno dei due controlla. Qui c'era `>= 50`
+ * mentre il modulo di governance aveva già `> 50`: due letture della stessa norma nello
+ * stesso prodotto, e quella sbagliata faceva nascere un gruppo dove non c'era — con
+ * appresso l'affermazione sulla responsabilità da direzione e coordinamento.
  */
 function controlloSocietario(soci: readonly Socio[]): Socio | null {
   const societari = soci.filter((s) => s.tipo === 'persona-giuridica');
   if (societari.length === 0) return null;
 
-  const maggioritario = societari.find((s) => quotaInPercentuale(s.quotaPercentuale, soci) >= 50);
+  const maggioritario = societari.find((s) => quotaInPercentuale(s.quotaPercentuale, soci) > 50);
   if (maggioritario !== undefined) return maggioritario;
 
   return soci.length === 1 ? (societari[0] ?? null) : null;

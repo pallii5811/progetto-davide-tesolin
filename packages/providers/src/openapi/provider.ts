@@ -399,6 +399,8 @@ export class OpenApiProvider implements CompanyDataProvider {
         bilanciSintetici: [],
         eventiNegativi: null,
         unitaLocali: null,
+        // Il perimetro di gruppo lo porta solo il profilo completo.
+        gruppo: null,
         // L'anagrafica minima non porta indici: dichiararlo, non riempire di zeri.
         indicatoriFornitore: INDICATORI_FORNITORE_VUOTI,
         datiDichiarati: DATI_DICHIARATI_VUOTI,
@@ -417,6 +419,7 @@ export class OpenApiProvider implements CompanyDataProvider {
         bilanciSintetici,
         eventiNegativi: null,
         unitaLocali: null,
+        gruppo: null,
         // L'anagrafica estesa porta le qualifiche che sa (gruppo IVA); gli indici
         // economico-finanziari arrivano solo con il profilo completo.
         indicatoriFornitore: mappaIndicatoriFornitore(rawAnagrafica),
@@ -459,6 +462,22 @@ export class OpenApiProvider implements CompanyDataProvider {
         profilo === null || profilo.unitaLocali.length === 0
           ? null
           : fromProvider(profilo.unitaLocali, this.name, 'IT-full', REGISTRO_IMPRESE, osservatoIl),
+      /*
+        Il punto esatto in cui il gruppo veniva buttato via.
+
+        `profilo.cariche` e `profilo.unitaLocali` venivano letti, `profilo.gruppo` no —
+        e non perché qualcuno l'avesse deciso: il modello canonico non aveva un campo
+        dove metterlo, quindi la riga non si poteva scrivere e nessuno se n'è accorto.
+        Il collaudo del mappatore continuava a passare, perché verificava l'estrazione e
+        non l'arrivo.
+
+        Non si fonde dentro `assettiCompleti`: quello spread conserva la provenienza
+        dell'anagrafica estesa, e il gruppo verrebbe attribuito al servizio sbagliato.
+      */
+      gruppo:
+        profilo?.gruppo == null
+          ? null
+          : fromProvider(profilo.gruppo, this.name, 'IT-full', REGISTRO_IMPRESE, osservatoIl),
       /*
         Gli indici del profilo completo hanno la precedenza: sono quarantotto contro le
         poche qualifiche che l'anagrafica estesa porta con sé. Quando l'approfondimento

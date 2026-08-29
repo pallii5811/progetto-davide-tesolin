@@ -24,6 +24,7 @@ import type {
   Carica,
   EventiNegativi,
   FormaGiuridica,
+  GruppoSocietario,
   Indirizzo,
   Pregiudizievole,
   Protesto,
@@ -103,10 +104,7 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
     Si compone quindi dai pezzi, che il fornitore restituisce separati, e si ricade sul
     campo già composto solo quando i pezzi mancano.
   */
-  const daPezzi = componiVia(
-    str(source, 'toponym', 'toponimo'),
-    str(source, 'street', 'via', 'indirizzo'),
-  );
+  const daPezzi = componiVia(str(source, 'toponym', 'toponimo'), str(source, 'street', 'via', 'indirizzo'));
 
   /*
     Il profilo completo restituisce la via in un pezzo solo, con il civico dopo la virgola:
@@ -638,14 +636,15 @@ export interface ProfiloCompleto {
   /** Indici, gare, qualifiche: già calcolati dall'archivio e compresi nel prezzo. */
   readonly indicatori: IndicatoriFornitore;
   readonly unitaLocali: readonly UnitaLocale[];
-  readonly gruppo: {
-    readonly appartieneAGruppo: boolean;
-    readonly denominazioneGruppo: string | null;
-    /** Chi sta al vertice: può essere una persona fisica, e per la D&O è ciò che conta. */
-    readonly capogruppo: string | null;
-    readonly controllateTotali: number | null;
-    readonly controllantiEstere: boolean;
-  } | null;
+  /**
+   * Il perimetro di gruppo.
+   *
+   * `controllantiEstere` non compare qui, ed è deliberato: lo stesso nodo della stessa
+   * risposta è già letto da `mappaIndicatoriFornitore` come `haControllantiEstere`, con
+   * il tipo giusto — `boolean | null` — e arriva già a schermo. Tenerne due copie
+   * significherebbe farle divergere.
+   */
+  readonly gruppo: GruppoSocietario | null;
 }
 
 /** `SSL` è la sede legale e amministrativa; gli altri codici sono unità operative. */
@@ -708,11 +707,15 @@ export function mappaProfiloCompleto(raw: unknown): ProfiloCompleto {
     gruppoRaw === undefined
       ? null
       : {
-          appartieneAGruppo: bool(gruppoRaw, 'belongsToGroup') ?? false,
-          denominazioneGruppo: str(gruppoRaw, 'groupName'),
-          capogruppo: str(gruppoRaw, 'holdingCompanyName'),
+          // Niente `?? false`: un gruppo non dichiarato non è un gruppo assente, ed è la
+          // regola che vale ovunque in questo prodotto. La copia buona dello stesso dato
+          // — negli indicatori — lascia già correttamente `null`, e portare avanti quella
+          // sbagliata avrebbe messo un «no» inventato accanto a un «non dichiarato» vero,
+          // sulla stessa pagina.
+          appartieneAGruppo: bool(gruppoRaw, 'belongsToGroup'),
+          denominazione: str(gruppoRaw, 'groupName'),
+          verticeDichiarato: str(gruppoRaw, 'holdingCompanyName'),
           controllateTotali: num(gruppoRaw, 'totalGroupSubsidiaries'),
-          controllantiEstere: bool(gruppoRaw, 'hasForeignParents') ?? false,
         };
 
   return { cariche, indicatori, unitaLocali, gruppo };

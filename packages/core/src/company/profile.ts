@@ -182,6 +182,35 @@ export interface Assetti {
   readonly controllate: readonly CompanyIdentity[];
 }
 
+/**
+ * Il gruppo societario come lo dichiara il registro.
+ *
+ * Sezione a sé e non campo dentro `Assetti`, per provenienza: la compagine arriva
+ * dall'anagrafica estesa, il gruppo dal profilo completo. Infilarlo dentro l'oggetto
+ * tracciato degli assetti attribuirebbe a un servizio un fatto che non ha mai mandato — e
+ * la provenienza è ciò che rende difendibile un fascicolo.
+ *
+ * Il dato veniva estratto dal mappatore, aveva persino un collaudo, e poi non entrava da
+ * nessuna parte perché il modello canonico non aveva un posto dove metterlo: si perdeva
+ * nel passaggio, in silenzio, dopo essere stato pagato.
+ */
+export interface GruppoSocietario {
+  /** `null` quando il registro non si pronuncia: un gruppo non dichiarato non è un gruppo assente. */
+  readonly appartieneAGruppo: boolean | null;
+  readonly denominazione: string | null;
+  /**
+   * Chi sta al vertice, come testo e nient'altro.
+   *
+   * Si chiama `verticeDichiarato` e non `capogruppo` perché non è la stessa cosa di
+   * `AssettoProprietario.capogruppo`: quella è la **società** socia di controllo, e porta
+   * una partita IVA con cui l'interfaccia costruisce un collegamento analizzabile. Qui il
+   * vertice può essere una **persona fisica** — osservato su una risposta reale — e un
+   * collegamento verso di essa produrrebbe una ricerca a vuoto, per giunta a pagamento.
+   */
+  readonly verticeDichiarato: string | null;
+  readonly controllateTotali: number | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Eventi negativi
 // ─────────────────────────────────────────────────────────────────────────────
@@ -331,11 +360,71 @@ export interface ImmobileDichiarato {
 }
 
 /**
+ * Le voci di bilancio rilevate in intervista, dal documento che l'impresa ha già.
+ *
+ * Nasce da una misura, non da un'idea. L'anagrafica estesa porta gli aggregati sintetici
+ * — fatturato, patrimonio netto, totale attivo, costo del personale — ma non lo schema
+ * CEE, che è un servizio a parte e costa cinquanta volte tanto.
+ *
+ * Misurato sull'azienda dimostrativa privata del bilancio dettagliato, cioè su ciò che
+ * l'utente vede davvero in produzione: contenuto, scorte, danni indiretti e fido clienti
+ * tutti «non determinabile», Altman assente, ritenzione assente, e l'esposizione non
+ * assicurata che scende da 8,1 a 2,4 milioni — il settanta per cento in meno, non perché
+ * l'impresa sia più coperta ma perché il prodotto non sa contare.
+ *
+ * Quelle voci però **non vanno comprate**: stanno nel bilancio depositato, che
+ * l'imprenditore porta all'appuntamento. Si leggono dal suo documento in due minuti.
+ *
+ * Tre regole, le stesse di tutto il prodotto:
+ *
+ *  - ogni voce resta `null` finché nessuno la scrive. Uno zero inventato sulle rimanenze
+ *    produce «attività senza magazzino» su un'impresa che il magazzino ce l'ha;
+ *  - il dichiarato **non scavalca** il registro: se il bilancio dettagliato è stato
+ *    acquistato, vince quello;
+ *  - dove un capitale nasce da una dichiarazione la confidenza scende e il documento lo
+ *    scrive. Un numero rilevato in intervista è vero, ma ne risponde chi l'ha detto.
+ */
+export interface BilancioDichiarato {
+  /** L'esercizio a cui le voci si riferiscono, per non mescolare due anni diversi. */
+  readonly anno: number | null;
+  /** Voce C-I dell'attivo: base della somma assicuranda per merci e scorte. */
+  readonly rimanenze: Euro | null;
+  /** Voce C-II-1: base dell'assicurazione del credito commerciale. */
+  readonly creditiVersoClienti: Euro | null;
+  /**
+   * Voci B-II-2 e B-II-3 sommate: impianti, macchinario, attrezzature.
+   *
+   * Al **costo storico lordo** se la nota integrativa lo riporta. Il valore netto
+   * contabile è già ammortizzato e sottostima il costo di rimpiazzo: è la sorgente più
+   * comune di sottoassicurazione sul contenuto.
+   */
+  readonly impiantiEAttrezzature: Euro | null;
+  /** Se il valore sopra è al lordo degli ammortamenti: cambia il coefficiente applicato. */
+  readonly impiantiAlCostoStorico: boolean | null;
+  /** Voce B-6 del conto economico: materie prime, sussidiarie, di consumo e merci. */
+  readonly costiMateriePrime: Euro | null;
+  /** Voce B-7: costi per servizi. La quota variabile si stima, e si dichiara. */
+  readonly costiServizi: Euro | null;
+}
+
+export const BILANCIO_DICHIARATO_VUOTO: BilancioDichiarato = {
+  anno: null,
+  rimanenze: null,
+  creditiVersoClienti: null,
+  impiantiEAttrezzature: null,
+  impiantiAlCostoStorico: null,
+  costiMateriePrime: null,
+  costiServizi: null,
+};
+
+/**
  * Ciò che il bilancio non può dire e che l'intermediario raccoglie in intervista.
  * Tutti i campi sono opzionali: il motore deve produrre un'analisi utile anche a
  * questionario vuoto, e migliorarla man mano che viene compilato.
  */
 export interface DatiDichiarati {
+  /** Voci lette dal bilancio depositato che l'impresa porta all'appuntamento. */
+  readonly bilancio: BilancioDichiarato;
   readonly immobili: readonly ImmobileDichiarato[];
   readonly numeroVeicoli: number | null;
   readonly numeroDipendenti: number | null;
@@ -365,6 +454,7 @@ export interface DatiDichiarati {
 }
 
 export const DATI_DICHIARATI_VUOTI: DatiDichiarati = {
+  bilancio: BILANCIO_DICHIARATO_VUOTO,
   immobili: [],
   numeroVeicoli: null,
   numeroDipendenti: null,
@@ -401,6 +491,13 @@ export interface CompanyProfile {
   readonly bilanciSintetici: readonly Sourced<BilancioSintetico>[];
   readonly eventiNegativi: Sourced<EventiNegativi> | null;
   readonly unitaLocali: Sourced<readonly UnitaLocale[]> | null;
+  /**
+   * Il perimetro di gruppo dichiarato dal registro. `null` finché non lo si acquista.
+   *
+   * Fratello di `unitaLocali` e non campo di `Assetti`: arriva dallo stesso servizio, e
+   * come quello va tracciato alla fonte che l'ha venduto.
+   */
+  readonly gruppo: Sourced<GruppoSocietario> | null;
   /**
    * Indicatori e qualifiche già elaborati dall'archivio camerale.
    *

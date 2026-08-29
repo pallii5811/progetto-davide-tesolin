@@ -20,9 +20,10 @@
  * le domande da fare. Un amministratore inventato è peggio di un amministratore ignoto.
  */
 
-import type { Assetti, Socio } from '../company/profile.js';
+import type { Assetti, Carica, Socio } from '../company/profile.js';
 import type { CompanyFacts } from '../company/facts.js';
 import type { Confidence } from '../shared/provenance.js';
+import { normaResponsabilitaAmministratori } from './norme.js';
 
 /**
  * Soglia di controllo: **maggioranza** dei voti esercitabili in assemblea ordinaria
@@ -73,6 +74,29 @@ export interface Capogruppo {
   readonly controlloDiDiritto: boolean;
 }
 
+/**
+ * Chi, uscendo di scena, fermerebbe l'impresa.
+ *
+ * Prima era un socio e basta: `personeChiave` filtrava la compagine per quota ≥ 66%, e un
+ * **amministratore non socio** — cioè il caso più frequente nelle imprese che hanno
+ * separato proprietà e gestione — non compariva da nessuna parte. Le cariche c'erano,
+ * comprate con il profilo completo, e servivano solo ad accendere un booleano.
+ *
+ * `motivo` non è ornamentale: distingue chi comanda perché **possiede** da chi comanda
+ * perché è stato **nominato**, e senza quella distinzione la frase che ne esce dice a un
+ * amministratore senza quote che «detiene la quasi totalità del capitale».
+ */
+export interface PersonaChiave {
+  readonly denominazione: string;
+  readonly codiceFiscale: string | null;
+  /** `null` per chi è persona chiave in virtù della sola carica. */
+  readonly quotaPercentuale: number | null;
+  readonly ruolo: string | null;
+  readonly rappresentanteLegale: boolean;
+  readonly eta: number | null;
+  readonly motivo: 'quota' | 'carica' | 'quota-e-carica';
+}
+
 export interface ImplicazioneAssicurativa {
   readonly titolo: string;
   readonly conseguenza: string;
@@ -92,9 +116,11 @@ export interface AssettoProprietario {
   readonly capogruppo: Capogruppo | null;
   /** Presunzione ex art. 2497-sexies c.c. in presenza di controllo societario. */
   readonly soggettaADirezioneECoordinamento: boolean;
-  /** Persone fisiche la cui uscita bloccherebbe l'impresa. */
-  readonly personeChiave: readonly SocioDiRilievo[];
+  /** Persone la cui uscita bloccherebbe l'impresa: per quota, per carica, o per entrambe. */
+  readonly personeChiave: readonly PersonaChiave[];
   readonly caricheDisponibili: boolean;
+  /** Le cariche acquisite, per intero. Vuoto finché non si compra il profilo completo. */
+  readonly cariche: readonly Carica[];
   readonly implicazioni: readonly ImplicazioneAssicurativa[];
   /** Ciò che il fornitore non dice e va chiesto in intervista. */
   readonly domande: readonly string[];
@@ -154,9 +180,8 @@ export function analizzaAssetto(
 
   // Il socio societario che controlla: è lui a definire l'esistenza del gruppo.
   const controllanteSocietaria =
-    conQuota.find(
-      (s) => s.tipo === 'persona-giuridica' && (s.quotaPercentuale ?? 0) > SOGLIA_CONTROLLO,
-    ) ?? null;
+    conQuota.find((s) => s.tipo === 'persona-giuridica' && (s.quotaPercentuale ?? 0) > SOGLIA_CONTROLLO) ??
+    null;
 
   // Un unico socio societario **senza quota dichiarata** è comunque il controllante: nessun
   // altro può esserlo, e ignorarlo perché manca la percentuale nasconderebbe un gruppo.
@@ -189,11 +214,9 @@ export function analizzaAssetto(
   const compagineCompleta = sommaNote >= 99;
   const tipoControllo = determinaTipo(conQuota, capogruppo, quotaPrimo, compagineCompleta);
 
-  const personeChiave = conQuota.filter(
-    (s) => s.tipo === 'persona-fisica' && (s.quotaPercentuale ?? 0) >= SOGLIA_PERSONA_CHIAVE,
-  );
-
-  const caricheDisponibili = (assetti?.cariche.length ?? 0) > 0;
+  const cariche = assetti?.cariche ?? [];
+  const personeChiave = componiPersoneChiave(conQuota, cariche);
+  const caricheDisponibili = cariche.length > 0;
 
   return {
     tipoControllo,
@@ -206,12 +229,127 @@ export function analizzaAssetto(
     soggettaADirezioneECoordinamento: capogruppo !== null,
     personeChiave,
     caricheDisponibili,
+    cariche,
     implicazioni: implicazioni(tipoControllo, capogruppo, personeChiave, facts),
     domande: domande(conQuota, capogruppo, caricheDisponibili, sommaNote),
     // La compagine incompleta abbassa la fiducia: si sta ragionando su una parte.
     confidenza:
       conQuota.length === 0 ? 'bassa' : sommaNote >= 99 ? 'alta' : sommaNote > 0 ? 'media' : 'bassa',
   };
+}
+
+/**
+ * Unisce i due lati del potere: le quote e le cariche.
+ *
+ * La deduplica è la parte delicata. La stessa persona compare spesso in entrambi gli
+ * elenchi — il socio unico che amministra è la forma più comune di impresa italiana — e
+ * senza unirli la scheda stamperebbe due volte lo stesso nome, con due chiavi identiche
+ * nell'elenco e una frase che ripete «MARIO ROSSI, MARIO ROSSI detiene…».
+ *
+ * Il confronto è sul **codice fiscale quando c'è su entrambi i lati**, perché è ciò che
+ * identifica una persona; e il codice fiscale si confronta come stringa, mai convertito.
+ * In sua assenza si ripiega sul nominativo normalizzato: «ROSSI GIOVANNI» fra i soci e
+ * «Giovanni Rossi» fra le cariche sono la stessa persona per un lettore e due per un
+ * database — ma due omonimi con codici fiscali diversi restano due persone.
+ */
+function componiPersoneChiave(
+  soci: readonly SocioDiRilievo[],
+  cariche: readonly Carica[],
+): readonly PersonaChiave[] {
+  const perNome = (s: string): string => s.trim().toUpperCase().replace(/\s+/g, ' ');
+  // Un nominativo si normalizza anche nell'ordine: «ROSSI MARIO» e «MARIO ROSSI» sono
+  // la stessa persona, e il registro non è coerente su quale dei due usa.
+  const chiaveNome = (s: string): string => perNome(s).split(' ').sort().join(' ');
+
+  const esiti: PersonaChiave[] = [];
+  const indicePerCf = new Map<string, number>();
+  const indicePerNome = new Map<string, number>();
+
+  const posizione = (codiceFiscale: string | null, denominazione: string): number | undefined => {
+    if (codiceFiscale !== null) {
+      const perCf = indicePerCf.get(codiceFiscale.toUpperCase());
+      if (perCf !== undefined) return perCf;
+    }
+
+    const perNomeTrovato = indicePerNome.get(chiaveNome(denominazione));
+    if (perNomeTrovato === undefined) return undefined;
+
+    /*
+      Il nome vale solo dove il codice fiscale non può parlare.
+
+      Se **entrambi** hanno un codice fiscale e sono arrivati fin qui, quei codici sono
+      diversi: sono due persone omonime, e fonderle attribuirebbe a una la carica
+      dell'altra — su un documento che dice chi è assicurato dalla D&O.
+    */
+    const candidato = esiti[perNomeTrovato];
+    if (codiceFiscale !== null && candidato?.codiceFiscale != null) return undefined;
+
+    return perNomeTrovato;
+  };
+
+  const registra = (p: PersonaChiave): void => {
+    const i = esiti.length;
+    esiti.push(p);
+    if (p.codiceFiscale !== null) indicePerCf.set(p.codiceFiscale.toUpperCase(), i);
+    indicePerNome.set(chiaveNome(p.denominazione), i);
+  };
+
+  // I soci che, da soli, hanno i voti per decidere.
+  for (const s of soci) {
+    if (s.tipo !== 'persona-fisica') continue;
+    if ((s.quotaPercentuale ?? 0) < SOGLIA_PERSONA_CHIAVE) continue;
+    registra({
+      denominazione: s.denominazione,
+      codiceFiscale: s.codiceFiscale,
+      quotaPercentuale: s.quotaPercentuale,
+      ruolo: null,
+      rappresentanteLegale: false,
+      eta: null,
+      motivo: 'quota',
+    });
+  }
+
+  /*
+    Chi ha la rappresentanza legale.
+
+    Si usa il booleano che il fornitore dichiara, non una regex sul testo del ruolo: in
+    questo prodotto esistevano già due letture divergenti di «chi rappresenta» — una per
+    regex nell'anagrafica estesa e una per booleano nel profilo completo — e aggiungerne
+    una terza nel dominio avrebbe reso il concetto indistinguibile da caso a caso.
+
+    Un sindaco o un procuratore non entrano: rispondono, ma la loro uscita non ferma
+    l'impresa.
+  */
+  for (const c of cariche) {
+    if (!c.isRappresentanteLegale) continue;
+
+    const gia = posizione(c.codiceFiscale, c.nominativo);
+    if (gia !== undefined) {
+      const p = esiti[gia];
+      if (p === undefined) continue;
+      esiti[gia] = {
+        ...p,
+        codiceFiscale: p.codiceFiscale ?? c.codiceFiscale,
+        ruolo: c.ruolo,
+        rappresentanteLegale: true,
+        eta: c.eta,
+        motivo: p.motivo === 'quota' ? 'quota-e-carica' : p.motivo,
+      };
+      continue;
+    }
+
+    registra({
+      denominazione: c.nominativo,
+      codiceFiscale: c.codiceFiscale,
+      quotaPercentuale: null,
+      ruolo: c.ruolo,
+      rappresentanteLegale: true,
+      eta: c.eta,
+      motivo: 'carica',
+    });
+  }
+
+  return esiti;
 }
 
 function determinaTipo(
@@ -247,7 +385,7 @@ function determinaTipo(
 function implicazioni(
   tipo: TipoControllo,
   capogruppo: Capogruppo | null,
-  personeChiave: readonly SocioDiRilievo[],
+  personeChiave: readonly PersonaChiave[],
   facts: Pick<CompanyFacts, 'formaGiuridica' | 'addetti'>,
 ): readonly ImplicazioneAssicurativa[] {
   const esiti: ImplicazioneAssicurativa[] = [];
@@ -270,11 +408,25 @@ function implicazioni(
     });
   }
 
-  if (personeChiave.length > 0) {
-    const nomi = personeChiave.map((p) => p.denominazione).join(', ');
+  /*
+    Tre frasi, non una.
+
+    La formulazione unica diceva «detiene la quasi totalità del capitale», e sarebbe
+    diventata falsa nel momento stesso in cui le persone chiave hanno cominciato a
+    comprendere gli amministratori: un amministratore delegato senza quote non detiene
+    niente. Si compone su `motivo`, come ovunque: frammenti fissi più i valori.
+  */
+  for (const p of personeChiave) {
+    const perche =
+      p.motivo === 'quota'
+        ? 'detiene la quasi totalità del capitale'
+        : p.motivo === 'carica'
+          ? `ha la rappresentanza legale${p.ruolo === null ? '' : ` (${p.ruolo.toLowerCase()})`}`
+          : `detiene la quasi totalità del capitale e ne ha la rappresentanza legale`;
+
     esiti.push({
-      titolo: 'Persona chiave',
-      conseguenza: `${nomi} detiene la quasi totalità del capitale: la sua assenza improvvisa blocca le decisioni sociali e, di norma, i rapporti commerciali e bancari.`,
+      titolo: `Persona chiave — ${p.denominazione}`,
+      conseguenza: `${p.denominazione} ${perche}: la sua assenza improvvisa blocca le decisioni sociali e, di norma, i rapporti commerciali e bancari.`,
       azione:
         'Proporre una copertura key man commisurata al margine perso in un esercizio, e verificare l’esistenza di patti successori o di continuità.',
       riferimento: null,
@@ -292,21 +444,23 @@ function implicazioni(
     });
   }
 
-  const societaDiCapitali =
-    facts.formaGiuridica === 'spa' ||
-    facts.formaGiuridica === 'srl' ||
-    facts.formaGiuridica === 'srls' ||
-    facts.formaGiuridica === 'sapa' ||
-    facts.formaGiuridica === 'cooperativa';
+  /*
+    La norma non è la stessa per tutte le società di capitali.
 
-  if (societaDiCapitali) {
+    Qui c'era «Artt. 2392 ss. c.c.» per srl, srls, spa, sapa e cooperativa insieme: sono
+    le norme della S.p.A. Su una S.r.l. — la forma della quasi totalità del portafoglio —
+    la responsabilità degli amministratori è retta dall'art. 2476 c.c.
+  */
+  const normaAmministratori = normaResponsabilitaAmministratori(facts.formaGiuridica);
+
+  if (normaAmministratori !== null) {
     esiti.push({
       titolo: 'Responsabilità personale degli amministratori',
       conseguenza:
         'Gli amministratori rispondono con il patrimonio personale verso la società, i creditori sociali e i terzi, anche per omessa istituzione di assetti organizzativi adeguati.',
       azione:
         'Verificare la presenza e i massimali della D&O, e l’estensione alla responsabilità per crisi d’impresa.',
-      riferimento: 'Artt. 2392 ss. c.c. e art. 2086 c.c.',
+      riferimento: `${normaAmministratori} · art. 2086 c.c.`,
     });
   }
 

@@ -38,6 +38,7 @@ export * from './risk/rules.js';
 export * from './risk/engine.js';
 export * from './risk/ritenzione.js';
 export * from './governance/assetto.js';
+export * from './governance/norme.js';
 export * from './governance/titolare-effettivo.js';
 export * from './risk/prevenzione.js';
 
@@ -58,6 +59,7 @@ export * from './monitoring/events.js';
 export * from './monitoring/state.js';
 export * from './monitoring/detect.js';
 export * from './coverage/catnat.js';
+export * from './coverage/motivazione.js';
 export * from './coverage/gap.js';
 
 // ── Compagnie ────────────────────────────────────────────────────────────────

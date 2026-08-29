@@ -141,18 +141,26 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'attivo B-II, numeri 1, 2 e 3.',
     base: 'valore-ricostruzione',
     obbligoDiLegge: true,
+    /*
+      L'obbligo è dell'impresa, non della copertura.
+
+      Questa frase affermava l'obbligo a chiunque, e veniva letta anche a un'impresa
+      agricola — esclusa per legge, e dichiarata tale dal motore CAT NAT nella stessa
+      risposta. Il documento si contraddiceva al proprio interno.
+
+      Anche «condizione per l'accesso» era più severa della norma: l'art. 1 c. 102
+      prevede che dell'inadempimento «si tenga conto» nell'assegnazione dei contributi.
+      Sovradichiarare un obbligo si paga come tacerlo, al primo controllo del cliente.
+    */
     motivazioneTipo:
-      'Adempimento dell’obbligo assicurativo previsto dalla L. 213/2023 e condizione per l’accesso a ' +
-      'contributi, incentivi e agevolazioni pubbliche.',
+      'Trasferisce il danno da sisma, alluvione, inondazione, esondazione e frana ai beni indicati ' +
+      'dalla norma, che nessuna polizza incendio ordinaria comprende per intero.',
     insidie: [
       'Scoperti e franchigie non possono superare il 15% del danno indennizzabile per somme fino a 30 M€.',
       'La copertura deve riguardare i beni indicati dalla norma: una polizza incendio con estensione ' +
         'terremoto non necessariamente soddisfa l’obbligo.',
     ],
-    riferimenti: [
-      'L. 213/2023 art. 1 cc. 101-111',
-      'DM MEF-MIMIT n. 18 del 30/01/2025',
-    ],
+    riferimenti: ['L. 213/2023 art. 1 cc. 101-111', 'DM MEF-MIMIT n. 18 del 30/01/2025'],
   },
   'guasti-macchine': {
     id: 'guasti-macchine',
@@ -163,9 +171,15 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'dalla polizza incendio.',
     base: 'valore-rimpiazzo',
     obbligoDiLegge: false,
+    // Prometteva il «fermo», che questa garanzia non paga: il fermo è la danni indiretti.
+    // Qui si indennizza il danno al bene, ed è il prodotto stesso ad assegnarle come
+    // capitale il valore di rimpiazzo del macchinario.
     motivazioneTipo:
-      'Copre il fermo di macchinari critici per cause interne, escluse dalle garanzie incendio.',
-    insidie: ['Spesso confusa con la garanzia incendio, che non copre il guasto meccanico o elettrico interno.'],
+      'Indennizza il danno al macchinario per cause interne — rotture, corti circuiti, errori di ' +
+      'manovra — che la garanzia incendio esclude.',
+    insidie: [
+      'Spesso confusa con la garanzia incendio, che non copre il guasto meccanico o elettrico interno.',
+    ],
     riferimenti: [],
   },
   elettronica: {
@@ -208,13 +222,29 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'e danneggiamento di cose.',
     base: 'massimale-benchmark',
     obbligoDiLegge: false,
+    /*
+      Il nucleo vero per chiunque.
+
+      Qui c'era «…che nelle società di persone si estende al patrimonio dei soci»: una
+      clausola condizionale finita dentro una stringa fissa, e quindi letta anche a ogni
+      S.r.l. e S.p.A., dove non si applica. Chi risponde, e con quale patrimonio, ora lo
+      dice un frammento scelto sulla forma giuridica (`coverage/motivazione.ts`).
+
+      Questo campo resta esposto senza impresa in contesto dall'endpoint del catalogo:
+      deve poter essere letto da solo senza dire il falso a nessuno.
+    */
     motivazioneTipo:
-      'Trasferisce l’obbligazione risarcitoria verso terzi, che nelle società di persone si estende al patrimonio dei soci.',
+      'Trasferisce l’obbligazione risarcitoria per i danni involontariamente cagionati a terzi ' +
+      'nell’esercizio dell’attività.',
     insidie: [
       'Il massimale unico per sinistro è spesso tarato su una sinistrosità storica, non sul danno massimo ipotizzabile.',
       'Le garanzie postume e la RC prodotti richiedono estensioni specifiche.',
     ],
-    riferimenti: ['Artt. 2043 e 2050 c.c.'],
+    // L'art. 2050 riguarda le sole attività pericolose per natura o per i mezzi adoperati:
+    // citarlo a uno studio di consulenza è sbagliato. Le norme che dipendono dall'impresa
+    // — art. 2049 sul fatto dei commessi — le aggiunge il frammento condizionale, che sa
+    // se ci sono dipendenti.
+    riferimenti: ['Art. 2043 c.c.'],
   },
   rco: {
     id: 'rco',
@@ -224,8 +254,17 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'Azioni di rivalsa INAIL e richieste di danno differenziale dei dipendenti infortunati sul lavoro.',
     base: 'monte-salari',
     obbligoDiLegge: false,
+    /*
+      La formulazione precedente confondeva due cose.
+
+      Dall'art. 13 D.Lgs. 38/2000 l'INAIL indennizza anche il danno biologico permanente
+      dal 6%: dire che «il danno differenziale e biologico resta a carico del datore»
+      afferma che l'istituto non lo copra. Ciò che resta a carico è il differenziale —
+      quantitativo e qualitativo — e le voci che l'INAIL non indennizza.
+    */
     motivazioneTipo:
-      'La copertura INAIL non esaurisce il danno risarcibile: il danno differenziale e biologico resta a carico del datore di lavoro.',
+      'L’indennizzo INAIL non esaurisce il danno risarcibile: restano a carico del datore di lavoro ' +
+      'il danno differenziale e le voci che l’istituto non indennizza.',
     insidie: [
       'Il massimale per persona è la voce che conta davvero: le condanne per infortunio grave superano di norma il milione di euro.',
       'Le malattie professionali richiedono estensione espressa.',
@@ -241,8 +280,13 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'se espressamente garantite.',
     base: 'massimale-benchmark',
     obbligoDiLegge: false,
+    // «Oggettiva» senza riserve è la versione che il legale della controparte smonta per
+    // primo: l'art. 118 Cod. cons. elenca le esimenti, fra cui il rischio da sviluppo, e
+    // l'art. 120 pone al danneggiato la prova di difetto, danno e nesso. Chi risponde —
+    // produttore o mero fornitore — lo stabilisce il frammento condizionale.
     motivazioneTipo:
-      'La responsabilità da prodotto difettoso è oggettiva: prescinde dalla colpa del produttore.',
+      'La responsabilità da prodotto difettoso prescinde dalla colpa, nei limiti delle esimenti ' +
+      'previste dalla legge.',
     insidie: [
       'L’esportazione verso USA e Canada richiede estensione territoriale espressa e comporta massimali sensibilmente superiori.',
       'Il ritiro prodotti (recall) è quasi sempre escluso dalla garanzia base.',
@@ -258,25 +302,42 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'da normativa pubblicistica.',
     base: 'massimale-benchmark',
     obbligoDiLegge: false,
+    // La responsabilità ambientale è oggettiva SOLO per gli operatori delle attività
+    // dell'Allegato 5 alla Parte VI; per le altre risponde chi ha agito con dolo o colpa.
+    // La regola che identifica il rischio usa diciassette divisioni ATECO, molto più
+    // larghe di quell'Allegato — fra cui quella dell'azienda dimostrativa.
     motivazioneTipo:
-      'La responsabilità ambientale prescinde dalla colpa e i costi di bonifica non sono coperti dalla RCT ordinaria.',
-    insidie: ['L’inquinamento graduale è escluso dalle polizze RCT standard e richiede un prodotto dedicato.'],
+      'I costi di bonifica e di ripristino ambientale non sono coperti dalla RCT ordinaria e possono ' +
+      'eccedere di molto il danno cagionato a terzi.',
+    insidie: [
+      'L’inquinamento graduale è escluso dalle polizze RCT standard e richiede un prodotto dedicato.',
+    ],
     riferimenti: ['D.Lgs. 152/2006 — Testo unico ambientale'],
   },
   'rc-professionale': {
     id: 'rc-professionale',
     category: 'responsabilita-civile',
     label: 'RC Professionale',
-    description: 'Danni patrimoniali cagionati a terzi nell’esercizio dell’attività professionale o di servizio.',
+    description:
+      'Danni patrimoniali cagionati a terzi nell’esercizio dell’attività professionale o di servizio.',
     base: 'massimale-benchmark',
     obbligoDiLegge: false,
-    motivazioneTipo:
-      'Copre il danno puramente patrimoniale, che la RCT esclude in via ordinaria.',
+    motivazioneTipo: 'Copre il danno puramente patrimoniale, che la RCT esclude in via ordinaria.',
     insidie: [
       'Regime claims made: la retroattività e la garanzia postuma determinano l’effettiva ampiezza della copertura.',
-      'Per gli esercenti professioni protette l’obbligo assicurativo è di legge.',
     ],
-    riferimenti: ['L. 124/2017 art. 1 c. 26', 'D.L. 138/2011 art. 3 c. 5 lett. e)'],
+    // L'obbligo vale per chi è iscritto a un albo, non per una sezione ATECO: era
+    // un'insidia fissa, e a una software house affermava una legge che non esiste. Ora è
+    // un frammento condizionato sulla sezione professionale.
+    //
+    // La L. 124/2017 art. 1 c. 26 riguarda la polizza degli avvocati, non un obbligo
+    // generale: la norma generale è quella del D.L. 138/2011 con il D.P.R. 137/2012.
+    riferimenti: [
+      'Art. 1176, c. 2, c.c.',
+      'Art. 2236 c.c.',
+      'Art. 3, c. 5, lett. e) D.L. 138/2011',
+      'Art. 5 D.P.R. 137/2012',
+    ],
   },
   'd-and-o': {
     id: 'd-and-o',
@@ -291,9 +352,14 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'ampliato in modo sostanziale il perimetro della responsabilità.',
     insidie: [
       'La garanzia opera in claims made: la cessazione della carica senza garanzia postuma lascia scoperto l’ex amministratore.',
-      'L’azione di responsabilità del curatore in caso di liquidazione giudiziale è l’ipotesi statisticamente più frequente.',
+      // «Statisticamente più frequente» era un superlativo che nessuno può verificare.
+      // Il fatto normativo dice la stessa cosa e si può difendere.
+      'In caso di liquidazione giudiziale l’azione di responsabilità è esercitata dal curatore (art. 255 CCII): il massimale va rapportato al passivo potenziale.',
     ],
-    riferimenti: ['Artt. 2392-2395 c.c.', 'Art. 2086 c.c.', 'D.Lgs. 14/2019 — Codice della crisi'],
+    // Gli artt. 2392-2395 sono norme della S.p.A.: per la S.r.l. — la forma della quasi
+    // totalità del portafoglio — la norma è l'art. 2476 c.c. La citazione giusta per
+    // questa impresa la sceglie `governance/norme.ts` e la porta il frammento.
+    riferimenti: ['Art. 2086 c.c.', 'Art. 255 CCII', 'D.Lgs. 14/2019 — Codice della crisi'],
   },
   cyber: {
     id: 'cyber',
@@ -329,12 +395,20 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
     id: 'infortuni-titolare',
     category: 'persone',
     label: 'Infortuni titolare e soci',
-    description: 'Indennizzo per invalidità permanente o morte del titolare, dei soci e dei collaboratori familiari.',
+    description:
+      'Indennizzo per invalidità permanente o morte del titolare, dei soci e dei collaboratori familiari.',
     base: 'da-definire',
     obbligoDiLegge: false,
+    // «A conduzione familiare» era un'affermazione sull'impresa dentro una stringa fissa,
+    // e la regola che accende il rischio scatta anche su una S.r.l. con tre soci
+    // societari e quattordici addetti. Se la conduzione sia personale lo stabilisce ora
+    // un frammento che guarda forma giuridica e compagine.
     motivazioneTipo:
-      'Nelle imprese a conduzione familiare la capacità di reddito coincide con la persona del titolare.',
-    insidie: ['I capitali sono spesso simbolici rispetto al reddito effettivamente prodotto dalla persona.'],
+      'L’invalidità o la morte del titolare e dei soci operativi non trova ristoro in alcuna garanzia ' +
+      'di responsabilità: è un capitale che va costituito a parte.',
+    insidie: [
+      'I capitali sono spesso simbolici rispetto al reddito effettivamente prodotto dalla persona.',
+    ],
     riferimenti: [],
   },
   'malattia-key-man': {
@@ -344,8 +418,11 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
     description: 'Rimborso spese mediche e diaria da ricovero per figure chiave dell’organizzazione.',
     base: 'da-definire',
     obbligoDiLegge: false,
-    motivazioneTipo: 'Riduce il tempo di indisponibilità delle figure critiche e ne fidelizza la permanenza.',
-    insidie: ['Le preesistenze sono escluse: la sottoscrizione va fatta prima che il rischio si manifesti.'],
+    motivazioneTipo:
+      'Riduce il tempo di indisponibilità delle figure critiche e ne fidelizza la permanenza.',
+    insidie: [
+      'Le preesistenze sono escluse: la sottoscrizione va fatta prima che il rischio si manifesti.',
+    ],
     riferimenti: [],
   },
   'tcm-key-man': {
@@ -369,11 +446,14 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
     id: 'rca-flotta',
     category: 'flotta',
     label: 'RC Auto (libro matricola)',
-    description: 'Responsabilità civile obbligatoria per i veicoli aziendali, in gestione a libro matricola.',
+    description:
+      'Responsabilità civile obbligatoria per i veicoli aziendali, in gestione a libro matricola.',
     base: 'da-definire',
     obbligoDiLegge: true,
     motivazioneTipo: 'Adempimento dell’obbligo assicurativo per la circolazione dei veicoli a motore.',
-    insidie: ['La gestione a libro matricola evita scoperture nei passaggi di proprietà e nelle immatricolazioni.'],
+    insidie: [
+      'La gestione a libro matricola evita scoperture nei passaggi di proprietà e nelle immatricolazioni.',
+    ],
     riferimenti: ['D.Lgs. 209/2005 — Codice delle assicurazioni private, art. 122'],
   },
   'kasko-flotta': {
@@ -405,7 +485,8 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
     id: 'credito-commerciale',
     category: 'finanziarie',
     label: 'Assicurazione del credito commerciale',
-    description: 'Indennizzo per insolvenza e mancato pagamento dei clienti, con servizi di valutazione e recupero.',
+    description:
+      'Indennizzo per insolvenza e mancato pagamento dei clienti, con servizi di valutazione e recupero.',
     base: 'fido-clienti',
     obbligoDiLegge: false,
     motivazioneTipo:
@@ -439,9 +520,21 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
       'in materia di sicurezza sul lavoro.',
     base: 'massimale-benchmark',
     obbligoDiLegge: false,
+    /*
+      Diceva «e degli amministratori», e contraddiceva la voce D&O dello stesso catalogo.
+
+      La tutela legale aziendale standard non difende gli amministratori nelle azioni di
+      responsabilità: quelle sono precisamente l'oggetto della D&O. Letta a voce, quella
+      frase vendeva la rinuncia alla D&O — cioè faceva perdere all'intermediario la
+      copertura più redditizia mentre gli faceva sbagliare il consiglio.
+    */
     motivazioneTipo:
-      'Garantisce la difesa dell’impresa e degli amministratori anche quando nessun’altra polizza è chiamata a rispondere.',
-    insidie: ['La libera scelta del legale e i massimali per grado di giudizio sono i due elementi che ne determinano l’utilità reale.'],
+      'Garantisce le spese di difesa dell’impresa nei procedimenti civili, penali e amministrativi, ' +
+      'comprese le contestazioni in materia di sicurezza sul lavoro, dove nessuna garanzia di ' +
+      'responsabilità è chiamata a rispondere.',
+    insidie: [
+      'La libera scelta del legale e i massimali per grado di giudizio sono i due elementi che ne determinano l’utilità reale.',
+    ],
     riferimenti: ['D.Lgs. 209/2005, artt. 163-164'],
   },
 };

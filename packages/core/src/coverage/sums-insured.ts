@@ -23,6 +23,7 @@ import { formatNumber } from '../shared/math.js';
 import type { CompanyFacts } from '../company/facts.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
 import type { ImmobileDichiarato } from '../company/profile.js';
+import { haOrganoAmministrativo, normaResponsabilitaAmministratori } from '../governance/norme.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Parametri di calcolo
@@ -119,10 +120,10 @@ export function computeSumsInsured(
   options: SumsInsuredOptions = {},
 ): SumsInsured {
   const fabbricati = calcolaFabbricati(facts, bilancio, immobili, options);
-  const contenuto = calcolaContenuto(bilancio, options);
-  const scorte = calcolaScorte(bilancio, options);
+  const contenuto = calcolaContenuto(facts, bilancio, options);
+  const scorte = calcolaScorte(facts, bilancio, options);
   const danniIndiretti = calcolaDanniIndiretti(facts, bilancio, options);
-  const monteSalari = calcolaMonteSalari(bilancio);
+  const monteSalari = calcolaMonteSalari(facts, bilancio);
 
   const componenti = [fabbricati.value, contenuto.value, scorte.value];
   const noti = componenti.filter((v): v is Euro => v !== null);
@@ -164,12 +165,14 @@ function calcolaFabbricati(
   immobili: readonly ImmobileDichiarato[],
   options: SumsInsuredOptions,
 ): Explained<Euro | null> {
-  const builder = explain('Somma assicuranda — Fabbricati')
-    .reference('Valore di ricostruzione a nuovo, non valore di mercato né valore contabile');
+  const builder = explain('Somma assicuranda — Fabbricati').reference(
+    'Valore di ricostruzione a nuovo, non valore di mercato né valore contabile',
+  );
 
   // Metodo preferito: superficie × costo di ricostruzione. È l'unico corretto.
   const conSuperficie = immobili.filter(
-    (i): i is ImmobileDichiarato & { superficieMq: number } => i.superficieMq !== null && i.superficieMq > 0,
+    (i): i is ImmobileDichiarato & { superficieMq: number } =>
+      i.superficieMq !== null && i.superficieMq > 0,
   );
 
   if (conSuperficie.length > 0) {
@@ -283,17 +286,59 @@ function formattaOppureIgnoto(valore: Euro | null): string {
 // ── Contenuto: macchinari, impianti, attrezzature ────────────────────────────
 
 function calcolaContenuto(
+  facts: CompanyFacts,
   bilancio: BilancioRiclassificato | null,
   options: SumsInsuredOptions,
 ): Explained<Euro | null> {
-  const builder = explain('Somma assicuranda — Macchinari e attrezzature')
-    .reference('Valore di rimpiazzo a nuovo');
+  const builder = explain('Somma assicuranda — Macchinari e attrezzature').reference(
+    'Valore di rimpiazzo a nuovo',
+  );
 
+  /*
+    Senza il bilancio CEE si prova con quanto rilevato in intervista.
+
+    Le voci B-II-2 e B-II-3 dello stato patrimoniale stanno nel bilancio depositato: chi
+    le legge dal documento del cliente le porta qui, e il capitale smette di essere «non
+    determinabile». Il coefficiente cambia a seconda che il valore dichiarato sia al
+    costo storico lordo — quello della nota integrativa — o al netto contabile.
+  */
   if (bilancio === null) {
+    const lordo = facts.costoStoricoImmobilizzazioni;
+    const netto = facts.valoreImpiantiNetto;
+
+    if (lordo !== null && Money.isPositive(lordo)) {
+      const stima = Money.multiply(lordo, COEFF_LORDO_A_RIMPIAZZO);
+      return builder
+        .formula('Costo storico lordo di impianti e attrezzature × adeguamento a nuovo')
+        .input('Costo storico lordo dichiarato', Money.formatCompact(lordo))
+        .input('Adeguamento a nuovo', `${formatNumber(COEFF_LORDO_A_RIMPIAZZO)}×`)
+        .note(
+          'Valore rilevato in intervista dal bilancio depositato. Il costo storico è la base corretta ' +
+            'per il valore a nuovo: ne risponde chi lo ha dichiarato.',
+        )
+        .confidence('media')
+        .value<Euro | null>(Money.commercialRoundUp(stima));
+    }
+
+    if (netto !== null && Money.isPositive(netto)) {
+      const coefficiente = options.coefficienteRivalutazione ?? COEFF_NETTO_A_RIMPIAZZO;
+      const stima = Money.multiply(netto, coefficiente);
+      return builder
+        .formula('Valore netto contabile dichiarato × coefficiente di riporto a nuovo')
+        .input('Impianti e attrezzature, netti', Money.formatCompact(netto))
+        .input('Coefficiente di riporto', `${formatNumber(coefficiente)}×`)
+        .note(
+          'STIMA su valore rilevato in intervista. Il netto contabile è già decurtato dagli ' +
+            'ammortamenti: chiedere il costo storico dalla nota integrativa alza la precisione di molto.',
+        )
+        .confidence('bassa')
+        .value<Euro | null>(Money.commercialRoundUp(stima));
+    }
+
     return builder
       .note(
-        'Bilancio in schema dettagliato non disponibile: il valore di impianti e attrezzature non è ' +
-          'ricavabile dagli aggregati. Da rilevare in intervista o acquisendo il bilancio completo.',
+        'Il valore di impianti e attrezzature non compare fra gli aggregati sintetici del registro: ' +
+          'si rileva dalle voci B-II-2 e B-II-3 del bilancio depositato, che l’impresa ha già in mano.',
       )
       .confidence('bassa')
       .value<Euro | null>(null);
@@ -310,12 +355,18 @@ function calcolaContenuto(
       .formula('(Costo storico immobilizzazioni materiali − fabbricati) × adeguamento a nuovo')
       .input('Costo storico lordo', Money.formatCompact(costoStorico))
       .input('Adeguamento a nuovo', `${formatNumber(COEFF_LORDO_A_RIMPIAZZO)}×`)
-      .note('Calcolo basato sul costo storico da nota integrativa: è la base corretta per il valore a nuovo.')
+      .note(
+        'Calcolo basato sul costo storico da nota integrativa: è la base corretta per il valore a nuovo.',
+      )
       .confidence('alta')
       .value(Money.commercialRoundUp(stima));
   }
 
-  const netto = Money.add(attivo.impiantiEMacchinario, attivo.attrezzature, attivo.altreImmobilizzazioniMateriali);
+  const netto = Money.add(
+    attivo.impiantiEMacchinario,
+    attivo.attrezzature,
+    attivo.altreImmobilizzazioniMateriali,
+  );
   if (!Money.isPositive(netto)) {
     return builder
       .note('Nessuna immobilizzazione materiale mobile iscritta a bilancio.')
@@ -344,19 +395,34 @@ function calcolaContenuto(
 // ── Scorte ───────────────────────────────────────────────────────────────────
 
 function calcolaScorte(
+  facts: CompanyFacts,
   bilancio: BilancioRiclassificato | null,
   options: SumsInsuredOptions,
 ): Explained<Euro | null> {
   const builder = explain('Somma assicuranda — Merci e scorte');
 
-  if (bilancio === null) {
+  /*
+    Le rimanenze dal bilancio depositato, o rilevate in intervista dal documento.
+
+    Qui si guardava solo il bilancio CEE, che in produzione non si compra: il capitale
+    usciva «non determinabile» su ogni impresa reale. La voce C-I dello stato
+    patrimoniale è però nel documento che l'imprenditore porta all'appuntamento, e si
+    legge in trenta secondi.
+  */
+  const rimanenze = bilancio?.sp.rimanenze ?? facts.rimanenze;
+  const daIntervista = bilancio === null && facts.rimanenze !== null;
+
+  if (rimanenze === null) {
     return builder
-      .note('Bilancio dettagliato non disponibile: le rimanenze non compaiono fra gli aggregati.')
+      .note(
+        'Le rimanenze non compaiono fra gli aggregati sintetici del registro: si rilevano dalla voce ' +
+          'C-I dello stato patrimoniale del bilancio depositato, che l’impresa ha già in mano.',
+      )
       .confidence('bassa')
       .value<Euro | null>(null);
   }
 
-  if (!Money.isPositive(bilancio.sp.rimanenze)) {
+  if (!Money.isPositive(rimanenze)) {
     return builder
       .note('Nessuna rimanenza iscritta a bilancio: attività senza magazzino.')
       .confidence('media')
@@ -364,19 +430,29 @@ function calcolaScorte(
   }
 
   const coefficiente = options.coefficientePiccoScorte ?? COEFF_PICCO_SCORTE;
-  const stima = Money.multiply(bilancio.sp.rimanenze, coefficiente);
+  const stima = Money.multiply(rimanenze, coefficiente);
 
-  return builder
-    .formula('Rimanenze di bilancio × coefficiente di picco stagionale')
-    .input('Rimanenze al 31/12', Money.formatCompact(bilancio.sp.rimanenze))
-    .input('Coefficiente di picco', `${formatNumber(coefficiente)}×`)
-    .note(
-      'Il bilancio fotografa la giacenza di fine esercizio, che per la maggior parte dei settori ' +
-        'coincide con il minimo annuo. Il capitale va dimensionato sul picco, non sulla media.',
-    )
-    .note('Verificare con il cliente il mese di massima giacenza e valutare una clausola di scorta variabile.')
-    .confidence('media')
-    .value(Money.commercialRoundUp(stima));
+  return (
+    builder
+      .formula('Rimanenze di bilancio × coefficiente di picco stagionale')
+      .input('Rimanenze al 31/12', Money.formatCompact(rimanenze))
+      .input('Coefficiente di picco', `${formatNumber(coefficiente)}×`)
+      .noteIf(
+        daIntervista,
+        'Valore rilevato in intervista dal bilancio depositato, non letto dal registro: ne risponde chi lo ha dichiarato.',
+      )
+      .note(
+        'Il bilancio fotografa la giacenza di fine esercizio, che per la maggior parte dei settori ' +
+          'coincide con il minimo annuo. Il capitale va dimensionato sul picco, non sulla media.',
+      )
+      .note(
+        'Verificare con il cliente il mese di massima giacenza e valutare una clausola di scorta variabile.',
+      )
+      // Un dato dichiarato resta un dato vero, ma di cui risponde chi l'ha detto: la
+      // confidenza scende di un gradino e il documento lo scrive.
+      .confidence(daIntervista ? 'bassa' : 'media')
+      .value(Money.commercialRoundUp(stima))
+  );
 }
 
 // ── Danni indiretti (business interruption) ──────────────────────────────────
@@ -387,21 +463,34 @@ function calcolaDanniIndiretti(
   options: SumsInsuredOptions,
 ): Explained<Euro | null> {
   const mesi = options.periodoIndennizzoMesi ?? PERIODO_INDENNIZZO_DEFAULT_MESI;
-  const builder = explain('Somma assicuranda — Danni indiretti (Business Interruption)')
-    .reference('Margine di contribuzione, non fatturato');
+  const builder = explain('Somma assicuranda — Danni indiretti (Business Interruption)').reference(
+    'Margine di contribuzione, non fatturato',
+  );
 
-  if (bilancio === null) {
+  /*
+    Il margine di contribuzione dal bilancio CEE, o composto dalle voci dichiarate.
+
+    È la garanzia su cui il capitale sbagliato costa di più, e in produzione usciva
+    sempre «non determinabile»: il dettaglio dei costi variabili non sta negli aggregati
+    sintetici. Ma le due voci che servono — B-6 materie prime e B-7 servizi — sono nel
+    conto economico del bilancio depositato, e `deriveFacts` le compone applicando la
+    stessa quota di variabilità della riclassificazione.
+  */
+  const margine = bilancio?.ce.margineDiContribuzione ?? facts.margineDiContribuzione;
+  const daIntervista = bilancio === null && facts.margineDiContribuzione !== null;
+
+  if (margine === null) {
     return builder
       .note(
-        'Il margine di contribuzione richiede il dettaglio dei costi variabili, assente negli ' +
-          'aggregati di bilancio. È la garanzia su cui il capitale sbagliato costa di più: da ' +
-          'quantificare prima di quotare.',
+        'Il margine di contribuzione richiede il dettaglio dei costi variabili, assente dagli ' +
+          'aggregati sintetici del registro. Si rileva in intervista dalle voci B-6 e B-7 del conto ' +
+          'economico depositato: è la garanzia su cui il capitale sbagliato costa di più, e va ' +
+          'quantificata prima di quotare.',
       )
       .confidence('bassa')
       .value<Euro | null>(null);
   }
 
-  const margine = bilancio.ce.margineDiContribuzione;
   if (!Money.isPositive(margine)) {
     return builder
       .input('Margine di contribuzione', Money.formatCompact(margine))
@@ -413,51 +502,99 @@ function calcolaDanniIndiretti(
   const capitale = Money.multiply(margine, mesi / 12);
   const perdMese = Money.divide(margine, 12);
 
-  return builder
-    .formula('Margine di contribuzione annuo × (periodo di indennizzo / 12)')
-    .input('Valore della produzione', Money.formatCompact(bilancio.ce.valoreDellaProduzione))
-    .input('Costi variabili', Money.formatCompact(bilancio.ce.costiVariabili))
-    .input('Margine di contribuzione', Money.formatCompact(margine))
-    .input('Periodo di indennizzo', `${mesi} mesi`)
-    .note(`Ogni mese di fermo attività vale ${Money.formatCompact(perdMese)} di margine perso.`)
-    .note(
-      'Assicurare il fatturato anziché il margine significa pagare premio su costi che, a impianto ' +
-        'fermo, non si sostengono: è l’errore più diffuso su questa garanzia.',
-    )
-    .noteIf(
-      mesi < 12,
-      'Periodo di indennizzo inferiore a 12 mesi: la ricostruzione di un capannone industriale ' +
-        'raramente si completa in meno di un anno fra permessi, appalto e collaudo.',
-    )
-    .noteIf(
-      facts.dimensione === 'media' || facts.dimensione === 'grande',
-      'Per imprese di queste dimensioni valutare un periodo di indennizzo di 18-24 mesi.',
-    )
-    .confidence('media')
-    .value(Money.commercialRoundUp(capitale));
+  return (
+    builder
+      .formula('Margine di contribuzione annuo × (periodo di indennizzo / 12)')
+      .input(
+        'Valore della produzione',
+        bilancio === null
+          ? formattaOppureIgnoto(facts.fatturato)
+          : Money.formatCompact(bilancio.ce.valoreDellaProduzione),
+      )
+      .input(
+        'Costi variabili',
+        bilancio === null ? 'rilevati in intervista' : Money.formatCompact(bilancio.ce.costiVariabili),
+      )
+      .input('Margine di contribuzione', Money.formatCompact(margine))
+      .input('Periodo di indennizzo', `${mesi} mesi`)
+      .noteIf(
+        daIntervista,
+        'Margine composto dalle voci B-6 e B-7 rilevate in intervista dal conto economico depositato, ' +
+          'con la quota variabile dei servizi stimata al 60%. Va confermato con il commercialista prima ' +
+          'di quotare: è il capitale su cui un errore costa di più.',
+      )
+      .note(`Ogni mese di fermo attività vale ${Money.formatCompact(perdMese)} di margine perso.`)
+      .note(
+        'Assicurare il fatturato anziché il margine significa pagare premio su costi che, a impianto ' +
+          'fermo, non si sostengono: è l’errore più diffuso su questa garanzia.',
+      )
+      .noteIf(
+        mesi < 12,
+        'Periodo di indennizzo inferiore a 12 mesi: la ricostruzione di un capannone industriale ' +
+          'raramente si completa in meno di un anno fra permessi, appalto e collaudo.',
+      )
+      .noteIf(
+        facts.dimensione === 'media' || facts.dimensione === 'grande',
+        'Per imprese di queste dimensioni valutare un periodo di indennizzo di 18-24 mesi.',
+      )
+      // Il margine composto in intervista resta una stima di secondo livello: la quota
+      // variabile dei servizi è un'ipotesi, non una lettura.
+      .confidence(daIntervista ? 'bassa' : 'media')
+      .value(Money.commercialRoundUp(capitale))
+  );
 }
 
 // ── Monte salari ─────────────────────────────────────────────────────────────
 
-function calcolaMonteSalari(bilancio: BilancioRiclassificato | null): Explained<Euro | null> {
+/**
+ * Monte salari: dal bilancio dettagliato **o** da quello sintetico.
+ *
+ * Il costo del personale è uno dei pochi aggregati che l'anagrafica estesa porta con sé,
+ * gratis, nei dieci esercizi sintetici. Qui si leggeva solo dal bilancio CEE dettagliato,
+ * che in produzione non si compra mai — `bilancioDettagliato` è dichiarato non verificato
+ * e non viene chiamato — e il massimale RCO usciva «non disponibile» su ogni impresa
+ * reale, mentre nel documento dimostrativo compare.
+ *
+ * `facts.costoDelPersonale` faceva già la scelta giusta fra le due fonti: bastava
+ * chiederlo a lui. Un capitale recuperato senza spendere un centesimo.
+ */
+function calcolaMonteSalari(
+  facts: CompanyFacts,
+  bilancio: BilancioRiclassificato | null,
+): Explained<Euro | null> {
   const builder = explain('Monte salari annuo').reference('Base di calcolo del premio RCO');
 
-  if (bilancio === null) {
-    return builder.note('Costo del personale non disponibile.').confidence('bassa').value<Euro | null>(null);
+  const costo = bilancio?.ce.costoDelPersonale ?? facts.costoDelPersonale;
+  const daSintetico = bilancio === null && facts.costoDelPersonale !== null;
+
+  if (costo === null) {
+    return builder
+      .note('Costo del personale non disponibile né dal bilancio depositato né dagli aggregati sintetici.')
+      .confidence('bassa')
+      .value<Euro | null>(null);
   }
-  if (!Money.isPositive(bilancio.ce.costoDelPersonale)) {
+  if (!Money.isPositive(costo)) {
     return builder
       .note('Nessun costo del personale a bilancio: impresa senza dipendenti.')
       .confidence('media')
       .value<Euro | null>(ZERO);
   }
 
-  return builder
-    .formula('Salari e stipendi + oneri sociali e accessori')
-    .input('Costo del personale', Money.formatCompact(bilancio.ce.costoDelPersonale))
-    .note('Verificare la retribuzione convenzionale dei soci lavoratori e dei collaboratori familiari.')
-    .confidence('alta')
-    .value(bilancio.ce.costoDelPersonale);
+  return (
+    builder
+      .formula('Salari e stipendi + oneri sociali e accessori')
+      .input('Costo del personale', Money.formatCompact(costo))
+      .noteIf(
+        daSintetico,
+        'Valore preso dagli aggregati sintetici del registro: è il costo del personale dell’ultimo ' +
+          'esercizio depositato, non la retribuzione corrente. Va confermato in intervista se l’organico è cambiato.',
+      )
+      .note('Verificare la retribuzione convenzionale dei soci lavoratori e dei collaboratori familiari.')
+      // Dal sintetico il dato è vero ma di un solo aggregato, senza il dettaglio delle voci:
+      // la confidenza scende, e dirlo è ciò che distingue una misura da una stima.
+      .confidence(daSintetico ? 'media' : 'alta')
+      .value(costo)
+  );
 }
 
 // ── Massimali di responsabilità civile ───────────────────────────────────────
@@ -486,7 +623,9 @@ function settorePericoloso(facts: CompanyFacts): boolean {
 
 function calcolaMassimaleRct(facts: CompanyFacts): Explained<Euro> {
   const builder = explain('Massimale consigliato — RCT')
-    .formula('Benchmark per classe di fatturato, elevato di un gradino per i settori a maggiore pericolosità')
+    .formula(
+      'Benchmark per classe di fatturato, elevato di un gradino per i settori a maggiore pericolosità',
+    )
     .reference('Benchmark di mercato AEGIS');
 
   let indice = massimaleDaFatturato(facts.fatturato);
@@ -504,7 +643,10 @@ function calcolaMassimaleRct(facts: CompanyFacts): Explained<Euro> {
 
   const massimale = scala(indice);
   return builder
-    .input('Fatturato', facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato))
+    .input(
+      'Fatturato',
+      facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato),
+    )
     .input('Settore', facts.atecoSezione ?? 'da rilevare in intervista')
     .note(
       'Il massimale va commisurato al danno massimo ipotizzabile, non alla sinistrosità storica: ' +
@@ -515,8 +657,9 @@ function calcolaMassimaleRct(facts: CompanyFacts): Explained<Euro> {
 }
 
 function calcolaMassimaleRco(facts: CompanyFacts): Explained<Euro> {
-  const builder = explain('Massimale consigliato — RCO per persona')
-    .reference('D.P.R. 1124/1965 · danno differenziale e biologico');
+  const builder = explain('Massimale consigliato — RCO per persona').reference(
+    'D.P.R. 1124/1965 · danno differenziale e biologico',
+  );
 
   const elevato = settorePericoloso(facts) || (facts.addetti !== null && facts.addetti > 50);
   const massimale = Money.euro(elevato ? 2_500_000 : 1_500_000);
@@ -526,7 +669,9 @@ function calcolaMassimaleRco(facts: CompanyFacts): Explained<Euro> {
     .input('Addetti', facts.addetti === null ? 'da rilevare in intervista' : String(facts.addetti))
     .input(
       'Costo del personale',
-      facts.costoDelPersonale === null ? 'da rilevare in intervista' : Money.formatCompact(facts.costoDelPersonale),
+      facts.costoDelPersonale === null
+        ? 'da rilevare in intervista'
+        : Money.formatCompact(facts.costoDelPersonale),
     )
     .note(
       'Il massimale che conta è quello **per persona**: le condanne per infortunio grave con danno ' +
@@ -540,7 +685,8 @@ function calcolaMassimaleRco(facts: CompanyFacts): Explained<Euro> {
 function calcolaMassimaleRcProdotti(facts: CompanyFacts): Explained<Euro | null> {
   const builder = explain('Massimale consigliato — RC Prodotti');
 
-  const produce = facts.produceBeniFinali === true || facts.atecoSezione === 'C' || facts.atecoSezione === 'G';
+  const produce =
+    facts.produceBeniFinali === true || facts.atecoSezione === 'C' || facts.atecoSezione === 'G';
   if (!produce) {
     return builder
       .note('Attività senza immissione di prodotti sul mercato: garanzia non pertinente.')
@@ -562,26 +708,37 @@ function calcolaMassimaleRcProdotti(facts: CompanyFacts): Explained<Euro | null>
 
   return builder
     .formula('Benchmark per classe di fatturato, elevato in funzione dei mercati di destinazione')
-    .input('Fatturato', facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato))
-    .input('Export', facts.quotaExport === null ? 'da rilevare in intervista' : `${formatNumber(facts.quotaExport * 100, 0)}%`)
+    .input(
+      'Fatturato',
+      facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato),
+    )
+    .input(
+      'Export',
+      facts.quotaExport === null
+        ? 'da rilevare in intervista'
+        : `${formatNumber(facts.quotaExport * 100, 0)}%`,
+    )
     .note('Valutare l’estensione alle spese di ritiro prodotti (recall), esclusa dalla garanzia base.')
     .confidence(facts.fatturato === null ? 'bassa' : 'media')
     .value(scala(indice));
 }
 
 function calcolaMassimaleDandO(facts: CompanyFacts): Explained<Euro | null> {
-  const builder = explain('Massimale consigliato — D&O').reference('Artt. 2392-2395 c.c.');
+  /*
+    La norma si sceglie sulla forma giuridica, non si scrive una volta per tutte.
 
-  const societaDiCapitali =
-    facts.formaGiuridica === 'spa' ||
-    facts.formaGiuridica === 'srl' ||
-    facts.formaGiuridica === 'srls' ||
-    facts.formaGiuridica === 'sapa' ||
-    facts.formaGiuridica === 'cooperativa';
+    Qui c'era «Artt. 2392-2395 c.c.» fisso: sono le norme della S.p.A., citate a ogni
+    S.r.l. — cioè alla quasi totalità del portafoglio di un intermediario italiano.
+  */
+  const norma = normaResponsabilitaAmministratori(facts.formaGiuridica);
+  const builder = explain('Massimale consigliato — D&O');
+  if (norma !== null) builder.reference(norma);
 
-  if (!societaDiCapitali) {
+  if (!haOrganoAmministrativo(facts.formaGiuridica)) {
     return builder
-      .note('Forma giuridica priva di organo amministrativo distinto dalla proprietà: garanzia non pertinente.')
+      .note(
+        'Forma giuridica priva di organo amministrativo distinto dalla proprietà: garanzia non pertinente.',
+      )
       .confidence('alta')
       .value(null);
   }
@@ -598,20 +755,52 @@ function calcolaMassimaleDandO(facts: CompanyFacts): Explained<Euro | null> {
             ? Money.euro(2_500_000)
             : Money.euro(5_000_000);
 
-  return builder
-    .formula('Benchmark per classe di totale attivo')
-    .input('Totale attivo', facts.totaleAttivo === null ? 'da rilevare in intervista' : Money.formatCompact(facts.totaleAttivo))
-    .input('Amministratori in carica', String(facts.numeroAmministratori))
-    .note(
-      'L’ipotesi statisticamente più frequente è l’azione di responsabilità del curatore in caso di ' +
-        'liquidazione giudiziale: il massimale va rapportato al passivo potenziale, non al compenso dell’organo.',
-    )
-    .noteIf(
-      facts.appartieneAGruppo,
-      'Appartenenza a gruppo: verificare la copertura della responsabilità da direzione e coordinamento (art. 2497 c.c.).',
-    )
-    .confidence(facts.totaleAttivo === null ? 'bassa' : 'media')
-    .value(massimale);
+  return (
+    builder
+      .formula('Benchmark per classe di totale attivo')
+      .input(
+        'Totale attivo',
+        facts.totaleAttivo === null ? 'da rilevare in intervista' : Money.formatCompact(facts.totaleAttivo),
+      )
+      /*
+      «0» non è un conteggio, è un'assenza.
+
+      Le cariche arrivano solo con il profilo completo: sotto quel livello l'elenco è
+      vuoto perché nessuno le ha comprate, non perché la società non abbia
+      amministratori. Stampare «Amministratori in carica: 0» dentro il ragionamento sul
+      massimale D&O di un documento di adeguatezza afferma una cosa impossibile su una
+      società attiva, e lo faceva su ogni analisi non approfondita.
+    */
+      .input(
+        'Amministratori in carica',
+        facts.numeroAmministratori === null
+          ? 'non acquisiti: li porta il profilo completo'
+          : String(facts.numeroAmministratori),
+      )
+      .note(
+        'In caso di liquidazione giudiziale l’azione di responsabilità è esercitata dal curatore ' +
+          '(art. 255 CCII): il massimale va rapportato al passivo potenziale, non al compenso dell’organo.',
+      )
+      /*
+      L'art. 2497 c.c. grava su chi ESERCITA la direzione, a tutela dei soci e dei
+      creditori della società diretta. Con un solo booleano per entrambe le posizioni,
+      il prodotto diceva alla controllata — cioè alla parte che la norma protegge — di
+      esserne responsabile.
+    */
+      .noteIf(
+        facts.esercitaDirezioneECoordinamento,
+        'La società esercita direzione e coordinamento: risponde verso i soci e i creditori delle società ' +
+          'dirette (art. 2497 c.c.). Verificare che la D&O comprenda questa responsabilità e gli incarichi ' +
+          'ricoperti nelle controllate.',
+      )
+      .noteIf(
+        facts.soggettaADirezioneECoordinamento,
+        'La società è soggetta a direzione e coordinamento: verificare se esiste una D&O di gruppo che la ' +
+          'comprenda, e se copre gli amministratori per il concorso nel fatto lesivo (art. 2497, c. 2, c.c.).',
+      )
+      .confidence(facts.totaleAttivo === null ? 'bassa' : 'media')
+      .value(massimale)
+  );
 }
 
 function calcolaMassimaleCyber(facts: CompanyFacts): Explained<Euro> {
@@ -641,7 +830,10 @@ function calcolaMassimaleCyber(facts: CompanyFacts): Explained<Euro> {
 
   return builder
     .formula('Benchmark per classe di fatturato, raddoppiato in presenza di dati particolari o e-commerce')
-    .input('Fatturato', facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato))
+    .input(
+      'Fatturato',
+      facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato),
+    )
     .input(
       'Margine mensile a rischio di fermo',
       facts.margineDiContribuzione === null
@@ -652,7 +844,9 @@ function calcolaMassimaleCyber(facts: CompanyFacts): Explained<Euro> {
       'Il massimale deve coprire tre voci distinte: ripristino dei sistemi, perdita di margine per il ' +
         'fermo operativo e responsabilità verso gli interessati.',
     )
-    .note('Verificare i requisiti minimi di sicurezza imposti dalla compagnia: la loro assenza è causa di decadenza.')
+    .note(
+      'Verificare i requisiti minimi di sicurezza imposti dalla compagnia: la loro assenza è causa di decadenza.',
+    )
     .confidence(facts.fatturato === null ? 'bassa' : 'media')
     .value(massimale);
 }

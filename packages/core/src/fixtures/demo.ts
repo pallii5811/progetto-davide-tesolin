@@ -18,6 +18,7 @@ import {
 import type { IndicatoriFornitore } from '../company/indicatori-fornitore.js';
 import { reclassify } from '../company/financials.js';
 import type { Bilancio, BilancioSintetico } from '../company/financials.js';
+import { BILANCIO_DICHIARATO_VUOTO } from '../company/profile.js';
 import type { CompanyProfile, Indirizzo } from '../company/profile.js';
 import type { PolizzaInEssere } from '../coverage/policy.js';
 
@@ -265,7 +266,32 @@ export function demoCompanyProfile(): CompanyProfile {
       REGISTRO_IMPRESE,
       osservato,
     ),
+    /*
+      L'impresa dimostrativa non appartiene a un gruppo, e il registro lo dichiara.
+
+      È diverso da «non lo sappiamo»: qui `appartieneAGruppo` è `false` perché il dato c'è
+      ed è negativo. Quando il registro tace il campo resta `null`, e la scheda lo scrive
+      in un modo diverso — che è tutto il punto della distinzione.
+    */
+    gruppo: fromProvider(
+      {
+        appartieneAGruppo: false,
+        denominazione: null,
+        verticeDichiarato: null,
+        controllateTotali: null,
+      },
+      PROVIDER,
+      'IT-full',
+      REGISTRO_IMPRESE,
+      osservato,
+    ),
     datiDichiarati: {
+      /*
+        L'azienda dimostrativa ha il bilancio CEE completo, quindi qui non serve nulla:
+        il dichiarato è il ripiego per chi quel bilancio non l'ha comprato, e non deve mai
+        scavalcare il registro.
+      */
+      bilancio: BILANCIO_DICHIARATO_VUOTO,
       immobili: [
         {
           descrizione: 'Capannone produttivo con palazzina uffici — Adro (BS)',

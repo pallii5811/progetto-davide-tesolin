@@ -14,13 +14,23 @@ import type { AssessedRisk, RiskAssessment } from '../risk/engine.js';
 import { riskLevelRank } from '../risk/assessment.js';
 import type { RiskLevel } from '../risk/assessment.js';
 import type { CatNatAssessment } from './catnat.js';
-import { capitaleDiPolizza, giorniAllaScadenza, indexPolizze, soggettaARegolaProporzionale } from './policy.js';
+import {
+  capitaleDiPolizza,
+  giorniAllaScadenza,
+  indexPolizze,
+  soggettaARegolaProporzionale,
+} from './policy.js';
 import type { PolizzaInEssere } from './policy.js';
 import type { SumsInsured } from './sums-insured.js';
 import { COVERAGE_CATALOG } from './taxonomy.js';
 import type { CoverageDefinition, CoverageId } from './taxonomy.js';
 import { computeUnderinsurance } from './underinsurance.js';
 import type { Underinsurance } from './underinsurance.js';
+import type { DannoMassimo } from './danno-massimo.js';
+import { componiMotivazioneCopertura, obbligoPerImpresa } from './motivazione.js';
+import type { ObbligoPerImpresa } from './motivazione.js';
+import type { CompanyFacts } from '../company/facts.js';
+import type { Confidence } from '../shared/provenance.js';
 
 export type GapStatus =
   /** Copertura necessaria e completamente assente. */
@@ -59,10 +69,28 @@ export interface CoverageGap {
   readonly capitaleInEssere: Euro | null;
   readonly polizza: PolizzaInEssere | null;
   readonly sottoassicurazione: Explained<Underinsurance | null> | null;
+  /**
+   * `true` solo quando l'obbligo grava su **questa** impresa.
+   *
+   * Conservato per compatibilità con chi già lo legge; il dettaglio — compreso il caso
+   * «non si sa» e il motivo dell'esclusione — sta in `obbligo`.
+   */
   readonly obbligoDiLegge: boolean;
+  readonly obbligo: ObbligoPerImpresa;
   readonly azione: string;
   /** Motivazione pronta per il fascicolo di adeguatezza (Reg. IVASS 40/2018, All. 4-ter). */
   readonly motivazioneAdeguatezza: string;
+  /**
+   * I fatti in base ai quali la motivazione è stata scritta.
+   *
+   * Davanti a una contestazione la domanda non è «cosa avete scritto» ma «in base a
+   * quale fatto»: senza questa riga il fascicolo non ha risposta.
+   */
+  readonly motivazionePresupposti: readonly string[];
+  /** Le sole norme applicabili a questa impresa, non quelle della copertura in astratto. */
+  readonly motivazioneRiferimenti: readonly string[];
+  /** `bassa` quando un frammento poggia su un dato che nessuno ha rilevato. */
+  readonly motivazioneConfidenza: Confidence;
   readonly insidie: readonly string[];
   /** Chi fa cosa ed entro quando: l'ISO 31000 chiede che il trattamento sia un piano. */
   readonly piano: PianoDiTrattamento;
@@ -128,14 +156,31 @@ export interface GapAnalysis {
 
 export interface GapAnalysisInput {
   readonly assessment: RiskAssessment;
+  /**
+   * I fatti dell'impresa.
+   *
+   * Senza di essi la motivazione di adeguatezza non poteva che essere uguale per tutti:
+   * era il motivo strutturale per cui clausole valide solo per alcune forme giuridiche
+   * finivano stampate a chiunque.
+   */
+  readonly facts: CompanyFacts;
   readonly sums: SumsInsured;
   readonly polizze: readonly PolizzaInEssere[];
   readonly catNat: CatNatAssessment | null;
+  /**
+   * Il danno massimo probabile, quando è stato stimato.
+   *
+   * Serve a giudicare una polizza scritta a **primo rischio assoluto**: quella forma non
+   * si misura sul valore dei beni ma sulla perdita attesa in un solo sinistro, ed è il
+   * metro che mancava. Vale per l'incendio, perché il modello è fisicamente specifico di
+   * quel rischio: compartimentazione e sprinkler non fanno nulla contro un sisma.
+   */
+  readonly dannoMassimo: DannoMassimo | null;
   readonly asOf: Date;
 }
 
 export function analyzeGaps(input: GapAnalysisInput): GapAnalysis {
-  const { assessment, sums, polizze, catNat, asOf } = input;
+  const { assessment, facts, sums, polizze, catNat, dannoMassimo, asOf } = input;
   const indice = indexPolizze(polizze);
 
   // Coperture da valutare: quelle richieste dall'analisi dei rischi più quelle
@@ -150,7 +195,18 @@ export function analyzeGaps(input: GapAnalysisInput): GapAnalysis {
 
   const gaps: CoverageGap[] = [];
   for (const coverageId of daValutare) {
-    gaps.push(buildGap(coverageId, assessment, sums, indice.get(coverageId) ?? null, catNat, asOf));
+    gaps.push(
+      buildGap(
+        coverageId,
+        assessment,
+        facts,
+        sums,
+        indice.get(coverageId) ?? null,
+        catNat,
+        dannoMassimo,
+        asOf,
+      ),
+    );
   }
 
   // Ordinamento totale e deterministico: due esecuzioni sulla stessa azienda devono
@@ -188,9 +244,11 @@ export function analyzeGaps(input: GapAnalysisInput): GapAnalysis {
 function buildGap(
   coverageId: CoverageId,
   assessment: RiskAssessment,
+  facts: CompanyFacts,
   sums: SumsInsured,
   polizza: PolizzaInEssere | null,
   catNat: CatNatAssessment | null,
+  dannoMassimo: DannoMassimo | null,
   asOf: Date,
 ): CoverageGap {
   const definition = COVERAGE_CATALOG[coverageId];
@@ -205,10 +263,15 @@ function buildGap(
     capitaleRaccomandato.value,
     capitaleInEssere,
     polizza,
+    dannoMassimo,
     asOf,
   );
 
-  const priorita = calcolaPriorita(definition, status, livelloRischioMassimo, catNat);
+  // L'obbligo è dell'impresa, non della copertura: la CAT NAT non è dovuta da chi la
+  // legge esclude, e la RCA nasce dal veicolo posto in circolazione.
+  const obbligo = obbligoPerImpresa(definition, facts, catNat);
+  const priorita = calcolaPriorita(obbligo, status, livelloRischioMassimo, catNat, definition.id);
+  const motivazione = componiMotivazioneCopertura(definition, facts, rischiServiti, catNat);
 
   return {
     definition,
@@ -220,11 +283,15 @@ function buildGap(
     capitaleInEssere,
     polizza,
     sottoassicurazione,
-    obbligoDiLegge: definition.obbligoDiLegge,
+    obbligoDiLegge: obbligo.dovuto === true,
+    obbligo,
     azione: descriviAzione(definition, status, capitaleRaccomandato.value, capitaleInEssere, polizza, asOf),
-    motivazioneAdeguatezza: componiMotivazione(definition, rischiServiti),
+    motivazioneAdeguatezza: motivazione.testo,
+    motivazionePresupposti: motivazione.presupposti,
+    motivazioneRiferimenti: motivazione.riferimenti,
+    motivazioneConfidenza: motivazione.confidenza,
     insidie: definition.insidie,
-    piano: componiPiano(status, definition, livelloRischioMassimo, polizza, catNat, asOf),
+    piano: componiPiano(status, obbligo, livelloRischioMassimo, polizza, catNat, asOf),
   };
 }
 
@@ -237,7 +304,7 @@ function buildGap(
  */
 function componiPiano(
   status: GapStatus,
-  definition: CoverageDefinition,
+  obbligo: ObbligoPerImpresa,
   livello: RiskLevel | null,
   polizza: PolizzaInEssere | null,
   catNat: CatNatAssessment | null,
@@ -246,13 +313,29 @@ function componiPiano(
   const fraGiorni = (giorni: number): Date => new Date(asOf.getTime() + giorni * 86_400_000);
 
   // Obbligo di legge non adempiuto: il termine è già passato, non se ne fissa un altro.
-  if (definition.obbligoDiLegge && status === 'assente') {
+  //
+  // `dovuto === true` e non `definition.obbligoDiLegge`: quest'ultimo è una proprietà
+  // della copertura e vale per chiunque. Con quello, a un'impresa agricola — che dalla
+  // CAT NAT è esclusa per legge — il piano dichiarava un termine scaduto oggi stesso,
+  // perché `catNat.termine` per una non soggetta è `null` e il ripiego era `asOf`.
+  if (obbligo.dovuto === true && status === 'assente') {
     return {
       urgenza: 'immediata',
       termine: catNat?.termine ?? asOf,
       aCura: 'intermediario',
       motivazioneTermine:
         'Obbligo di legge: il termine è fissato dalla norma, non dalla pianificazione. Va documentato di averlo rappresentato al cliente anche se questi decide di non adempiere.',
+    };
+  }
+
+  // «Non so se sei obbligato» non è «sei inadempiente»: si verifica, non si intima.
+  if (obbligo.dovuto === null && status === 'assente') {
+    return {
+      urgenza: 'prossima-revisione',
+      termine: null,
+      aCura: 'congiunta',
+      motivazioneTermine:
+        'Per questa copertura esiste un obbligo di legge, ma il dato che stabilisce se gravi su questa impresa non è stato rilevato. Va accertato prima di dichiarare un inadempimento.',
     };
   }
 
@@ -439,7 +522,10 @@ function calcolaEsposizioneNonAssicurata(gaps: readonly CoverageGap[]): Euro {
     const raccomandato = gap.capitaleRaccomandato.value;
     if (raccomandato === null) continue;
 
-    const mancante = Money.max(Money.ZERO, Money.subtract(raccomandato, gap.capitaleInEssere ?? Money.ZERO));
+    const mancante = Money.max(
+      Money.ZERO,
+      Money.subtract(raccomandato, gap.capitaleInEssere ?? Money.ZERO),
+    );
     const attuale = perBase.get(base) ?? Money.ZERO;
     if (mancante > attuale) perBase.set(base, mancante);
   }
@@ -452,6 +538,7 @@ function determinaStato(
   raccomandato: Euro | null,
   inEssere: Euro | null,
   polizza: PolizzaInEssere | null,
+  dannoMassimo: DannoMassimo | null,
   asOf: Date,
 ): { status: GapStatus; sottoassicurazione: Explained<Underinsurance | null> | null } {
   if (polizza === null) {
@@ -463,9 +550,35 @@ function determinaStato(
   }
 
   if (isGaranziaAValore(coverageId)) {
+    /*
+      La polizza in essere si giudica sulla SUA forma, non su quella raccomandata.
+
+      Sono due domande diverse che finora condividevano un numero solo: «quanto
+      proporre» e «quanto vale il contratto che c'è già». Un cliente che ha comprato bene
+      — primo rischio sul danno probabile, su protezioni accertate — deve leggere
+      «adeguata»; e uno con una polizza a valore intero da 2 M su 6,2 M di beni deve
+      continuare a leggere che al sinistro prende un terzo.
+
+      Il metro del primo rischio è il danno massimo probabile, e vale per il solo
+      incendio: il modello è fisicamente specifico di quel rischio. Su furto o guasti
+      macchine riusarlo produrrebbe un numero vero in apparenza e senza base — un ladro
+      non ragiona per carico d'incendio.
+    */
+    const aValoreIntero = soggettaARegolaProporzionale(polizza);
+    const riferimentoPrimoRischio =
+      coverageId === 'incendio' && dannoMassimo !== null ? dannoMassimo.probabile : undefined;
+
     const verifica = computeUnderinsurance(raccomandato, inEssere, {
-      soggettaARegolaProporzionale: soggettaARegolaProporzionale(polizza),
+      soggettaARegolaProporzionale: aValoreIntero,
+      ...(riferimentoPrimoRischio === undefined ? {} : { riferimentoAdeguatezza: riferimentoPrimoRischio }),
     });
+
+    // Il limite di un primo rischio senza un metro non si può giudicare: dirlo è più
+    // utile che dedurne un'insufficienza dal confronto con il valore intero, che è il
+    // confronto sbagliato per costruzione.
+    if (verifica.value?.adeguatezzaDelLimite === 'non-verificabile') {
+      return { status: 'da-quantificare', sottoassicurazione: verifica };
+    }
     if (verifica.value?.sottoassicurata === true) {
       return { status: 'sottoassicurata', sottoassicurazione: verifica };
     }
@@ -486,10 +599,11 @@ function determinaStato(
 }
 
 function calcolaPriorita(
-  definition: CoverageDefinition,
+  obbligo: ObbligoPerImpresa,
   status: GapStatus,
   livello: RiskLevel | null,
   catNat: CatNatAssessment | null,
+  coverageId: CoverageId,
 ): number {
   const pesoRischio = livello === null ? 0.4 : (riskLevelRank(livello) + 1) / 5;
 
@@ -510,11 +624,14 @@ function calcolaPriorita(
   // di legge già scaduti, che devono restare in cima senza pareggi.
   let priorita = Math.min(99, pesoRischio * pesoStato * 100);
 
-  // Un obbligo di legge non adempiuto viene prima di qualunque valutazione di merito.
-  if (definition.obbligoDiLegge && status !== 'adeguata' && status !== 'in-scadenza') {
+  // Un obbligo di legge non adempiuto viene prima di qualunque valutazione di merito —
+  // ma solo se grava davvero su questa impresa. `dovuto === null` non forza nulla:
+  // un obbligo non accertato non è un inadempimento, e metterlo in cima al piano
+  // sposterebbe in basso i rischi reali per una supposizione.
+  if (obbligo.dovuto === true && status !== 'adeguata' && status !== 'in-scadenza') {
     priorita = Math.max(priorita, 92);
   }
-  if (definition.id === 'catastrofali' && catNat?.status === 'inadempiente') {
+  if (coverageId === 'catastrofali' && obbligo.dovuto === true && catNat?.status === 'inadempiente') {
     priorita = 100;
   }
 
@@ -536,9 +653,7 @@ function descriviAzione(
         : `Attivare la copertura ${definition.label} con capitale di ${Money.formatCompact(raccomandato)}.`;
     case 'sottoassicurata': {
       const delta =
-        raccomandato !== null && inEssere !== null
-          ? Money.subtract(raccomandato, inEssere)
-          : null;
+        raccomandato !== null && inEssere !== null ? Money.subtract(raccomandato, inEssere) : null;
       return delta === null
         ? `Adeguare la somma assicurata di ${definition.label}.`
         : `Integrare la somma assicurata di ${Money.formatCompact(delta)} ` +
@@ -558,28 +673,6 @@ function descriviAzione(
     case 'adeguata':
       return 'Copertura congrua: nessun intervento richiesto in questa fase.';
   }
-}
-
-/**
- * Motivazione dell'adeguatezza: catena rischio → esigenza → copertura.
- * È il testo che l'intermediario deve poter esibire a fronte di una contestazione.
- */
-function componiMotivazione(
-  definition: CoverageDefinition,
-  rischiServiti: readonly AssessedRisk[],
-): string {
-  if (rischiServiti.length === 0) {
-    return definition.motivazioneTipo;
-  }
-  const principali = [...rischiServiti]
-    .sort((a, b) => b.residualScore - a.residualScore)
-    .slice(0, 3)
-    .map((r) => `${r.definition.label.toLowerCase()} (rischio residuo ${r.residualLevel})`);
-
-  return (
-    `${definition.motivazioneTipo} L'analisi ha rilevato i seguenti rischi residui a carico ` +
-    `dell'impresa: ${principali.join('; ')}.`
-  );
 }
 
 function worstLevel(risks: readonly AssessedRisk[]): RiskLevel | null {

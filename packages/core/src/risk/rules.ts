@@ -21,15 +21,29 @@ import type { CompanyFacts } from '../company/facts.js';
 import { atecoStartsWith } from '../shared/identifiers.js';
 import type { RiskId } from './taxonomy.js';
 import { worstExposure } from './geo.js';
+import { normaResponsabilitaAmministratori, regimeDiResponsabilita } from '../governance/norme.js';
 
 export type Verdict = true | false | 'ignoto';
+
+/**
+ * Il motivo per cui la regola si è accesa, come lo legge l'utente.
+ *
+ * Può essere una funzione dei fatti, e in un caso **doveva** esserlo: una regola
+ * annunciava «ogni mese di fermo vale oltre 80.000 €» prendendo il numero dalla propria
+ * soglia divisa per dodici, non dal margine di quell'impresa. Su un'azienda con dodici
+ * milioni di margine il numero vero era dodici volte quello mostrato — e il broker lo
+ * leggeva a voce al cliente.
+ *
+ * Resta una **composizione**, non una generazione: frammenti fissi più i valori.
+ */
+export type Rationale = string | ((facts: CompanyFacts) => string);
 
 export interface IdentifyRule {
   readonly kind: 'identifica';
   readonly id: string;
   readonly risk: RiskId;
   readonly when: (facts: CompanyFacts) => Verdict;
-  readonly rationale: string;
+  readonly rationale: Rationale;
 }
 
 export interface ModulateRule {
@@ -41,7 +55,22 @@ export interface ModulateRule {
   readonly likelihood?: number | undefined;
   /** Variazione dell'impatto, in passi della scala 1-5. */
   readonly impact?: number | undefined;
-  readonly rationale: string;
+  readonly rationale: Rationale;
+}
+
+/**
+ * Risolve il motivo sui fatti di questa impresa.
+ *
+ * Una composizione difettosa non deve far cadere l'analisi: se solleva, si ripiega su una
+ * frase generica e vera invece che su una plausibile.
+ */
+export function risolviRationale(rationale: Rationale, facts: CompanyFacts): string {
+  if (typeof rationale === 'string') return rationale;
+  try {
+    return rationale(facts);
+  } catch {
+    return 'Motivazione non componibile con i dati disponibili.';
+  }
 }
 
 /**
@@ -314,7 +343,20 @@ export const RISK_RULES: readonly RiskRule[] = [
     risk: 'fermo-attivita',
     when: (f) => importoOltre(f.margineDiContribuzione, 1_000_000),
     impact: 1,
-    rationale: 'Margine di contribuzione annuo superiore a 1 M€: ogni mese di fermo vale oltre 80.000 €.',
+    /*
+      Il numero è di questa impresa, non della soglia.
+
+      Qui c'era «ogni mese di fermo vale oltre 80.000 €»: ottantamila è un milione diviso
+      dodici, cioè la soglia della regola. Su un'azienda con dodici milioni di margine il
+      valore vero era dodici volte tanto, e il broker leggeva al cliente il numero
+      sbagliato — per difetto, che su una business interruption è il verso peggiore.
+    */
+    rationale: (f) =>
+      f.margineDiContribuzione === null
+        ? 'Margine di contribuzione rilevante: ogni mese di fermo attività ne perde una quota.'
+        : `Margine di contribuzione annuo di ${Money.formatCompact(f.margineDiContribuzione)}: ` +
+          `ogni mese di fermo vale ${Money.formatCompact(Money.multiply(f.margineDiContribuzione, 1 / 12))} ` +
+          'di margine perso.',
   },
   {
     kind: 'modula',
@@ -377,8 +419,10 @@ export const RISK_RULES: readonly RiskRule[] = [
     risk: 'rc-verso-terzi',
     when: (f) => f.responsabilitaIllimitata,
     impact: 1,
-    rationale:
-      'Forma giuridica a responsabilità illimitata: il risarcimento aggredisce anche il patrimonio dei soci.',
+    // «Il patrimonio dei soci» non vale per tutte e quattro le forme: nell'accomandita
+    // rispondono i soli accomandatari, e nella ditta individuale non ci sono soci ma
+    // l'imprenditore. Il regime esatto lo compone `governance/norme.ts`.
+    rationale: (f) => regimeDiResponsabilita(f.formaGiuridica).testo,
   },
 
   {
@@ -420,8 +464,23 @@ export const RISK_RULES: readonly RiskRule[] = [
       if (settore === true) return true;
       return dichiarato === 'ignoto' || settore === 'ignoto' ? 'ignoto' : false;
     },
-    rationale:
-      'Immissione di prodotti sul mercato: responsabilità oggettiva del produttore o del distributore.',
+    /*
+      Produttore e fornitore non rispondono allo stesso modo.
+
+      Qui c'era «responsabilità oggettiva del produttore o del distributore». Per il mero
+      fornitore la responsabilità è **sussidiaria**: scatta solo se il produttore non è
+      individuato e il fornitore non ne comunica l'identità entro tre mesi (art. 116 Cod.
+      cons.). Dire a un negozio che risponde come chi ha fabbricato il prodotto è falso.
+    */
+    rationale: (f) =>
+      f.produceBeniFinali === true
+        ? 'Immissione sul mercato di prodotti finiti: il produttore risponde del danno da prodotto ' +
+          'difettoso a prescindere dalla colpa (artt. 114 e 118 D.Lgs. 206/2005).'
+        : f.produceBeniFinali === false
+          ? 'Commercializzazione di prodotti: il fornitore risponde in via sussidiaria quando il ' +
+            'produttore non è individuato (art. 116 D.Lgs. 206/2005).'
+          : 'Prodotti immessi sul mercato: il regime di responsabilità dipende dal ruolo nella catena — ' +
+            'oggettivo per il produttore, sussidiario per il solo fornitore — e va accertato.',
   },
   {
     kind: 'modula',
@@ -572,7 +631,15 @@ export const RISK_RULES: readonly RiskRule[] = [
       f.formaGiuridica === 'srls' ||
       f.formaGiuridica === 'sapa' ||
       f.formaGiuridica === 'cooperativa',
-    rationale: 'Società di capitali: gli amministratori rispondono personalmente ex artt. 2392 ss. c.c.',
+    // La norma non è la stessa per tutte. Qui c'era «artt. 2392 ss. c.c.» per tutte e
+    // cinque le forme: sono norme della S.p.A., citate a ogni S.r.l. — cioè alla forma
+    // più diffusa del portafoglio, e a quella dell'azienda dimostrativa.
+    rationale: (f) => {
+      const norma = normaResponsabilitaAmministratori(f.formaGiuridica);
+      return norma === null
+        ? 'Società di capitali: gli amministratori rispondono personalmente verso la società, i soci e i terzi.'
+        : `Società di capitali: gli amministratori rispondono personalmente ex ${norma}`;
+    },
   },
   {
     kind: 'modula',
@@ -583,14 +650,34 @@ export const RISK_RULES: readonly RiskRule[] = [
     rationale:
       'Totale attivo superiore a 5 M€: entità delle azioni di responsabilità proporzionalmente maggiore.',
   },
+  /*
+    Le due posizioni nel gruppo non si equivalgono, e prima condividevano una regola sola.
+
+    L'art. 2497 c.c. grava su chi ESERCITA la direzione e il coordinamento, a tutela dei
+    soci e dei creditori della società diretta. Con `appartieneAGruppo` — vero anche per
+    la controllata — il prodotto diceva alla parte che la norma protegge di esserne
+    responsabile: rovesciava il ruolo giuridico.
+  */
   {
     kind: 'modula',
-    id: 'd-and-o/gruppo',
+    id: 'd-and-o/gruppo-esercita-direzione',
     risk: 'responsabilita-amministratori',
-    when: (f) => f.appartieneAGruppo,
+    when: (f) => f.esercitaDirezioneECoordinamento,
     likelihood: 1,
     rationale:
-      'Appartenenza a gruppo societario: responsabilità da direzione e coordinamento ex art. 2497 c.c.',
+      'La società esercita direzione e coordinamento su altre società: risponde verso i soci e i ' +
+      'creditori delle dirette (art. 2497 c.c.).',
+  },
+  {
+    kind: 'modula',
+    id: 'd-and-o/gruppo-soggetta-a-direzione',
+    risk: 'responsabilita-amministratori',
+    when: (f) => f.soggettaADirezioneECoordinamento,
+    likelihood: 1,
+    rationale:
+      'La società è soggetta a direzione e coordinamento: i suoi amministratori rispondono in solido ' +
+      'con la capogruppo se hanno preso parte al fatto lesivo (art. 2497, c. 2, c.c.), e vanno ' +
+      'verificati i limiti della D&O di gruppo.',
   },
   {
     kind: 'identifica',
@@ -602,19 +689,46 @@ export const RISK_RULES: readonly RiskRule[] = [
   },
   {
     kind: 'identifica',
-    id: '231/enti-strutturati',
+    id: '231/enti',
+    risk: 'sanzioni-231',
+    /*
+      Il perimetro della norma non ha soglie dimensionali.
+
+      L'art. 1, c. 2, D.Lgs. 231/2001 comprende «gli enti forniti di personalità giuridica
+      e le società e associazioni anche prive di personalità giuridica»: niente addetti,
+      niente fatturato. Il filtro precedente — società di capitali *e* oltre 15 addetti o
+      5 M€ — lasciava fuori la S.r.l.s., l'accomandita, la s.n.c. e la s.a.s., e con esse
+      ogni impresa piccola. È un falso negativo su un rischio con sanzioni interdittive
+      che possono fermare l'attività.
+
+      Le soglie erano un criterio commerciale di priorità travestito da perimetro
+      normativo: la priorità resta, ma la dice la modulazione qui sotto, non l'esclusione.
+    */
+    when: (f) =>
+      f.formaGiuridica === 'ditta-individuale'
+        ? // L'impresa individuale non è un ente distinto dalla persona: fuori perimetro.
+          false
+        : true,
+    rationale:
+      'La responsabilità amministrativa da reato riguarda gli enti e le società, senza soglie ' +
+      'dimensionali (art. 1, c. 2, D.Lgs. 231/2001). Le sanzioni comprendono misure interdittive ' +
+      'che possono sospendere l’attività.',
+  },
+  {
+    kind: 'modula',
+    id: '231/ente-strutturato',
     risk: 'sanzioni-231',
     when: (f) => {
-      const societaDiCapitali =
-        f.formaGiuridica === 'spa' || f.formaGiuridica === 'srl' || f.formaGiuridica === 'cooperativa';
-      if (!societaDiCapitali) return false;
       const perAddetti = numeroOltre(f.addetti, 15);
       if (perAddetti === true) return true;
       const perFatturato = importoOltre(f.fatturato, 5_000_000);
       if (perFatturato === true) return true;
       return perAddetti === 'ignoto' && perFatturato === 'ignoto' ? 'ignoto' : false;
     },
-    rationale: 'Ente strutturato esposto alla responsabilità amministrativa da reato ex D.Lgs. 231/2001.',
+    likelihood: 1,
+    rationale:
+      'Organizzazione strutturata: più funzioni delegate, più occasioni in cui un reato presupposto ' +
+      'può essere commesso nell’interesse dell’ente.',
   },
 
   // ── Credito ───────────────────────────────────────────────────────────────
