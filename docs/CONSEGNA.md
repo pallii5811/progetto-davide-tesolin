@@ -139,6 +139,7 @@ perché una divisione non comprende le proprie sottocategorie. È una stranezza 
 ed è dichiarata nel modulo; il contatore gratuito permette di scoprirla in due tentativi.
 
 ---
+
 ## 5. Dati reali
 
 Il profilo aziendale arriva da [OpenAPI.com](https://openapi.com). In `.env`:
@@ -197,6 +198,7 @@ requisito patrimoniale — - 150% debole · 200% adeguata · 250% solida · oltr
 solida. La media del mercato italiano si colloca stabilmente sopra il 250%.
 
 ---
+
 ## 5-ter. Tetto di spesa
 
 `AEGIS_TETTO_SPESA_GIORNALIERO_CENTESIMI` — predefinito **2000** (20 € al giorno per
@@ -247,7 +249,7 @@ valido — senza, nessuno riesce più ad accedere, ed è il comportamento voluto
 
 #### Fonti territoriali
 
-Sono **gratuite**, ma nessuna delle due è gratuita *per un prodotto venduto* alle stesse
+Sono **gratuite**, ma nessuna delle due è gratuita _per un prodotto venduto_ alle stesse
 condizioni con cui lo è per una prova. Vanno lette prima di andare in esercizio.
 
 ```
@@ -298,49 +300,55 @@ npm run start --workspace @aegis/web  # frontend, porta 3000
 Il frontend parla con l'API tramite `AEGIS_API_URL`; l'unico processo che deve essere
 raggiungibile dai browser è il frontend.
 
-### 6.4 Row Level Security — ora si può applicare
+### 6.4 Row Level Security — non ancora, e conviene sapere perché
 
-Le policy in `packages/db/src/rls.ts` sono scritte e **inerti** finché non le si applica
-come migrazione. Il collegamento applicativo che serviva — l'impostazione di
-`app.tenant_id` a ogni transazione — **è stato fatto il 22/08/2026**: ogni metodo del
-contesto di uno studio passa da `conTenant`, che apre una transazione e vi dichiara
-l'identificativo con `SET LOCAL`.
+Le policy in `packages/db/src/rls.ts` sono scritte e **inerti**: nessuna migrazione le
+applica. **Non applicarle.** Questa sezione dice cosa manca, così la decisione non poggia
+su una data ma su un elenco che si può contare.
 
-Resta da fare, e va fatto su un PostgreSQL vero:
+Il collegamento applicativo che serve — `SET LOCAL app.tenant_id` all'apertura di ogni
+transazione — è stato fatto il 22/08/2026 **per il contesto di uno studio**: ogni metodo di
+`creaContesto` passa da `conTenant` (`apps/api/src/persistenza.ts`), che apre una
+transazione e vi dichiara l'identificativo. Non è però tutto il servizio.
 
-1. applicare il SQL delle policy come migrazione, **con il ruolo proprietario**;
-2. far connettere l'applicazione con un ruolo **non superuser**: i superuser scavalcano la
-   Row Level Security anche con `FORCE` — misurato il 20/08/2026, due righe di due
-   intermediari diversi entrambe visibili a policy attiva;
-3. collaudarlo: aprire due studi, analizzare un'azienda col primo, verificare che il
-   secondo non la veda. In sviluppo non si può provare, e una sicurezza non provata non è
-   una sicurezza.
+Restano **diciannove punti** che raggiungono una tabella protetta senza dichiarare per
+conto di quale studio. L'elenco non è stimato: lo misura
+`packages/db/test/isolamento-rls.test.ts` leggendo il codice, e il collaudo fallisce sia se
+se ne aggiunge uno sia se se ne risolve uno senza toglierlo dall'elenco — così il conto
+resta vero. Il peggiore è `trovaUtentePerEmail`, la ricerca dell'utente per indirizzo, che
+avviene _prima_ di sapere di quale studio si tratti: con le policy attive
+`current_setting('app.tenant_id')` torna vuoto, quella query restituisce zero righe e **non
+entra più nessuno** — senza un errore che lo spieghi.
 
-**Applicarle oggi manderebbe giù il prodotto.** Le policy filtrano su
-`current_setting('app.tenant_id')`, e l'applicazione **non imposta ancora quella
-variabile**: con `FORCE ROW LEVEL SECURITY` attivo, ogni query di un utente non superuser
-tornerebbe **zero righe** su un archivio pieno di dati — senza un errore che spieghi
-perché. Un portafoglio che appare vuoto è il guasto peggiore che questo prodotto possa
-mostrare.
+Alcuni di quei diciannove attraversano gli studi **per disegno** — l'elenco degli studi, la
+spesa complessiva della piattaforma, la creazione del primo amministratore di uno studio
+nuovo — e non vanno avvolti in `conTenant`: con `FORCE ROW LEVEL SECURITY` nemmeno il
+proprietario delle tabelle li vede. Serviranno un ruolo distinto e una decisione, non una
+deroga sparsa.
 
 **L'isolamento oggi in vigore è quello applicativo**, ed è reale: ogni repository filtra
 per `tenant_id` e c'è un collaudo che verifica su due studi distinti che nessuno veda i
-dati dell'altro. Manca il *secondo* strato, quello che regge se un giorno qualcuno
-dimentica un `where`.
+dati dell'altro. Manca il _secondo_ strato, quello che regge se un giorno qualcuno
+dimentica un `where`. **Su un'installazione con un solo studio la differenza è teorica**;
+diventa concreta il giorno in cui il secondo studio entra sulla stessa macchina, e quel
+giorno il lavoro va fatto prima, non dopo.
 
 Per accenderlo servono, in quest'ordine:
 
-1. un **PostgreSQL vero** su cui verificarlo. PGlite gira come superuser e i superuser
+1. **svuotare l'elenco dei diciannove aggiramenti**: avvolgere in `conTenant`
+   (`packages/db/src/tenant.ts`) ciò che appartiene a uno studio, e decidere separatamente
+   cosa fare di ciò che attraversa gli studi per disegno. Finché l'elenco non è vuoto, i
+   passi seguenti non vanno nemmeno tentati;
+2. un **PostgreSQL vero** su cui verificarlo. PGlite gira come superuser e i superuser
    scavalcano la Row Level Security anche con `FORCE`: misurato il 20/08/2026 — due righe
    di due intermediari diversi, entrambe visibili a policy attiva. In sviluppo non si può
    provare, e una sicurezza non provata non è una sicurezza;
-2. il collegamento di **`conTenant`** (`packages/db/src/tenant.ts`, già pronto) a ogni
-   metodo di `creaContesto`: apre una transazione e vi imposta `app.tenant_id`. È un
-   `SET LOCAL`, quindi il valore muore con la transazione e non resta appiccicato a una
-   connessione che il pool riassegna a un altro studio;
 3. un **ruolo applicativo non superuser** con cui il servizio si collega, altrimenti le
    policy non mordono nemmeno in produzione;
-4. `sqlAbilitaRls()` eseguito come proprietario delle tabelle.
+4. `sqlAbilitaRls()` eseguito come **proprietario** delle tabelle, sotto forma di
+   migrazione;
+5. **collaudarlo**: aprire due studi, analizzare un'azienda col primo, verificare che il
+   secondo non la veda — e che l'accesso funzioni ancora per entrambi.
 
 `cache_risposte` resta **fuori** dalle policy, deliberatamente: contiene dati pubblici del
 registro imprese comprati con un contratto unico, non dati di un cliente. Vedi il commento
@@ -472,10 +480,12 @@ Ma è una garanzia che dipende dalla disciplina di chi scrive il codice, non dal
 
 `packages/db/src/rls.ts` contiene le policy PostgreSQL che imporrebbero l'isolamento a
 livello di motore: se il codice sbaglia, il database restituisce zero righe invece dei dati
-di un altro studio. **Sono scritte e non sono mai state applicate.**
+di un altro studio. **Sono scritte e non sono mai state applicate — e oggi non vanno
+applicate.**
 
-Attivarle richiede due cose: eseguire quel SQL come migrazione con un ruolo proprietario, e
-impostare `SET LOCAL app.tenant_id` all'apertura di ogni transazione applicativa. È un
+Il motivo, l'elenco esatto di ciò che manca e l'ordine dei passi stanno nella sezione 6.4.
+In breve: diciannove punti del servizio raggiungono ancora una tabella protetta senza
+dichiarare per conto di quale studio, e il primo a cadere sarebbe l'accesso. È un
 intervento sul livello di accesso ai dati, va fatto su un PostgreSQL vero e va collaudato:
 non è materiale da ultima serata prima della consegna.
 

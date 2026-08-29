@@ -17,28 +17,28 @@ qualunque altra verifica.
 **Il confronto sul fac-simile è stato fatto** (20 pagine, lette il 19/08/2026). Le voci
 qui sotto che riguardano il modulo PMI non vengono più da una brochure ma dal loro
 documento, capitolo per capitolo. Resta vero il limite sulla piattaforma: il confronto è
-con i loro *documenti*, non con le loro schermate.
+con i loro _documenti_, non con le loro schermate.
 
 ---
 
 ## Creditsafe — sezioni del report aziendale
 
-| Sezione | Noi | Nota |
-|---|---|---|
-| Dati identificativi, sede, codici attività, recapiti | **sì** | più completo: REA, CCIAA, PEC, SDI, codice catastale, frazione |
-| Punteggio di merito creditizio 1–100 | **sì** | e ogni fattore è spiegato: peso, punteggio, motivazione |
-| Fido consigliato | **sì** | con il vincolo che lo determina, non solo il numero |
-| Bilanci storici | **sì** | fino a 10 esercizi, più la riclassificazione CEE |
-| Protesti, pregiudizievoli, procedure concorsuali | **sì** | sezione propria con date, importi, tribunale ed esito; distingue una procedura **chiusa** da una **revocata**, e dichiara quando il registro afferma senza dettagliare |
-| Amministratori, soci, titolare effettivo | **sì** | il titolare effettivo è **ricavato dai soci già acquistati** (art. 20 D.Lgs. 231/2007), senza spendere. La visura `IT-ubo` da 1,10 € si compra solo quando la catena non si chiude |
-| Struttura del gruppo, controllanti e controllate | **sì** | con controllanti/controllate estere |
-| **Comportamento di pagamento (DBT, giorni di ritardo)** | **no** | non acquistabile in Italia da alcun fornitore |
-| Violazioni di conformità (ambiente, lavoro, fisco) | **no** | non offerto dalla fonte dati attuale |
-| Verifica antiriciclaggio (D.Lgs. 231/2007) | **no** | ⚠ il servizio esiste ed è economico: `IT-aml`, 0,20 € (0,095 € con abbonamento) |
-| Monitoraggio con avvisi sui cambiamenti | **sì** | dieci tipi di evento, fra cui obblighi normativi |
-| Vista di portafoglio con segnalazione delle criticità | **sì** | ordinata per urgenza di intervento, non per punteggio |
-| Report internazionali (48 paesi) | **no** | solo Italia |
-| Esportazione di elenchi | **sì** | CSV per Excel italiano, con il filtro attivo e l'azione prioritaria in colonna |
+| Sezione                                                 | Noi    | Nota                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dati identificativi, sede, codici attività, recapiti    | **sì** | più completo: REA, CCIAA, PEC, SDI, codice catastale, frazione                                                                                                                                                                                                                                            |
+| Punteggio di merito creditizio 1–100                    | **sì** | e ogni fattore è spiegato: peso, punteggio, motivazione                                                                                                                                                                                                                                                   |
+| Fido consigliato                                        | **sì** | con il vincolo che lo determina, non solo il numero                                                                                                                                                                                                                                                       |
+| Bilanci storici                                         | **sì** | fino a 10 esercizi, più la riclassificazione CEE                                                                                                                                                                                                                                                          |
+| Protesti, pregiudizievoli, procedure concorsuali        | **sì** | sezione propria con date, importi, tribunale ed esito; distingue una procedura **chiusa** da una **revocata**, e dichiara quando il registro afferma senza dettagliare                                                                                                                                    |
+| Amministratori, soci, titolare effettivo                | **sì** | amministratori con codice fiscale, ruolo, data di nomina, rappresentanza legale ed età, dal profilo completo (0,30 €). Il titolare effettivo è **ricavato dai soci già acquistati** (art. 20 D.Lgs. 231/2007), senza spendere; la visura `IT-ubo` da 1,10 € si compra solo quando la catena non si chiude |
+| Struttura del gruppo, controllanti e controllate        | **sì** | appartenenza, denominazione, vertice dichiarato e numero di controllate; le controllanti estere aprono il tema del programma internazionale                                                                                                                                                               |
+| **Comportamento di pagamento (DBT, giorni di ritardo)** | **no** | non acquistabile in Italia da alcun fornitore                                                                                                                                                                                                                                                             |
+| Violazioni di conformità (ambiente, lavoro, fisco)      | **no** | non offerto dalla fonte dati attuale                                                                                                                                                                                                                                                                      |
+| Verifica antiriciclaggio (D.Lgs. 231/2007)              | **no** | ⚠ il servizio esiste ed è economico: `IT-aml`, 0,20 € (0,095 € con abbonamento)                                                                                                                                                                                                                           |
+| Monitoraggio con avvisi sui cambiamenti                 | **sì** | dieci tipi di evento, fra cui obblighi normativi                                                                                                                                                                                                                                                          |
+| Vista di portafoglio con segnalazione delle criticità   | **sì** | ordinata per urgenza di intervento, non per punteggio                                                                                                                                                                                                                                                     |
+| Report internazionali (48 paesi)                        | **no** | solo Italia                                                                                                                                                                                                                                                                                               |
+| Esportazione di elenchi                                 | **sì** | CSV per Excel italiano, con il filtro attivo e l'azione prioritaria in colonna                                                                                                                                                                                                                            |
 
 ### La ricerca: due modelli diversi
 
@@ -70,26 +70,26 @@ nessuno. Va detto al broker per primo, prima che lo scopra lui.
 
 ## Insurance Advisor — modulo PMI
 
-| Funzione | Noi | Nota |
-|---|---|---|
-| Analisi dei rischi ISO 31000:2018 | **sì** | con catalogo versionato e motivazioni per ogni modulazione |
-| Analisi su **ogni sede** aziendale | **sì** | rischio sismico e idraulico per ubicazione |
-| Indicatori CAT/NAT e vulnerabilità | **sì** | più la verifica dell'obbligo di legge (L. 213/2023) |
-| Valutazione economica dell'impatto dei rischi | **sì** | somme assicurande dal bilancio, danno massimo, EML/PML |
-| Estrazione automatica delle esigenze, conforme IDD | **sì** | motivazione di adeguatezza per ogni copertura |
-| Report personalizzato con il proprio marchio | **sì** | logo, denominazione e numero RUI in testata |
-| Mappatura per aree con scelta delle priorità | **sì** | registro rischi con priorità e piano d'azione |
-| **Tre livelli di profondità per area di rischio** | **sì** | sintetico, motivato, approfondito — e i numeri non cambiano fra i livelli: cambia quanto del ragionamento si stampa |
-| **Condivisione del questionario con il cliente** | **sì** | collegamento con scadenza e revoca, con il marchio dello studio; resta a verbale che ha compilato il cliente |
-| **Selezione di quali rischi portare nel report** | **sì** | e ogni esclusione è dichiarata nel documento: loro non lo fanno |
-| Scala di impatto economico a quattro fasce, con giorni di fermo | **sì** | e le soglie sono motivate: la più grave è l'art. 2446 c.c. Loro non le motivano |
-| Analisi economica pluriennale e schema del margine di contribuzione | **sì** | lo schema quadra col totale per costruzione, non per riimplementazione |
-| **Analisi del contesto per ubicazione** (soccorso, attività confinanti) | **sì** | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap |
-| **Valori di ricostruzione degli edifici** | **sì** | già calcolati per tipologia costruttiva; ora la superficie arriva dalla cartografia quando l'intervista non l'ha misurata |
+| Funzione                                                                    | Noi          | Nota                                                                                                                                                      |
+| --------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Analisi dei rischi ISO 31000:2018                                           | **sì**       | con catalogo versionato e motivazioni per ogni modulazione                                                                                                |
+| Analisi su **ogni sede** aziendale                                          | **sì**       | rischio sismico e idraulico per ubicazione                                                                                                                |
+| Indicatori CAT/NAT e vulnerabilità                                          | **sì**       | più la verifica dell'obbligo di legge (L. 213/2023)                                                                                                       |
+| Valutazione economica dell'impatto dei rischi                               | **sì**       | somme assicurande dal bilancio, danno massimo, EML/PML                                                                                                    |
+| Estrazione automatica delle esigenze, conforme IDD                          | **sì**       | motivazione di adeguatezza per ogni copertura                                                                                                             |
+| Report personalizzato con il proprio marchio                                | **sì**       | logo, denominazione e numero RUI in testata                                                                                                               |
+| Mappatura per aree con scelta delle priorità                                | **sì**       | registro rischi con priorità e piano d'azione                                                                                                             |
+| **Tre livelli di profondità per area di rischio**                           | **sì**       | sintetico, motivato, approfondito — e i numeri non cambiano fra i livelli: cambia quanto del ragionamento si stampa                                       |
+| **Condivisione del questionario con il cliente**                            | **sì**       | collegamento con scadenza e revoca, con il marchio dello studio; resta a verbale che ha compilato il cliente                                              |
+| **Selezione di quali rischi portare nel report**                            | **sì**       | e ogni esclusione è dichiarata nel documento: loro non lo fanno                                                                                           |
+| Scala di impatto economico a quattro fasce, con giorni di fermo             | **sì**       | e le soglie sono motivate: la più grave è l'art. 2446 c.c. Loro non le motivano                                                                           |
+| Analisi economica pluriennale e schema del margine di contribuzione         | **sì**       | lo schema quadra col totale per costruzione, non per riimplementazione                                                                                    |
+| **Analisi del contesto per ubicazione** (soccorso, attività confinanti)     | **sì**       | vigili del fuoco con tempo stimato e attività entro 300 m, da OpenStreetMap                                                                               |
+| **Valori di ricostruzione degli edifici**                                   | **sì**       | già calcolati per tipologia costruttiva; ora la superficie arriva dalla cartografia quando l'intervista non l'ha misurata                                 |
 | **Serie storica georiferita a 10 anni** (pioggia, grandine, vento, fulmini) | **parziale** | pioggia e raffiche sì, con giorni e anni oltre soglia; grandine e fulmini **no**, e il report lo dichiara. Spento di default: uso commerciale a pagamento |
-| **Immagini per ubicazione** | **sì** | caricamento per ubicazione, con didascalia; capitolo dedicato nel report |
-| Linea Condomini | **no** | fuori perimetro: il prodotto è sulle imprese |
-| Linea Famiglia | **no** | fuori perimetro |
+| **Immagini per ubicazione**                                                 | **sì**       | caricamento per ubicazione, con didascalia; capitolo dedicato nel report                                                                                  |
+| Linea Condomini                                                             | **no**       | fuori perimetro: il prodotto è sulle imprese                                                                                                              |
+| Linea Famiglia                                                              | **no**       | fuori perimetro                                                                                                                                           |
 
 ---
 
@@ -147,7 +147,7 @@ In ordine di valore.
 
    Quando la catena si interrompe su una società, prima della visura conviene **risalirla
    con un'altra anagrafica estesa a 0,10 €**: un decimo del prezzo per gradino.
-2-bis. **Antiriciclaggio** (endpoint `IT-aml`, **0,20 €** a chiamata, 0,095 € con
+   2-bis. **Antiriciclaggio** (endpoint `IT-aml`, **0,20 €** a chiamata, 0,095 € con
    abbonamento) e **cariche collegate** (`IT-stakeholders`, stesso prezzo). Entrambi erano
    segnati come lacune «non offerte dalla fonte dati»: non era vero, e costano meno di un
    quarto di un'analisi. L'antiriciclaggio è un **obbligo di legge** per

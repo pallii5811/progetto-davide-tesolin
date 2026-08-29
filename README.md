@@ -115,7 +115,7 @@ registro dei rischi, somme assicurande, verifica CAT NAT e piano d'azione.
 npm run verifica
 ```
 
-Compilazione in TypeScript strict, lint con informazioni di tipo, 259 test.
+Compilazione in TypeScript strict, lint con informazioni di tipo, 581 test.
 
 E il collaudo su browser reale — accesso, analisi, intervista, monitoraggio, gestione
 collaboratori — che usa la piattaforma come la userebbe un broker:
