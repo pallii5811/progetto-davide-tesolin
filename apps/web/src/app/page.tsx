@@ -3,6 +3,7 @@ import { INDIRIZZO_API, cercaAziende, statoServizio } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { ModuloRicerca } from './ModuloRicerca';
 import { SchedaRisultato } from './SchedaRisultato';
+import { formattaGiornoEsteso } from '@aegis/core/tempo';
 
 export const dynamic = 'force-dynamic';
 
@@ -176,11 +177,9 @@ export default async function PaginaRicerca({
       {risultati !== null && risultati.daArchivio === true && risultati.risultati.length > 0 && (
         <p className="mb-3 rounded border-l-2 border-basso bg-basso/5 py-1.5 pl-3 text-sm leading-relaxed">
           <strong>Trovata nel suo archivio — nessun costo.</strong> Questi dati sono già stati acquistati
-          {risultati.aggiornatoIl == null
-            ? ''
-            : ` il ${new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(new Date(risultati.aggiornatoIl))}`}
-          : la ricerca non ha consumato credito. Aprendo l&apos;azienda, l&apos;analisi userà gli stessi
-          dati senza ricomprarli.
+          {risultati.aggiornatoIl == null ? '' : ` il ${formattaGiornoEsteso(risultati.aggiornatoIl)}`}: la
+          ricerca non ha consumato credito. Aprendo l&apos;azienda, l&apos;analisi userà gli stessi dati
+          senza ricomprarli.
         </p>
       )}
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { chiamaApiConSessione } from '@/lib/chiamata-server';
+import { componentiDelGiorno } from '@aegis/core/tempo';
 
 export interface EsitoCensimento {
   readonly ok: boolean;
@@ -56,7 +57,7 @@ export async function censisciCompagnia(
         denominazione,
         gruppo: testo(modulo, 'gruppo'),
         codiceIvass: testo(modulo, 'codiceIvass'),
-        anno: numero(modulo, 'anno') ?? new Date().getFullYear() - 1,
+        anno: numero(modulo, 'anno') ?? componentiDelGiorno(new Date()).anno - 1,
         solvencyRatio: solvencyPercentuale === undefined ? undefined : solvencyPercentuale / 100,
         quotaTier1Unrestricted:
           numero(modulo, 'quotaTier1') === undefined ? undefined : numero(modulo, 'quotaTier1')! / 100,

@@ -15,6 +15,7 @@ import type { Explained } from '../shared/explain.js';
 import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import { formatNumber, formatPercent, interpolate, weightedAverageDefined } from '../shared/math.js';
+import { componentiDelGiorno } from '../shared/tempo.js';
 
 export type RatingAgenzia = 'AM Best' | 'S&P' | 'Fitch' | 'Moody’s' | 'KBRA';
 
@@ -112,7 +113,7 @@ export function computeCarrierStrength(data: CarrierData): Explained<CarrierStre
         'inadeguatezza patrimoniale ai sensi di Solvency II.',
     );
   }
-  const eta = new Date().getFullYear() - data.annoRiferimento;
+  const eta = componentiDelGiorno(new Date()).anno - data.annoRiferimento;
   if (eta >= 2) {
     allerte.push(
       `Dati SFCR riferiti al ${data.annoRiferimento}: aggiornare con l'ultimo esercizio pubblicato.`,

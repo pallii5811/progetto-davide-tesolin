@@ -10,6 +10,7 @@ import { SelezioneRischi } from './SelezioneRischi';
 import { DettaglioRischi } from './DettaglioRischi';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
+import { formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,9 +105,7 @@ export default async function PaginaReport({
   const studio: DatiStudio | null = await leggiStudio()
     .then((s) => ('errore' in s ? null : s))
     .catch(() => null);
-  const dataAnalisi = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(
-    new Date(analisi.asOf),
-  );
+  const dataAnalisi = formattaGiornoEsteso(analisi.asOf);
 
   const interventi = gap.voci.filter((v) => v.stato !== 'adeguata');
 
@@ -437,8 +436,7 @@ export default async function PaginaReport({
                           {i > 0 && '; '}
                           {c.nominativo}
                           {c.ruolo !== '' && `, ${c.ruolo.toLowerCase()}`}
-                          {c.dataNomina !== null &&
-                            `, in carica dal ${new Date(c.dataNomina).toLocaleDateString('it-IT')}`}
+                          {c.dataNomina !== null && `, in carica dal ${formattaGiorno(c.dataNomina)}`}
                         </span>
                       ))}
                       . È il perimetro nominativo della copertura D&amp;O, da confermare in polizza.
@@ -697,9 +695,7 @@ export default async function PaginaReport({
                           <td className="tabular py-2 pr-3 text-right">
                             {v.capitaleInEssere?.formattato ?? '—'}
                           </td>
-                          <td className="py-2 text-xs" suppressHydrationWarning>
-                            {new Date(v.polizza!.scadenza).toLocaleDateString('it-IT')}
-                          </td>
+                          <td className="py-2 text-xs">{formattaGiorno(v.polizza!.scadenza)}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -739,10 +735,9 @@ export default async function PaginaReport({
                     quando. In un documento di adeguatezza è ciò che distingue l'aver
                     seguito la pratica dall'aver emesso una carta.
                   */}
-                  <p className="mt-1 text-xs text-testo-tenue" suppressHydrationWarning>
+                  <p className="mt-1 text-xs text-testo-tenue">
                     {ETICHETTE_URGENZA[voce.piano.urgenza]}
-                    {voce.piano.termine !== null &&
-                      ` — entro il ${new Date(voce.piano.termine).toLocaleDateString('it-IT')}`}
+                    {voce.piano.termine !== null && ` — entro il ${formattaGiorno(voce.piano.termine)}`}
                     {` · a cura ${ETICHETTE_A_CURA[voce.piano.aCura]}. `}
                     {voce.piano.motivazioneTermine}
                   </p>
@@ -781,11 +776,7 @@ export default async function PaginaReport({
               L&apos;impresa rientra fra i soggetti obbligati. Il termine applicabile alla sua classe
               dimensionale è il{' '}
               <strong>
-                {catNat.termine === null
-                  ? 'non determinato'
-                  : new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(
-                      new Date(catNat.termine),
-                    )}
+                {catNat.termine === null ? 'non determinato' : formattaGiornoEsteso(catNat.termine)}
               </strong>
               . Stato rilevato: <strong>{catNat.stato}</strong>.
             </p>

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { creaInvitoQuestionario, revocaInvitoQuestionario } from './actions';
 import type { InvitoQuestionarioDto } from '@/lib/api';
+import { formattaGiornoEOra, formattaGiornoEsteso } from '@aegis/core/tempo';
 
 /**
  * Il collegamento da mandare al cliente perché compili da sé.
@@ -56,10 +57,7 @@ export function CollegamentoQuestionario({
     });
   }
 
-  const scadenza =
-    invito === null
-      ? null
-      : new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(new Date(invito.scadeIl));
+  const scadenza = invito === null ? null : formattaGiornoEsteso(invito.scadeIl);
 
   return (
     <div className="rounded-lg border border-bordo bg-superficie p-4">
@@ -76,10 +74,7 @@ export function CollegamentoQuestionario({
           <span className="mt-0.5 block text-xs text-testo-tenue">
             {invito.compilatoIl === null
               ? 'Il cliente non ha ancora salvato nulla.'
-              : `Ultima compilazione: ${new Intl.DateTimeFormat('it-IT', {
-                  dateStyle: 'long',
-                  timeStyle: 'short',
-                }).format(new Date(invito.compilatoIl))}.`}
+              : `Ultima compilazione: ${formattaGiornoEOra(invito.compilatoIl)}.`}
           </span>
           <span className="mt-1 block text-xs text-testo-debole">
             Il collegamento non è più leggibile: in archivio ne resta solo l&apos;impronta. Se serve di

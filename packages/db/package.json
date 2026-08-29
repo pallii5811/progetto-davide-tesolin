@@ -20,6 +20,7 @@
     "generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@aegis/core": "0.1.0",
     "@electric-sql/pglite": "^0.5.5",
     "drizzle-orm": "^0.38.3",
     "postgres": "^3.4.9"

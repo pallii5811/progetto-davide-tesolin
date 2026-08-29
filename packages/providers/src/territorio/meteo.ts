@@ -32,6 +32,7 @@
 
 import type { Cache } from '../http.js';
 import type { StoricoMeteo, SogliaSuperata } from '@aegis/core';
+import { FUSO_ORARIO } from '@aegis/core/tempo';
 
 const OPEN_METEO_PREDEFINITO = 'https://archive-api.open-meteo.com/v1/archive';
 
@@ -112,7 +113,7 @@ export async function leggiStoricoMeteo(
     `${options.baseUrl ?? OPEN_METEO_PREDEFINITO}` +
     `?latitude=${latitudine.toFixed(4)}&longitude=${longitudine.toFixed(4)}` +
     `&start_date=${dal}&end_date=${al}` +
-    `&daily=precipitation_sum,wind_gusts_10m_max&timezone=Europe%2FRome`;
+    `&daily=precipitation_sum,wind_gusts_10m_max&timezone=${encodeURIComponent(FUSO_ORARIO)}`;
 
   try {
     const risposta = await richiesta(url, {

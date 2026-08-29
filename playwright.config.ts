@@ -67,6 +67,21 @@ export default defineConfig({
     },
   ],
 
+  /*
+    I due server girano in UTC, di proposito, e il browser resta a Europe/Rome (riga 46).
+
+    E' la condizione della produzione — server in un fuso, broker in un altro — ed e'
+    l'unica in cui questa classe di difetti si vede. Finche' il fuso dei due processi
+    veniva dalla macchina, i 107 collaudi passavano sul portatile di chi sviluppa (dove
+    server e browser stanno entrambi a Roma) e diventavano rossi in CI: un rosso che
+    arrivava dopo, a chi non aveva scritto la riga, e per una ragione che il messaggio
+    non diceva.
+
+    Scritto qui, il collaudo mette alla prova la correzione invece di dipendere
+    dall'ambiente. E vale come prova a vuoto: togliendo queste due righe la suite deve
+    tornare a passare, e mettendole prima della correzione deve diventare rossa — se non
+    lo fa, non stanno controllando quello che si crede.
+  */
   webServer: [
     {
       command: 'npx tsx apps/api/src/main.ts',
@@ -76,6 +91,7 @@ export default defineConfig({
       env: {
         PORT: String(PORTA_API),
         HOST: '127.0.0.1',
+        TZ: 'UTC',
         AEGIS_DATA_DIR: CARTELLA_DATI,
         AEGIS_TENANT: 'Studio di collaudo',
         // Nessun token: si lavora sui dati dimostrativi, e il collaudo non costa nulla.
@@ -89,6 +105,7 @@ export default defineConfig({
       timeout: 180_000,
       env: {
         PORT: String(PORTA_WEB),
+        TZ: 'UTC',
         AEGIS_API_URL: INDIRIZZO_API,
       },
     },

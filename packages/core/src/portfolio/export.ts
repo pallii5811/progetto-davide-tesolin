@@ -32,6 +32,8 @@
  * e verificando il carattere di controllo. Il giro completo è sicuro per costruzione.
  */
 
+import { componentiDelGiorno } from '../shared/tempo.js';
+
 /**
  * I filtri del portafoglio, in un posto solo.
  *
@@ -162,9 +164,10 @@ function percentuale(quota: number): string {
 }
 
 function data(quando: Date): string {
-  const g = String(quando.getDate()).padStart(2, '0');
-  const m = String(quando.getMonth() + 1).padStart(2, '0');
-  return `${g}/${m}/${quando.getFullYear()}`;
+  const c = componentiDelGiorno(quando);
+  const g = String(c.giorno).padStart(2, '0');
+  const m = String(c.mese).padStart(2, '0');
+  return `${g}/${m}/${c.anno}`;
 }
 
 /**
@@ -197,9 +200,10 @@ export function esportaPortafoglioCsv(voci: readonly VoceEsportabile[]): string 
  * che il destinatario non riesce a salvare vanifica l'esportazione.
  */
 export function nomeFileEsportazione(quando: Date, filtro?: string): string {
-  const g = String(quando.getDate()).padStart(2, '0');
-  const m = String(quando.getMonth() + 1).padStart(2, '0');
-  const parti = ['portafoglio', `${quando.getFullYear()}-${m}-${g}`];
+  const c = componentiDelGiorno(quando);
+  const g = String(c.giorno).padStart(2, '0');
+  const m = String(c.mese).padStart(2, '0');
+  const parti = ['portafoglio', `${c.anno}-${m}-${g}`];
   if (filtro !== undefined && filtro !== '') parti.splice(1, 0, filtro.replace(/[^a-z0-9]/gi, ''));
   return `${parti.join('-')}.csv`;
 }

@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./tempo": {
+      "types": "./dist/shared/tempo.d.ts",
+      "default": "./dist/shared/tempo.js"
     }
   },
   "files": [

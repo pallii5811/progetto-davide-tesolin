@@ -25,6 +25,7 @@ import {
   ultimoBilancioSintetico,
 } from '../company/profile.js';
 import { altmanToScore, computeAltmanZ } from './altman.js';
+import { formattaGiorno } from '../shared/tempo.js';
 
 export type ClasseDiMerito = 'A' | 'B' | 'C' | 'D' | 'E';
 
@@ -771,7 +772,5 @@ function anniTra(from: Date, to: Date): number {
 }
 
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(
-    date,
-  );
+  return formattaGiorno(date);
 }

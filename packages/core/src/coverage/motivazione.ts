@@ -26,6 +26,7 @@ import type { CatNatAssessment } from './catnat.js';
 import type { CoverageDefinition, CoverageId } from './taxonomy.js';
 import { regimeDiResponsabilita } from '../governance/norme.js';
 import type { Confidence } from '../shared/provenance.js';
+import { formattaGiorno } from '../shared/tempo.js';
 
 /**
  * Un pezzo di motivazione che si accende su un fatto.
@@ -458,5 +459,5 @@ export function obbligoPerImpresa(
 }
 
 function formattaData(d: Date): string {
-  return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formattaGiorno(d);
 }

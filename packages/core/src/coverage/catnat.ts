@@ -17,6 +17,7 @@ import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import type { CompanyFacts } from '../company/facts.js';
 import type { CompanySize } from '../company/size.js';
+import { formattaGiorno } from '../shared/tempo.js';
 
 export type CatNatStatus =
   /** Non soggetta all'obbligo. */
@@ -207,7 +208,5 @@ function valutaEsclusione(facts: CompanyFacts): string | null {
 }
 
 function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(
-    date,
-  );
+  return formattaGiorno(date);
 }

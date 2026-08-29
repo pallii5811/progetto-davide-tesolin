@@ -10,6 +10,7 @@ import {
 } from '@/lib/api';
 import { ImmaginiUbicazione } from './ImmaginiUbicazione';
 import { TitolareEffettivo } from './TitolareEffettivo';
+import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
 import { RitornoAllElenco } from '../../prospect/UltimoElenco';
 import type {
   AnalisiDto,
@@ -1205,8 +1206,7 @@ export default async function PaginaAzienda({
       )}
 
       <p className="text-xs text-testo-debole">
-        Analisi generata il{' '}
-        {new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(new Date(analisi.asOf))}
+        Analisi generata il {formattaGiornoEsteso(analisi.asOf)}
         {azienda.fonte !== null && ` · dati anagrafici da ${azienda.fonte.descrizione}`}
       </p>
     </>
@@ -1347,7 +1347,7 @@ function esitoProcedura(p: { dataRevoca: string | null; dataChiusura: string | n
 }
 
 function dataBreve(iso: string | null | undefined): string | null {
-  return iso === null || iso === undefined ? null : new Date(iso).toLocaleDateString('it-IT');
+  return iso === null || iso === undefined ? null : formattaGiorno(iso);
 }
 
 /**
@@ -1502,13 +1502,13 @@ function coloreDelPunteggio(punteggio: number): string {
  */
 function etaOggi(dataNascita: string | null): number | null {
   if (dataNascita === null) return null;
-  const nato = new Date(dataNascita);
-  if (Number.isNaN(nato.getTime())) return null;
-  const oggi = new Date();
-  let anni = oggi.getFullYear() - nato.getFullYear();
+  const grezza = new Date(dataNascita);
+  if (Number.isNaN(grezza.getTime())) return null;
+  const nato = componentiDelGiorno(grezza);
+  const oggi = componentiDelGiorno(new Date());
+  let anni = oggi.anno - nato.anno;
   const primaDelCompleanno =
-    oggi.getMonth() < nato.getMonth() ||
-    (oggi.getMonth() === nato.getMonth() && oggi.getDate() < nato.getDate());
+    oggi.mese < nato.mese || (oggi.mese === nato.mese && oggi.giorno < nato.giorno);
   if (primaDelCompleanno) anni -= 1;
   return anni >= 0 && anni < 130 ? anni : null;
 }
@@ -1848,11 +1848,8 @@ function VoceGap({
           {ETICHETTE_URGENZA[voce.piano.urgenza]}
         </span>
         {voce.piano.termine !== null && (
-          <span suppressHydrationWarning>
-            entro il{' '}
-            <time dateTime={voce.piano.termine}>
-              {new Date(voce.piano.termine).toLocaleDateString('it-IT')}
-            </time>
+          <span>
+            entro il <time dateTime={voce.piano.termine}>{formattaGiorno(voce.piano.termine)}</time>
           </span>
         )}
         <span>a cura {ETICHETTE_A_CURA[voce.piano.aCura]}</span>
@@ -1872,7 +1869,7 @@ function VoceGap({
         <p className="mt-2 text-xs text-testo-debole">
           Polizza {voce.polizza.compagnia}
           {voce.polizza.numero !== null && ` n. ${voce.polizza.numero}`} · scadenza{' '}
-          {new Intl.DateTimeFormat('it-IT').format(new Date(voce.polizza.scadenza))}
+          {formattaGiorno(voce.polizza.scadenza)}
           {/*
             Una copertura adeguata presso una compagnia fragile non è una copertura
             adeguata: è il rischio spostato da un posto visibile a uno che nessuno guarda.

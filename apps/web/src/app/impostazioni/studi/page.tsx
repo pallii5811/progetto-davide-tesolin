@@ -4,6 +4,7 @@ import { elencoStudi } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { BottoneAttivita } from './BottoneAttivita';
 import { ModuloStudio } from './ModuloStudio';
+import { formattaGiorno } from '@aegis/core/tempo';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,7 +75,7 @@ export default async function PaginaStudi() {
                   <p className="font-medium">{studio.denominazione}</p>
                   <p className="text-xs text-testo-debole">
                     {studio.numeroRui === null ? 'RUI non indicato' : `RUI n. ${studio.numeroRui}`} · aperto
-                    il {new Date(studio.apertoIl).toLocaleDateString('it-IT')}
+                    il {formattaGiorno(studio.apertoIl)}
                   </p>
                 </td>
                 <td className="tabular px-4 py-3">{studio.utenti}</td>

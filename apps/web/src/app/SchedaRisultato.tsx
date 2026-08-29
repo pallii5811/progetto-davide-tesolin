@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { RisultatoRicerca } from '@/lib/api';
+import { formattaGiorno } from '@aegis/core/tempo';
 
 /**
  * Il risultato di una ricerca: **tutto** il record acquistato.
@@ -236,7 +237,7 @@ function centesimi(valore: number | null): string {
 }
 
 function giorno(iso: string | null): string {
-  return iso === null ? 'n.d.' : new Date(iso).toLocaleDateString('it-IT');
+  return iso === null ? 'n.d.' : formattaGiorno(iso);
 }
 
 /** «Non disponibile» e «zero» non sono la stessa cosa, e non vanno stampati uguali. */

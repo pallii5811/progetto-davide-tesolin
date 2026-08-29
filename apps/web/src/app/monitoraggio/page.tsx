@@ -5,6 +5,7 @@ import type { EventoMonitoraggioDto } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { BottoneAggiorna } from './BottoneAggiorna';
 import { segnaGestito } from './actions';
+import { formattaGiorno } from '@aegis/core/tempo';
 
 export const dynamic = 'force-dynamic';
 
@@ -173,7 +174,7 @@ function RigaEvento({ evento }: { evento: EventoMonitoraggioDto }) {
         </p>
       )}
 
-      <p className="mt-2 text-xs text-testo-debole" suppressHydrationWarning>
+      <p className="mt-2 text-xs text-testo-debole">
         Rilevato <time dateTime={evento.rilevatoIl}>{formattaQuando(evento.rilevatoIl)}</time>
       </p>
     </li>
@@ -209,5 +210,5 @@ function formattaQuando(iso: string): string {
   if (minuti < 60) return `${minuti} minuti fa`;
   if (minuti < 24 * 60) return `${Math.round(minuti / 60)} ore fa`;
   if (minuti < 48 * 60) return 'ieri';
-  return quando.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formattaGiorno(quando);
 }

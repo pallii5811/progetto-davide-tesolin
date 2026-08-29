@@ -15,6 +15,7 @@ import { and, desc, eq, gte, ilike, isNull, sql } from 'drizzle-orm';
 import { righeDi } from './client.js';
 import type { Database } from './client.js';
 import * as schema from './schema.js';
+import { inizioDellaGiornata } from '@aegis/core/tempo';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenant e aziende
@@ -1202,8 +1203,7 @@ export async function collegamentiSocietari(
  * Le chiamate servite dalla cache non contano: non sono state pagate.
  */
 export async function spesaOdierna(db: Database, tenantId: string, adesso = new Date()): Promise<number> {
-  const inizioGiornata = new Date(adesso);
-  inizioGiornata.setHours(0, 0, 0, 0);
+  const inizioGiornata = inizioDellaGiornata(adesso);
 
   const righe = await db
     .select({ totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)` })
@@ -1231,8 +1231,7 @@ export async function spesaOdierna(db: Database, tenantId: string, adesso = new 
  * studi, ed è riservata a chi gestisce la piattaforma.
  */
 export async function spesaOdiernaComplessiva(db: Database, adesso = new Date()): Promise<number> {
-  const inizioGiornata = new Date(adesso);
-  inizioGiornata.setHours(0, 0, 0, 0);
+  const inizioGiornata = inizioDellaGiornata(adesso);
 
   const righe = await db
     .select({ totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)` })

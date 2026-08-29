@@ -3,6 +3,7 @@ import { convertiPolizze, unisciDati } from '../../azienda/[id]/dati/modulo';
 import { salvaQuestionarioCliente } from './actions';
 import { Avviso, Scheda } from '@/components/ui';
 import { chiamaQuestionarioPubblico } from '@/lib/chiamata-server';
+import { formattaGiornoEsteso } from '@aegis/core/tempo';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,9 +68,7 @@ export default async function PaginaQuestionario({ params }: { params: Promise<{
   }
 
   const apertura = (await risposta.json()) as QuestionarioApertura;
-  const scadenza = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long' }).format(
-    new Date(apertura.scadeIl),
-  );
+  const scadenza = formattaGiornoEsteso(apertura.scadeIl);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">

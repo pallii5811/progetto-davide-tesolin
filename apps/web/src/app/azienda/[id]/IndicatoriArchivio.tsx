@@ -1,5 +1,6 @@
 import type { IndicatoriArchivioDto } from '@/lib/api';
 import { Scheda } from '@/components/ui';
+import { formattaGiorno } from '@aegis/core/tempo';
 
 /**
  * Gli indicatori che l'archivio camerale restituisce già calcolati.
@@ -327,7 +328,7 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
 
       {q.aggiornatoIl !== null && (
         <p className="mt-3 text-xs text-testo-debole">
-          Record camerale aggiornato al {new Date(q.aggiornatoIl).toLocaleDateString('it-IT')}.
+          Record camerale aggiornato al {formattaGiorno(q.aggiornatoIl)}.
         </p>
       )}
     </Scheda>

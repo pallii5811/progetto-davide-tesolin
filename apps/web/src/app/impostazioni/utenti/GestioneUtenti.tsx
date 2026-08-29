@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import type { RuoloUtente, UtenteElencoDto } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { creaUtenteAzione, gestisciUtenteAzione } from '../actions';
+import { formattaGiorno } from '@aegis/core/tempo';
 
 const RUOLI: { valore: RuoloUtente; etichetta: string; cosaPuoFare: string }[] = [
   {
@@ -93,9 +94,13 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
             )}
           </p>
           <p className="truncate text-sm text-testo-tenue">{utente.email}</p>
-          {/* `suppressHydrationWarning`: il fuso orario del server di Next e quello del
-              browser possono differire, e il tempo trascorso cambia fra le due esecuzioni.
-              Il valore autorevole resta nell'attributo `dateTime`, in formato ISO. */}
+          {/* suppressHydrationWarning, e resta: ma NON per il fuso, che ora e' dichiarato.
+              formattaQuando dice «5 minuti fa» confrontando con Date.now(), e il rendering
+              sul server e quello di idratazione avvengono in due momenti diversi: basta una
+              richiesta lenta perche' il minuto cambi. E' una divergenza che esiste anche a
+              fuso identico, e che nessuna correzione di fuso puo' togliere — l'unica cura
+              sarebbe smettere di rendere una durata relativa sul server.
+              Il valore autorevole resta nell'attributo dateTime, in formato ISO. */}
           <p className="mt-1 text-xs text-testo-debole" suppressHydrationWarning>
             Ultimo accesso:{' '}
             {utente.ultimoAccesso === null ? (
@@ -285,7 +290,7 @@ function ModuloNuovoUtente() {
 // ── Formattazione ────────────────────────────────────────────────────────────
 
 function formattaData(iso: string): string {
-  return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formattaGiorno(iso);
 }
 
 /** «mai» è un'informazione: distingue chi non ha ancora attivato l'utenza da chi è inattivo. */
@@ -299,5 +304,5 @@ function formattaQuando(iso: string | null): string {
   if (minuti < 60) return `${minuti} minuti fa`;
   if (minuti < 24 * 60) return `${Math.round(minuti / 60)} ore fa`;
   if (minuti < 48 * 60) return 'ieri';
-  return quando.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formattaGiorno(quando);
 }
