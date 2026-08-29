@@ -22,6 +22,19 @@ export interface ImmobileForm {
   annoCostruzione: number | null;
   presenzaImpiantoAntincendio: boolean | null;
   presenzaAllarme: boolean | null;
+  /**
+   * Compartimentazione REI e impianto di estinzione automatica.
+   *
+   * Erano nel dominio, accettati dall'API con la loro validazione, e usati dal motore
+   * come moltiplicatori della quota di danno probabile — 0,55 il primo, 0,70 il secondo.
+   * Il modulo non li chiedeva: nessun utente reale poteva valorizzarli, quindi il calcolo
+   * girava sempre sul ramo «non noto» e il capitale incendio usciva quasi doppio.
+   *
+   * Misurato sull'azienda dimostrativa: danno probabile da 2,2 a 4,3 milioni, e la forma
+   * consigliata che si ribalta da primo rischio assoluto a valore intero.
+   */
+  compartimentazioneRei: boolean | null;
+  impiantoSprinkler: boolean | null;
 }
 
 export interface PolizzaForm {
@@ -38,7 +51,30 @@ export interface PolizzaForm {
   formaGaranzia: 'valore-a-nuovo' | 'valore-allo-stato-duso' | 'primo-rischio-assoluto' | null;
 }
 
+/**
+ * Le voci del bilancio depositato, rilevate dal documento che il cliente porta.
+ *
+ * Sono la differenza fra un'analisi con quattro capitali «non determinabile» e
+ * un'analisi completa. Misurato: contenuto, scorte, danni indiretti e fido clienti
+ * passano da vuoti a valorizzati, l'esposizione non assicurata da 2,4 a 7,8 milioni, e le
+ * coperture da quantificare da cinque a due — cioè lo stesso risultato del bilancio CEE
+ * che costerebbe cinque euro a impresa.
+ *
+ * Gli importi sono in **euro** nel modulo e in centesimi al confine dell'API, come per le
+ * polizze.
+ */
+export interface BilancioForm {
+  anno: number | null;
+  rimanenzeEuro: number | null;
+  creditiVersoClientiEuro: number | null;
+  impiantiEAttrezzatureEuro: number | null;
+  impiantiAlCostoStorico: boolean | null;
+  costiMateriePrimeEuro: number | null;
+  costiServiziEuro: number | null;
+}
+
 export interface DatiForm {
+  bilancio: BilancioForm;
   immobili: ImmobileForm[];
   numeroVeicoli: number | null;
   numeroDipendenti: number | null;
@@ -54,6 +90,15 @@ export interface DatiForm {
   produceBeniFinali: boolean | null;
   trasportaMerciProprie: boolean | null;
   periodoIndennizzoMesi: number | null;
+  /**
+   * Quanto rischio il titolare è disposto a tenersi.
+   *
+   * È il primo passo dell'ISO 31000 — la definizione del contesto — e ciò che trasforma
+   * il trattamento da calcolo a decisione dell'imprenditore. Il motore la usava già per
+   * la capacità di ritenzione; il modulo non la chiedeva, quindi restava sempre nulla e
+   * la franchigia proponibile veniva decisa dal motore al posto del cliente.
+   */
+  propensioneAlRischio: 'prudente' | 'equilibrata' | 'incline-a-ritenere' | null;
 }
 
 const CERTIFICAZIONI_NOTE = [
@@ -81,6 +126,21 @@ const TIPOLOGIE = [
   { valore: 'legno' as const, testo: 'Legno — 1.000 €/mq' },
   { valore: 'muratura' as const, testo: 'Muratura — 1.050 €/mq' },
   { valore: 'misto' as const, testo: 'Misto — 950 €/mq' },
+];
+
+/**
+ * Le tre propensioni, dette come le direbbe un imprenditore.
+ *
+ * Il testo accanto a ciascuna non è decorativo: dice l'effetto sulla franchigia, che è
+ * ciò che rende la domanda rispondibile invece che astratta.
+ */
+const PROPENSIONI = [
+  { valore: 'prudente' as const, testo: 'Prudente — preferisce trasferire, franchigie basse' },
+  { valore: 'equilibrata' as const, testo: 'Equilibrata — franchigie in linea con la capacità' },
+  {
+    valore: 'incline-a-ritenere' as const,
+    testo: 'Incline a ritenere — franchigie alte per abbassare il premio',
+  },
 ];
 
 const FORME_GARANZIA = [
@@ -132,7 +192,21 @@ export function EditorDossier({
       );
 
       const risultato = await salva(identificativo, {
-        datiDichiarati: { ...dati, immobili: immobiliValidi },
+        datiDichiarati: {
+          ...dati,
+          immobili: immobiliValidi,
+          // Euro nel modulo, centesimi al confine: la stessa convenzione delle polizze.
+          // `null` resta `null` — un campo non compilato è ignoto, non zero.
+          bilancio: {
+            anno: dati.bilancio.anno,
+            rimanenze: inCentesimi(dati.bilancio.rimanenzeEuro),
+            creditiVersoClienti: inCentesimi(dati.bilancio.creditiVersoClientiEuro),
+            impiantiEAttrezzature: inCentesimi(dati.bilancio.impiantiEAttrezzatureEuro),
+            impiantiAlCostoStorico: dati.bilancio.impiantiAlCostoStorico,
+            costiMateriePrime: inCentesimi(dati.bilancio.costiMateriePrimeEuro),
+            costiServizi: inCentesimi(dati.bilancio.costiServiziEuro),
+          },
+        },
         polizze: polizzeValide,
       });
 
@@ -141,8 +215,80 @@ export function EditorDossier({
     });
   };
 
+  /** Euro nel modulo, centesimi al confine. `null` resta `null`: l'assenza non è zero. */
+  const inCentesimi = (euro: number | null): number | null =>
+    euro === null ? null : Math.round(euro * 100);
+
+  const aggiornaBilancio = (patch: Partial<BilancioForm>): void => {
+    aggiorna('bilancio', { ...dati.bilancio, ...patch });
+  };
+
   return (
     <div className="space-y-5 pb-24">
+      {/*
+        Le voci del bilancio depositato.
+
+        Stanno per prime perché sono quelle che cambiano di più: senza, quattro capitali
+        su cinque restano «non determinabile» e il piano d'azione perde la business
+        interruption, che è la garanzia dove il capitale sbagliato costa di più.
+
+        Il documento ce l'ha il cliente. Le etichette dicono **dove guardare** — la voce e
+        la lettera dello schema — perché un broker non è un contabile e cercare a occhio in
+        un bilancio è il motivo per cui questi campi restano vuoti.
+      */}
+      <GruppoCampi
+        titolo="Voci dal bilancio depositato"
+        descrizione="Si leggono dal bilancio che l’impresa ha già: cinque minuti che valgono quanto il servizio a pagamento da 5 € per impresa. Senza, contenuto, scorte, danni indiretti e credito restano non quantificabili."
+      >
+        <CampoNumero
+          etichetta="Esercizio di riferimento"
+          valore={dati.bilancio.anno}
+          onChange={(v) => aggiornaBilancio({ anno: v })}
+          aiuto="L’anno del bilancio da cui si stanno leggendo le voci: serve a non mescolare due esercizi."
+        />
+        <CampoNumero
+          etichetta="Rimanenze"
+          valore={dati.bilancio.rimanenzeEuro}
+          onChange={(v) => aggiornaBilancio({ rimanenzeEuro: v })}
+          suffisso="€"
+          aiuto="Stato patrimoniale, attivo, voce C-I. Base della somma assicuranda per merci e scorte, poi maggiorata del picco stagionale."
+        />
+        <CampoNumero
+          etichetta="Crediti verso clienti"
+          valore={dati.bilancio.creditiVersoClientiEuro}
+          onChange={(v) => aggiornaBilancio({ creditiVersoClientiEuro: v })}
+          suffisso="€"
+          aiuto="Attivo, voce C-II-1. È il capitale dell’assicurazione del credito commerciale."
+        />
+        <CampoNumero
+          etichetta="Impianti e attrezzature"
+          valore={dati.bilancio.impiantiEAttrezzatureEuro}
+          onChange={(v) => aggiornaBilancio({ impiantiEAttrezzatureEuro: v })}
+          suffisso="€"
+          aiuto="Attivo, voci B-II-2 e B-II-3 sommate. Se la nota integrativa riporta il costo storico lordo, usare quello e spuntare la casella qui sotto: è la base corretta per il valore a nuovo."
+        />
+        <CampoTriStato
+          etichetta="Il valore sopra è al costo storico lordo"
+          valore={dati.bilancio.impiantiAlCostoStorico}
+          onChange={(v) => aggiornaBilancio({ impiantiAlCostoStorico: v })}
+          aiuto="Il netto contabile è già decurtato dagli ammortamenti e sottostima il rimpiazzo: dichiararlo cambia il coefficiente applicato."
+        />
+        <CampoNumero
+          etichetta="Costi per materie prime"
+          valore={dati.bilancio.costiMateriePrimeEuro}
+          onChange={(v) => aggiornaBilancio({ costiMateriePrimeEuro: v })}
+          suffisso="€"
+          aiuto="Conto economico, voce B-6. Serve al margine di contribuzione, che è il capitale della business interruption."
+        />
+        <CampoNumero
+          etichetta="Costi per servizi"
+          valore={dati.bilancio.costiServiziEuro}
+          onChange={(v) => aggiornaBilancio({ costiServiziEuro: v })}
+          suffisso="€"
+          aiuto="Conto economico, voce B-7. Se ne considera variabile il 60%: è l’ipotesi dichiarata nella spiegazione del capitale."
+        />
+      </GruppoCampi>
+
       {/* ── Immobili ─────────────────────────────────────────────────────── */}
       <fieldset className="rounded-lg border border-bordo bg-superficie p-4">
         <legend className="px-1.5 text-sm font-semibold">Immobili e sedi</legend>
@@ -203,6 +349,25 @@ export function EditorDossier({
                   etichetta="Impianto antincendio"
                   valore={immobile.presenzaImpiantoAntincendio}
                   onChange={(v) => aggiornaImmobile(indice, { presenzaImpiantoAntincendio: v })}
+                  aiuto="Estintori, idranti, rilevazione: richiedono qualcuno che intervenga."
+                />
+                {/*
+                  Le due domande che il motore poneva e il modulo non permetteva di
+                  rispondere. Sono i moltiplicatori del danno massimo probabile, e senza
+                  di esse il capitale incendio esce quasi doppio: sull'azienda
+                  dimostrativa, 4,3 milioni invece di 2,2.
+                */}
+                <CampoTriStato
+                  etichetta="Compartimentazione REI"
+                  valore={immobile.compartimentazioneRei}
+                  onChange={(v) => aggiornaImmobile(indice, { compartimentazioneRei: v })}
+                  aiuto="Muri e porte tagliafuoco fra le aree. È la domanda che più abbassa il capitale da assicurare: un compartimento confina l’incendio, ed è struttura, non un dispositivo che deve attivarsi."
+                />
+                <CampoTriStato
+                  etichetta="Estinzione automatica (sprinkler)"
+                  valore={immobile.impiantoSprinkler}
+                  onChange={(v) => aggiornaImmobile(indice, { impiantoSprinkler: v })}
+                  aiuto="Agisce senza che nessuno sia presente. Vale meno della compartimentazione perché un impianto può non entrare in funzione."
                 />
                 <CampoTriStato
                   etichetta="Allarme antifurto"
@@ -227,6 +392,8 @@ export function EditorDossier({
                 annoCostruzione: null,
                 presenzaImpiantoAntincendio: null,
                 presenzaAllarme: null,
+                compartimentazioneRei: null,
+                impiantoSprinkler: null,
               },
             ])
           }
@@ -283,6 +450,22 @@ export function EditorDossier({
           valore={dati.concentrazionePrimoCliente}
           onChange={(v) => aggiorna('concentrazionePrimoCliente', v)}
           aiuto="Sopra il 20% il rischio di concentrazione diventa rilevante."
+        />
+        {/*
+          Il primo passo dell'ISO 31000, e l'unico che nessuno poteva compilare.
+
+          Il motore la usava già per la capacità di ritenzione, l'API la accettava con la
+          sua validazione, la completezza la contava fra le voci da compilare — e il
+          modulo non la chiedeva. Restava nulla per sempre: la franchigia proponibile la
+          decideva il motore al posto dell'imprenditore, che è esattamente la critica che
+          si fa ai questionari standardizzati.
+        */}
+        <CampoSelezione
+          etichetta="Propensione al rischio del titolare"
+          valore={dati.propensioneAlRischio}
+          opzioni={PROPENSIONI}
+          onChange={(v) => aggiorna('propensioneAlRischio', v)}
+          aiuto="Si chiede, non si deduce: un imprenditore prudente con mezzi solidi ha ogni diritto di assicurare tutto. Dimezza o raddoppia la franchigia proponibile, ed è una domanda da trenta secondi."
         />
       </GruppoCampi>
 

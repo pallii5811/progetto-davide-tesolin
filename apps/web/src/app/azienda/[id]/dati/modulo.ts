@@ -10,7 +10,18 @@
 
 import type { DatiForm, ImmobileForm, PolizzaForm } from './EditorDossier';
 
+const BILANCIO_VUOTO = {
+  anno: null,
+  rimanenzeEuro: null,
+  creditiVersoClientiEuro: null,
+  impiantiEAttrezzatureEuro: null,
+  impiantiAlCostoStorico: null,
+  costiMateriePrimeEuro: null,
+  costiServiziEuro: null,
+} as const;
+
 export const DATI_VUOTI: DatiForm = {
+  bilancio: { ...BILANCIO_VUOTO },
   immobili: [],
   numeroVeicoli: null,
   numeroDipendenti: null,
@@ -26,7 +37,10 @@ export const DATI_VUOTI: DatiForm = {
   produceBeniFinali: null,
   trasportaMerciProprie: null,
   periodoIndennizzoMesi: null,
+  propensioneAlRischio: null,
 };
+
+const PROPENSIONI_VALIDE = ['prudente', 'equilibrata', 'incline-a-ritenere'] as const;
 
 const TITOLI_VALIDI = ['proprieta', 'locazione', 'comodato', 'leasing', 'misto'] as const;
 const TIPOLOGIE_VALIDE = [
@@ -59,11 +73,46 @@ export function unisciDati(salvati: Record<string, unknown> | null, addettiNoti:
         annoCostruzione: numeroOrNull(i['annoCostruzione']),
         presenzaImpiantoAntincendio: booleanOrNull(i['presenzaImpiantoAntincendio']),
         presenzaAllarme: booleanOrNull(i['presenzaAllarme']),
+        /*
+          Le due protezioni che il modulo non chiedeva.
+
+          Non era solo una domanda mancante: `unisciDati` ricostruisce il dossier da un
+          elenco chiuso di chiavi, quindi un valore arrivato per altra via veniva
+          **cancellato** al primo salvataggio dal modulo. Aggiungerle qui chiude anche
+          quella perdita.
+        */
+        compartimentazioneRei: booleanOrNull(i['compartimentazioneRei']),
+        impiantoSprinkler: booleanOrNull(i['impiantoSprinkler']),
       }))
     : [];
 
+  /*
+    Le voci di bilancio, dai centesimi dell'archivio agli euro del modulo.
+
+    Come per le polizze: il dominio conserva centesimi, il modulo mostra euro. Un campo
+    non compilato resta `null` e non diventa zero — uno zero sulle rimanenze produrrebbe
+    «attività senza magazzino» su un'impresa che il magazzino ce l'ha.
+  */
+  const bilancioSalvato =
+    typeof salvati['bilancio'] === 'object' && salvati['bilancio'] !== null
+      ? (salvati['bilancio'] as Record<string, unknown>)
+      : {};
+  const inEuro = (v: unknown): number | null => {
+    const centesimi = numeroOrNull(v);
+    return centesimi === null ? null : centesimi / 100;
+  };
+
   return {
     ...base,
+    bilancio: {
+      anno: numeroOrNull(bilancioSalvato['anno']),
+      rimanenzeEuro: inEuro(bilancioSalvato['rimanenze']),
+      creditiVersoClientiEuro: inEuro(bilancioSalvato['creditiVersoClienti']),
+      impiantiEAttrezzatureEuro: inEuro(bilancioSalvato['impiantiEAttrezzature']),
+      impiantiAlCostoStorico: booleanOrNull(bilancioSalvato['impiantiAlCostoStorico']),
+      costiMateriePrimeEuro: inEuro(bilancioSalvato['costiMateriePrime']),
+      costiServiziEuro: inEuro(bilancioSalvato['costiServizi']),
+    },
     immobili,
     numeroVeicoli: numeroOrNull(salvati['numeroVeicoli']) ?? base.numeroVeicoli,
     numeroDipendenti: numeroOrNull(salvati['numeroDipendenti']) ?? base.numeroDipendenti,
@@ -79,6 +128,7 @@ export function unisciDati(salvati: Record<string, unknown> | null, addettiNoti:
     produceBeniFinali: booleanOrNull(salvati['produceBeniFinali']),
     trasportaMerciProprie: booleanOrNull(salvati['trasportaMerciProprie']),
     periodoIndennizzoMesi: numeroOrNull(salvati['periodoIndennizzoMesi']),
+    propensioneAlRischio: unoDi(salvati['propensioneAlRischio'], PROPENSIONI_VALIDE),
   };
 }
 

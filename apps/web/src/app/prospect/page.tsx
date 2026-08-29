@@ -70,6 +70,25 @@ export default async function PaginaProspect({
   // `scarica` è l'unica azione che spende: senza, la pagina si limita a contare.
   const scarica = parametri['scarica'] === '1';
 
+  /*
+    Ha descritto un'impresa, o ha solo aperto la pagina?
+
+    Non è la stessa domanda di `haFiltri`: forma giuridica e quante aziende arrivano già
+    compilate a chi non ha scritto niente, quindi `haFiltri` è vero anche sul modulo
+    vuoto. Da soli quei due campi non sono una ricerca — non si cerca «una S.r.l.».
+
+    La distinzione serve perché a schermo ci sono due richiami diversi allo stesso
+    elenco già comprato, e ciascuno risponde a una domanda che l'altro non pone:
+    «dov'è finito l'elenco che ho pagato?» sul modulo vuoto, «sto per ricomprarlo?»
+    quando i filtri ci sono. Senza distinguerli comparivano **entrambi**, uno sotto
+    l'altro, con la stessa frase — e il secondo diceva «filtri quasi uguali»
+    confrontandosi con un modulo in cui non c'era scritto niente.
+  */
+  const SOLO_PREDEFINITI: readonly string[] = ['formaGiuridicaCodice', 'limite'];
+  const haDescrittoUnImpresa = Object.entries(criteri).some(
+    ([campo, valore]) => !SOLO_PREDEFINITI.includes(campo) && valore.trim() !== '',
+  );
+
   let risultato: RisultatoProspezione | null = null;
   let errore: string | null = null;
 
@@ -81,14 +100,19 @@ export default async function PaginaProspect({
     }
   }
 
-
   return (
     <>
       {/*
-        Si offre il richiamo ogni volta che a schermo non c'è già un elenco: la pagina
-        nuda fa comunque un conteggio, quindi «nessun risultato» non basta a riconoscerla.
+        Il richiamo sta sul modulo vuoto, dove è l'unica cosa che dice dov'è finito
+        l'elenco pagato. Appena l'utente scrive un criterio il compito passa al confronto
+        qui sotto, che dice la stessa cosa **e** in che cosa la ricerca di adesso
+        differisce da quella già comprata: due richiami affiancati sarebbero la stessa
+        frase due volte.
+
+        Non basta guardare se a schermo c'è un elenco: la pagina nuda fa comunque un
+        conteggio, quindi «nessun risultato» non la riconosce.
       */}
-      {(risultato === null || risultato.soloConteggio) && <UltimoElenco />}
+      {!haDescrittoUnImpresa && <UltimoElenco />}
 
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Ricerca di nuovi clienti</h1>
@@ -198,8 +222,7 @@ export default async function PaginaProspect({
                 <option value="">Tutte le forme</option>
               </select>
               <span className="mt-1 block text-xs text-testo-tenue">
-                Le ditte individuali non depositano bilanci: su di esse l&apos;analisi resta
-                a metà.
+                Le ditte individuali non depositano bilanci: su di esse l&apos;analisi resta a metà.
               </span>
             </label>
 
@@ -223,8 +246,11 @@ export default async function PaginaProspect({
             risposta, e la convinzione ragionevole di aver rifatto la stessa ricerca. A
             schermo non c'era nulla che dicesse con quali filtri era stato comprato quello
             che si aveva già.
+
+            Compare solo quando una ricerca c'è: su un modulo vuoto non c'è niente da
+            confrontare, e il richiamo qui sopra dice già dov'è l'elenco.
           */}
-          <ConfrontoConElencoComprato criteri={criteri} />
+          {haDescrittoUnImpresa && <ConfrontoConElencoComprato criteri={criteri} />}
 
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -284,8 +310,8 @@ export default async function PaginaProspect({
               {risultato.diagnosiZero !== undefined && risultato.diagnosiZero.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-sm text-testo-tenue">
-                    Non è un errore: è l’incrocio dei filtri a essere vuoto. Togliendone uno
-                    solo, ecco cosa si troverebbe.
+                    Non è un errore: è l’incrocio dei filtri a essere vuoto. Togliendone uno solo, ecco cosa
+                    si troverebbe.
                   </p>
                   <ul className="space-y-1">
                     {risultato.diagnosiZero.map((d) => (
@@ -301,15 +327,14 @@ export default async function PaginaProspect({
                 </div>
               ) : (
                 <p className="text-sm text-testo-tenue">
-                  Nessuno dei filtri, tolto da solo, riapre la ricerca: l’insieme è vuoto in
-                  partenza. Conviene allargare il territorio o la dimensione.
+                  Nessuno dei filtri, tolto da solo, riapre la ricerca: l’insieme è vuoto in partenza.
+                  Conviene allargare il territorio o la dimensione.
                 </p>
               )}
 
               <p className="text-xs text-testo-debole">
-                Sul codice ATECO il confronto è <strong>esatto</strong>, e l’archivio usa due
-                cifre oppure quattro: «25» e «2562» sono insiemi diversi e disgiunti, mentre
-                «256» non trova mai nulla.
+                Sul codice ATECO il confronto è <strong>esatto</strong>, e l’archivio usa due cifre oppure
+                quattro: «25» e «2562» sono insiemi diversi e disgiunti, mentre «256» non trova mai nulla.
               </p>
             </div>
           ) : (
@@ -320,15 +345,11 @@ export default async function PaginaProspect({
                 acquistare l'intero insieme, o di pagare una ricerca invece di un elenco.
               */}
               <div>
-                <p className="tabular text-2xl font-bold">
-                  {risultato.totale.toLocaleString('it-IT')}
-                </p>
+                <p className="tabular text-2xl font-bold">{risultato.totale.toLocaleString('it-IT')}</p>
                 <p className="text-sm text-testo-tenue">aziende corrispondono ai criteri</p>
                 <p className="mt-1 text-sm">
                   Scaricandone <strong>{risultato.lotto}</strong> si spendono{' '}
-                  <strong>
-                    {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} €
-                  </strong>
+                  <strong>{(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} €</strong>
                   <span className="text-testo-debole"> · 5 centesimi ad azienda</span>
                 </p>
               </div>
@@ -352,8 +373,8 @@ export default async function PaginaProspect({
           />
           <p className="mb-3 text-sm text-testo-tenue">
             {risultato.aziende.length} aziende scaricate ·{' '}
-            {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi.
-            Analizzarne una consuma credito a parte, come qualunque altra analisi.
+            {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi. Analizzarne una
+            consuma credito a parte, come qualunque altra analisi.
           </p>
           <div className="overflow-hidden rounded-lg border border-bordo">
             <table className="w-full text-sm">
@@ -369,9 +390,7 @@ export default async function PaginaProspect({
                 {risultato.aziende.map((azienda) => (
                   <tr key={azienda.providerId} className="border-t border-bordo bg-superficie">
                     <td className="px-4 py-3 font-medium">{azienda.denominazione}</td>
-                    <td className="tabular px-4 py-3 text-testo-tenue">
-                      {azienda.partitaIva ?? '—'}
-                    </td>
+                    <td className="tabular px-4 py-3 text-testo-tenue">{azienda.partitaIva ?? '—'}</td>
                     <td className="px-4 py-3 text-testo-tenue">
                       {azienda.comune ?? '—'}
                       {azienda.provincia !== null && ` (${azienda.provincia})`}

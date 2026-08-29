@@ -44,7 +44,6 @@
   --color-azione: oklch(0.42 0.11 254);
   --color-azione-testo: oklch(1 0 0);
 
-
   /* Scala di gravità: dal basso al critico. */
   /*
      I colori della gravità sono testo **sul fondo della propria gravità**: un badge
@@ -66,6 +65,27 @@
   --color-alto-fondo: oklch(0.95 0.045 32);
   --color-critico: oklch(0.54 0.2 22);
   --color-critico-fondo: oklch(0.94 0.05 22);
+
+  /*
+     Il colore delle cose da leggere prima di firmare.
+
+     Non è una gravità: è una **riserva**. «Documento parziale: due rischi non sono
+     riportati in questa copia», «valutazione formulata su dati presuntivi», «serve la
+     visura per chiudere la catena». Sono le frasi che rendono difendibile un fascicolo,
+     e vanno viste.
+
+     Nove classi lo usavano da sempre — `text-attenzione`, `border-attenzione`,
+     `bg-attenzione/15` — e il token **non esisteva**. In Tailwind v4 `@theme` è l'unica
+     sorgente: senza la variabile quelle classi non producono un byte di CSS, e il
+     preflight lascia `border-color: inherit`. Il risultato era che sul titolare effettivo
+     lo stato di allarme risultava **meno** marcato di quello tranquillo, che invece usa un
+     verde esistente. Nessun errore, nessun avviso: solo un riquadro senza colore.
+
+     Ambra a 75, fra il moderato (100) e il rilevante (65): una cautela, non una gravità.
+     Stesso metodo degli altri — il più chiaro che supera 4,5:1 sul proprio fondo.
+  */
+  --color-attenzione: oklch(0.53 0.14 75);
+  --color-attenzione-fondo: oklch(0.96 0.045 75);
 
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -102,6 +122,9 @@
     --color-alto-fondo: oklch(0.3 0.08 32);
     --color-critico: oklch(0.69 0.2 22);
     --color-critico-fondo: oklch(0.3 0.09 22);
+
+    --color-attenzione: oklch(0.68 0.14 75);
+    --color-attenzione-fondo: oklch(0.3 0.065 75);
   }
 }
 
@@ -170,6 +193,9 @@ body {
     --color-alto-fondo: oklch(1 0 0);
     --color-critico: oklch(0.42 0.2 22);
     --color-critico-fondo: oklch(1 0 0);
+
+    --color-attenzione: oklch(0.48 0.14 75);
+    --color-attenzione-fondo: oklch(1 0 0);
   }
 
   html,
@@ -185,6 +211,7 @@ body {
   [class*='bg-rilevante-fondo'],
   [class*='bg-moderato-fondo'],
   [class*='bg-basso-fondo'],
+  [class*='bg-attenzione-fondo'],
   [class*='bg-marchio-tenue'] {
     border-width: 1px;
   }

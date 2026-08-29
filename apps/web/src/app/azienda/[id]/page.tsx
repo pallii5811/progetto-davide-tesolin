@@ -75,7 +75,7 @@ export default async function PaginaAzienda({
     );
   }
 
-  const { azienda, sintesi, catNat, gap, assetto, ubicazioni } = analisi;
+  const { azienda, sintesi, catNat, gap, assetto, gruppo, ubicazioni } = analisi;
 
   /*
     Le fotografie si leggono a parte, dopo l'analisi.
@@ -316,6 +316,22 @@ export default async function PaginaAzienda({
         trattini comunicherebbero «il software non funziona» invece di «questo servizio
         non è stato chiesto».
       */}
+      {/*
+        Su quali dati poggia questa analisi, e cosa manca.
+
+        Il prodotto lo sapeva già — `livelloDatiEconomici` e `arricchimentiPossibili` sono
+        nel DTO da sempre — e non lo diceva a nessuna pagina. Chi apre un'impresa vera
+        legge «non determinabile» accanto a quattro capitali senza sapere perché né cosa
+        farci: l'anagrafica estesa porta gli aggregati sintetici ma non lo schema CEE, e da
+        quello dipendono margine di contribuzione, danni indiretti, indici di liquidità e
+        Altman.
+
+        Un vuoto dichiarato con accanto ciò che lo chiude è una vendita; un vuoto muto è un
+        difetto del software — ed è il modo più rapido di far credere che il dato non
+        esista invece che non sia stato chiesto.
+      */}
+      <LivelloDeiDati analisi={analisi} />
+
       {/* ── Record camerale ──────────────────────────────────────────────── */}
       <RecordCamerale registro={analisi.registro} fonte={analisi.azienda.fonte} />
 
@@ -563,6 +579,131 @@ export default async function PaginaAzienda({
             )}
 
             {/*
+              Le cariche, quando ci sono.
+
+              Erano comprate con il profilo completo, mappate con otto campi, spedite
+              dall'API — e nessun componente percorreva l'array: l'unica cosa che il
+              prodotto ne faceva era mostrare il riquadro «non disponibili» qui sotto. Chi
+              pagava i trenta centesimi vedeva lo stesso schermo di chi non li aveva pagati.
+
+              Il codice fiscale accanto al nome per la stessa ragione dei soci: senza, il
+              nome è un omonimo qualunque e il fascicolo antiriciclaggio non regge.
+            */}
+            {assetto.caricheDisponibili && (
+              <Scheda>
+                <h3 className="mb-3 text-sm font-semibold">
+                  Cariche <span className="font-normal text-testo-debole">({assetto.cariche.length})</span>
+                </h3>
+                <ul className="space-y-2.5">
+                  {[...assetto.cariche]
+                    // Prima chi rappresenta la società: è chi la D&O deve coprire.
+                    .sort((a, b) => Number(b.isRappresentanteLegale) - Number(a.isRappresentanteLegale))
+                    .map((c) => (
+                      <li
+                        key={`${c.nominativo}-${c.codiceFiscale ?? c.ruolo}`}
+                        className="border-b border-bordo pb-2.5 last:border-0 last:pb-0"
+                      >
+                        <p className="text-sm font-medium">
+                          {c.nominativo}
+                          {c.isRappresentanteLegale && (
+                            <span className="ml-2 rounded bg-marchio/10 px-1.5 py-0.5 text-[11px] font-medium text-marchio">
+                              rappresentanza legale
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-xs text-testo-tenue">
+                          {c.ruolo}
+                          {c.dataNomina !== null && ` · in carica dal ${dataBreve(c.dataNomina)}`}
+                          {/*
+                            L'età si ricalcola dalla data di nascita al momento del disegno:
+                            il campo del fornitore è congelato all'osservazione e il profilo
+                            viene conservato, quindi una scheda riletta fra due anni
+                            mostrerebbe un'età vecchia di due anni senza dirlo.
+                          */}
+                          {etaOggi(c.dataNascita) !== null && ` · ${etaOggi(c.dataNascita)} anni`}
+                        </p>
+                        {c.codiceFiscale !== null && (
+                          <p className="mt-0.5 font-mono text-xs text-testo-debole">{c.codiceFiscale}</p>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </Scheda>
+            )}
+
+            {/*
+              Il perimetro di gruppo.
+
+              Il mappatore lo estraeva, un collaudo lo verificava, e poi il dato non
+              entrava da nessuna parte perché il modello canonico non aveva un campo dove
+              metterlo. Il documento di confronto con Creditsafe lo dava per fatto.
+
+              Il vertice è **testo**, mai un collegamento: può essere una persona fisica, e
+              un link verso di essa produrrebbe una ricerca a vuoto, per giunta a pagamento.
+            */}
+            {gruppo.disponibile && (
+              <Scheda>
+                <h3 className="mb-2 text-sm font-semibold">Gruppo societario</h3>
+                {gruppo.appartieneAGruppo === true ? (
+                  <div className="space-y-1.5 text-sm">
+                    <p>
+                      Appartiene a un gruppo
+                      {gruppo.denominazione !== null && (
+                        <>
+                          {' '}
+                          <span className="font-medium">{gruppo.denominazione}</span>
+                        </>
+                      )}
+                      .
+                    </p>
+                    {gruppo.verticeDichiarato !== null && (
+                      <p className="text-testo-tenue">
+                        Vertice dichiarato: <span className="text-testo">{gruppo.verticeDichiarato}</span>
+                      </p>
+                    )}
+                    {gruppo.controllateTotali !== null && gruppo.controllateTotali > 0 && (
+                      <p className="text-testo-tenue">
+                        {gruppo.controllateTotali}{' '}
+                        {gruppo.controllateTotali === 1 ? 'società controllata' : 'società controllate'} nel
+                        perimetro.
+                      </p>
+                    )}
+                  </div>
+                ) : gruppo.appartieneAGruppo === false ? (
+                  <p className="text-sm text-testo-tenue">
+                    Il registro non dichiara alcun gruppo societario.
+                  </p>
+                ) : (
+                  <p className="text-sm text-testo-tenue">
+                    Il registro non si pronuncia sull&apos;appartenenza a un gruppo: è un dato da chiedere,
+                    non un&apos;assenza accertata.
+                  </p>
+                )}
+
+                {gruppo.controllantiEstere === true && (
+                  <p className="mt-2 border-l-2 border-marchio/40 pl-2 text-xs leading-relaxed text-testo-tenue">
+                    Risultano controllanti estere: il programma va impostato come master policy con polizze
+                    locali, e la D&amp;O va verificata sulle giurisdizioni coinvolte.
+                  </p>
+                )}
+
+                {gruppo.controllateNote.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-testo-tenue">Controllate risultanti</p>
+                    <ul className="mt-1 space-y-0.5 text-xs text-testo-tenue">
+                      {gruppo.controllateNote.map((n) => (
+                        <li key={n}>{n}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 text-xs text-testo-debole">
+                      L&apos;anagrafica non ne porta la partita IVA: non sono analizzabili con un clic.
+                    </p>
+                  </div>
+                )}
+              </Scheda>
+            )}
+
+            {/*
               Le cariche non arrivano dall'anagrafica acquistata. Dichiararlo è più utile
               che lasciare un riquadro vuoto: dice all'intermediario cosa deve chiedere.
             */}
@@ -571,7 +712,8 @@ export default async function PaginaAzienda({
                 <h3 className="mb-2 text-sm font-semibold">Cariche</h3>
                 <p className="text-sm text-testo-tenue">
                   Gli amministratori non sono compresi nell&apos;anagrafica acquisita: vanno rilevati in
-                  intervista. Dalla carica dipende chi è assicurato dalla D&amp;O.
+                  intervista, oppure acquistati con il profilo completo. Dalla carica dipende chi è
+                  assicurato dalla D&amp;O.
                 </p>
               </Scheda>
             )}
@@ -677,10 +819,9 @@ export default async function PaginaAzienda({
         {gap.polizzeDichiarate === 0 && (
           <div className="mb-4">
             <Avviso tono="attenzione" titolo="Il confronto con le polizze non è stato fatto">
-              Non è stata inserita nessuna polizza in essere, quindi le voci qui sotto
-              elencano le coperture <strong>necessarie</strong> a questa impresa — non quelle
-              che le mancano. Per avere il confronto vero, e sapere dove è sottoassicurata,
-              inserire il portafoglio in essere nei{' '}
+              Non è stata inserita nessuna polizza in essere, quindi le voci qui sotto elencano le coperture{' '}
+              <strong>necessarie</strong> a questa impresa — non quelle che le mancano. Per avere il
+              confronto vero, e sapere dove è sottoassicurata, inserire il portafoglio in essere nei{' '}
               <Link href={`/azienda/${id}/dati`} className="text-marchio underline">
                 dati di intervista
               </Link>
@@ -724,12 +865,11 @@ export default async function PaginaAzienda({
           analisi.rischi.every((r) => r.punteggioResiduo === r.punteggioInerente) && (
             <div className="mb-4">
               <Avviso tono="informativo" titolo="Rischio residuo pari all’inerente">
-                Nessuna misura di prevenzione è stata <strong>confermata</strong> in intervista,
-                quindi nessuna riduzione è stata applicata: il rischio residuo coincide con
-                quello inerente. Le protezioni che l’impresa già possiede — impianto
-                antincendio, allarme, modello 231 — abbassano il punteggio solo quando sono
-                verificate, perché accreditarle senza averle viste significherebbe proporre una
-                franchigia che non regge.{' '}
+                Nessuna misura di prevenzione è stata <strong>confermata</strong> in intervista, quindi
+                nessuna riduzione è stata applicata: il rischio residuo coincide con quello inerente. Le
+                protezioni che l’impresa già possiede — impianto antincendio, allarme, modello 231 —
+                abbassano il punteggio solo quando sono verificate, perché accreditarle senza averle viste
+                significherebbe proporre una franchigia che non regge.{' '}
                 <Link href={`/azienda/${id}/dati`} className="text-marchio underline">
                   Confermarle nei dati di intervista
                 </Link>
@@ -973,17 +1113,29 @@ export default async function PaginaAzienda({
                       e la riga sotto dice quale dato serve. Un punteggio che non c'è va
                       nominato per quello che è.
                     */}
-                    {fattore.punteggio === null
-                      ? 'non valutabile'
-                      : `${Math.round(fattore.punteggio)}/100`}
+                    {fattore.punteggio === null ? 'non valutabile' : `${Math.round(fattore.punteggio)}/100`}
                   </span>
                 </p>
               </div>
 
+              {/*
+                Il colore della barra dice il punteggio, non il marchio.
+
+                Era `bg-marchio` sempre: «Liquidità 57/100» e «Eventi negativi 97/100»
+                uscivano dello stesso identico blu, e il colore non portava alcuna
+                informazione — contro il principio scritto in cima al foglio di stile,
+                dove si dice che il colore serve solo dove informa.
+
+                Sette barre tutte uguali si leggono una per una; sette barre che virano
+                dal verde all'arancione si leggono di sguardo, ed è quello che serve a chi
+                apre venti schede al giorno. La lunghezza resta l'informazione principale:
+                il colore la raddoppia, non la sostituisce, così chi non distingue i colori
+                non perde nulla.
+              */}
               {fattore.punteggio !== null && (
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bordo">
                   <div
-                    className="h-full rounded-full bg-marchio"
+                    className={`h-full rounded-full ${coloreDelPunteggio(fattore.punteggio)}`}
                     style={{ width: `${Math.round(fattore.punteggio)}%` }}
                   />
                 </div>
@@ -1088,9 +1240,7 @@ function EventiNegativi({ eventi }: { eventi: AnalisiDto['eventiNegativi'] }) {
   if (eventi === null) return null;
 
   const nessuno =
-    eventi.protesti.length === 0 &&
-    eventi.pregiudizievoli.length === 0 &&
-    eventi.procedure.length === 0;
+    eventi.protesti.length === 0 && eventi.pregiudizievoli.length === 0 && eventi.procedure.length === 0;
 
   return (
     <Sezione
@@ -1105,9 +1255,9 @@ function EventiNegativi({ eventi }: { eventi: AnalisiDto['eventiNegativi'] }) {
       {eventi.dichiaratiSenzaDettaglio.length > 0 && (
         <div className="mb-4">
           <Avviso tono="attenzione" titolo="Il registro dichiara eventi senza fornirne il dettaglio">
-            Risultano <strong>{eventi.dichiaratiSenzaDettaglio.join(', ')}</strong> di cui
-            l’archivio non ha restituito l’elenco. Non è un’assenza: è un’informazione
-            mancante, e finché resta tale il fattore non può essere valutato per intero.
+            Risultano <strong>{eventi.dichiaratiSenzaDettaglio.join(', ')}</strong> di cui l’archivio non ha
+            restituito l’elenco. Non è un’assenza: è un’informazione mancante, e finché resta tale il
+            fattore non può essere valutato per intero.
           </Avviso>
         </div>
       )}
@@ -1115,8 +1265,8 @@ function EventiNegativi({ eventi }: { eventi: AnalisiDto['eventiNegativi'] }) {
       {nessuno && eventi.dichiaratiSenzaDettaglio.length === 0 && (
         <Scheda>
           <p className="text-sm">
-            Nessun protesto, nessuna pregiudizievole e nessuna procedura concorsuale
-            risultano a carico dell’impresa alla data dell’accertamento.
+            Nessun protesto, nessuna pregiudizievole e nessuna procedura concorsuale risultano a carico
+            dell’impresa alla data dell’accertamento.
           </p>
         </Scheda>
       )}
@@ -1201,6 +1351,169 @@ function dataBreve(iso: string | null | undefined): string | null {
 }
 
 /**
+ * Su quale livello di dati economici l'analisi ha lavorato, e cosa manca.
+ *
+ * Non compare quando i dati sono completi: una riga che dice «va tutto bene» occupa
+ * spazio in una pagina già lunga e insegna a saltare gli avvisi. Compare quando c'è
+ * qualcosa da sapere — ed è quasi sempre, perché lo schema CEE dettagliato è un servizio
+ * a parte che nessuno compra per abitudine.
+ */
+function LivelloDeiDati({ analisi }: { analisi: AnalisiDto }) {
+  if (analisi.livelloDatiEconomici === 'completo') return null;
+  if (analisi.arricchimentiPossibili.length === 0 && analisi.livelloDatiEconomici === 'sintetico') {
+    return null;
+  }
+
+  const assente = analisi.livelloDatiEconomici === 'assente';
+
+  return (
+    <div className="mb-8">
+      <Scheda className="border-attenzione/40 bg-attenzione-fondo/40">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="text-sm font-semibold">
+            {assente
+              ? 'Analisi condotta senza dati di bilancio'
+              : 'Analisi condotta sugli aggregati sintetici del registro'}
+          </h2>
+          <span className="text-xs text-testo-tenue">
+            {assente
+              ? 'nessun esercizio depositato è stato letto'
+              : 'fatturato, patrimonio netto, totale attivo, costo del personale'}
+          </span>
+        </div>
+
+        <p className="mt-2 text-sm leading-relaxed text-testo-tenue">
+          {assente
+            ? 'Senza almeno un esercizio, i capitali che si calcolano dal bilancio restano non determinabili e il merito creditizio poggia sui soli fatti anagrafici. Non è una stima prudente: è l’assenza del dato, dichiarata.'
+            : 'Gli aggregati sintetici bastano a dimensionare alcuni capitali, non tutti. Le voci che richiedono lo schema CEE dettagliato — art. 2424 e 2425 c.c. — restano non determinabili, e sotto è scritto quali.'}
+        </p>
+
+        {analisi.arricchimentiPossibili.length > 0 && (
+          <div className="mt-3 space-y-2.5">
+            {analisi.arricchimentiPossibili.map((a) => (
+              <div key={a.dato} className="border-l-2 border-attenzione/50 pl-3">
+                <p className="text-sm font-medium">{a.dato}</p>
+                <ul className="mt-0.5 space-y-0.5 text-xs leading-relaxed text-testo-tenue">
+                  {a.sbloccherebbe.map((s) => (
+                    <li key={s}>· {s}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/*
+          La via che non costa nulla, detta per prima.
+
+          Il bilancio depositato l'imprenditore ce l'ha già: le voci che mancano si
+          leggono dal suo PDF in due minuti, e valgono più di qualunque acquisto. Dirlo
+          qui evita che un vuoto venga letto come «serve comprare».
+        */}
+        <p className="mt-3 border-t border-bordo pt-2.5 text-xs leading-relaxed text-testo-debole">
+          Il bilancio depositato è già in mano all’impresa: le voci mancanti si rilevano in intervista dal
+          documento che il cliente porta, senza alcun acquisto.
+        </p>
+      </Scheda>
+    </div>
+  );
+}
+
+/**
+ * Le voci del record camerale, in un posto solo.
+ *
+ * Serve a due chiamanti — il menu delle sezioni e la sezione stessa — perché prima
+ * decidevano in modo diverso se quel blocco esistesse: il menu guardava
+ * `registro != null`, la sezione contava i campi valorizzati. Su un registro con tutti i
+ * campi vuoti il collegamento c'era e non portava da nessuna parte.
+ *
+ * Il blocco può mancare del tutto: le analisi congelate prima che esistesse non lo
+ * contengono, e leggerlo senza verificarlo fa cadere la pagina — è già successo, su
+ * un'azienda già pagata, con un messaggio che parlava di una porta di rete e non
+ * c'entrava nulla.
+ */
+function vociDelRecordCamerale(
+  registro: AnalisiDto['registro'] | null | undefined,
+): readonly { etichetta: string; valore: string }[] {
+  if (registro === undefined || registro === null) return [];
+
+  const voci: { etichetta: string; valore: string }[] = [];
+  const aggiungi = (etichetta: string, valore: string | null | undefined): void => {
+    if (valore !== null && valore !== undefined && valore !== '') voci.push({ etichetta, valore });
+  };
+
+  aggiungi('Forma giuridica', registro.formaGiuridicaDescrizione);
+  aggiungi('Numero REA', registro.numeroREA);
+  aggiungi('Camera di commercio', registro.cciaa);
+  aggiungi('Costituita il', dataBreve(registro.dataCostituzione));
+  aggiungi('Attività iniziata il', dataBreve(registro.dataInizioAttivita));
+  aggiungi('Cessata il', dataBreve(registro.dataCessazione));
+  aggiungi('Capitale sociale deliberato', registro.capitaleSocialeDeliberato?.formattato);
+  aggiungi('Capitale sociale versato', registro.capitaleSocialeVersato?.formattato);
+  aggiungi('Fatturato dichiarato', registro.fatturatoDichiarato?.formattato);
+  aggiungi('Addetti', registro.numeroAddetti === null ? null : String(registro.numeroAddetti));
+  aggiungi(
+    'ATECO secondari',
+    registro.atecoSecondari.length > 0 ? registro.atecoSecondari.join(' · ') : null,
+  );
+  aggiungi('PEC', registro.pec);
+  aggiungi('Sito web', registro.sitoWeb);
+  aggiungi('Telefono', registro.telefono);
+  aggiungi('Codice catastale del comune', registro.codiceCatastale);
+  if (registro.sedeLegale !== null) {
+    const s = registro.sedeLegale;
+    aggiungi(
+      'Sede legale',
+      `${s.via}${s.civico === null ? '' : ' ' + s.civico}, ${s.cap ?? ''} ${s.comune} (${s.provincia})${
+        s.frazione === null || s.frazione === '' ? '' : ' — ' + s.frazione
+      }`.replace(/\s+/g, ' '),
+    );
+  }
+
+  return voci;
+}
+
+const haRecordCamerale = (registro: AnalisiDto['registro'] | null | undefined): boolean =>
+  vociDelRecordCamerale(registro).length > 0;
+
+/**
+ * Il colore di una barra di punteggio, sulla scala di gravità già in uso.
+ *
+ * Le stesse cinque tinte dei rischi, lette al contrario: qui cento è buono. Riusare la
+ * scala esistente invece di inventarne una seconda è ciò che tiene coerente il
+ * vocabolario visivo — in una scheda dove convivono punteggi di merito e livelli di
+ * rischio, due scale di colore diverse per la stessa idea di «grave» si contraddicono.
+ */
+function coloreDelPunteggio(punteggio: number): string {
+  if (punteggio >= 80) return 'bg-basso';
+  if (punteggio >= 65) return 'bg-moderato';
+  if (punteggio >= 50) return 'bg-rilevante';
+  if (punteggio >= 30) return 'bg-alto';
+  return 'bg-critico';
+}
+
+/**
+ * L'età, calcolata oggi.
+ *
+ * Il fornitore manda anche un campo `age`, ma è fermo all'istante in cui il record è
+ * stato osservato, e il profilo viene conservato: una scheda riletta fra due anni
+ * mostrerebbe un'età vecchia di due anni senza dichiararlo. Qui si ricalcola dalla data
+ * di nascita, che invece non invecchia.
+ */
+function etaOggi(dataNascita: string | null): number | null {
+  if (dataNascita === null) return null;
+  const nato = new Date(dataNascita);
+  if (Number.isNaN(nato.getTime())) return null;
+  const oggi = new Date();
+  let anni = oggi.getFullYear() - nato.getFullYear();
+  const primaDelCompleanno =
+    oggi.getMonth() < nato.getMonth() ||
+    (oggi.getMonth() === nato.getMonth() && oggi.getDate() < nato.getDate());
+  if (primaDelCompleanno) anni -= 1;
+  return anni >= 0 && anni < 130 ? anni : null;
+}
+
+/**
  * Le sezioni dell'analisi, e solo quelle che ci sono davvero.
  *
  * L'elenco era fisso: dodici voci sempre. Su un'impresa senza bilancio depositato,
@@ -1212,7 +1525,21 @@ function dataBreve(iso: string | null | undefined): string | null {
  * «questo programma è rotto». E ha ragione a concluderlo.
  */
 function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
+  /*
+    L'ordine del menu è l'ordine della pagina.
+
+    «Record camerale» stava in fondo all'elenco e viene disegnato per **primo**: chi
+    cliccava l'ultima voce del menu veniva riportato in cima. È lo stesso difetto che il
+    commento qui sopra dice di aver corretto — un collegamento che non porta dove
+    promette — in una forma più subdola, perché la pagina si muove davvero.
+
+    E la condizione era `analisi.registro != null`, mentre la sezione si disegna solo se
+    almeno un campo è valorizzato: su un registro con tutti i campi vuoti il collegamento
+    esisteva e non portava da nessuna parte. Ora entrambi chiedono la stessa cosa alla
+    stessa funzione.
+  */
   const sezioni = [
+    { id: 'record-camerale', testo: 'Record camerale', presente: haRecordCamerale(analisi.registro) },
     { id: 'ubicazioni', testo: 'Ubicazioni', presente: analisi.ubicazioni.elenco.length > 0 },
     { id: 'assetto', testo: 'Assetto e gruppo', presente: true },
     { id: 'piano', testo: 'Piano d’azione', presente: analisi.gap.voci.length > 0 },
@@ -1224,7 +1551,6 @@ function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
     { id: 'credito', testo: 'Merito creditizio', presente: true },
     { id: 'eventi-negativi', testo: 'Eventi negativi', presente: analisi.eventiNegativi !== null },
     { id: 'bilancio', testo: 'Bilancio', presente: analisi.bilancio !== null },
-    { id: 'record-camerale', testo: 'Record camerale', presente: analisi.registro != null },
   ].filter((s) => s.presente);
 
   return (
@@ -1279,42 +1605,9 @@ function RecordCamerale({
     Vale per ogni campo aggiunto a un oggetto che viene conservato: il vecchio, in
     archivio, resta com'era.
   */
-  if (registro === undefined || registro === null) return null;
+  if (!haRecordCamerale(registro)) return null;
 
-  const voci: { etichetta: string; valore: string }[] = [];
-  const aggiungi = (etichetta: string, valore: string | null | undefined) => {
-    if (valore !== null && valore !== undefined && valore !== '') voci.push({ etichetta, valore });
-  };
-
-  aggiungi('Forma giuridica', registro.formaGiuridicaDescrizione);
-  aggiungi('Numero REA', registro.numeroREA);
-  aggiungi('Camera di commercio', registro.cciaa);
-  aggiungi('Costituita il', dataBreve(registro.dataCostituzione));
-  aggiungi('Attività iniziata il', dataBreve(registro.dataInizioAttivita));
-  aggiungi('Cessata il', dataBreve(registro.dataCessazione));
-  aggiungi('Capitale sociale deliberato', registro.capitaleSocialeDeliberato?.formattato);
-  aggiungi('Capitale sociale versato', registro.capitaleSocialeVersato?.formattato);
-  aggiungi('Fatturato dichiarato', registro.fatturatoDichiarato?.formattato);
-  aggiungi('Addetti', registro.numeroAddetti === null ? null : String(registro.numeroAddetti));
-  aggiungi(
-    'ATECO secondari',
-    registro.atecoSecondari.length > 0 ? registro.atecoSecondari.join(' · ') : null,
-  );
-  aggiungi('PEC', registro.pec);
-  aggiungi('Sito web', registro.sitoWeb);
-  aggiungi('Telefono', registro.telefono);
-  aggiungi('Codice catastale del comune', registro.codiceCatastale);
-  if (registro.sedeLegale !== null) {
-    const s = registro.sedeLegale;
-    aggiungi(
-      'Sede legale',
-      `${s.via}${s.civico === null ? '' : ' ' + s.civico}, ${s.cap ?? ''} ${s.comune} (${s.provincia})${
-        s.frazione === null || s.frazione === '' ? '' : ' — ' + s.frazione
-      }`.replace(/\s+/g, ' '),
-    );
-  }
-
-  if (voci.length === 0) return null;
+  const voci = vociDelRecordCamerale(registro);
 
   return (
     <Sezione
@@ -1337,8 +1630,8 @@ function RecordCamerale({
         </dl>
       </Scheda>
       <p className="mt-2 text-xs text-testo-debole">
-        Le voci che il registro non riporta non compaiono: un&apos;assenza qui significa che il
-        dato non esiste nell&apos;archivio, non che non sia stato acquistato.
+        Le voci che il registro non riporta non compaiono: un&apos;assenza qui significa che il dato non
+        esiste nell&apos;archivio, non che non sia stato acquistato.
       </p>
     </Sezione>
   );
@@ -1355,7 +1648,10 @@ function RecordCamerale({
 function componiNotaPatrimonio(somme: AnalisiDto['sommeAssicurande']): string {
   const dentro: string[] = [];
   const fuori: string[] = [];
-  const voce = (etichetta: string, valore: { valore: { formattato: string } | null } | null | undefined): void => {
+  const voce = (
+    etichetta: string,
+    valore: { valore: { formattato: string } | null } | null | undefined,
+  ): void => {
     if (valore?.valore != null) dentro.push(etichetta);
     else fuori.push(etichetta);
   };
@@ -1523,9 +1819,7 @@ function VoceGap({
           */}
           <BadgeStato
             stato={voce.stato}
-            testo={
-              !polizzeCensite && voce.stato === 'assente' ? 'non censita' : voce.statoEtichetta
-            }
+            testo={!polizzeCensite && voce.stato === 'assente' ? 'non censita' : voce.statoEtichetta}
           />
           {voce.obbligoDiLegge && (
             <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium text-critico">

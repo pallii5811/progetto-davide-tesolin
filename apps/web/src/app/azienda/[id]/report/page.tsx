@@ -246,7 +246,9 @@ export default async function PaginaReport({
             */}
             {sintesi.esposizioneNonAssicurata.euro === 0 && sintesi.coperturaDaQuantificare > 0 ? (
               <>
-                {gap.polizzeDichiarate === 0 ? 'Non essendo stata censita alcuna polizza in essere, restano' : 'Rispetto alle coperture attualmente in essere restano'}{' '}
+                {gap.polizzeDichiarate === 0
+                  ? 'Non essendo stata censita alcuna polizza in essere, restano'
+                  : 'Rispetto alle coperture attualmente in essere restano'}{' '}
                 <strong>
                   {sintesi.coperturaDaQuantificare}{' '}
                   {sintesi.coperturaDaQuantificare === 1 ? 'garanzia' : 'garanzie'} il cui capitale non è
@@ -285,18 +287,17 @@ export default async function PaginaReport({
               {gap.polizzeDichiarate === 0 ? (
                 <>
                   <strong>Adempimento normativo da verificare.</strong> L&apos;impresa è soggetta
-                  all&apos;obbligo di assicurazione contro le calamità naturali introdotto dalla
-                  L. 213/2023. Non essendo state censite le polizze in essere,{' '}
+                  all&apos;obbligo di assicurazione contro le calamità naturali introdotto dalla L.
+                  213/2023. Non essendo state censite le polizze in essere,{' '}
                   <strong>il presente documento non accerta se l&apos;obbligo sia stato adempiuto</strong>:
                   la verifica va completata sulla documentazione assicurativa dell&apos;impresa.
                 </>
               ) : (
                 <>
                   <strong>Adempimento normativo pendente.</strong> L&apos;impresa è soggetta
-                  all&apos;obbligo di assicurazione contro le calamità naturali introdotto dalla
-                  L. 213/2023 e, fra le polizze censite, non ne risulta alcuna che lo adempia.
-                  L&apos;inadempimento è considerato nell&apos;assegnazione di contributi,
-                  sovvenzioni e agevolazioni pubbliche.
+                  all&apos;obbligo di assicurazione contro le calamità naturali introdotto dalla L. 213/2023
+                  e, fra le polizze censite, non ne risulta alcuna che lo adempia. L&apos;inadempimento è
+                  considerato nell&apos;assegnazione di contributi, sovvenzioni e agevolazioni pubbliche.
                 </>
               )}
             </p>
@@ -405,6 +406,45 @@ export default async function PaginaReport({
                   )}
                 </p>
               ))}
+
+              {/*
+                Chi ha la rappresentanza legale, detto al cliente.
+
+                Il documento dichiarava soltanto ciò che mancava. Con le cariche acquisite,
+                il nome di chi la D&O assicura è un dato pagato, non una domanda da fare —
+                e in un fascicolo di adeguatezza è la differenza fra nominare l'assicurato
+                e rimandarlo a una rilevazione successiva.
+
+                La frase si compone dai valori, come ovunque: nessun modello linguistico, e
+                un ruolo non previsto produce una formulazione generica e vera.
+              */}
+              {assetto.caricheDisponibili &&
+                (() => {
+                  const legali = assetto.cariche.filter((c) => c.isRappresentanteLegale);
+                  if (legali.length === 0) {
+                    return (
+                      <p className="text-testo-tenue">
+                        Fra le cariche acquisite non risulta chi ha la rappresentanza legale: va confermato
+                        prima di intestare la copertura D&amp;O.
+                      </p>
+                    );
+                  }
+                  return (
+                    <p>
+                      <strong>Rappresentanza legale.</strong>{' '}
+                      {legali.map((c, i) => (
+                        <span key={`${c.nominativo}-${c.codiceFiscale ?? i}`}>
+                          {i > 0 && '; '}
+                          {c.nominativo}
+                          {c.ruolo !== '' && `, ${c.ruolo.toLowerCase()}`}
+                          {c.dataNomina !== null &&
+                            `, in carica dal ${new Date(c.dataNomina).toLocaleDateString('it-IT')}`}
+                        </span>
+                      ))}
+                      . È il perimetro nominativo della copertura D&amp;O, da confermare in polizza.
+                    </p>
+                  );
+                })()}
 
               {!assetto.caricheDisponibili && (
                 <p className="text-testo-tenue">

@@ -213,6 +213,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
     prevenzione: analisi.prevenzione,
     catNat: presentCatNat(analisi),
     assetto: presentAssetto(analisi),
+    gruppo: presentGruppo(analisi),
     /*
       Il titolare effettivo passa **con la sua azione consigliata**, non solo con i nomi.
 
@@ -283,10 +284,64 @@ function presentAssetto(analisi: CompanyAnalysis) {
     soggettaADirezioneECoordinamento: a.soggettaADirezioneECoordinamento,
     personeChiave: a.personeChiave,
     caricheDisponibili: a.caricheDisponibili,
-    cariche: analisi.profile.assetti?.value.cariche ?? [],
+    /*
+      Le cariche, con le date già serializzate.
+
+      Attraversavano già il filo per intero — non esiste alcuno schema di risposta che le
+      filtri — ma nessun componente le disegnava, e il tipo lato web ne dichiarava tre su
+      otto. Chi comprava il profilo completo a trenta centesimi vedeva esattamente lo
+      stesso schermo di chi non l'aveva comprato.
+
+      `eta` non viene inoltrata: è congelata all'istante dell'osservazione e il profilo
+      viene conservato, quindi una scheda riletta fra due anni mostrerebbe un'età vecchia
+      di due anni senza dirlo. Si manda la data di nascita e l'età si calcola quando si
+      disegna.
+    */
+    cariche: a.cariche.map((c) => ({
+      nominativo: c.nominativo,
+      codiceFiscale: c.codiceFiscale,
+      ruolo: c.ruolo,
+      isRappresentanteLegale: c.isRappresentanteLegale,
+      dataNomina: c.dataNomina?.toISOString() ?? null,
+      dataNascita: c.dataNascita?.toISOString() ?? null,
+      luogoNascita: c.luogoNascita,
+    })),
     implicazioni: a.implicazioni,
     domande: a.domande,
     confidenza: a.confidenza,
+  };
+}
+
+/**
+ * Il perimetro di gruppo, blocco a sé.
+ *
+ * Fuori da `presentAssetto` di proposito: quell'oggetto costruisce la compagine sociale e
+ * la controllante **societaria**, che porta una partita IVA con cui l'interfaccia fa un
+ * collegamento analizzabile. Il vertice dichiarato qui può essere una persona fisica, e
+ * infilarlo là dentro renderebbe ambiguo un oggetto che oggi è univoco.
+ */
+function presentGruppo(analisi: CompanyAnalysis): {
+  readonly disponibile: boolean;
+  readonly appartieneAGruppo: boolean | null;
+  readonly denominazione: string | null;
+  readonly verticeDichiarato: string | null;
+  readonly controllateTotali: number | null;
+  readonly controllantiEstere: boolean | null;
+  readonly controllateNote: readonly string[];
+} {
+  const g = analisi.profile.gruppo?.value ?? null;
+  return {
+    disponibile: g !== null,
+    appartieneAGruppo: g?.appartieneAGruppo ?? null,
+    denominazione: g?.denominazione ?? null,
+    verticeDichiarato: g?.verticeDichiarato ?? null,
+    controllateTotali: g?.controllateTotali ?? null,
+    // La copia buona di questo dato sta negli indicatori dell'archivio, con il tipo
+    // giusto: si legge di lì invece di tenerne due.
+    controllantiEstere: analisi.profile.indicatoriFornitore.qualifiche?.haControllantiEstere ?? null,
+    // Le controllate nominate dall'anagrafica estesa: arrivano senza partita IVA, quindi
+    // sono nomi e non collegamenti. Meglio un elenco che il silenzio.
+    controllateNote: (analisi.profile.assetti?.value.controllate ?? []).map((c) => c.denominazione),
   };
 }
 

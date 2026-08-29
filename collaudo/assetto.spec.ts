@@ -48,7 +48,17 @@ test.describe('Assetto proprietario e gruppo', () => {
     await expect(sezione).toContainText(/Responsabilità personale degli amministratori/i);
     // Un'implicazione senza azione è un'informazione; con l'azione è consulenza.
     await expect(sezione).toContainText(/D&O/);
-    await expect(sezione).toContainText(/2392/);
+    /*
+      L'azienda di prova è una **S.r.l.**, e per la S.r.l. la responsabilità degli
+      amministratori è retta dall'art. 2476 c.c.
+
+      Qui era pinnato il 2392, che è norma della S.p.A.: il collaudo fissava la citazione
+      sbagliata, e finché ci restava nessuno poteva correggerla senza far diventare rosso
+      il collaudo. Si verifica anche che l'altra **non** compaia: una citazione errata è
+      più dannosa di una mancante, perché dà l'aria della competenza a un errore.
+    */
+    await expect(sezione).toContainText(/2476/);
+    await expect(sezione).not.toContainText(/2392/);
   });
 
   test('elenca le domande da porre al cliente', async ({ page }) => {

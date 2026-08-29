@@ -36,12 +36,34 @@ test.describe('Accessibilità', () => {
 
   for (const [nome, percorso] of PAGINE) {
     test(`${nome} non ha violazioni WCAG A/AA`, async ({ page }) => {
-      test.setTimeout(120_000);
+      test.setTimeout(180_000);
       await page.goto(percorso);
 
       const esito = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();
+
+      /*
+        Il tema chiaro non è l'unico tema.
+
+        Playwright emula `light` per impostazione predefinita e nessuno spec lo cambiava:
+        il tema scuro non è mai passato sotto axe. Ed è proprio il tema in cui il foglio
+        di stile racconta un guasto già pagato — pulsanti a 2,47:1, illeggibili — che
+        nessuna verifica visiva aveva colto «perché erano tutte in modalità chiara».
+
+        Costa un'emulazione e un ricarico sulla stessa pagina.
+      */
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.reload();
+      const esitoScuro = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      await page.emulateMedia({ colorScheme: 'light' });
+
+      const violazioniScuro = esitoScuro.violations.flatMap((v) =>
+        v.nodes.map((n) => `[tema scuro] ${v.id} (${v.impact ?? 'n.d.'}) su ${n.target.join(' ')}`),
+      );
+      expect(violazioniScuro, `${nome} in tema scuro: ${violazioniScuro.length} violazioni`).toEqual([]);
 
       /*
         Il messaggio d'errore elenca le violazioni con il selettore dell'elemento: senza,

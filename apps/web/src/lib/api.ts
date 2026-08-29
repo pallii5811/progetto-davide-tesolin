@@ -553,9 +553,39 @@ export interface AnalisiDto {
       controlloDiDiritto: boolean;
     } | null;
     soggettaADirezioneECoordinamento: boolean;
-    personeChiave: { denominazione: string; quotaPercentuale: number | null }[];
+    /**
+     * Chi ferma l'impresa uscendo di scena.
+     *
+     * `motivo` distingue chi comanda perché possiede da chi comanda perché è stato
+     * nominato: senza, la frase attribuisce a un amministratore senza quote un capitale
+     * che non ha.
+     */
+    personeChiave: {
+      denominazione: string;
+      codiceFiscale: string | null;
+      quotaPercentuale: number | null;
+      ruolo: string | null;
+      rappresentanteLegale: boolean;
+      motivo: 'quota' | 'carica' | 'quota-e-carica';
+    }[];
     caricheDisponibili: boolean;
-    cariche: { nominativo: string; ruolo: string; isRappresentanteLegale: boolean }[];
+    /*
+      Tutti i campi che l'API manda davvero.
+
+      Qui ne erano dichiarati tre su otto: gli altri attraversavano il filo e TypeScript
+      non li vedeva, quindi nessuno poteva disegnarli nemmeno volendo. Le date sono
+      **stringhe ISO** — arrivano da JSON.stringify, e tiparle come `Date` produrrebbe un
+      `.getFullYear()` che esplode a runtime senza che il compilatore fiati.
+    */
+    cariche: {
+      nominativo: string;
+      codiceFiscale: string | null;
+      ruolo: string;
+      isRappresentanteLegale: boolean;
+      dataNomina: string | null;
+      dataNascita: string | null;
+      luogoNascita: string | null;
+    }[];
     implicazioni: {
       titolo: string;
       conseguenza: string;
@@ -564,6 +594,25 @@ export interface AnalisiDto {
     }[];
     domande: string[];
     confidenza: string;
+  };
+  /**
+   * Il perimetro di gruppo dichiarato dal registro.
+   *
+   * Blocco a sé e non campo dell'assetto: `verticeDichiarato` può essere una persona
+   * fisica, mentre `assetto.capogruppo` è una società con partita IVA che l'interfaccia
+   * trasforma in un collegamento. Confonderli produrrebbe un link verso una persona.
+   */
+  gruppo: {
+    /** `false` finché il profilo completo non è stato acquistato. */
+    disponibile: boolean;
+    /** `null` quando il registro non si pronuncia: non è un «no». */
+    appartieneAGruppo: boolean | null;
+    denominazione: string | null;
+    verticeDichiarato: string | null;
+    controllateTotali: number | null;
+    controllantiEstere: boolean | null;
+    /** Controllate nominate dall'anagrafica: nomi, senza partita IVA, quindi non link. */
+    controllateNote: string[];
   };
   gap: {
     voci: GapDto[];

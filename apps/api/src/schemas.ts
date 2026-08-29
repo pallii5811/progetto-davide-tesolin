@@ -48,8 +48,26 @@ const immobileSchema = z.object({
   impiantoSprinkler: z.boolean().nullable().default(null),
 });
 
+/**
+ * Le voci lette dal bilancio depositato che il cliente porta all'appuntamento.
+ *
+ * Importi in centesimi come ovunque nel prodotto, non negativi. Ogni voce è annullabile:
+ * un campo lasciato vuoto resta ignoto e non diventa zero — uno zero sulle rimanenze
+ * produrrebbe «attività senza magazzino» su un'impresa che il magazzino ce l'ha.
+ */
+const bilancioDichiaratoSchema = z.object({
+  anno: z.number().int().min(1990).max(2100).nullable().default(null),
+  rimanenze: z.number().int().min(0).nullable().default(null),
+  creditiVersoClienti: z.number().int().min(0).nullable().default(null),
+  impiantiEAttrezzature: z.number().int().min(0).nullable().default(null),
+  impiantiAlCostoStorico: z.boolean().nullable().default(null),
+  costiMateriePrime: z.number().int().min(0).nullable().default(null),
+  costiServizi: z.number().int().min(0).nullable().default(null),
+});
+
 export const datiDichiaratiSchema = z
   .object({
+    bilancio: bilancioDichiaratoSchema.optional(),
     immobili: z.array(immobileSchema).optional(),
     numeroVeicoli: z.number().int().min(0).nullable().optional(),
     numeroDipendenti: z.number().int().min(0).nullable().optional(),
