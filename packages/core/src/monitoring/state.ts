@@ -35,7 +35,15 @@ export interface StatoSorvegliato {
   readonly attiva: boolean;
   readonly ateco: string | null;
   readonly indirizzoSedeLegale: string | null;
-  readonly numeroUnitaLocali: number;
+  /**
+   * `null` quando le unità locali non sono state acquisite.
+   *
+   * Non è una sfumatura: le unità locali arrivano solo con l'approfondimento, e un'analisi
+   * ordinaria non le contiene. Scriverle come zero faceva sì che la prima analisi
+   * approfondita, confrontata con una ordinaria, annunciasse «3 nuove unità locali
+   * aperte» con rilevanza 5 — mentre l'unica cosa cambiata era quanto si era pagato.
+   */
+  readonly numeroUnitaLocali: number | null;
 
   readonly dimensione: CompanySize;
   readonly addetti: number | null;
@@ -83,7 +91,9 @@ export function statoSorvegliato(
     attiva: anagrafica.statoAttivita === 'attiva',
     ateco: analisi.facts.ateco,
     indirizzoSedeLegale: sede === null ? null : `${sede.via} ${sede.civico ?? ''}, ${sede.comune}`.trim(),
-    numeroUnitaLocali: analisi.profile.unitaLocali?.value.length ?? 0,
+    // Da `facts`, che la distinzione la fa già: `null` significa «capitolo non
+    // acquisito», e non va confuso con «nessuna unità locale».
+    numeroUnitaLocali: analisi.facts.numeroUnitaLocali,
 
     dimensione: analisi.dimensione.value,
     addetti: analisi.facts.addetti,

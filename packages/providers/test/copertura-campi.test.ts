@@ -40,6 +40,101 @@ const SCARTATI_A_RAGION_VEDUTA: Readonly<Record<string, string>> = {
   registryOk: 'flag di coerenza interna del registro IVA del fornitore',
 };
 
+/**
+ * Campi comprati e **non letti**, dichiarati uno per uno, con la ragione e il costo.
+ *
+ * È il terzo stato che a questo collaudo mancava. Prima c'erano solo «letto» e «scartato a
+ * ragion veduta», e un campo comprato e dimenticato non aveva dove stare: finiva per non
+ * essere misurato affatto, perché il file che lo conteneva non veniva passato.
+ *
+ * L'elenco è confrontato per **uguaglianza esatta**, non per capienza: se qualcuno smette
+ * di leggere un campo il collaudo diventa rosso, e se qualcuno ne legge uno di questi senza
+ * toglierlo di qui diventa rosso lo stesso. Un elenco che può solo crescere sarebbe una
+ * lista di scuse; questo è un conto aperto, e il collaudo lo stampa a ogni esecuzione.
+ */
+const NON_LETTI_DICHIARATI: Readonly<
+  Record<string, { readonly perche: string; readonly campi: readonly string[] }>
+> = {
+  /*
+      Difetto 37 dell'audit. Le persone coinvolte nelle procedure concorsuali — codice
+      fiscale, data e comune di nascita, legale rappresentante, l'elenco delle cariche —
+      sono esattamente ciò che una D&O deve valutare, e costano quarantacinque centesimi
+      insieme al resto della pratica.
+
+      Non sono letti perché il modello canonico non ha dove metterli: servono un'entità
+      nuova in `packages/core/src/company/profile.ts`, la colonna che la conserva, il
+      presentatore che la espone e la sezione che la mostra. È una funzione nuova, e le
+      funzioni nuove sono una decisione del committente, non di chi corregge i difetti.
+    */
+  'prod-IT-negativita-10354890963.json': {
+    perche:
+      'difetto 37: persone coinvolte e dettagli della procedura — richiedono un’entità canonica nuova, una decisione del committente',
+    campi: [
+      'data.procedure.accordo_ristrutturazione_debiti',
+      'data.procedure.codice_comune_tribunale',
+      'data.procedure.codice_fiscale',
+      'data.procedure.codice_natura_giuridica',
+      'data.procedure.codice_procedura',
+      'data.procedure.commento',
+      'data.procedure.data_caricamento',
+      'data.procedure.data_esecuzione',
+      'data.procedure.domanda_ammissione_concordato',
+      'data.procedure.identificativo_procedura',
+      'data.procedure.indirizzo.altre_indicazioni',
+      'data.procedure.indirizzo.codice_comune',
+      'data.procedure.indirizzo.codice_comune_istat',
+      'data.procedure.indirizzo.codice_stato_estero',
+      'data.procedure.indirizzo.stato_estero',
+      'data.procedure.natura_giuridica',
+      'data.procedure.numero_rea',
+      'data.procedure.persone_coinvolte.cariche.codice_carica',
+      'data.procedure.persone_coinvolte.cariche.descrizione_carica',
+      'data.procedure.persone_coinvolte.codice_comune_nascita',
+      'data.procedure.persone_coinvolte.codice_fiscale',
+      'data.procedure.persone_coinvolte.codice_istat_comune_nascita',
+      'data.procedure.persone_coinvolte.codice_stato_nascita',
+      'data.procedure.persone_coinvolte.comune_nascita',
+      'data.procedure.persone_coinvolte.data_nascita',
+      'data.procedure.persone_coinvolte.indirizzo_residenza.altre_indicazioni',
+      'data.procedure.persone_coinvolte.indirizzo_residenza.codice_comune',
+      'data.procedure.persone_coinvolte.indirizzo_residenza.codice_comune_istat',
+      'data.procedure.persone_coinvolte.indirizzo_residenza.codice_stato_estero',
+      'data.procedure.persone_coinvolte.indirizzo_residenza.stato_estero',
+      'data.procedure.persone_coinvolte.legale_rappresentante',
+      'data.procedure.persone_coinvolte.persona_fisica',
+      'data.procedure.persone_coinvolte.provincia_nascita',
+      'data.procedure.persone_coinvolte.sesso',
+      'data.procedure.persone_coinvolte.stato_nascita',
+      'data.procedure.progressivo_procedura',
+      'data.procedure.provincia_tribunale',
+      'data.procedure.riferimento_sentenza',
+    ],
+  },
+  /*
+      La ricevuta di apertura di una pratica asincrona. Non è un dato dell'impresa: è
+      l'involucro della richiesta che l'abbiamo aperta. Ciò che serve — `status` e `id` —
+      è letto; il resto descrive il PDF che il fornitore genererebbe e l'account che ha
+      chiamato, e non ha un posto nel profilo di un'azienda.
+    */
+  'prod-negativita-avvio-10354890963.json': {
+    perche:
+      'involucro della pratica asincrona, non dati dell’impresa: si leggono lo stato e l’identificativo, il resto descrive il PDF del fornitore e l’account chiamante',
+    campi: [
+      'data.callback',
+      'data.cf_piva',
+      'data.date_completion',
+      'data.date_request',
+      'data.esito',
+      'data.logo_pdf',
+      'data.owner',
+      'data.soggetto',
+      'data.text_pdf',
+      'data.timestamp',
+      'data.title_pdf',
+    ],
+  },
+};
+
 function sorgenti(dir: string, acc: string[] = []): string[] {
   for (const voce of readdirSync(dir)) {
     const p = join(dir, voce);
@@ -109,50 +204,80 @@ function divario(file: string): { totale: number; mancanti: readonly string[] } 
 
 const disponibile = existsSync(SONDA);
 
+/**
+ * Ogni risposta registrata, non tre scelte a mano.
+ *
+ * Era il difetto di questo collaudo, e l'audit l'ha misurato: girava su **tre** campioni,
+ * scelti uno per servizio. Due dei tre erano i più poveri che ci fossero — quello degli
+ * eventi negativi ha sei campi, tutti `null`, e l'asserzione chiedeva «più di tre» — e i
+ * due file che contenevano i quindici e i trentotto buchi non venivano passati mai. Il
+ * collaudo era verde **per assenza di dato**: la stessa forma dell'errore che avrebbe
+ * dovuto sorvegliare.
+ *
+ * Ora si scandisce la cartella: quello che entra in `.sonda` entra nel conto, e chi
+ * registra una risposta nuova non deve ricordarsi di aggiungerla qui.
+ */
+function campioniConDati(): readonly { file: string; totale: number }[] {
+  return (
+    readdirSync(SONDA)
+      .filter((f) => f.endsWith('.json'))
+      .map((file) => ({ file, totale: divario(file).totale }))
+      /*
+      Si escludono le risposte che non contengono dati d'impresa: gli errori di
+      autenticazione da ottantacinque byte e le ricevute di apertura pratica. Non è una
+      scelta di comodo — una risposta senza campi non misura la copertura di niente — ed è
+      dichiarata con una soglia esplicita invece che con un elenco di nomi, che
+      invecchierebbe.
+    */
+      .filter((c) => c.totale >= 10)
+  );
+}
+
 describe.skipIf(!disponibile)('Copertura dei campi acquistati', () => {
-  it('l’anagrafica estesa viene letta per intero', () => {
-    const { totale, mancanti } = divario('prod-IT-advanced-12485671007.json');
+  const campioni = disponibile ? campioniConDati() : [];
 
-    expect(totale).toBeGreaterThan(50);
-    expect(
-      mancanti,
-      `campi acquistati e mai letti (${mancanti.length} su ${totale}): ${mancanti.join(', ')}`,
-    ).toEqual([]);
+  it('i campioni su cui si misura sono tutti quelli registrati con dati', () => {
+    // Se questo numero scende, il collaudo sta misurando meno di prima e nessuno lo
+    // vedrebbe: le asserzioni sotto continuerebbero a passare su un insieme più piccolo.
+    expect(campioni.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('il profilo completo viene letto per intero', () => {
-    /*
-      È il servizio più caro e il più ricco: quarantotto centesimi per duecentotrentadue
-      campi, fra cui i quarantotto indici già elaborati, le gare pubbliche e le qualifiche
-      d'impresa. È qui che lo spreco pesava di più.
-    */
-    const { totale, mancanti } = divario('prod-IT-full-12485671007.json');
+  it.each(campioni)('$file: ogni campo acquistato viene letto o è dichiarato', ({ file, totale }) => {
+    const { mancanti } = divario(file);
+    const dichiarati = NON_LETTI_DICHIARATI[file]?.campi ?? [];
 
-    expect(totale).toBeGreaterThan(200);
+    // Uguaglianza esatta nei due versi: un campo che smette di essere letto rende rosso il
+    // collaudo, e un campo dichiarato che invece viene letto lo rende rosso finché non lo
+    // si toglie dall'elenco. Una soglia «non più di N» lascerebbe marcire il conto aperto.
     expect(
-      mancanti,
+      [...mancanti].sort(),
       `campi acquistati e mai letti (${mancanti.length} su ${totale}): ${mancanti.join(', ')}`,
-    ).toEqual([]);
+    ).toEqual([...dichiarati].sort());
   });
 
-  it('gli eventi negativi vengono letti per intero, indicatori compresi', () => {
+  it('ogni campo non letto ha un motivo scritto e un file che lo contiene', () => {
+    for (const [file, voce] of Object.entries(NON_LETTI_DICHIARATI)) {
+      expect(existsSync(join(SONDA, file)), `${file} non è fra le risposte registrate`).toBe(true);
+      expect(voce.perche.length, `«${file}» è nell’elenco senza spiegare perché`).toBeGreaterThan(40);
+      expect(voce.campi.length, `«${file}» è nell’elenco senza campi`).toBeGreaterThan(0);
+    }
+  });
+
+  it('il conto aperto è quello che l’audit ha misurato: 38 più 11', () => {
     /*
-      Questo campione mancava, ed è costato caro: la risposta reale porta tre indicatori
-      booleani — `presenzaProtesti`, `presenzaPregiudizievoli`, `presenzaProcedure` —
-      accanto agli elenchi. Nessuno li leggeva, perché la funzione che avrebbe dovuto
-      farlo cercava nomi plausibili e mai verificati.
-
-      Su un'azienda con protesti dichiarati e dettaglio non fornito, la piattaforma avrebbe
-      risposto «nessun evento negativo»: un certificato di buona salute falso, sul fattore
-      che pesa il venti per cento dello score di credito.
+      I due numeri del rapporto, scritti qui perché il lettore possa fare la sottrazione.
+      Se un domani salgono, qualcuno ha comprato dati nuovi e non li ha letti; se scendono,
+      qualcuno li ha letti e questo elenco va accorciato.
     */
-    const { totale, mancanti } = divario('prod-IT-negativita-12485671007.json');
+    const perFile = Object.values(NON_LETTI_DICHIARATI).map((v) => v.campi.length);
+    expect(perFile).toEqual([38, 11]);
+  });
 
-    expect(totale).toBeGreaterThan(3);
-    expect(
-      mancanti,
-      `campi acquistati e mai letti (${mancanti.length} su ${totale}): ${mancanti.join(', ')}`,
-    ).toEqual([]);
+  it('il profilo completo resta il campione più ricco, e resta ricco', () => {
+    // Duecentotrenta campi: se il fornitore ne togliesse metà, il collaudo sopra
+    // resterebbe verde misurando un servizio dimezzato.
+    expect(divario('prod-IT-full-12485671007.json').totale).toBeGreaterThan(200);
+    expect(divario('prod-IT-advanced-12485671007.json').totale).toBeGreaterThan(50);
   });
 
   it('ogni campo scartato ha una motivazione scritta', () => {

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { chiamaApiConSessione } from '@/lib/chiamata-server';
+import { nullaEPartito } from '@/lib/errore-rete';
 
 export interface RigaScartataDto {
   riga: number;
@@ -94,8 +95,28 @@ export async function eseguiImportazione(
       metodo: 'POST',
       corpo: { contenuto },
     });
-  } catch {
-    return { ok: false, messaggio: 'Servizio non raggiungibile.' };
+  } catch (errore) {
+    /*
+      Qui c'era «Servizio non raggiungibile», su ogni eccezione.
+
+      Questa azione **spende**: fino a duecentocinquanta anagrafiche a dieci centesimi
+      l'una. Una connessione che cade a metà — il servizio riavviato mentre gira, un
+      proxy che chiude la presa — arriva a questo `catch` dopo che la richiesta è stata
+      inviata e le aziende sono state acquisite e pagate. Dichiarare che non è successo
+      niente porta a rilanciare l'importazione, e a pagarla due volte.
+
+      Solo un rifiuto di connessione prova che nulla è partito. Negli altri casi si dice
+      ciò che si sa, che è poco: controllare prima di ripetere. È la stessa risposta che
+      questa azione dà già quando la risposta arriva troncata, qualche riga più sotto.
+    */
+    if (nullaEPartito(errore)) {
+      return { ok: false, messaggio: 'Servizio non raggiungibile: nessuna azienda è stata acquisita.' };
+    }
+    return {
+      ok: false,
+      messaggio:
+        'Collegamento interrotto durante l’importazione. Non è possibile stabilire quante aziende siano state acquisite: controllare il portafoglio prima di ripetere l’operazione, per non pagarle due volte.',
+    };
   }
 
   if (!risposta.ok) {

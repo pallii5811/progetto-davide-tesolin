@@ -12,6 +12,7 @@ import {
   GruppoCampi,
 } from '@/components/campi';
 import { COPERTURE } from '@/lib/coperture';
+import { messaggioRigheIncomplete, righeIncomplete } from '@/lib/dossier-incompleto';
 
 export interface ImmobileForm {
   descrizione: string;
@@ -154,10 +155,26 @@ export function EditorDossier({
   datiIniziali,
   polizzeIniziali,
   salva,
+  collegamentoAnalisi = null,
 }: {
   identificativo: string;
   datiIniziali: DatiForm;
   polizzeIniziali: PolizzaForm[];
+  /**
+   * Dove porta il pulsante «Vedi l'analisi», quando ha senso che ci sia.
+   *
+   * Non si costruisce qui dentro, e la ragione è che `identificativo` **non è la stessa
+   * cosa nelle due porte**: per l'intermediario è la partita IVA, per il cliente è il
+   * token del questionario. La barra fissa rinviava a `/azienda/<identificativo>` in
+   * entrambi i casi, quindi sul percorso del cliente portava al login di AEGIS con il suo
+   * token nel parametro `ritorno` — cioè nella barra dell'indirizzo, nella cronologia del
+   * suo browser e nell'intestazione `Referer` di ogni richiesta successiva. Un token che
+   * apre il questionario di un'impresa, lasciato in tre posti dove nessuno lo cerca.
+   *
+   * Il valore predefinito è `null` — nessun pulsante — perché il caso pericoloso è quello
+   * in cui ci si dimentica di dire qualcosa, e deve essere il caso sicuro.
+   */
+  collegamentoAnalisi?: string | null;
   salva: (
     id: string,
     payload: { datiDichiarati: unknown; polizze: unknown },
@@ -183,18 +200,29 @@ export function EditorDossier({
   };
 
   const onSalva = (): void => {
-    avvia(async () => {
-      // Un immobile senza descrizione non passa la validazione al confine API:
-      // meglio scartarlo qui che restituire un errore su una riga vuota lasciata per sbaglio.
-      const immobiliValidi = dati.immobili.filter((i) => i.descrizione.trim() !== '');
-      const polizzeValide = polizze.filter(
-        (p) => p.compagnia.trim() !== '' && p.dataEffetto !== '' && p.dataScadenza !== '',
-      );
+    /*
+      Ciò che non si può salvare si dice, non si butta.
 
+      Qui gli immobili senza descrizione e le polizze senza compagnia o senza date
+      venivano tolti dal carico, e il salvataggio rispondeva «Risposte inviate. Grazie» —
+      mentre al cliente, due riquadri più su, era stato promesso che nessun campo è
+      obbligatorio. La polizza non arrivava all'intermediario e a valle il piano proponeva
+      di **attivare** una garanzia che il cliente ha già.
+
+      Adesso il salvataggio si ferma e nomina le righe e i campi mancanti. Non si perde
+      nulla: ciò che è stato scritto resta nel modulo, e chi ha compilato può completare
+      la riga o toglierla — è l'unico dei due a poterlo fare.
+    */
+    const incomplete = righeIncomplete(dati.immobili, polizze);
+    if (incomplete.length > 0) {
+      setEsito({ ok: false, messaggio: messaggioRigheIncomplete(incomplete) });
+      return;
+    }
+
+    avvia(async () => {
       const risultato = await salva(identificativo, {
         datiDichiarati: {
           ...dati,
-          immobili: immobiliValidi,
           // Euro nel modulo, centesimi al confine: la stessa convenzione delle polizze.
           // `null` resta `null` — un campo non compilato è ignoto, non zero.
           bilancio: {
@@ -207,7 +235,7 @@ export function EditorDossier({
             costiServizi: inCentesimi(dati.bilancio.costiServiziEuro),
           },
         },
-        polizze: polizzeValide,
+        polizze,
       });
 
       setEsito(risultato);
@@ -313,7 +341,7 @@ export function EditorDossier({
                       dati.immobili.filter((_, n) => n !== indice),
                     )
                   }
-                  className="rounded px-2 py-1 text-xs text-alto hover:bg-alto-fondo focus:outline-none focus:ring-2 focus:ring-alto/30"
+                  className="rounded px-2 py-1 text-xs text-alto hover:bg-alto-fondo"
                 >
                   Rimuovi
                 </button>
@@ -397,7 +425,7 @@ export function EditorDossier({
               },
             ])
           }
-          className="mt-3 rounded border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio focus:outline-none focus:ring-2 focus:ring-marchio/25"
+          className="mt-3 rounded border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio"
         >
           + Aggiungi immobile
         </button>
@@ -529,7 +557,7 @@ export function EditorDossier({
                       : [...dati.certificazioni, norma],
                   )
                 }
-                className={`rounded-full border px-3 py-1.5 text-sm transition focus:outline-none focus:ring-2 focus:ring-marchio/25 ${
+                className={`rounded-full border px-3 py-1.5 text-sm transition ${
                   attiva
                     ? 'border-marchio bg-azione text-azione-testo'
                     : 'border-bordo-forte bg-fondo hover:border-marchio/50'
@@ -563,7 +591,7 @@ export function EditorDossier({
                     setPolizze(polizze.filter((_, n) => n !== indice));
                     setEsito(null);
                   }}
-                  className="rounded px-2 py-1 text-xs text-alto hover:bg-alto-fondo focus:outline-none focus:ring-2 focus:ring-alto/30"
+                  className="rounded px-2 py-1 text-xs text-alto hover:bg-alto-fondo"
                 >
                   Rimuovi
                 </button>
@@ -656,7 +684,7 @@ export function EditorDossier({
             ]);
             setEsito(null);
           }}
-          className="mt-3 rounded border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio focus:outline-none focus:ring-2 focus:ring-marchio/25"
+          className="mt-3 rounded border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio"
         >
           + Aggiungi polizza
         </button>
@@ -672,18 +700,20 @@ export function EditorDossier({
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push(`/azienda/${identificativo}`)}
-              className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/25"
-            >
-              Vedi l&apos;analisi
-            </button>
+            {collegamentoAnalisi !== null && (
+              <button
+                type="button"
+                onClick={() => router.push(collegamentoAnalisi)}
+                className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio"
+              >
+                Vedi l&apos;analisi
+              </button>
+            )}
             <button
               type="button"
               onClick={onSalva}
               disabled={inCorso}
-              className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+              className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
             >
               {inCorso ? 'Salvataggio…' : 'Salva e ricalcola'}
             </button>

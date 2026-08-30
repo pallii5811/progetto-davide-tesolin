@@ -136,6 +136,17 @@ const ETICHETTE: Record<TipoControllo, string> = {
   'non-disponibile': 'Assetto non disponibile',
 };
 
+/**
+ * La quota come si legge ad alta voce: virgola decimale, e nessuno zero inutile.
+ *
+ * `66` resta «66», `66.5` diventa «66,5». Non si arrotonda all'intero: una quota è un
+ * dato del registro, e mostrarne una diversa da quella della tabella dei soci
+ * riaprirebbe la contraddizione che questa funzione serve a chiudere.
+ */
+function formattaQuota(quota: number): string {
+  return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 }).format(quota);
+}
+
 /** Ordina per quota decrescente; i soci senza quota nota restano in fondo. */
 function perQuota(a: Socio, b: Socio): number {
   return (b.quotaPercentuale ?? -1) - (a.quotaPercentuale ?? -1);
@@ -409,20 +420,33 @@ function implicazioni(
   }
 
   /*
-    Tre frasi, non una.
+    Tre frasi, non una — e la quota si dice, non si aggettiva.
 
     La formulazione unica diceva «detiene la quasi totalità del capitale», e sarebbe
     diventata falsa nel momento stesso in cui le persone chiave hanno cominciato a
     comprendere gli amministratori: un amministratore delegato senza quote non detiene
-    niente. Si compone su `motivo`, come ovunque: frammenti fissi più i valori.
+    niente.
+
+    Restava falsa anche per chi le quote le ha. La soglia di persona chiave è il 66%:
+    «quasi totalità» veniva detto a chi ne detiene esattamente due terzi, **una riga sotto
+    il 66% stampato nella tabella dei soci**. Chi legge vede i due numeri insieme, e il
+    superlativo li contraddice. Il valore c'è: si scrive quello, come ovunque in questo
+    prodotto — frammenti fissi più i valori del dato.
   */
   for (const p of personeChiave) {
+    const detiene =
+      p.quotaPercentuale === null
+        ? // Non capita per i motivi `quota`, dove la soglia è stata superata su un numero.
+          // Se capitasse, meglio una frase vera e vaga che una percentuale inventata.
+          'detiene una partecipazione di controllo'
+        : `detiene il ${formattaQuota(p.quotaPercentuale)}% del capitale`;
+
     const perche =
       p.motivo === 'quota'
-        ? 'detiene la quasi totalità del capitale'
+        ? detiene
         : p.motivo === 'carica'
           ? `ha la rappresentanza legale${p.ruolo === null ? '' : ` (${p.ruolo.toLowerCase()})`}`
-          : `detiene la quasi totalità del capitale e ne ha la rappresentanza legale`;
+          : `${detiene} e ne ha la rappresentanza legale`;
 
     esiti.push({
       titolo: `Persona chiave — ${p.denominazione}`,

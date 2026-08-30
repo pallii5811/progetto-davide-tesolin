@@ -51,9 +51,20 @@ export function soggettaARegolaProporzionale(polizza: PolizzaInEssere): boolean 
   return polizza.formaGaranzia !== 'primo-rischio-assoluto';
 }
 
-/** Indicizza le polizze per copertura, tenendo la più capiente in caso di duplicati. */
+/**
+ * Indicizza le polizze per copertura, tenendo in caso di duplicati quella che conta.
+ *
+ * L'ordine di precedenza è **prima lo stato, poi il capitale**, e non è un dettaglio di
+ * ordinamento: fra due contratti della stessa garanzia il criterio del capitale più alto
+ * faceva vincere la polizza scaduta, cioè quella che al sinistro non paga nulla. È la
+ * condizione normale dopo ogni rinnovo — il vecchio contratto resta a fascicolo, e quasi
+ * sempre porta il capitale storico più alto perché il rinnovo lo ha ridimensionato — e
+ * l'effetto era doppio: il prodotto dichiarava in ordine una garanzia morta e taceva la
+ * sottoassicurazione del contratto realmente in vigore.
+ */
 export function indexPolizze(
   polizze: readonly PolizzaInEssere[],
+  asOf: Date,
 ): ReadonlyMap<CoverageId, PolizzaInEssere> {
   const index = new Map<CoverageId, PolizzaInEssere>();
   for (const polizza of polizze) {
@@ -62,9 +73,30 @@ export function indexPolizze(
       index.set(polizza.coverage, polizza);
       continue;
     }
-    const nuova = capitaleDiPolizza(polizza) ?? 0;
-    const vecchia = capitaleDiPolizza(existing) ?? 0;
-    if (nuova > vecchia) index.set(polizza.coverage, polizza);
+    if (prevale(polizza, existing, asOf)) index.set(polizza.coverage, polizza);
   }
   return index;
+}
+
+/** Se `candidata` debba sostituire `attuale` come polizza di riferimento della garanzia. */
+function prevale(candidata: PolizzaInEssere, attuale: PolizzaInEssere, asOf: Date): boolean {
+  const candidataScaduta = isScaduta(candidata, asOf);
+  const attualeScaduta = isScaduta(attuale, asOf);
+
+  // Una garanzia in vigore batte una cessata, quale che sia il capitale.
+  if (candidataScaduta !== attualeScaduta) return attualeScaduta;
+
+  /*
+    A parità di stato decide il capitale — e «capitale non dichiarato» non è zero.
+
+    Confrontarlo come zero, com'era scritto qui, non produceva un errore visibile:
+    produceva una scelta. Fra due polizze in vigore si preferisce quella di cui si
+    conosce il capitale, perché è la sola su cui la sottoassicurazione si possa
+    verificare; ma la si preferisce dichiarandolo, non fingendo che l'altra valga nulla.
+  */
+  const capitaleCandidata = capitaleDiPolizza(candidata);
+  const capitaleAttuale = capitaleDiPolizza(attuale);
+  if (capitaleCandidata === null) return false;
+  if (capitaleAttuale === null) return true;
+  return capitaleCandidata > capitaleAttuale;
 }

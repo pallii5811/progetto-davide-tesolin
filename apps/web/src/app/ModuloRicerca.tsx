@@ -61,7 +61,7 @@ export function ModuloRicerca({
           onChange={(e) => setQ(e.target.value)}
           disabled={inCorso}
           placeholder="Ragione sociale, anche parziale"
-          className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio disabled:opacity-60"
+          className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio disabled:opacity-60"
         />
       </label>
 
@@ -77,7 +77,7 @@ export function ModuloRicerca({
           onChange={(e) => setPiva(e.target.value)}
           disabled={inCorso}
           placeholder="11 cifre"
-          className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio disabled:opacity-60"
+          className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio disabled:opacity-60"
         />
       </label>
 

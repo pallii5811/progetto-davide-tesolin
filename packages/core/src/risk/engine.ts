@@ -17,7 +17,7 @@ import { clampImpact, clampLikelihood, riskLevel, riskScore, suggestTreatment } 
 import type { Impact, Likelihood, RiskLevel, RiskTreatment } from './assessment.js';
 import { RISK_RULES, RULES_VERSION, risolviRationale } from './rules.js';
 import type { RiskRule, Verdict } from './rules.js';
-import { RISK_CATALOG, RISK_CATALOG_VERSION } from './taxonomy.js';
+import { RISK_CATALOG, RISK_CATALOG_VERSION, riferimentiPerImpresa } from './taxonomy.js';
 import type { RiskCategory, RiskDefinition, RiskId } from './taxonomy.js';
 
 export interface AppliedRule {
@@ -106,7 +106,21 @@ export function assessRisks(
   const risks: AssessedRisk[] = [];
 
   for (const [riskId, identificationRules] of identificati) {
-    const definition = RISK_CATALOG[riskId];
+    /*
+      La definizione esce dal catalogo con i riferimenti normativi risolti su questa
+      impresa.
+
+      Il catalogo non conosce la forma giuridica né il settore, e le norme che ne
+      dipendono — la responsabilità degli amministratori, l'obbligo assicurativo del
+      professionista iscritto a un albo — vi stavano scritte come se valessero per tutti.
+      Si sostituisce il solo campo `riferimenti`: chi legge la definizione a valle, dal
+      presentatore in giù, riceve le norme di questa impresa senza sapere che qui è
+      successo qualcosa.
+    */
+    const definition: RiskDefinition = {
+      ...RISK_CATALOG[riskId],
+      riferimenti: riferimentiPerImpresa(riskId, facts),
+    };
     const modulationRules = modulazioni.get(riskId) ?? [];
     const controlRules = controlli.get(riskId) ?? [];
 

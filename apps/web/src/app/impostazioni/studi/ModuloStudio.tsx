@@ -76,7 +76,7 @@ function Campo({ nome, etichetta, tipo = 'text' }: { nome: string; etichetta: st
         name={nome}
         type={tipo}
         required
-        className="w-full rounded border border-bordo-forte bg-fondo px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-marchio/40"
+        className="w-full rounded border border-bordo-forte bg-fondo px-2.5 py-1.5 text-sm"
       />
     </label>
   );

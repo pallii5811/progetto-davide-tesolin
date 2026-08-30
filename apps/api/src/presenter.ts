@@ -455,7 +455,9 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
       addetti: x.addetti,
       haCoordinate: x.haCoordinate,
       sismica: x.esposizione.sismica,
-      idraulica: x.esposizione.idraulica,
+      // L'etichetta e non il livello: la tabella idraulica conosce le sole province alte,
+      // e per le altre non ha misurato. Il dominio la compone, qui si inoltra e basta.
+      idraulica: x.esposizione.idraulicaEtichetta,
       piuEsposta: x.id === u.ubicazionePeggiore?.id,
       contesto:
         x.contesto === null

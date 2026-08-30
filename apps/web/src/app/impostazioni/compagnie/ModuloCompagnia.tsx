@@ -93,7 +93,7 @@ function Campo({
         name={nome}
         placeholder={segnaposto}
         inputMode={numerico ? 'decimal' : 'text'}
-        className={`w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio ${
+        className={`w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio ${
           numerico ? 'tabular' : ''
         }`}
       />

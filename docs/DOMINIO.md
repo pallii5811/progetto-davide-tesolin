@@ -182,17 +182,17 @@ fatturato, presenza di immobili, export, dipendenti, veicoli, trattamento dati p
 
 Il punto in cui la piattaforma crea più valore. Fonte: bilancio + visura + dichiarazioni.
 
-| Copertura                                   | Base di calcolo                                                                                                                                                                                                                                                                 |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Fabbricati**                              | Valore di ricostruzione a nuovo = mq × costo di ricostruzione/mq. In assenza del dato metrico: immobilizzazioni materiali "terreni e fabbricati" al **costo storico lordo** × coefficiente di rivalutazione (il valore netto contabile è ammortizzato e sottostima gravemente). |
-| **Contenuto: macchinari e attrezzature**    | Valore di rimpiazzo a nuovo = costo storico lordo di "impianti e macchinari" + "attrezzature industriali e commerciali" × coefficiente di rivalutazione                                                                                                                         |
-| **Merci e scorte**                          | Rimanenze di bilancio × coefficiente di picco stagionale (default 1.30: il bilancio fotografa il 31/12, tipicamente il minimo dell'anno)                                                                                                                                        |
-| **Danni indiretti / Business Interruption** | **Margine di contribuzione** = Ricavi − Costi variabili (materie prime + servizi variabili). Moltiplicato per il periodo di indennizzo scelto (6/12/18/24 mesi). È l'errore più frequente del mercato: si assicura il fatturato, non il margine.                                |
-| **RCO** (resp. civile verso prestatori)     | Monte salari annuo, con massimali per sinistro e per persona                                                                                                                                                                                                                    |
-| **RCT** massimale                           | Benchmark per classe di fatturato e pericolosità del settore (1 / 2.5 / 5 / 10 M€)                                                                                                                                                                                              |
-| **D&O**                                     | Benchmark su totale attivo e fatturato                                                                                                                                                                                                                                          |
-| **Cyber**                                   | Benchmark su fatturato × intensità di trattamento dati (ATECO)                                                                                                                                                                                                                  |
-| **Credito**                                 | Fido complessivo concesso ai clienti = crediti verso clienti a bilancio                                                                                                                                                                                                         |
+| Copertura                                   | Base di calcolo                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fabbricati**                              | Valore di ricostruzione a nuovo = mq × costo di ricostruzione/mq per tipologia costruttiva. Se i mq non sono stati rilevati in intervista si usa l'impronta a terra da OpenStreetMap, dichiarata come stima (misura il coperto, non lo sviluppato: su più piani sottostima). Ultimo ripiego: "terreni e fabbricati" B.II.1 al **valore netto contabile × 2,0**, con confidenza bassa — non il costo storico lordo, che l'anagrafica camerale non porta. |
+| **Contenuto: macchinari e attrezzature**    | Se il costo storico lordo è dichiarato in intervista: lordo × **1,25** (adeguamento inflattivo). Altrimenti "impianti e macchinari" + "attrezzature" + "altri beni" al netto contabile × **2,0** — il coefficiente copre due scarti, l'ammortamento e l'aumento del costo di riacquisto.                                                                                                                                                                |
+| **Merci e scorte**                          | Rimanenze di bilancio × coefficiente di picco stagionale (default 1.30: il bilancio fotografa il 31/12, tipicamente il minimo dell'anno)                                                                                                                                                                                                                                                                                                                |
+| **Danni indiretti / Business Interruption** | **Margine di contribuzione** = Ricavi − Costi variabili (materie prime + servizi variabili). Moltiplicato per il periodo di indennizzo scelto (6/12/18/24 mesi). È l'errore più frequente del mercato: si assicura il fatturato, non il margine.                                                                                                                                                                                                        |
+| **RCO** (resp. civile verso prestatori)     | Monte salari annuo, con massimali per sinistro e per persona                                                                                                                                                                                                                                                                                                                                                                                            |
+| **RCT** massimale                           | Benchmark per classe di fatturato e pericolosità del settore, sulla scala 1 / 2,5 / 5 / 10 / 15 / 25 M€ (`SCALA_MASSIMALI`)                                                                                                                                                                                                                                                                                                                             |
+| **D&O**                                     | Benchmark su totale attivo e fatturato                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Cyber**                                   | Benchmark su fatturato × intensità di trattamento dati (ATECO)                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Credito**                                 | Fido complessivo concesso ai clienti = crediti verso clienti a bilancio                                                                                                                                                                                                                                                                                                                                                                                 |
 
 → `coverage/sums-insured.ts`
 
@@ -382,12 +382,33 @@ diritto (art. 2359, c. 1, n. 1 c.c.); un unico socio societario controlla anche 
 non è dichiarata — ed è proprio nelle partecipazioni totalitarie che la percentuale manca più
 spesso.
 
-| Situazione rilevata                    | Conseguenza assicurativa                                                    | Riferimento                  |
-| -------------------------------------- | --------------------------------------------------------------------------- | ---------------------------- |
-| Socio societario oltre la maggioranza  | Presunzione di direzione e coordinamento: responsabilità della capogruppo   | Artt. 2497, 2497-sexies c.c. |
-| Società di capitali                    | Responsabilità personale degli amministratori, anche per assetti inadeguati | Artt. 2392 ss., 2086 c.c.    |
-| Socio persona fisica oltre i due terzi | Persona chiave: la sua uscita blocca le decisioni sociali                   | —                            |
-| Primi due soci con quote pari          | Stallo decisionale, anche nella gestione di un sinistro                     | —                            |
+| Situazione rilevata                     | Conseguenza assicurativa                                                                              | Riferimento                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Socio societario oltre la maggioranza   | Presunzione di direzione e coordinamento: responsabilità della capogruppo                             | Artt. 2497, 2497-sexies c.c.                  |
+| Organo amministrativo distinto dai soci | Responsabilità personale degli amministratori: la norma dipende dalla forma giuridica (tabella sotto) | Art. 2086, c. 2 c.c. per gli assetti adeguati |
+| Socio persona fisica oltre i due terzi  | Persona chiave: la sua uscita blocca le decisioni sociali                                             | —                                             |
+| Primi due soci con quote pari           | Stallo decisionale, anche nella gestione di un sinistro                                               | —                                             |
+
+**La norma sulla responsabilità degli amministratori non è una sola.** Per un periodo il
+prodotto citava «artt. 2392 ss. c.c.» a ogni società di capitali: quegli articoli sono
+norme della **S.p.A.**, e la S.r.l. — che è la forma della quasi totalità del portafoglio
+di un intermediario italiano — risponde all'art. 2476. Una citazione sbagliata è più
+dannosa di una mancante: il primo commercialista che legge il fascicolo la vede, e da lì
+in poi mette in dubbio anche i numeri.
+
+| Forma giuridica                          | Norma citata                                                                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S.p.A.                                   | Artt. 2392-2395 c.c.                                                                                                                                    |
+| S.r.l. e S.r.l.s.                        | Art. 2476 c.c. (azione dei creditori sociali: art. 378 D.Lgs. 14/2019)                                                                                  |
+| S.a.p.a.                                 | Art. 2454 c.c., che rinvia agli artt. 2392-2395 c.c.                                                                                                    |
+| Società cooperativa                      | Art. 2519 c.c., che rinvia alla disciplina della S.p.A. o della S.r.l. secondo il modello adottato                                                      |
+| S.n.c., S.a.s., ditta individuale, altro | **Nessuna**: non esiste un organo amministrativo distinto dalla proprietà, e il tema è la responsabilità patrimoniale del socio, non quella dell'organo |
+
+L'implementazione è in un punto solo — `governance/norme.ts`, funzione
+`normaResponsabilitaAmministratori` — che restituisce `null` dove la norma non esiste.
+Lo stesso file porta `regimeDiResponsabilita`, con cinque rami perché cinque sono i
+regimi di responsabilità patrimoniale (artt. 2291, 2313, 2452, 2740, 2325/2462 c.c.).
+→ `governance/norme.ts`
 
 **Soglie.** Controllo: quota _superiore_ al 50% — metà esatta non è maggioranza, e due soci al
 50% non hanno né l'uno né l'altro il controllo. Persona chiave: 66%.
@@ -440,10 +461,53 @@ dichiarare perché il prodotto è adeguato (Allegato 4-ter).
 
 Mappatura in AEGIS:
 
-| Obbligo normativo                              | Artefatto generato                                                |
-| ---------------------------------------------- | ----------------------------------------------------------------- |
-| Rilevazione richieste ed esigenze              | Risk register ISO 31000 con rischi residui ponderati              |
-| Motivazione dell'adeguatezza                   | Catena `rischio → esigenza → copertura → massimale → motivazione` |
-| Informativa precontrattuale                    | Allegati 3, 4, 4-ter precompilati                                 |
-| Conservazione della documentazione             | Snapshot immutabili + audit trail append-only                     |
-| Eventuale inadeguatezza dichiarata dal cliente | Registrazione esplicita del rifiuto informato, con firma          |
+| Obbligo normativo                              | Cosa il prodotto genera oggi                                                                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rilevazione richieste ed esigenze              | Risk register ISO 31000 con rischi residui ponderati                                                                                                      |
+| Motivazione dell'adeguatezza                   | Catena `rischio → esigenza → copertura → massimale → motivazione`, stampata nel capitolo «Coperture proposte e motivazione dell'adeguatezza» del report   |
+| Informativa precontrattuale                    | **Niente.** Nessun Allegato 3, 4 o 4-ter viene compilato o prodotto — vedi sotto                                                                          |
+| Conservazione della documentazione             | Snapshot, analisi e registro di audit in sola aggiunta (`REVOKE UPDATE, DELETE` in `db/rls.ts`). Il registro **non è leggibile dal prodotto**: vedi sotto |
+| Eventuale inadeguatezza dichiarata dal cliente | **Niente.** Non esiste alcuna registrazione del rifiuto informato — vedi sotto                                                                            |
+
+### Le tre righe che il prodotto oggi non copre per intero
+
+Per un periodo questa tabella prometteva «Allegati 3, 4, 4-ter precompilati» e
+«registrazione esplicita del rifiuto informato, con firma». Nessuna delle due esisteva, e
+questo è il documento che si dichiara fonte di verità: **su un fascicolo di adeguatezza
+una promessa scritta vale quanto un'affermazione a schermo**, e la scopre l'ispettore o il
+cliente, non chi l'ha scritta.
+
+Ciò che manca sono decisioni del committente prima che lavoro di sviluppo: ognuna comporta
+un modulo nuovo e una scelta su come raccogliere una firma. Finché non sono prese, la
+tabella dice «Niente».
+
+**1. Allegati 3 e 4: non esistono in nessuna forma.** Gli allegati 3 (informazioni sul
+distributore) e 4 (informazioni sull'attività di distribuzione e sui conflitti di
+interesse) del Reg. IVASS 40/2018 non sono né precompilati né generati né stampati: nel
+codice non ne esiste traccia. Vanno consegnati al contraente **prima** della
+sottoscrizione, e oggi l'intermediario deve produrli con i propri strumenti.
+
+**Dell'Allegato 4-ter esiste il contenuto, non il modulo.** Il report stampa, per ogni
+copertura proposta, la ragione per cui è ritenuta adeguata alle richieste e alle esigenze
+rilevate, dichiarando la conformità all'All. 4-ter. È la sostanza della dichiarazione di
+adeguatezza, ma è un capitolo di un documento nostro: **non è il modello dell'allegato
+compilato**, e chi si aspetta il modulo dell'IVASS non lo trova.
+
+**2. Il registro di audit non si può esibire.** Ciò che è vero e verificato è
+l'inalterabilità: su `audit_log`, `snapshot_azienda` e `analisi` il ruolo applicativo non
+ha il permesso di UPDATE né di DELETE (`packages/db/src/rls.ts`), quindi una riga scritta
+resta. Ciò che manca è la lettura: **nessuna schermata e nessuna rotta espongono il
+registro**. In ispezione non c'è modo di mostrarlo senza interrogare il database a mano —
+e un registro che nessuno può esibire non è documentazione, è una tabella.
+
+Finché la lettura non esiste, la riga qui sopra dice «in sola aggiunta» e non «conformità
+IVASS», che sono due cose diverse.
+
+**3. Il rifiuto informato non si registra.** Non esiste un percorso per dichiarare che il
+contraente ha rifiutato una copertura proposta, non esiste un'azione di audit
+corrispondente, non esiste una firma raccolta dal prodotto. L'unica firma è quella su
+carta, in calce al report stampato («Firma per presa visione»), che vale come presa
+visione del documento e **non** come rifiuto informato di una proposta specifica.
+
+È la riga che protegge l'intermediario nel caso peggiore — il sinistro sulla garanzia che
+il cliente aveva scartato — e per questo dichiararla è più grave che tacerla.

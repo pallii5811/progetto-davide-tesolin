@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Money } from '@aegis/core';
-import { bool, date, money, num, percent, pick, str } from '../src/openapi/parse.js';
+import { bool, date, money, num, pick, str } from '../src/openapi/parse.js';
 
 /**
  * Il parsing difensivo è il codice più esposto dell'intera piattaforma: è l'unico punto
@@ -82,12 +82,18 @@ describe('Lettura difensiva delle risposte', () => {
     });
   });
 
-  describe('percent', () => {
-    it('accetta sia la quota sia i punti percentuali', () => {
-      expect(percent({ v: 0.42 }, 'v')).toBeCloseTo(0.42, 6);
-      expect(percent({ v: 42 }, 'v')).toBeCloseTo(0.42, 6);
-    });
-  });
+  /*
+    Qui c'era il collaudo di `percent`, e passava — ma quello che verificava era il difetto.
+
+    «Accetta sia la quota sia i punti percentuali» era la descrizione di una funzione che
+    decideva la scala guardando **un valore per volta**: sopra 1 divideva per cento, sotto
+    no. Su una scala che va da 0 a 100 quella decisione non si può prendere da un numero
+    solo, e infatti sbagliava nei due versi: il 99 % usciva «0,99 %» e l'1 % usciva
+    «100,00 %». Il collaudo non poteva accorgersene perché non chiedeva mai il caso limite.
+
+    La funzione è stata tolta e la scelta spostata dove i valori si vedono tutti insieme:
+    `normalizzaQuote` in `mapper.ts`, provata in `audit-mappatura.test.ts`.
+  */
 
   describe('str', () => {
     it('rimuove gli spazi e considera vuota la stringa di soli spazi', () => {

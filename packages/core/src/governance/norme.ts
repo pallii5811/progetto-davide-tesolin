@@ -61,6 +61,63 @@ export function normaResponsabilitaAmministratori(forma: FormaGiuridica): string
 }
 
 /**
+ * Come si chiama, in italiano, la categoria a cui questa forma appartiene.
+ *
+ * Serve a comporre la frase, non a decorarla: «Società di capitali: gli amministratori
+ * rispondono personalmente…» veniva detto anche alla **società cooperativa**, che società
+ * di capitali non è — è una società mutualistica che *adotta* il modello S.p.A. o quello
+ * S.r.l. La frase era falsa nella prima parola, davanti a una citazione corretta.
+ *
+ * `null` dove non esiste un organo amministrativo distinto dai soci: lì la frase sulla
+ * responsabilità dell'organo non va composta affatto.
+ */
+export function categoriaSocietaria(forma: FormaGiuridica): string | null {
+  switch (forma) {
+    case 'spa':
+    case 'srl':
+    case 'srls':
+    case 'sapa':
+      return 'Società di capitali';
+    case 'cooperativa':
+      return 'Società cooperativa';
+    default:
+      return null;
+  }
+}
+
+/**
+ * La norma sulla riduzione del capitale per perdite, per forma giuridica.
+ *
+ * Due discipline parallele e incompatibili: artt. 2446-2447 c.c. per la S.p.A., artt.
+ * 2482-bis e 2482-ter c.c. per la S.r.l. Citarne una sola a chiunque è lo stesso errore
+ * degli artt. 2392-2395, un piano più in là — e viveva in `credit/altman.ts`, dove la
+ * nota sul patrimonio netto negativo rimandava alla disciplina della S.r.l. anche a una
+ * S.p.A.
+ *
+ * `null` dove la disciplina non si applica: nelle società di persone e nella ditta
+ * individuale non c'è un capitale sociale minimo da ricostituire, e la perdita si porta
+ * sul patrimonio dei soci.
+ */
+export function normaRiduzioneCapitalePerPerdite(forma: FormaGiuridica): string | null {
+  switch (forma) {
+    case 'spa':
+      return 'Artt. 2446-2447 c.c.';
+    case 'sapa':
+      // Rinvio alla disciplina della S.p.A. in quanto compatibile (art. 2454 c.c.).
+      return 'Artt. 2446-2447 c.c., richiamati dall’art. 2454 c.c.';
+    case 'srl':
+    case 'srls':
+      return 'Artt. 2482-bis e 2482-ter c.c.';
+    case 'cooperativa':
+      // Il modello adottato decide quale delle due discipline si applichi, e lo statuto
+      // non è nell'anagrafica camerale: si nominano entrambe invece di sceglierne una.
+      return 'Art. 2519 c.c., che rinvia agli artt. 2446-2447 c.c. o agli artt. 2482-bis e 2482-ter c.c. secondo il modello adottato';
+    default:
+      return null;
+  }
+}
+
+/**
  * La norma sulla responsabilità patrimoniale per le obbligazioni sociali.
  *
  * Serve alla RCT e a ogni frase sul patrimonio aggredibile. Cinque rami perché cinque

@@ -12,7 +12,7 @@ function Bottone({ etichetta, inCorso }: { etichetta: string; inCorso: string })
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
       {pending ? inCorso : etichetta}
     </button>
@@ -74,7 +74,7 @@ export function ModuloImportazione() {
             value={contenuto}
             onChange={(e) => setContenuto(e.target.value)}
             placeholder={'P.IVA;Denominazione\n12485671007;Openapi S.p.A.\n00743110157;Pirelli & C.'}
-            className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 font-mono text-xs outline-none transition focus:border-marchio focus:ring-2 focus:ring-marchio/25"
+            className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 font-mono text-xs transition focus:border-marchio"
           />
         </div>
 

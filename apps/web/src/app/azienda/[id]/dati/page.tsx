@@ -120,11 +120,17 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
         <CollegamentoQuestionario identificativo={id} invito={invito} />
       </div>
 
+      {/*
+        Il collegamento all'analisi si passa **da qui**, dove `id` è davvero la partita
+        IVA. Costruito dentro l'editor valeva anche sul percorso del cliente, dove lo
+        stesso parametro è il token del questionario.
+      */}
       <EditorDossier
         identificativo={id}
         datiIniziali={datiIniziali}
         polizzeIniziali={polizzeIniziali}
         salva={salvaDossier}
+        collegamentoAnalisi={`/azienda/${id}`}
       />
     </>
   );

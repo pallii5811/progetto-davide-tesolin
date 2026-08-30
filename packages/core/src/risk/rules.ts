@@ -21,7 +21,11 @@ import type { CompanyFacts } from '../company/facts.js';
 import { atecoStartsWith } from '../shared/identifiers.js';
 import type { RiskId } from './taxonomy.js';
 import { worstExposure } from './geo.js';
-import { normaResponsabilitaAmministratori, regimeDiResponsabilita } from '../governance/norme.js';
+import {
+  categoriaSocietaria,
+  normaResponsabilitaAmministratori,
+  regimeDiResponsabilita,
+} from '../governance/norme.js';
 
 export type Verdict = true | false | 'ignoto';
 
@@ -631,14 +635,23 @@ export const RISK_RULES: readonly RiskRule[] = [
       f.formaGiuridica === 'srls' ||
       f.formaGiuridica === 'sapa' ||
       f.formaGiuridica === 'cooperativa',
-    // La norma non è la stessa per tutte. Qui c'era «artt. 2392 ss. c.c.» per tutte e
-    // cinque le forme: sono norme della S.p.A., citate a ogni S.r.l. — cioè alla forma
-    // più diffusa del portafoglio, e a quella dell'azienda dimostrativa.
+    /*
+      La norma non è la stessa per tutte. Qui c'era «artt. 2392 ss. c.c.» per tutte e
+      cinque le forme: sono norme della S.p.A., citate a ogni S.r.l. — cioè alla forma
+      più diffusa del portafoglio, e a quella dell'azienda dimostrativa.
+
+      Corretta la norma restava sbagliata la prima parola: «Società di capitali» veniva
+      detto anche alla società cooperativa, che di capitali non è — è mutualistica, e
+      adotta il modello S.p.A. o quello S.r.l. secondo lo statuto. Una frase che comincia
+      con una categoria falsa e prosegue con una citazione esatta è peggio di una
+      generica: la citazione le dà l'aria di essere stata verificata.
+    */
     rationale: (f) => {
       const norma = normaResponsabilitaAmministratori(f.formaGiuridica);
+      const categoria = categoriaSocietaria(f.formaGiuridica) ?? 'Ente con organo amministrativo';
       return norma === null
-        ? 'Società di capitali: gli amministratori rispondono personalmente verso la società, i soci e i terzi.'
-        : `Società di capitali: gli amministratori rispondono personalmente ex ${norma}`;
+        ? `${categoria}: gli amministratori rispondono personalmente verso la società, i soci e i terzi.`
+        : `${categoria}: gli amministratori rispondono personalmente ex ${norma}`;
     },
   },
   {

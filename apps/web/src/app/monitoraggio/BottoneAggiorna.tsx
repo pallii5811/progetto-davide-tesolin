@@ -11,7 +11,7 @@ function Bottone() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
       {pending ? 'Verifica in corso…' : 'Aggiorna monitoraggio'}
     </button>

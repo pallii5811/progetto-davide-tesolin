@@ -331,8 +331,9 @@ function derivePossiedeImmobili(
  *
  *  - una società la cui quota dichiarata supera la maggioranza (controllo di diritto,
  *    art. 2359, comma 1, n. 1 c.c.);
- *  - **oppure** l'unico socio, quando è una società: la percentuale può mancare, ma un
- *    socio solo possiede per definizione l'intero capitale.
+ *  - **oppure** l'unico socio, quando è una società **e la quota non è dichiarata**: un
+ *    socio solo possiede per definizione l'intero capitale, e ignorarlo perché manca la
+ *    percentuale nasconderebbe un gruppo.
  *
  * Il secondo criterio non è un dettaglio: nelle risposte reali la quota è spesso assente
  * proprio nelle società interamente controllate, cioè nei casi che contano di più.
@@ -343,6 +344,18 @@ function derivePossiedeImmobili(
  * mentre il modulo di governance aveva già `> 50`: due letture della stessa norma nello
  * stesso prodotto, e quella sbagliata faceva nascere un gruppo dove non c'era — con
  * appresso l'affermazione sulla responsabilità da direzione e coordinamento.
+ *
+ * ## La seconda divergenza, e perché era la più grave
+ *
+ * Il secondo criterio qui non guardava la quota: bastava che il socio fosse unico e
+ * societario. Su una quota **dichiarata minoritaria** — il dato dice 30%, e dicendolo dice
+ * anche che il restante 70% è di qualcun altro che l'anagrafica non ha elencato — questo
+ * modulo rispondeva «controllante» mentre `assetto.ts:186` rispondeva «no», e lo motivava
+ * per iscritto. Due moduli dello stesso prodotto davano risposta opposta alla stessa
+ * domanda giuridica; e da qui, non da lì, l'art. 2497 c.c. entrava nel fascicolo come
+ * fatto accertato.
+ *
+ * Vince la lettura di `assetto.ts`: contraddire il dato è peggio che integrarlo.
  */
 function controlloSocietario(soci: readonly Socio[]): Socio | null {
   const societari = soci.filter((s) => s.tipo === 'persona-giuridica');
@@ -351,7 +364,8 @@ function controlloSocietario(soci: readonly Socio[]): Socio | null {
   const maggioritario = societari.find((s) => quotaInPercentuale(s.quotaPercentuale, soci) > 50);
   if (maggioritario !== undefined) return maggioritario;
 
-  return soci.length === 1 ? (societari[0] ?? null) : null;
+  const unico = soci.length === 1 ? (societari[0] ?? null) : null;
+  return unico !== null && unico.quotaPercentuale === null ? unico : null;
 }
 
 /** Quota del socio di controllo in percentuale, `null` se non dichiarata o assente. */

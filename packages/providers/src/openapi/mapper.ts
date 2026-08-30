@@ -35,7 +35,7 @@ import type {
   UnitaLocale,
 } from '@aegis/core';
 import { classificaProcedura } from './negativita.js';
-import { asArray, atecoOf, bool, date, money, moneyOrZero, num, percent, pick, str } from './parse.js';
+import { asArray, atecoOf, bool, date, money, moneyOrZero, num, pick, str } from './parse.js';
 
 const PROVIDER = 'OpenAPI.com';
 
@@ -72,27 +72,96 @@ export function normalizzaFormaGiuridica(descrizione: string | null): FormaGiuri
   return 'altro';
 }
 
+/**
+ * Stato di attività, dalle diciture del registro.
+ *
+ * **Il fornitore risponde in due lingue.** `IT-start` e `IT-advanced` danno «ATTIVA» e
+ * «CESSATA»; il profilo completo dà «Enable» e «Out of business (in a positive way)» — e
+ * cercando solo parole italiane, una sede chiusa e un'impresa chiusa uscivano entrambe
+ * «attiva», che è il verso che costa: su un capannone che non esiste più si quota incendio.
+ *
+ * Resta un ripiego su `'attiva'` per il valore assente o non riconosciuto. È un difetto
+ * dichiarato, non una scelta: `StatoAttivita` non ha un valore «non dichiarato», e
+ * aggiungerlo cambia il tipo canonico e i sette punti che lo consumano.
+ */
 export function normalizzaStatoAttivita(valore: string | null): StatoAttivita {
   if (valore === null) return 'attiva';
   const testo = valore.toLowerCase();
-  if (testo.includes('fallit')) return 'fallita';
-  if (testo.includes('liquidazione')) return 'in-liquidazione';
-  if (testo.includes('cessat') || testo.includes('cancellat')) return 'cessata';
-  if (testo.includes('sospes')) return 'sospesa';
-  if (testo.includes('inattiv')) return 'inattiva';
+  if (testo.includes('fallit') || testo.includes('bankrupt')) return 'fallita';
+  if (testo.includes('liquidazione') || testo.includes('liquidation')) return 'in-liquidazione';
+  if (
+    testo.includes('cessat') ||
+    testo.includes('cancellat') ||
+    testo.includes('out of business') ||
+    testo.includes('ceased') ||
+    testo.includes('closed')
+  ) {
+    return 'cessata';
+  }
+  if (testo.includes('sospes') || testo.includes('suspend')) return 'sospesa';
+  if (testo.includes('inattiv') || testo.includes('inactive')) return 'inattiva';
   return 'attiva';
+}
+
+/** Vero solo quando il registro dichiara uno stato che non è «in esercizio». */
+function statoNonOperativo(valore: string | null): boolean {
+  return valore !== null && normalizzaStatoAttivita(valore) !== 'attiva';
 }
 
 function normalizzaTipoUnitaLocale(valore: string | null): TipoUnitaLocale {
   if (valore === null) return 'altro';
   const testo = valore.toLowerCase();
-  if (testo.includes('legale')) return 'sede-legale';
-  if (testo.includes('stabilimento') || testo.includes('produzion')) return 'stabilimento';
-  if (testo.includes('magazzin') || testo.includes('deposit')) return 'magazzino';
-  if (testo.includes('vendita') || testo.includes('negozio')) return 'punto-vendita';
-  if (testo.includes('ufficio')) return 'ufficio';
-  if (testo.includes('operativ')) return 'sede-operativa';
+  // Le diciture italiane e quelle inglesi dello stesso registro, appaiate: il profilo
+  // completo risponde in inglese, e cercando le sole parole italiane ogni sede finiva
+  // in «altro» — l'etichetta che non dice niente a chi deve quotare.
+  if (testo.includes('legale') || testo.includes('registered office')) return 'sede-legale';
+  if (
+    testo.includes('stabilimento') ||
+    testo.includes('produzion') ||
+    testo.includes('plant') ||
+    testo.includes('factory')
+  ) {
+    return 'stabilimento';
+  }
+  if (
+    testo.includes('magazzin') ||
+    testo.includes('deposit') ||
+    testo.includes('warehouse') ||
+    testo.includes('storage')
+  ) {
+    return 'magazzino';
+  }
+  if (
+    testo.includes('vendita') ||
+    testo.includes('negozio') ||
+    testo.includes('shop') ||
+    testo.includes('store')
+  ) {
+    return 'punto-vendita';
+  }
+  if (testo.includes('ufficio') || testo.includes('office')) return 'ufficio';
+  if (testo.includes('operativ') || testo.includes('operating')) return 'sede-operativa';
   return 'altro';
+}
+
+/**
+ * Le quote della compagine, in **punti percentuali**.
+ *
+ * La scala si decide sull'insieme, mai sul singolo valore: `1` da solo è ambiguo — può
+ * essere l'uno per cento o l'intero capitale — ma una compagine i cui valori sommano a uno
+ * è fatta di frazioni, e una che somma a cento è fatta di punti. Guardando un numero per
+ * volta si sbagliava nei due versi opposti: il 99 % diventava 0,99 e l'1 % diventava 100.
+ *
+ * Le risposte reali del fornitore sono sempre in punti — 100, 88, 50, 20, 6 — e questa
+ * funzione le lascia come sono. Il ramo delle frazioni esiste perché il modello canonico
+ * accetta anche quella grafia (`SOGLIA_CONTROLLO = 50`, `SOGLIA_PARTECIPAZIONE = 25` sono
+ * punti percentuali) e un domani il fornitore potrebbe cambiarla senza dirlo.
+ */
+export function normalizzaQuote(quote: readonly (number | null)[]): readonly (number | null)[] {
+  const noti = quote.filter((q): q is number => q !== null);
+  const somma = noti.reduce((t, q) => t + q, 0);
+  const sonoFrazioni = noti.length > 0 && somma > 0 && somma <= 1.01 && noti.every((q) => q <= 1);
+  return sonoFrazioni ? quote.map((q) => (q === null ? null : q * 100)) : quote;
 }
 
 function mappaIndirizzo(source: unknown): Indirizzo | null {
@@ -230,13 +299,34 @@ export function mappaAnagrafica(raw: unknown, service: string, osservatoIl: Date
   const sede = sedeDi(raw);
   const ateco = mappaAteco(raw);
   const ultimoSintetico = mappaBilanciSintetici(raw)[0] ?? null;
+  // Il profilo completo annida le date e lo stato; gli altri servizi li tengono piatti.
+  const dateSocietarie = pick(raw, 'companyDates') ?? raw;
+  const statoRaw =
+    str(raw, 'activityStatus', 'statoAttivita', 'status') ??
+    str(pick(pick(raw, 'companyStatus'), 'activityStatus'), 'description', 'descrizione');
 
   const anagrafica: Anagrafica = {
     formaGiuridica: normalizzaFormaGiuridica(descrizioneForma),
     formaGiuridicaDescrizione: descrizioneForma ?? 'Non specificata',
-    statoAttivita: normalizzaStatoAttivita(str(raw, 'activityStatus', 'statoAttivita', 'status')),
-    dataCostituzione: date(raw, 'registrationDate', 'creationDate', 'dataCostituzione', 'dataIscrizione'),
-    dataInizioAttivita: date(raw, 'startDate', 'dataInizioAttivita', 'activityStartDate'),
+    statoAttivita: normalizzaStatoAttivita(statoRaw),
+    /*
+      Costituzione, non iscrizione al registro.
+
+      Sono due date diverse e il fornitore le manda entrambe: MARELLA ITALIA è stata
+      costituita il 18/04/1989 e iscritta il 18/02/1996. Il prodotto mostrava il 1996 —
+      sette anni di storia d'impresa in meno — su un dato che governa l'anzianità, e
+      l'anzianità entra nello score e nelle esclusioni di portafoglio.
+
+      `registrationDate` resta come ripiego: `IT-start` e `IT-advanced` non portano la
+      costituzione, e una data d'iscrizione è comunque meglio di nessuna data.
+    */
+    dataCostituzione:
+      date(dateSocietarie, 'incorporationDate', 'dataCostituzione') ??
+      date(raw, 'registrationDate', 'creationDate', 'dataCostituzione', 'dataIscrizione') ??
+      date(dateSocietarie, 'registrationDate'),
+    dataInizioAttivita:
+      date(raw, 'startDate', 'dataInizioAttivita', 'activityStartDate') ??
+      date(dateSocietarie, 'startDate'),
     numeroREA: str(raw, 'reaCode', 'rea', 'numeroRea'),
     cciaa: str(raw, 'cciaa', 'chamberOfCommerce'),
     atecoPrimario: ateco.codice,
@@ -252,8 +342,20 @@ export function mappaAnagrafica(raw: unknown, service: string, osservatoIl: Date
     pec: str(raw, 'pec', 'pecEmail', 'certifiedEmail'),
     sitoWeb: str(raw, 'website', 'sitoWeb', 'web'),
     telefono: str(raw, 'phone', 'telefono', 'tel'),
+    /*
+      Gli addetti dell'esercizio più recente che li dichiara.
+
+      Non di quello con gli aggregati: il fornitore manda l'anno in corso con fatturato e
+      attivo a `null` ma con gli addetti già valorizzati, e quell'anno veniva scartato
+      insieme al bilancio incompleto. Su Acciaierie d'Italia si mostravano i **10.133 del
+      2022** mentre il record appena comprato ne dichiarava **9.762 per il 2026** — quattro
+      anni di ridimensionamento invisibili, dentro un numero che finisce nel report al
+      cliente e governa la classificazione dimensionale UE, cioè la scadenza CAT NAT.
+    */
     numeroAddetti:
       num(raw, 'employees', 'numeroDipendenti', 'addetti', 'employeesNumber') ??
+      num(pick(raw, 'employees'), 'employee') ??
+      addettiPiuRecenti(raw) ??
       ultimoSintetico?.dipendenti ??
       null,
     fatturatoDichiarato:
@@ -344,8 +446,39 @@ export function mappaBilanciSintetici(raw: unknown): readonly BilancioSintetico[
     .sort((a, b) => b.anno - a.anno);
 }
 
+/**
+ * Gli addetti dell'esercizio più recente che li dichiara.
+ *
+ * Scandisce l'elenco grezzo, non quello filtrato da `mappaBilanciSintetici`: quel filtro
+ * scarta — a ragione — gli esercizi senza aggregati, e sono proprio quelli che portano il
+ * numero di addetti più aggiornato. Serve l'anno, altrimenti «più recente» non significa
+ * nulla; una voce senza anno non entra nel confronto.
+ */
+function addettiPiuRecenti(raw: unknown): number | null {
+  const contenitore = pick(raw, 'balanceSheets', 'bilanci');
+  const elenco = asArray(pick(contenitore, 'all') ?? contenitore);
+
+  let migliore: { anno: number; addetti: number } | null = null;
+  for (const voce of elenco) {
+    const anno = num(voce, 'year', 'anno');
+    const addetti = num(voce, 'employees', 'dipendenti');
+    if (anno === null || addetti === null) continue;
+    if (migliore === null || anno > migliore.anno) migliore = { anno, addetti };
+  }
+
+  return migliore?.addetti ?? null;
+}
+
 export function mappaAssetti(raw: unknown, service: string, osservatoIl: Date): Sourced<Assetti> {
-  const soci: Socio[] = asArray(pick(raw, 'shareHolders', 'shareholders', 'soci', 'members')).map((s) => {
+  const voci = asArray(pick(raw, 'shareHolders', 'shareholders', 'soci', 'members'));
+
+  // La scala delle quote si decide sull'intera compagine, prima di costruire i soci:
+  // un valore per volta non basta a distinguere l'uno per cento dall'intero capitale.
+  const quote = normalizzaQuote(
+    voci.map((s) => num(s, 'percentShare', 'sharePercentage', 'quotaPercentuale', 'quota')),
+  );
+
+  const soci: Socio[] = voci.map((s, i) => {
     // Le persone fisiche arrivano con `name` e `surname` valorizzati e `companyName` nullo;
     // le persone giuridiche con il solo `companyName`. È la distinzione più affidabile:
     // il campo `type`, dove esiste, non è compilato in modo uniforme.
@@ -391,7 +524,7 @@ export function mappaAssetti(raw: unknown, service: string, osservatoIl: Date): 
         ragioneSociale ?? (nominativo === '' ? (str(s, 'fullName') ?? 'Non specificato') : nominativo),
       codiceFiscale,
       tipo,
-      quotaPercentuale: percent(s, 'percentShare', 'sharePercentage', 'quotaPercentuale', 'quota'),
+      quotaPercentuale: quote[i] ?? null,
       quotaValore: money(s, 'shareValue', 'valoreQuota', 'quotaValore'),
       // Da quando detiene la quota: un cambio di compagine recente e un assetto fermo da
       // vent'anni sono due rischi diversi, e senza questa data si confondono.
@@ -689,14 +822,48 @@ export function mappaProfiloCompleto(raw: unknown): ProfiloCompleto {
       const indirizzo = mappaIndirizzo(pick(o, 'address') ?? o);
       if (indirizzo === null) return null;
 
+      /*
+        Una sede cessata non è un'ubicazione operativa.
+
+        `companyStatus.activityStatus.description` sta accanto a `companyDetails`, non
+        dentro, e non veniva letto in nessun punto del pacchetto: sullo stesso schermo
+        convivevano «4 ubicazioni» e «Unità locali: 2», perché il fornitore conta le sole
+        attive e noi contavamo tutte. Un intermediario quotava incendio e sisma su un
+        capannone che l'impresa non ha più.
+
+        Si scarta **solo** ciò che il registro dichiara chiuso: una sede senza stato resta,
+        perché «non lo so» non è «cessata». Le voci del campione senza `companyStatus` sono
+        infatti attive.
+      */
+      const stato = str(pick(pick(o, 'companyStatus'), 'activityStatus'), 'description', 'descrizione');
+      if (statoNonOperativo(stato)) return null;
+
       const dettagli = pick(o, 'companyDetails');
       const tipo = pick(dettagli, 'officeType');
 
       return {
         tipo: tipoUnitaDaCodice(str(tipo, 'code'), str(tipo, 'description')),
         indirizzo,
-        attivita: str(tipo, 'description'),
-        addetti: num(o, 'employees'),
+        /*
+          L'attività svolta nella sede: il profilo completo **non la porta**.
+
+          Qui c'era la descrizione del *tipo* di sede — «Local units» — messa nel campo
+          dell'attività: un dato in inglese, che ripeteva `tipo` e che a chi legge il
+          fascicolo si presentava come «attività svolta nella sede».
+
+          Non si mette al suo posto la lettura di una chiave plausibile: è la stessa forma
+          dell'errore accanto, e un alias che non aggancia mai niente fa credere che il
+          campo sia coperto. Quando il fornitore comincerà a mandarla, la sorveglianza dei
+          campi la segnalerà come chiave nuova — è il presidio che esiste per questo.
+        */
+        attivita: null,
+        /*
+          Gli addetti per sede: `allOffices` non ha alcuna chiave `employees` — verificato
+          voce per voce sulla risposta registrata. La lettura c'era e non poteva agganciare
+          nulla: un campo che finge di essere letto. Il numero di addetti dell'impresa
+          esiste, ma è dell'impresa intera e spalmarlo sulle sedi sarebbe un'invenzione.
+        */
+        addetti: null,
       };
     })
     .filter((u): u is UnitaLocale => u !== null);

@@ -279,7 +279,16 @@ export function analyzeCompany(
   });
 
   // ── 2. Credito ────────────────────────────────────────────────────────────
-  const altman = bilancio === null ? null : computeAltmanZ(bilancio);
+  // Il contesto d'impresa serve alle frasi che accompagnano lo Z'', non al calcolo: senza,
+  // la scheda affermava che il modello è «per imprese non manifatturiere» sotto lo Z''
+  // di una manifattura, e rimandava alle norme della S.r.l. anche a una S.p.A.
+  const altman =
+    bilancio === null
+      ? null
+      : computeAltmanZ(bilancio, {
+          formaGiuridica: facts.formaGiuridica,
+          atecoSezione: facts.atecoSezione,
+        });
   const creditScore = computeCreditScore({ profile, bilancio, indicatori, livelloDati, asOf });
 
   // Il fido si calcola sugli aggregati disponibili: dal bilancio dettagliato se c'è,

@@ -135,7 +135,10 @@ describe('Mappatura degli assetti', () => {
     expect(risultato.value.cariche[0]?.isRappresentanteLegale).toBe(true);
     expect(risultato.value.cariche[1]?.isRappresentanteLegale).toBe(false);
     expect(risultato.value.soci[1]?.tipo).toBe('persona-giuridica');
-    expect(risultato.value.soci[0]?.quotaPercentuale).toBeCloseTo(0.6, 6);
+    // Punti percentuali, come il modello canonico li aspetta (`SOGLIA_CONTROLLO = 50`).
+    // Qui l'attesa era 0,6: era il difetto 2 dell'audit scritto dentro un collaudo.
+    expect(risultato.value.soci[0]?.quotaPercentuale).toBeCloseTo(60, 6);
+    expect(risultato.value.soci[1]?.quotaPercentuale).toBeCloseTo(40, 6);
   });
 
   it('su liste assenti restituisce array vuoti, non errori', () => {

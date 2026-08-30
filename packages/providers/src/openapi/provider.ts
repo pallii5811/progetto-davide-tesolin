@@ -49,9 +49,9 @@ import {
   sedeDi,
 } from './mapper.js';
 import type { ProfiloCompleto } from './mapper.js';
-import { mappaIndicatoriFornitore } from './indicatori.js';
+import { fondiIndicatori, mappaIndicatoriFornitore } from './indicatori.js';
 import { mappaNegativita } from './negativita.js';
-import { asArray, bool, money, num, partitaIvaOf, pick, str } from './parse.js';
+import { asArray, bool, codiceFiscaleOf, money, num, partitaIvaOf, pick, str } from './parse.js';
 
 /**
  * Quante aziende si scaricano per volta, se non è chiesto altrimenti.
@@ -234,12 +234,28 @@ export class OpenApiProvider implements CompanyDataProvider {
         this.#contaProspect({ ...filtri, limit: limite, dataEnrichment: arricchimento }),
       ]);
 
+      const lotto = Math.min(limite, totali.count);
+
       return {
         totale: totali.count,
-        costoElencoCentesimi: preventivo.costoCentesimi,
+        /*
+          Il preventivo mostrato **davanti al pulsante che spende**.
+
+          Quando il fornitore non dichiara il costo, qui usciva `0,00 €`: non «non lo so»,
+          ma «gratis» — l'unica lettura che un numero a zero consente a chi legge, e quella
+          che porta a premere. Ora si ricade sul listino verificato (cinque centesimi a
+          record), che è un prezzo noto, non un'invenzione: un preventivo prudenziale è
+          onesto, uno a zero no.
+
+          Resta un difetto dichiarato: la forma giusta sarebbe distinguere «costo non
+          dichiarato dal fornitore» da «costo zero», e per farlo `costoElencoCentesimi`
+          dovrebbe poter valere `null` — cioè cambiare il contratto in `port.ts` e le
+          quattro schermate che lo leggono.
+        */
+        costoElencoCentesimi: preventivo.costoCentesimi ?? costoLotto(lotto),
         aziende: [],
         soloConteggio: true,
-        lotto: Math.min(limite, totali.count),
+        lotto,
         // Zero senza spiegazione fa sembrare rotto un servizio che sta funzionando.
         ...(totali.count === 0 ? { diagnosiZero: await this.#diagnosticaZero(filtri) } : {}),
       };
@@ -329,8 +345,15 @@ export class OpenApiProvider implements CompanyDataProvider {
     return esiti.filter((e) => e.totaleSenza > 0).sort((a, b) => b.totaleSenza - a.totaleSenza);
   }
 
-  /** Conteggio in modalità `dryRun`: non scarica nulla, non addebita nulla. */
-  async #contaProspect(query: Record<string, unknown>): Promise<{ count: number; costoCentesimi: number }> {
+  /**
+   * Conteggio in modalità `dryRun`: non scarica nulla, non addebita nulla.
+   *
+   * `costoCentesimi` vale `null` quando il fornitore non dichiara il prezzo. Valeva zero, e
+   * zero è un'affermazione: significa «gratis». Chi decide cosa mostrare sta a monte.
+   */
+  async #contaProspect(
+    query: Record<string, unknown>,
+  ): Promise<{ count: number; costoCentesimi: number | null }> {
     const raw = await this.#company.request<unknown>({
       service: 'prospezione',
       path: this.#config.services.prospezione.path,
@@ -344,8 +367,9 @@ export class OpenApiProvider implements CompanyDataProvider {
     return {
       count: num(raw, 'count') ?? 0,
       // Il prezzo lo dichiara il fornitore a ogni risposta: fidarsi del listino scritto
-      // nel codice significherebbe accorgersi di un aumento solo a fine mese.
-      costoCentesimi: dichiarato === null ? 0 : Math.round(dichiarato * 100),
+      // nel codice significherebbe accorgersi di un aumento solo a fine mese. Ma se non lo
+      // dichiara, l'assenza resta assenza — mai zero.
+      costoCentesimi: dichiarato === null ? null : Math.round(dichiarato * 100),
     };
   }
 
@@ -385,7 +409,19 @@ export class OpenApiProvider implements CompanyDataProvider {
 
     const identity = {
       partitaIva: partitaIvaOf(rawAnagrafica, 'vatCode', 'partitaIva') ?? parsePartitaIva(identifier),
-      codiceFiscale: null,
+      /*
+        Il codice fiscale era cablato a `null`.
+
+        Non per mancanza di dato: `taxCode` è presente in ogni risposta registrata, il
+        parser esiste (`codiceFiscaleOf`), la colonna esiste e il campo del modello pure.
+        Restava `null`, e con esso ogni riconciliazione fatta sul codice fiscale — che è
+        l'identificatore che non cambia quando la partita IVA cambia.
+
+        Resta una **stringa**: un identificatore di cifre non si converte mai. Sessantasei
+        partite IVA su ottanta cominciano per zero, e `Number('01528120981')` aggancerebbe
+        un'altra impresa.
+      */
+      codiceFiscale: codiceFiscaleOf(rawAnagrafica, 'taxCode', 'codiceFiscale', 'fiscalCode'),
       denominazione:
         str(rawAnagrafica, 'companyName', 'denominazione', 'ragioneSociale', 'name') ?? identifier,
     };
@@ -479,11 +515,20 @@ export class OpenApiProvider implements CompanyDataProvider {
           ? null
           : fromProvider(profilo.gruppo, this.name, 'IT-full', REGISTRO_IMPRESE, osservatoIl),
       /*
-        Gli indici del profilo completo hanno la precedenza: sono quarantotto contro le
-        poche qualifiche che l'anagrafica estesa porta con sé. Quando l'approfondimento
-        non è stato chiesto, o è fallito, restano quelle — meglio poche che nessuna.
+        I due servizi si **sommano**, campo per campo: non è uno il superset dell'altro.
+
+        Qui il profilo completo *sostituiva* la lettura dell'anagrafica estesa, e con essa
+        sparivano il gruppo IVA e il codice SDI — che `IT-advanced` porta e `IT-full` no.
+        Risultato: chi pagava l'approfondimento a quaranta centesimi vedeva una bandiera in
+        meno di chi si fermava ai dieci. Pagare di più e vedere di meno.
+
+        Il profilo completo vince dove ha un valore, perché è il più ricco e il più
+        aggiornato; dove non ce l'ha non cancella niente.
       */
-      indicatoriFornitore: profilo?.indicatori ?? mappaIndicatoriFornitore(rawAnagrafica),
+      indicatoriFornitore: fondiIndicatori(
+        mappaIndicatoriFornitore(rawAnagrafica),
+        profilo?.indicatori ?? INDICATORI_FORNITORE_VUOTI,
+      ),
       datiDichiarati: DATI_DICHIARATI_VUOTI,
     };
   }

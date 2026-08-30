@@ -1,5 +1,7 @@
-import Link from 'next/link';
 import { richiediSessione } from '@/lib/sessione';
+// La scheda sa quale è aperta, e per saperlo deve girare nel browser: il nome locale
+// resta `Scheda`, così le sette righe della navigazione si leggono come prima.
+import { SchedaImpostazioni as Scheda } from './SchedaImpostazioni';
 
 /**
  * Le impostazioni sono divise in tre.
@@ -29,7 +31,16 @@ export default async function LayoutImpostazioni({ children }: { children: React
         )}
       </p>
 
-      <nav aria-label="Impostazioni" className="mb-8 flex gap-1 border-b border-bordo">
+      {/*
+        Le sette schede scorrono **dentro la loro riga**, non trascinando la pagina.
+
+        A 390 pixel arrivavano a 603, e la pagina delle impostazioni scorreva in
+        orizzontale di duecentotredici. Non si mandano a capo: una fila di schede su tre
+        righe non si legge più come una fila di schede, e il bordo inferiore che le
+        raccoglie perderebbe senso. Si scorre la riga, che è ciò che un telefono si
+        aspetta da una barra di schede.
+      */}
+      <nav aria-label="Impostazioni" className="mb-8 flex gap-1 overflow-x-auto border-b border-bordo">
         <Scheda href="/impostazioni">Il tuo accesso</Scheda>
         {amministratore && <Scheda href="/impostazioni/studio">Anagrafica studio</Scheda>}
         {amministratore && <Scheda href="/impostazioni/utenti">Utenti dello studio</Scheda>}
@@ -50,14 +61,3 @@ const ETICHETTE_RUOLO: Record<string, string> = {
   assistente: 'Assistente',
   'sola-lettura': 'Sola lettura',
 };
-
-function Scheda({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="-mb-px rounded-t border-b-2 border-transparent px-3 py-2 text-sm text-testo-tenue transition hover:border-bordo-forte hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-    >
-      {children}
-    </Link>
-  );
-}

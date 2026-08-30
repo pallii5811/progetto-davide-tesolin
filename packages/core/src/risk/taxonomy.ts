@@ -6,7 +6,9 @@
  * L'aggiunta di un rischio è un evento di versione, non una modifica silenziosa.
  */
 
+import type { CompanyFacts } from '../company/facts.js';
 import type { CoverageId } from '../coverage/taxonomy.js';
+import { normaResponsabilitaAmministratori } from '../governance/norme.js';
 import type { Impact, Likelihood } from './assessment.js';
 
 export type RiskCategory =
@@ -265,7 +267,17 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
       'Verifica delle coperture dei subappaltatori',
     ],
     assicurabile: true,
-    riferimenti: ['Artt. 2043, 2050, 2051 c.c.'],
+    /*
+      L'art. 2050 riguarda le sole attività pericolose per natura o per i mezzi adoperati,
+      e stava qui accanto al 2043 come se valesse per chiunque: a uno studio di consulenza
+      è falso, e ribalta l'onere della prova in una direzione che quell'impresa non ha.
+
+      Non lo si sostituisce con una regola che indovini quali attività siano pericolose —
+      quella qualificazione la fa il giudice sul caso concreto, non una divisione ATECO.
+      Si cita ciò che vale per tutti, e sull'impresa pericolosa il riferimento resta
+      incompleto invece che sbagliato.
+    */
+    riferimenti: ['Art. 2043 c.c.', 'Art. 2051 c.c.'],
   },
   'rc-verso-dipendenti': {
     id: 'rc-verso-dipendenti',
@@ -331,7 +343,17 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
       'Documentazione delle istruzioni ricevute dal committente',
     ],
     assicurabile: true,
-    riferimenti: ['L. 124/2017 art. 1 c. 26'],
+    /*
+      La L. 124/2017 art. 1 c. 26 riguarda la polizza degli **avvocati**, e stava qui
+      addosso a ogni impresa delle sezioni M, J e K — software house comprese. Il file
+      gemello `coverage/taxonomy.ts` aveva già accertato che la norma è sbagliata e
+      l'aveva sostituita: qui la copia era sopravvissuta.
+
+      Restano le due norme che valgono per chiunque presti un servizio. L'obbligo
+      assicurativo del professionista iscritto a un albo lo aggiunge
+      `riferimentiPerImpresa`, che sa se l'impresa sta nella sezione professionale.
+    */
+    riferimenti: ['Art. 1176, c. 2, c.c.', 'Art. 2236 c.c.'],
   },
   'infortunio-titolare': {
     id: 'infortunio-titolare',
@@ -449,7 +471,17 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
       'Sistema di allerta sulla continuità aziendale',
     ],
     assicurabile: true,
-    riferimenti: ['Artt. 2392-2395 c.c.', 'D.Lgs. 14/2019'],
+    /*
+      Qui c'era «Artt. 2392-2395 c.c.» — norme della S.p.A. — a ogni impresa, due righe
+      sotto una motivazione che per la S.r.l. citava correttamente l'art. 2476. Era la
+      **quarta** copia della stessa citazione, quella che `governance/norme.ts` dichiara
+      per iscritto eliminata: se ne erano corrette tre e questa era rimasta.
+
+      Il catalogo è statico e non conosce la forma giuridica: qui restano le sole norme
+      vere per tutti, e la norma sulla responsabilità la aggiunge `riferimentiPerImpresa`
+      leggendola dall'unico punto in cui vive.
+    */
+    riferimenti: ['Art. 2086 c.c.', 'D.Lgs. 14/2019'],
   },
   'contenzioso-legale': {
     id: 'contenzioso-legale',
@@ -604,6 +636,45 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
 
 export function riskDefinition(id: RiskId): RiskDefinition {
   return RISK_CATALOG[id];
+}
+
+/**
+ * I riferimenti normativi di un rischio **per questa impresa**.
+ *
+ * Il catalogo è statico e versionato, e va bene così: è la stessa lingua che due analisi
+ * a mesi di distanza devono parlare. Ma una norma non è una proprietà del rischio, è una
+ * proprietà del rapporto fra quel rischio e quell'impresa — e scriverla nel catalogo
+ * significa affermarla per tutte.
+ *
+ * Da qui passano le sole norme che cambiano con l'impresa. Le altre restano dove sono.
+ */
+export function riferimentiPerImpresa(
+  id: RiskId,
+  facts: Pick<CompanyFacts, 'formaGiuridica' | 'atecoSezione'>,
+): readonly string[] {
+  const base = RISK_CATALOG[id].riferimenti;
+
+  if (id === 'responsabilita-amministratori') {
+    const norma = normaResponsabilitaAmministratori(facts.formaGiuridica);
+    // `null` nelle società di persone e nella ditta individuale: lì non c'è un organo
+    // amministrativo distinto dalla proprietà, e non si cita nulla al suo posto.
+    return norma === null ? base : [norma, ...base];
+  }
+
+  if (id === 'rc-professionale') {
+    /*
+      L'obbligo vale per chi è iscritto a un albo, non per una sezione ATECO.
+
+      La sezione M raccoglie le attività professionali; J e K no — e la regola che
+      identifica questo rischio prende tutte e tre. Dentro la M l'iscrizione all'albo
+      resta da confermare in intervista, ma l'affermazione è almeno plausibile; fuori è
+      falsa e basta.
+    */
+    if (facts.atecoSezione !== 'M') return base;
+    return [...base, 'Art. 3, c. 5, lett. e) D.L. 138/2011', 'Art. 5 D.P.R. 137/2012'];
+  }
+
+  return base;
 }
 
 export const ALL_RISK_IDS: readonly RiskId[] = Object.keys(RISK_CATALOG) as RiskId[];

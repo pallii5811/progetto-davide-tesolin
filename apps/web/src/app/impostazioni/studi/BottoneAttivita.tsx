@@ -31,7 +31,7 @@ export function BottoneAttivita({
         if (attivo && !confirm(`Sospendere «${denominazione}»? Gli accessi cessano subito.`)) return;
         avvia(() => void cambiaAttivita(id, !attivo));
       }}
-      className="rounded border border-bordo-forte px-2.5 py-1 text-xs text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40 disabled:opacity-50"
+      className="rounded border border-bordo-forte px-2.5 py-1 text-xs text-testo-tenue transition hover:text-testo disabled:opacity-50"
     >
       {inCorso ? '…' : attivo ? 'Sospendi' : 'Riattiva'}
     </button>

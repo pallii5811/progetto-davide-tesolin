@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { cambiaPasswordAzione } from './actions';
 
 const CAMPO =
-  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none transition focus:border-marchio focus:ring-2 focus:ring-marchio/25';
+  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio';
 const ETICHETTA = 'mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole';
 
 function Bottone() {
@@ -14,7 +14,7 @@ function Bottone() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
       {pending ? 'Aggiornamento…' : 'Aggiorna password'}
     </button>

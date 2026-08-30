@@ -215,19 +215,29 @@ function nuoveSedi(
     });
   }
 
-  if (corrente.numeroUnitaLocali > precedente.numeroUnitaLocali) {
-    const nuove = corrente.numeroUnitaLocali - precedente.numeroUnitaLocali;
+  /*
+    Si confrontano due conteggi solo quando esistono entrambi.
+
+    `null` significa «unità locali non acquisite», e un'assenza non è uno zero da cui
+    contare le aperture: fra un'analisi ordinaria e una approfondita l'unica cosa
+    cambiata è quanto si è pagato, non le sedi dell'impresa.
+  */
+  const prima = precedente.numeroUnitaLocali;
+  const adesso = corrente.numeroUnitaLocali;
+
+  if (prima !== null && adesso !== null && adesso > prima) {
+    const nuove = adesso - prima;
     eventi.push({
       tipo: 'nuova-sede',
       titolo: nuove === 1 ? 'Nuova unità locale aperta' : `${nuove} nuove unità locali aperte`,
-      descrizione: `Le unità locali sono passate da ${precedente.numeroUnitaLocali} a ${corrente.numeroUnitaLocali}.`,
+      descrizione: `Le unità locali sono passate da ${prima} a ${adesso}.`,
       conseguenza:
         'Un’ubicazione non elencata in polizza non è coperta: beni, merci e responsabilità che vi si trovano restano interamente a carico dell’impresa.',
       azioneSuggerita:
         'Rilevare i valori presenti nella nuova ubicazione e includerla nelle polizze a valore, oppure quotarne una dedicata.',
       rilevanza: 5,
-      valorePrecedente: String(precedente.numeroUnitaLocali),
-      valoreNuovo: String(corrente.numeroUnitaLocali),
+      valorePrecedente: String(prima),
+      valoreNuovo: String(adesso),
       riferimenti: [],
     });
   }

@@ -26,9 +26,11 @@ import {
   MemoryCostLedger,
   OPENAPI_DEFAULT_CONFIG,
   ProviderError,
+  conPrezzi,
   costoAnalisi,
   costoEventiNegativi,
   createCompanyProvider,
+  prezziDaConfigurazione,
   verificaAutorizzazioni,
 } from '@aegis/providers';
 import type { CostEvent } from '@aegis/providers';
@@ -94,7 +96,7 @@ import {
   spesaOdiernaComplessiva,
   trovaAziendaPerChiave,
 } from '@aegis/db';
-import { MemoryDossierStore, MemoryImmaginiStore, MemoryPortafoglioStore } from './store.js';
+import { MemoryDossierStore, MemoryImmaginiStore, MemoryPortafoglioStore, normalizza } from './store.js';
 import type { DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
 import type { Persistenza } from './persistenza.js';
 
@@ -152,6 +154,25 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     process.env['OPENAPI_AMBIENTE']?.trim().toLowerCase() === 'test'
       ? ('test' as const)
       : ('produzione' as const);
+
+  /*
+    Il listino con cui il servizio **dichiara** i prezzi, e che deve essere quello con cui
+    li paga.
+
+    `costoAnalisi()` senza argomenti risponde con il listino pubblico. Il provider, invece,
+    nasce con i prezzi del contratto — `AEGIS_PREZZI_CENTESIMI`, che `createCompanyProvider`
+    applica. I due numeri erano quindi diversi ovunque quella variabile fosse impostata: con
+    l'esempio scritto in `.env.example` lo scarto arriva a sette volte e mezzo, e compare
+    sulle schermate che dicono quanto costa **prima** di premere il pulsante che spende.
+
+    Un prezzo mostrato più alto di quello vero non è prudenza: è il numero su cui
+    l'intermediario decide se può permettersi un'analisi, ed è lo stesso su cui si tara il
+    tetto di spesa.
+  */
+  const listino = conPrezzi(
+    OPENAPI_DEFAULT_CONFIG,
+    prezziDaConfigurazione(process.env['AEGIS_PREZZI_CENTESIMI']),
+  );
 
   const provider =
     options.provider ??
@@ -340,6 +361,24 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   };
 
   /**
+   * L'azienda è già nell'archivio di questo studio.
+   *
+   * Serve a distinguere ciò che si **ricompra** da ciò che si **rilegge**: una riga
+   * presente in archivio è un'azienda per cui la risposta del fornitore è già stata pagata
+   * ed è servita dalla cache, che il tetto di spesa non ha ragione di fermare.
+   *
+   * Una sola lettura su un indice: non pesa sul percorso che protegge.
+   */
+  const giaInArchivio = async (request: FastifyRequest, identificativo: string): Promise<boolean> => {
+    if (persistenza === undefined) return false;
+    const sessione = request.sessione;
+    if (sessione === undefined) return false;
+    return (
+      (await trovaAziendaPerChiave(persistenza.db, sessione.tenantId, normalizza(identificativo))) !== null
+    );
+  };
+
+  /**
    * Il testo del rifiuto, scritto per chi lo legge.
    *
    * Le versioni precedenti citavano il nome della variabile d'ambiente da alzare: è
@@ -386,7 +425,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (sessione === undefined) {
       throw new ProviderError('Sessione assente', 'autenticazione');
     }
-    const tenant = persistenza.perTenant(sessione.tenantId);
+    // L'utente viaggia col contesto: è ciò che mette un nome nell'audit trail e nelle
+    // colonne `eseguita_da` e `aggiornato_da`, che finora restavano vuote.
+    const tenant = persistenza.perTenant(sessione.tenantId, sessione.utenteId);
     return {
       dossier: tenant.dossier,
       portafoglio: tenant.portafoglio,
@@ -410,6 +451,24 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   */
   const PREFISSO_QUESTIONARIO_PUBBLICO = '/api/questionario/';
 
+  /**
+   * Le rotte che un ruolo in sola lettura può invocare pur non essendo GET.
+   *
+   * Sono tre, e ciascuna per una ragione dichiarata:
+   *
+   *  - `/api/auth/logout` e `/api/auth/password` riguardano **il proprio accesso**, non i
+   *    dati dello studio. Impedire a qualcuno di uscire o di cambiarsi la password non è
+   *    una difesa del portafoglio: è una credenziale che non si può ruotare;
+   *  - `/api/aziende/<chiave>/analisi` è l'unico modo di **leggere** un'analisi. Non
+   *    esiste una GET equivalente, e finché non esiste è questa la consultazione che il
+   *    ruolo promette. Gli acquisti facoltativi restano fuori: li rifiuta la rotta.
+   */
+  const ROTTE_LETTURA_IN_POST = new Set(['/api/auth/logout', '/api/auth/password']);
+  const ANALISI_DI_UN_AZIENDA = /^\/api\/aziende\/[^/]+\/analisi$/;
+
+  const consentitaInSolaLettura = (percorso: string): boolean =>
+    ROTTE_LETTURA_IN_POST.has(percorso) || ANALISI_DI_UN_AZIENDA.test(percorso);
+
   app.addHook('preHandler', async (request, reply) => {
     if (!autenticazioneRichiesta) return;
     const percorso = request.url.split('?')[0] ?? '';
@@ -429,8 +488,21 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(401).send({ errore: 'Sessione scaduta o revocata' });
     }
 
-    // I ruoli in sola lettura non possono modificare nulla.
-    if (!puoScrivere(sessione.ruolo) && request.method !== 'GET') {
+    /*
+      I ruoli in sola lettura non possono modificare nulla — ma «non è una GET» e
+      «modifica qualcosa» non sono la stessa cosa.
+
+      La guardia filtrava per **verbo HTTP**, e l'analisi di un'azienda esiste solo in
+      POST: il ruolo descritto come «consulta le analisi esistenti» non poteva aprire
+      nessuna azienda, nessun report, e nemmeno cambiarsi la password. Un ruolo che non
+      apre nulla non è un ruolo in sola lettura, è un accesso che non funziona.
+
+      L'elenco qui sotto è di rotte, non di verbi, e contiene solo ciò che non tocca i
+      dati dello studio: la consultazione di un'azienda e le operazioni sul proprio
+      accesso. Ciò che *dentro* quelle rotte costa denaro resta interdetto, e il rifiuto
+      lo dice — vedi la rotta dell'analisi.
+    */
+    if (!puoScrivere(sessione.ruolo) && request.method !== 'GET' && !consentitaInSolaLettura(percorso)) {
       return reply.status(403).send({ errore: 'Il ruolo in sola lettura non consente modifiche' });
     }
 
@@ -455,12 +527,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       dieci a cinquantacinque centesimi — e un numero scritto a mano in una pagina resta
       quello del giorno in cui è stato scritto.
     */
-    costoAnalisiCentesimi: costoAnalisi('completo'),
-    costoAnalisiApprofonditaCentesimi: costoAnalisi('profondito'),
+    costoAnalisiCentesimi: costoAnalisi('completo', listino),
+    costoAnalisiApprofonditaCentesimi: costoAnalisi('profondito', listino),
     // I due acquisti facoltativi, col prezzo preso dal listino e non da una cifra scritta
     // a mano in una pagina: è così che «+0,48 €» è finito su un pulsante da trenta.
-    costoEventiNegativiCentesimi: costoEventiNegativi(),
-    costoApprofondimentoCentesimi: costoAnalisi('profondito') - costoAnalisi('completo'),
+    costoEventiNegativiCentesimi: costoEventiNegativi(listino),
+    costoApprofondimentoCentesimi: costoAnalisi('profondito', listino) - costoAnalisi('completo', listino),
     persistenza: persistenza?.descrizione ?? 'in memoria (i dati non sopravvivono al riavvio)',
     datiPersistenti: persistenza !== undefined,
     autenticazione: autenticazioneRichiesta,
@@ -958,6 +1030,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const { registraAudit } = await import('@aegis/db');
     await registraAudit(persistenza.db, {
       tenantId: sessione.tenantId,
+      utenteId: sessione.utenteId,
       azione: 'utente.creato',
       entita: 'utente',
       entitaId: utenteId,
@@ -1033,6 +1106,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     await registraAudit(persistenza.db, {
       tenantId: sessione.tenantId,
+      utenteId: sessione.utenteId,
       azione: 'utente.modificato',
       entita: 'utente',
       entitaId: request.params.id,
@@ -1057,6 +1131,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     await revocaSessioniUtente(persistenza.db, request.params.id);
     await registraAudit(persistenza.db, {
       tenantId: sessione.tenantId,
+      utenteId: sessione.utenteId,
       azione: 'utente.sessioni-revocate',
       entita: 'utente',
       entitaId: request.params.id,
@@ -1064,6 +1139,56 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     });
 
     return { revocate: true };
+  });
+
+  /**
+   * Reimpostazione della password di un collaboratore, da parte dell'amministratore.
+   *
+   * Chi dimenticava la password non rientrava: l'unica rotta esistente chiede quella
+   * **attuale**, e l'amministratore poteva soltanto revocare le sessioni — cioè buttare
+   * fuori chi era già fuori. L'unico rimedio era `scripts/reimposta-password.ts`, che
+   * richiede accesso alla macchina e il servizio fermo: non è una via che uno studio ha.
+   *
+   * Stessa forma della creazione di un utente, e per le stesse ragioni: la password nasce
+   * qui, viene mostrata **una volta sola** e non viene scritta in chiaro da nessuna parte.
+   * L'amministratore la consegna a voce.
+   *
+   * Le sessioni aperte si chiudono tutte: se la password viene reimpostata perché si
+   * sospetta un accesso altrui, lasciarle aperte vanificherebbe l'operazione.
+   *
+   * Resta fuori — ed è una decisione del committente, non una dimenticanza — il recupero
+   * autonomo per posta elettronica: richiede un servizio di invio che il prodotto non ha.
+   */
+  app.post<{ Params: { id: string } }>('/api/utenti/:id/reimposta-password', async (request, reply) => {
+    const sessione = soloAmministratore(request, reply);
+    if (sessione === null || persistenza === undefined) return reply;
+
+    const { elencoUtenti, impostaPassword, revocaSessioniUtente, registraAudit } =
+      await import('@aegis/db');
+
+    // Solo dentro il proprio studio: l'elenco è già filtrato per intermediario, e un
+    // identificativo indovinato non deve poter toccare l'utenza di un altro.
+    const utenti = await elencoUtenti(persistenza.db, sessione.tenantId);
+    const destinatario = utenti.find((u) => u.id === request.params.id);
+    if (destinatario === undefined) {
+      return reply.status(404).send({ errore: 'Utente non trovato' });
+    }
+
+    const password = generaPasswordIniziale();
+    await impostaPassword(persistenza.db, destinatario.id, await derivaPassword(password));
+    await revocaSessioniUtente(persistenza.db, destinatario.id);
+
+    await registraAudit(persistenza.db, {
+      tenantId: sessione.tenantId,
+      utenteId: sessione.utenteId,
+      azione: 'utente.password-reimpostata',
+      entita: 'utente',
+      entitaId: destinatario.id,
+      // Mai la password, nemmeno qui: l'audit trail è append-only e si conserva per anni.
+      dettagli: { destinatario: destinatario.email, da: sessione.email },
+    });
+
+    return { email: destinatario.email, passwordIniziale: password, sessioniRevocate: true };
   });
 
   // ── Ricerca ────────────────────────────────────────────────────────────────
@@ -1135,8 +1260,20 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           comune: null,
           provincia: a.provincia,
           ateco: a.atecoPrimario,
-          attiva: true,
-          statoAttivita: 'attiva' as const,
+          /*
+            `null`, non «attiva».
+
+            Erano scritte a mano: ogni impresa ritrovata in archivio usciva col bollino
+            verde, su una query che lo stato non lo seleziona e una tabella — `aziende` —
+            che quella colonna non ce l'ha. Un'impresa cessata il mese scorso continuava a
+            comparire come attiva, e il bollino è esattamente ciò che si guarda per
+            decidere se vale la pena spendere per analizzarla.
+
+            Lo stato camerale lo porta solo il fornitore. Qui non si sa, e non sapere si
+            dichiara: a valle il bollino non deve comparire affatto.
+          */
+          attiva: null,
+          statoAttivita: null,
           providerId: a.identificativo,
           sintesi: null,
           anagrafica: null,
@@ -1351,10 +1488,52 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         .send({ errore: 'Corpo della richiesta non valido', dettagli: parsed.error.issues });
     }
 
+    /*
+      Il ruolo in sola lettura consulta; non compra.
+
+      Il rifiuto è esplicito e dice quale parte della richiesta lo ha causato. Scartare in
+      silenzio i due flag e proseguire sarebbe peggio: chi ha chiesto l'approfondimento
+      leggerebbe un'analisi ordinaria credendola approfondita, e non avrebbe modo di
+      accorgersene.
+    */
+    const sessioneAnalisi = request.sessione;
+    if (
+      sessioneAnalisi !== undefined &&
+      !puoScrivere(sessioneAnalisi.ruolo) &&
+      (parsed.data.approfondita === true || parsed.data.eventiNegativi === true)
+    ) {
+      return reply.status(403).send({
+        errore:
+          'Il ruolo in sola lettura consulta l’analisi ordinaria. L’approfondimento e la ' +
+          'verifica di protesti e procedure sono acquisti, e restano ai ruoli che possono scrivere.',
+      });
+    }
+
+    /*
+      Il tetto ferma la **spesa**, non la consultazione di ciò che è già stato pagato.
+
+      Bloccava anche la riapertura di un'azienda già in archivio, cioè di un dato comprato
+      giorni prima e servito dalla cache a costo zero: raggiunto il tetto, l'intermediario
+      non poteva più nemmeno rileggere il proprio portafoglio fino al giorno dopo.
+
+      L'esenzione vale solo per un'azienda che questo studio ha già, e solo per l'analisi
+      ordinaria senza acquisti facoltativi. Resta uno sforamento possibile, ed è
+      dichiarato: se nel frattempo la risposta è uscita dalla cache, quella riapertura
+      ricompra l'anagrafica. È il costo di **una** operazione, non quello di una giornata
+      senza tetto — e il tetto viene comunque riletto a ogni richiesta successiva.
+    */
     const esito = await oltreIlTetto(request);
-    if (esito !== null) {
+    if (esito !== null && !(await giaInArchivio(request, request.params.id))) {
       return reply.status(429).send({
         errore: messaggioTetto(esito, 'Le analisi riprendono domani.'),
+      });
+    }
+    if (esito !== null && (parsed.data.approfondita === true || parsed.data.eventiNegativi === true)) {
+      return reply.status(429).send({
+        errore: messaggioTetto(
+          esito,
+          'L’azienda resta consultabile con l’analisi ordinaria, che non costa nulla perché è già in archivio.',
+        ),
       });
     }
 
@@ -1501,11 +1680,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const { preparaImportazione, MASSIMO_PER_IMPORTAZIONE } = await import('./importazione.js');
-    const { costoAnalisi } = await import('@aegis/providers');
 
     const presenti = new Set((await contestoDi(request).portafoglio.elenco()).map((v) => v.identificativo));
 
-    const costoUnitarioCentesimi = costoAnalisi('completo');
+    // Col listino del contratto, non con quello pubblico: è il preventivo che si legge
+    // prima di decidere se importare quattrocento aziende.
+    const costoUnitarioCentesimi = costoAnalisi('completo', listino);
     const anteprima = preparaImportazione(parsed.data.contenuto, presenti, costoUnitarioCentesimi);
 
     return {
@@ -1540,11 +1720,14 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const { preparaImportazione, MASSIMO_PER_IMPORTAZIONE } = await import('./importazione.js');
-    const { costoAnalisi } = await import('@aegis/providers');
 
     const contesto = contestoDi(request);
     const presenti = new Set((await contesto.portafoglio.elenco()).map((v) => v.identificativo));
-    const anteprima = preparaImportazione(parsed.data.contenuto, presenti, costoAnalisi('completo'));
+    const anteprima = preparaImportazione(
+      parsed.data.contenuto,
+      presenti,
+      costoAnalisi('completo', listino),
+    );
 
     if (anteprima.daAcquisire.length > MASSIMO_PER_IMPORTAZIONE) {
       return reply.status(400).send({
@@ -1565,30 +1748,70 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const fallite: { partitaIva: string; motivo: string }[] = [];
+    const eventiTotali: CostEvent[] = [];
     let acquisite = 0;
+    let interrottaPerTetto = false;
 
-    const { eventi } = await conCostiDellaRichiesta(async () => {
-      for (const riga of anteprima.daAcquisire) {
+    /*
+      Il tetto si rilegge **prima di ogni azienda**, e la spesa si annota subito dopo.
+
+      Controllarlo una volta sola prima di un ciclo da duecentocinquanta non è un tetto:
+      è una domanda posta quando la risposta è ancora zero. Con le spese registrate solo
+      alla fine, `spesaOdierna` restituiva lo stesso numero per tutta la durata
+      dell'importazione — duecentocinquanta analisi da dieci centesimi passavano intere
+      sotto un tetto da venti euro, superandolo del venticinque per cento, e due
+      importazioni lanciate insieme passavano entrambe perché nessuna delle due vedeva
+      ciò che l'altra stava spendendo.
+
+      Ora ogni giro scrive nel registro ciò che ha appena speso, e il giro successivo lo
+      legge. Lo sforamento residuo è quello di **una** azienda, non quello di un file.
+    */
+    for (const riga of anteprima.daAcquisire) {
+      const oltre = await oltreIlTetto(request);
+      if (oltre !== null) {
+        interrottaPerTetto = true;
+        // Ciò che resta fuori si dichiara riga per riga: un elenco che si accorcia in
+        // silenzio fa credere che il file fosse più corto.
+        fallite.push({
+          partitaIva: riga.partitaIva,
+          motivo: messaggioTetto(oltre, 'Non acquisita: riprendere l’importazione domani.'),
+        });
+        continue;
+      }
+
+      const { risultato, eventi } = await conCostiDellaRichiesta(async () => {
         try {
           const analisi = await analizzaERegistra(request, riga.partitaIva);
           if (analisi === null) {
             fallite.push({ partitaIva: riga.partitaIva, motivo: 'Azienda non trovata dal provider' });
-            continue;
+            return false;
           }
-          acquisite++;
+          return true;
         } catch (errore) {
           fallite.push({
             partitaIva: riga.partitaIva,
             motivo: errore instanceof ProviderError ? errore.message : 'Errore durante l’acquisizione',
           });
+          return false;
         }
-      }
-    });
+      });
 
-    await registraSpese(request, eventi);
-    const costoEffettivoCentesimi = costoDegliEventi(eventi);
+      // Prima si registra la spesa, poi si conta l'acquisto: un fallimento non deve poter
+      // lasciare fuori dal registro un dato che è già stato pagato.
+      eventiTotali.push(...eventi);
+      await registraSpese(request, eventi);
+      if (risultato) acquisite++;
+    }
 
-    return { acquisite, fallite, costoEffettivoCentesimi, giaPresenti: anteprima.giaPresenti.length };
+    const costoEffettivoCentesimi = costoDegliEventi(eventiTotali);
+
+    return {
+      acquisite,
+      fallite,
+      costoEffettivoCentesimi,
+      giaPresenti: anteprima.giaPresenti.length,
+      interrottaPerTetto,
+    };
   });
 
   // ── Monitoraggio continuo ──────────────────────────────────────────────────
@@ -1663,6 +1886,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     // dimostrabile chi l'ha preso in carico e quando.
     await registraAudit(persistenza.db, {
       tenantId,
+      utenteId: sessione?.utenteId ?? null,
       azione: 'monitoraggio.evento-gestito',
       entita: 'evento',
       entitaId: request.params.id,
@@ -1725,6 +1949,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     await registraAudit(persistenza.db, {
       tenantId,
+      utenteId: sessione?.utenteId ?? null,
       azione: 'questionario.invito-creato',
       entita: 'azienda',
       entitaId: aziendaId,
@@ -1766,6 +1991,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (revocati > 0) {
       await registraAudit(persistenza.db, {
         tenantId,
+        utenteId: request.sessione?.utenteId ?? null,
         azione: 'questionario.invito-revocato',
         entita: 'azienda',
         entitaId: aziendaId,
@@ -1806,7 +2032,13 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       invito,
       azienda,
       db: persistenza.db,
-      contesto: persistenza.perTenant(invito.tenantId),
+      /*
+        Senza utente, e deliberatamente: da questa porta entra il **cliente**
+        dell'intermediario, che un utente della piattaforma non è. Il suo lavoro non si
+        attribuisce a un collaboratore dello studio — l'audit trail lo registra con
+        un'azione propria, che dice esattamente da dove è arrivato.
+      */
+      contesto: persistenza.perTenant(invito.tenantId, null),
     };
   };
 

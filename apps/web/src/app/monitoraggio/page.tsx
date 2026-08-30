@@ -149,7 +149,7 @@ function RigaEvento({ evento }: { evento: EventoMonitoraggioDto }) {
             <input type="hidden" name="id" value={evento.id} />
             <button
               type="submit"
-              className="rounded border border-bordo-forte px-3 py-1.5 text-xs font-medium text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+              className="rounded border border-bordo-forte px-3 py-1.5 text-xs font-medium text-testo-tenue transition hover:text-testo"
             >
               Segna gestito
             </button>

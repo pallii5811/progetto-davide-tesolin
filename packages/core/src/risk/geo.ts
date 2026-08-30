@@ -140,25 +140,61 @@ const IDRAULICA_ALTA: ReadonlySet<string> = new Set([
   'AG',
 ]);
 
+/** Etichetta da mostrare quando la tabella non ha misurato. */
+export const IDRAULICA_NON_DETERMINATA = 'non determinata';
+
 export interface TerritorialExposure {
   readonly provincia: string;
+  /**
+   * Sismica: una misura vera a tre livelli. Le due tabelle coprono le zone 1-2 e la 3;
+   * ciò che non vi compare è zona 4, cioè esposizione bassa **accertata**.
+   */
   readonly sismica: ExposureLevel;
-  readonly idraulica: ExposureLevel;
+  /**
+   * Idraulica: `null` dove non è stata misurata.
+   *
+   * Di pericolosità idraulica esiste un insieme solo, quello delle province alte. Per le
+   * altre — circa due terzi — il codice restituiva «media», e il badge la mostrava
+   * accanto a una sismica misurata come se fosse dello stesso tipo. Non lo era: era il
+   * ripiego di un `else`, e chi legge non aveva modo di distinguerlo.
+   *
+   * Un livello mancante non è un livello intermedio. Ciò che si sa è che la provincia
+   * non è nell'elenco delle alte; ciò che non si sa — se sia media o bassa — resta `null`
+   * finché non arrivano le aree di pericolosità ISPRA.
+   */
+  readonly idraulica: ExposureLevel | null;
+  /**
+   * L'etichetta pronta da stampare: `alta` oppure `non determinata`.
+   *
+   * Sta qui e non nello strato di presentazione perché la frase mostrata all'utente non
+   * si ricicla e non si reinventa a valle: si compone dove il dato ha ancora il suo
+   * significato.
+   */
+  readonly idraulicaEtichetta: string;
 }
 
 export function territorialExposure(provincia: string): TerritorialExposure {
   const sigla = provincia.trim().toUpperCase();
+  const idraulica: ExposureLevel | null = IDRAULICA_ALTA.has(sigla) ? 'alta' : null;
   return {
     provincia: sigla,
     sismica: SISMICA_ALTA.has(sigla) ? 'alta' : SISMICA_MEDIA.has(sigla) ? 'media' : 'bassa',
-    idraulica: IDRAULICA_ALTA.has(sigla) ? 'alta' : 'media',
+    idraulica,
+    idraulicaEtichetta: idraulica ?? IDRAULICA_NON_DETERMINATA,
   };
 }
 
-/** Esposizione peggiore fra tutte le province in cui l'azienda opera. */
+/**
+ * Esposizione peggiore fra tutte le province in cui l'azienda opera.
+ *
+ * L'assenza di misura vale zero nella graduatoria, e non è una scelta prudenziale
+ * mascherata: la tabella idraulica conosce **solo** le province alte, quindi una
+ * provincia non misurata è per costruzione una provincia non alta. Trattarla come «media»
+ * dava lo stesso ordinamento e in più affermava un livello.
+ */
 export function worstExposure(province: readonly string[]): TerritorialExposure | null {
   if (province.length === 0) return null;
-  const rank = (level: ExposureLevel): number => (level === 'alta' ? 2 : level === 'media' ? 1 : 0);
+  const rank = (level: ExposureLevel | null): number => (level === 'alta' ? 2 : level === 'media' ? 1 : 0);
 
   let worst: TerritorialExposure | null = null;
   for (const p of province) {
@@ -167,13 +203,18 @@ export function worstExposure(province: readonly string[]): TerritorialExposure 
       worst = current;
       continue;
     }
+    // Annotato per forza: `worst` si riassegna nel ciclo, e senza il tipo esplicito
+    // l'inferenza gira su sé stessa.
+    const idraulica: ExposureLevel | null =
+      rank(current.idraulica) > rank(worst.idraulica) ? current.idraulica : worst.idraulica;
     worst = {
       provincia:
         rank(current.sismica) + rank(current.idraulica) > rank(worst.sismica) + rank(worst.idraulica)
           ? current.provincia
           : worst.provincia,
       sismica: rank(current.sismica) > rank(worst.sismica) ? current.sismica : worst.sismica,
-      idraulica: rank(current.idraulica) > rank(worst.idraulica) ? current.idraulica : worst.idraulica,
+      idraulica,
+      idraulicaEtichetta: idraulica ?? IDRAULICA_NON_DETERMINATA,
     };
   }
   return worst;

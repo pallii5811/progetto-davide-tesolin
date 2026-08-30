@@ -92,8 +92,29 @@
   --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, monospace;
 }
 
+/*
+ * Il tema scuro: variabili CSS, non un @theme annidato.
+ *
+ * Qui c'era `@media (prefers-color-scheme: dark) { @theme { … } }`, che sembra la forma
+ * ovvia e non lo è: **Tailwind v4 appiattisce `@theme` fuori da ogni media query**. Il
+ * blocco non produceva la media query, produceva le sue trentadue variabili in `:root`,
+ * dopo quelle chiare e quindi al posto loro. Misurato sul CSS emesso: zero occorrenze di
+ * prefers-color-scheme, `--color-fondo` a oklch(0.19 …) sempre. Il tema chiaro non è mai
+ * esistito, e con lui il ramo «chiaro» del collaudo di accessibilità, che misurava per la
+ * seconda volta gli stessi pixel del ramo scuro.
+ *
+ * `@theme` serve a **dichiarare** i colori al compilatore, che da lì genera le utilità;
+ * cambiarne il valore a seconda del tema è un'altra cosa, e si fa con le variabili CSS
+ * normali. Le utilità puntano tutte a `var(--color-…)`, quindi seguono il valore
+ * ridefinito qui senza che nulla vada rigenerato — comprese le forme con opacità, che in
+ * v4 sono `color-mix(… var(--color-…) …)`.
+ *
+ * Specificità identica (`:root` contro il `:root, :host` che `@theme` emette) e posizione
+ * successiva: vince questo blocco quando la media query è vera. E il blocco di stampa, più
+ * in basso, vince su entrambi — che è ciò che serve, perché la carta è bianca sempre.
+ */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-fondo: oklch(0.19 0.012 260);
     --color-superficie: oklch(0.235 0.014 260);
     --color-bordo: oklch(0.31 0.014 260);
@@ -130,6 +151,25 @@
 
 html {
   color-scheme: light dark;
+}
+
+/*
+ * Dove si trova il cursore, per chi naviga da tastiera.
+ *
+ * Il contorno nativo era tolto in trentaquattro punti con `focus:outline-none` e
+ * sostituito da un anello del colore del marchio a opacità 0,25 e 0,40. Misurato: quel
+ * velo sta sotto il 3:1 che il §2.4.11 delle WCAG 2.2 richiede fra indicatore e sfondo,
+ * e axe non lo segnala perché il collaudo filtra i marchi fino a WCAG 2.1. Il risultato
+ * è un prodotto che si usa otto ore al giorno e in cui, senza mouse, non si sa dove si è.
+ *
+ * Qui il contorno torna, una volta per tutto il prodotto, **a piena opacità**: 8,02:1 sul
+ * fondo chiaro e 7,45:1 su quello scuro. Ed è `:focus-visible` e non `:focus`, che è la
+ * ragione per cui era stato tolto: il browser lo mostra a chi arriva da tastiera e non a
+ * chi ha appena cliccato, quindi nessun bordo compare dietro il mouse.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-marchio);
+  outline-offset: 2px;
 }
 
 body {

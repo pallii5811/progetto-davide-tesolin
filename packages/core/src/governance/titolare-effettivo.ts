@@ -111,8 +111,32 @@ export function analizzaTitolareEffettivo(assetto: AssettoProprietario): Analisi
     (s) => s.tipo === 'persona-giuridica' && (s.quotaPercentuale ?? 0) > SOGLIA_PARTECIPAZIONE,
   );
 
+  /*
+    L'unico socio societario **senza quota dichiarata** interrompe la catena come le altre.
+
+    Il filtro qui sopra confronta `quotaPercentuale ?? 0` con la soglia, e su una quota
+    non dichiarata quel confronto dà falso: la holding spariva. L'esito era il ramo
+    finale, «titolare effettivo non determinabile: serve la visura sul registro» a 1,10 €
+    — mentre la controllante era a schermo, con la sua partita IVA, e la sua anagrafica
+    costa 0,10 €.
+
+    Che sia controllante non è una deduzione azzardata: è la stessa che fa
+    `governance/assetto.ts`, e la ragione è che un socio solo possiede per definizione
+    l'intero capitale. Diverso è il caso della quota dichiarata e minoritaria, che qui
+    resta fuori come là.
+  */
+  const unicoSocioSocietarioSenzaQuota =
+    assetto.soci.length === 1 &&
+    assetto.soci[0]?.tipo === 'persona-giuridica' &&
+    assetto.soci[0].quotaPercentuale === null
+      ? [assetto.soci[0]]
+      : [];
+
+  const societaCheInterrompono =
+    societaSopraSoglia.length > 0 ? societaSopraSoglia : unicoSocioSocietarioSenzaQuota;
+
   // ── Primo criterio: partecipazione ────────────────────────────────────────
-  if (fisiciSopraSoglia.length > 0 && societaSopraSoglia.length === 0) {
+  if (fisiciSopraSoglia.length > 0 && societaCheInterrompono.length === 0) {
     return {
       titolari: fisiciSopraSoglia.map((s) => ({
         nominativo: s.denominazione,
@@ -135,14 +159,21 @@ export function analizzaTitolareEffettivo(assetto: AssettoProprietario): Analisi
   }
 
   // ── La catena si interrompe su una società ────────────────────────────────
-  if (societaSopraSoglia.length > 0) {
-    const nomi = societaSopraSoglia.map((s) => s.denominazione).join(', ');
-    const risalibili = societaSopraSoglia.filter((s) => s.codiceFiscale !== null);
+  if (societaCheInterrompono.length > 0) {
+    const nomi = societaCheInterrompono.map((s) => s.denominazione).join(', ');
+    const risalibili = societaCheInterrompono.filter((s) => s.codiceFiscale !== null);
 
     note.push(
-      `La catena si interrompe su ${societaSopraSoglia.length === 1 ? 'una società' : 'più società'}: ` +
+      `La catena si interrompe su ${societaCheInterrompono.length === 1 ? 'una società' : 'più società'}: ` +
         'l’elenco dei soci restituisce la partecipante, non la persona fisica che vi sta sopra.',
     );
+
+    if (unicoSocioSocietarioSenzaQuota.length > 0 && societaSopraSoglia.length === 0) {
+      note.push(
+        'La quota non è dichiarata, ma il socio è unico: possiede per definizione l’intero ' +
+          'capitale, e la soglia del 25% è superata.',
+      );
+    }
 
     return {
       titolari: fisiciSopraSoglia.map((s) => ({
@@ -153,7 +184,7 @@ export function analizzaTitolareEffettivo(assetto: AssettoProprietario): Analisi
         motivazione: `Partecipazione diretta del ${s.quotaPercentuale ?? 0}%, sopra soglia.`,
       })),
       catenaChiusa: false,
-      daRisalire: societaSopraSoglia,
+      daRisalire: societaCheInterrompono,
       confidenza: 'media',
       /*
         L'azione consigliata mette il prezzo accanto all'alternativa, ed è deliberato:
@@ -231,7 +262,7 @@ export function analizzaTitolareEffettivo(assetto: AssettoProprietario): Analisi
     titolari: [],
     confidenza: 'bassa',
     catenaChiusa: false,
-    daRisalire: societaSopraSoglia,
+    daRisalire: societaCheInterrompono,
     azione:
       'Titolare effettivo non determinabile dai dati acquistati: serve la visura sul registro ' +
       'dei titolari effettivi.',

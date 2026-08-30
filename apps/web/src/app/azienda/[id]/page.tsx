@@ -11,6 +11,8 @@ import {
 import { ImmaginiUbicazione } from './ImmaginiUbicazione';
 import { TitolareEffettivo } from './TitolareEffettivo';
 import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
+import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
+import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
 import { RitornoAllElenco } from '../../prospect/UltimoElenco';
 import type {
   AnalisiDto,
@@ -337,7 +339,7 @@ export default async function PaginaAzienda({
       <RecordCamerale registro={analisi.registro} fonte={analisi.azienda.fonte} />
 
       {haIndicatoriArchivio(analisi.indicatoriArchivio) && (
-        <IndicatoriArchivio dati={analisi.indicatoriArchivio} />
+        <IndicatoriArchivio dati={analisi.indicatoriArchivio} approfondita={approfondita} />
       )}
 
       {/* ── Ubicazioni e rischio territoriale ─────────────────────────────── */}
@@ -358,7 +360,14 @@ export default async function PaginaAzienda({
           </Scheda>
         ) : (
           <>
-            <div className="overflow-hidden rounded-lg border border-bordo">
+            {/*
+              `overflow-x-auto` e non `overflow-hidden`: misurata a 390 pixel, questa
+              tabella arriva a 429 e con `hidden` le ultime colonne venivano **tagliate
+              via senza alcun indizio** — che è il caso peggiore fra i due, perché chi
+              guarda conclude che il dato non ci sia. Le due proprietà arrotondano gli
+              angoli allo stesso modo; solo una lascia arrivare a ciò che è fuori.
+            */}
+            <div className="overflow-x-auto rounded-lg border border-bordo">
               <table className="w-full text-sm">
                 <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
                   <tr>
@@ -613,7 +622,10 @@ export default async function PaginaAzienda({
                           )}
                         </p>
                         <p className="mt-0.5 text-xs text-testo-tenue">
-                          {c.ruolo}
+                          {/* IT-full risponde in inglese sulle cariche: qui si leggeva
+                              «Chairman of board of directors». Elenco fisso, e ciò che non
+                              vi compare resta com'è arrivato. */}
+                          {traduciDescrizioneArchivioMaiuscola(c.ruolo)}
                           {c.dataNomina !== null && ` · in carica dal ${dataBreve(c.dataNomina)}`}
                           {/*
                             L'età si ricalcola dalla data di nascita al momento del disegno:
@@ -1182,7 +1194,8 @@ export default async function PaginaAzienda({
             </Scheda>
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-lg border border-bordo">
+          {/* Stessa ragione della tabella delle ubicazioni: si scorre, non si taglia. */}
+          <div className="mt-3 overflow-x-auto rounded-lg border border-bordo">
             <table className="w-full text-sm">
               <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
                 <tr>
@@ -1563,7 +1576,7 @@ function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
           <li key={sezione.id}>
             <a
               href={`#${sezione.id}`}
-              className="rounded px-2.5 py-1 text-testo-tenue transition hover:bg-superficie hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+              className="rounded px-2.5 py-1 text-testo-tenue transition hover:bg-superficie hover:text-testo"
             >
               {sezione.testo}
             </a>
@@ -1720,7 +1733,7 @@ function Intestazione({
           {!conNegativita && (
             <Link
               href={`/azienda/${identificativo}?negativita=1${approfondita ? '&approfondita=1' : ''}`}
-              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"
+              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Verifica protesti e procedure{' '}
               <span className="text-testo-debole">{prezzo(listino?.costoEventiNegativiCentesimi)}</span>
@@ -1729,7 +1742,7 @@ function Intestazione({
           {!approfondita && (
             <Link
               href={`/azienda/${identificativo}?approfondita=1${conNegativita ? '&negativita=1' : ''}`}
-              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"
+              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Analisi approfondita{' '}
               <span className="text-testo-debole">{prezzo(listino?.costoApprofondimentoCentesimi)}</span>
@@ -1737,16 +1750,26 @@ function Intestazione({
           )}
           <Link
             href={`/azienda/${identificativo}/dati`}
-            className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
           >
             Dati di intervista{' '}
             <span className="tabular text-testo-debole">
               {Math.round(analisi.completezza.percentuale * 100)}%
             </span>
           </Link>
+          {/*
+            Il report eredita ciò che è stato comprato.
+
+            Il collegamento era nudo, e il report rilanciava l'analisi al livello di base:
+            il documento che l'intermediario consegna diceva «le cariche sociali non sono
+            comprese nei dati acquisiti» dopo che erano state pagate, perdeva le unità
+            locali e stampava score e fido senza la riserva che questa scheda mostra in
+            testata. Non si compra nulla di nuovo — l'analisi a quel livello è già in
+            archivio — si chiede la stessa che si sta guardando.
+          */}
           <Link
-            href={`/azienda/${identificativo}/report`}
-            className="rounded bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            href={`/azienda/${identificativo}/report${acquistiNellIndirizzo(approfondita, conNegativita)}`}
+            className="rounded bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90"
           >
             Report per il cliente
           </Link>

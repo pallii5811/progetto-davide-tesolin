@@ -148,25 +148,37 @@ export function calcolaMetricheDiImpatto(
     {
       livello: 'critico',
       /*
-        L'unica soglia con un ancoraggio **di legge**.
+        L'unica soglia con un ancoraggio **di legge** — e la sostanza è la stessa per tutte
+        le società di capitali, mentre gli articoli no.
 
-        L'art. 2446 c.c. obbliga a convocare l'assemblea quando le perdite superano un
-        terzo del capitale sociale; l'art. 2447 impone la ricapitalizzazione o la
-        trasformazione quando il capitale scende sotto il minimo legale. Una perdita di
-        questa entità non è «un danno grande»: è l'evento che apre un procedimento
-        societario e che gli amministratori hanno il dovere di prevenire.
+        La perdita che riduce il capitale di oltre un terzo obbliga a convocare l'assemblea,
+        e la discesa sotto il minimo legale impone la ricapitalizzazione o la trasformazione.
+        Ma la norma che lo dispone è l'art. 2446 per la S.p.A. e l'art. 2482-bis per la
+        S.r.l.; l'art. 2447 e l'art. 2482-ter reggono la seconda ipotesi. Il prodotto citava
+        solo la prima coppia, a chiunque: cioè le norme della S.p.A. alla forma giuridica
+        della quasi totalità del portafoglio di un intermediario italiano.
 
-        Quando il capitale sociale non è noto si ripiega sul patrimonio netto, dichiarandolo.
+        Qui la frase nomina il fatto — l'obbligo di riduzione del capitale per perdite — e
+        gli articoli stanno fra i riferimenti, entrambe le coppie, ciascuna con la sua forma.
+        È la stessa scelta già fatta due righe più in basso per «artt. 2392 e 2476 c.c.».
+
+        Quando il capitale sociale non è noto si ripiega sul patrimonio netto: lì di
+        obblighi societari non si parla affatto, perché la soglia non è più quella di legge.
       */
       etichetta: 'Critico',
       descrizione:
-        'Impatto non gestibile in autonomia: erode il patrimonio fino a far scattare gli ' +
-        'obblighi degli artt. 2446 e 2447 c.c. I rischi di questa magnitudo vanno trasferiti ' +
-        'in via prioritaria.',
+        Money.toEuro(capitaleSociale) > 0
+          ? 'Impatto non gestibile in autonomia: erode il patrimonio fino a far scattare gli ' +
+            'obblighi di riduzione del capitale per perdite previsti dal codice civile per la ' +
+            'forma giuridica dell’impresa. I rischi di questa magnitudo vanno trasferiti in via ' +
+            'prioritaria.'
+          : 'Impatto non gestibile in autonomia: erode il patrimonio in misura tale da ' +
+            'comprometterne l’equilibrio e la continuità operativa. I rischi di questa magnitudo ' +
+            'vanno trasferiti in via prioritaria.',
       importo: sogliaCritica(capitaleSociale, sp.patrimonioNetto),
       ancoraggio:
         Money.toEuro(capitaleSociale) > 0
-          ? 'perdita che porta il patrimonio sotto i due terzi del capitale sociale (art. 2446 c.c.)'
+          ? 'perdita che porta il patrimonio sotto i due terzi del capitale sociale'
           : '50% del patrimonio netto (capitale sociale non disponibile)',
     },
   ];
@@ -225,22 +237,28 @@ export function calcolaMetricheDiImpatto(
         'fermo produttivo totale. Non tengono conto di effetti di medio periodo come la ' +
         'perdita definitiva di clienti chiave o le conseguenze reputazionali.',
     )
-    .note(
+    .noteIf(
+      Money.toEuro(capitaleSociale) > 0,
       'La soglia critica è l’unica ancorata a una norma: oltre, non si tratta più di un ' +
         'danno grande ma di un procedimento societario che gli amministratori hanno il ' +
-        'dovere di prevenire.',
+        'dovere di prevenire. Gli articoli applicabili dipendono dalla forma giuridica: ' +
+        'artt. 2446 e 2447 c.c. per la società per azioni, artt. 2482-bis e 2482-ter c.c. ' +
+        'per la società a responsabilità limitata.',
     )
     .noteIf(
       Money.toEuro(capitaleSociale) <= 0,
       'Capitale sociale non disponibile: la soglia critica ripiega sul patrimonio netto ed è ' +
-        'quindi indicativa, non ancorata all’art. 2446 c.c.',
+        'quindi indicativa, non ancorata alla norma sulla riduzione del capitale per perdite.',
     )
     .noteIf(
       Money.toEuro(margineDiTesoreria) < 0,
       'Margine di tesoreria negativo: senza smobilizzare le rimanenze l’impresa non copre i ' +
         'debiti a breve. Un sinistro che blocchi il magazzino colpisce due volte.',
     )
-    .reference('Artt. 2446 e 2447 c.c. — riduzione del capitale per perdite')
+    .reference(
+      'Riduzione del capitale per perdite: artt. 2446 e 2447 c.c. (società per azioni) · ' +
+        'artt. 2482-bis e 2482-ter c.c. (società a responsabilità limitata)',
+    )
     .reference('Art. 2086 c.c. — assetti adeguati e continuità aziendale')
     .reference('Artt. 2392 e 2476 c.c. — diligenza degli amministratori')
     .reference('D.Lgs. 14/2019 e D.Lgs. 83/2022 — Codice della crisi d’impresa')

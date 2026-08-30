@@ -1,6 +1,8 @@
 import type { IndicatoriArchivioDto } from '@/lib/api';
 import { Scheda } from '@/components/ui';
 import { formattaGiorno } from '@aegis/core/tempo';
+import { notaCampiMancanti } from '@/lib/nota-campi-mancanti';
+import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 
 /**
  * Gli indicatori che l'archivio camerale restituisce già calcolati.
@@ -14,7 +16,19 @@ import { formattaGiorno } from '@aegis/core/tempo';
  * due letture indipendenti dello stesso bilancio sono una controprova, una sola sarebbe un
  * atto di fede. Quando divergono, la divergenza è essa stessa un'informazione.
  */
-export function IndicatoriArchivio({ dati }: { dati: IndicatoriArchivioDto }) {
+export function IndicatoriArchivio({
+  dati,
+  approfondita,
+}: {
+  dati: IndicatoriArchivioDto;
+  /**
+   * Se l'approfondimento è già stato acquistato per **questa** esecuzione.
+   *
+   * Il componente non lo sapeva, e chiudeva sempre con «si acquistano con l'analisi
+   * approfondita» — anche a chi l'aveva appena pagata.
+   */
+  approfondita: boolean;
+}) {
   const q = dati.qualifiche;
   const gruppi: readonly { titolo: string; nota: string; voci: readonly Voce[] }[] = [
     {
@@ -139,7 +153,7 @@ export function IndicatoriArchivio({ dati }: { dati: IndicatoriArchivioDto }) {
         divergenza è essa stessa un’informazione da approfondire.
       </p>
 
-      {q !== null && <Qualifiche q={q} />}
+      {q !== null && <Qualifiche q={q} approfondita={approfondita} />}
 
       {dati.gare.length > 0 && (
         <Scheda className="mb-4">
@@ -224,7 +238,13 @@ function valoreONull(v: string): string | null {
 
 type Voce = readonly [string, number | null | undefined, string];
 
-function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']> }) {
+function Qualifiche({
+  q,
+  approfondita,
+}: {
+  q: NonNullable<IndicatoriArchivioDto['qualifiche']>;
+  approfondita: boolean;
+}) {
   /*
     Le qualifiche prima degli indici, e non è un ordine estetico: dicono **quali** coperture
     servono, mentre gli indici dicono quanto regge l'impresa. Un esportatore senza polizza
@@ -250,7 +270,9 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
     Le seconde non si stampano una per una: si nominano in fondo, una volta sola.
   */
   const vociRiquadro: readonly (readonly [string, string | null])[] = [
-    ['Dimensione', q.dimensioneImpresa],
+    // IT-full risponde «Small enterprise»: la classe dimensionale è la stessa delle soglie
+    // UE, e in italiano si dice da sempre «piccola impresa».
+    ['Dimensione', traduciDescrizioneArchivioMaiuscola(q.dimensioneImpresa)],
     ['Fascia di fatturato', q.fasciaDiFatturato],
     ['Andamento fatturato', valoreONull(percentuale(q.andamentoFatturatoPercentuale))],
     ['Addetti', valoreONull(intero(q.addetti))],
@@ -270,6 +292,7 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
     (v): v is readonly [string, string] => v[1] !== null && v[1] !== '',
   );
   const righeMancanti = vociRiquadro.filter((v) => v[1] === null || v[1] === '').map((v) => v[0]);
+  const nota = notaCampiMancanti(righeMancanti, approfondita);
 
   return (
     <Scheda className="mb-4">
@@ -318,12 +341,15 @@ function Qualifiche({ q }: { q: NonNullable<IndicatoriArchivioDto['qualifiche']>
         </dl>
       )}
 
-      {righeMancanti.length > 0 && (
-        <p className="mt-3 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-debole">
-          Non compresi in questa analisi:{' '}
-          <span className="text-testo-tenue">{righeMancanti.join(', ').toLowerCase()}</span>. Si acquistano
-          con l&apos;<strong className="text-testo-tenue">analisi approfondita</strong>.
-        </p>
+      {/*
+        Cosa manca, e a chi lo si sta dicendo.
+
+        Qui c'era «si acquistano con l'analisi approfondita», sempre — anche a chi l'aveva
+        appena pagata, cosa che succede su entrambi i campioni reali di IT-full. La frase
+        si compone ora nel modulo che conosce il livello d'acquisto.
+      */}
+      {nota !== null && (
+        <p className="mt-3 border-t border-bordo pt-3 text-xs leading-relaxed text-testo-debole">{nota}</p>
       )}
 
       {q.aggiornatoIl !== null && (

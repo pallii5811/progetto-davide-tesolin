@@ -176,6 +176,15 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
     );
   }
 
+  // Sezione A senza divisione: non si sa se sia agricoltura (esclusa) o pesca (soggetta).
+  // Si prosegue come soggetta — è il verso che non espone — ma dichiarandolo.
+  builder.noteIf(
+    facts.atecoSezione === 'A' && facts.atecoDivisione === null,
+    'Attività della sezione ATECO A senza divisione rilevata: l’esclusione delle imprese agricole ' +
+      'ex art. 2135 c.c. non è verificabile e l’obbligo è trattato come sussistente. Rilevare il ' +
+      'codice ATECO completo per stabilirlo.',
+  );
+
   builder.noteIf(
     baseAssicurabile === null || !Money.isPositive(baseAssicurabile),
     'Base assicurabile non quantificata: rilevare il valore dei beni ex art. 2424 c.c. B-II 1/2/3 ' +
@@ -196,9 +205,37 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
   });
 }
 
+/**
+ * Divisione ATECO della pesca e dell'acquacoltura.
+ *
+ * È l'unica divisione della sezione A che il Fondo AGRICAT non copre: l'esclusione
+ * dall'obbligo catastrofale riguarda l'attività agricola ex art. 2135 c.c. — coltivazione
+ * del fondo, selvicoltura, allevamento — cioè le divisioni 01 e 02.
+ */
+export const DIVISIONE_PESCA = '03';
+
 function valutaEsclusione(facts: CompanyFacts): string | null {
-  // Le imprese agricole ex art. 2135 c.c. sono escluse: per esse opera il Fondo AGRICAT.
+  /*
+    L'esclusione è dell'attività agricola, non dell'intera sezione A.
+
+    La sezione A comprende le divisioni 01, 02 e 03, e la 03 è la pesca. Escludere la
+    sezione intera significava dichiarare **non soggetta a un obbligo di legge** anche
+    un peschereccio — mentre nello stesso file la tabella delle proroghe assegna alla
+    divisione 03 un termine prorogato al 31 dicembre 2026. Le due affermazioni non
+    possono essere vere insieme: un termine non si proroga a chi non è obbligato. E
+    infatti quel ramo del codice non era raggiungibile, perché l'esclusione ritornava
+    prima: la proroga era scritta, documentata e morta.
+
+    Delle due si è tenuta quella che, sbagliando, costa meno. Su un obbligo di legge
+    «non sei obbligato» è il verso che espone il cliente — e l'intermediario che
+    gliel'ha detto.
+  */
   if (facts.atecoSezione === 'A') {
+    // Divisione non rilevata: dentro la sezione A non si distingue l'agricoltura dalla
+    // pesca, e l'esclusione non si può accertare. Si prosegue come soggetta, dichiarandolo
+    // nella nota qui sotto.
+    if (facts.atecoDivisione === null) return null;
+    if (facts.atecoDivisione === DIVISIONE_PESCA) return null;
     return 'impresa agricola ex art. 2135 c.c., per la quale opera il Fondo AGRICAT';
   }
   if (facts.statoAttivita === 'cessata') {

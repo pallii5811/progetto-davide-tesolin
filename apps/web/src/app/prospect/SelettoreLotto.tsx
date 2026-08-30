@@ -50,7 +50,7 @@ export function SelettoreLotto({
         step={1}
         value={quante}
         onChange={(e) => setQuante(e.target.value)}
-        className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio"
+        className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio"
       />
       <span className="mt-1 block text-xs text-testo-tenue">
         {costo === null ? (

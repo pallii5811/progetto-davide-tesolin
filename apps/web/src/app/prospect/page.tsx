@@ -5,15 +5,25 @@ import type { RisultatoProspezione } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { SelettoreLotto } from './SelettoreLotto';
 import { ConfrontoConElencoComprato, RicordaElenco, UltimoElenco } from './UltimoElenco';
+import { centesimiPerRiga } from '@/lib/prezzo-prospect';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Quanto costa una riga dell'elenco.
+ * Quanto costa una riga dell'elenco, **finché non c'è una risposta**.
  *
- * Il fornitore lo dichiara a ogni risposta e la pagina lo mostra ricalcolato; questo è il
- * valore usato mentre si compila, prima che una risposta esista. Sta in un solo posto
- * perché un prezzo scritto in più punti è un prezzo che prima o poi diverge.
+ * Il fornitore dichiara il costo a ogni risposta, e da lì in poi il prezzo unitario si
+ * ricava dividendo — non si ricorda. Questo valore serve al solo campo «quante aziende
+ * vuoi», che deve mostrare una cifra mentre si digita, prima che qualunque chiamata sia
+ * partita.
+ *
+ * Il commento qui diceva «sta in un solo posto», e non era vero: il numero era scritto
+ * anche accanto al totale della risposta, dove il prezzo vero c'era già. Adesso è vero, ma
+ * con un limite dichiarato: **è una stima di listino, non il prezzo di contratto.** Il
+ * costo del lotto (`costoLotto` in `packages/providers`) non passa dalla configurazione
+ * dei prezzi negoziati, quindi con un listino diverso da quello pubblico questa cifra
+ * resta indietro finché non arriva la prima risposta. Chiuderlo è una modifica di quel
+ * pacchetto, non di questa pagina.
  */
 const CENTESIMI_PER_AZIENDA = 5;
 
@@ -213,7 +223,7 @@ export default async function PaginaProspect({
               <select
                 name="formaGiuridicaCodice"
                 defaultValue={criteri.formaGiuridicaCodice}
-                className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio"
+                className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio"
               >
                 <option value="SR">Solo S.r.l.</option>
                 <option value="SP">Solo S.p.A.</option>
@@ -347,10 +357,27 @@ export default async function PaginaProspect({
               <div>
                 <p className="tabular text-2xl font-bold">{risultato.totale.toLocaleString('it-IT')}</p>
                 <p className="text-sm text-testo-tenue">aziende corrispondono ai criteri</p>
+                {/*
+                  Il prezzo unitario si **divide**, non si ricorda.
+
+                  Qui c'era «· 5 centesimi ad azienda», scritto a mano accanto a un totale
+                  che arriva dalla risposta del fornitore: due numeri sulla stessa riga,
+                  uno misurato e uno ricordato. Il giorno in cui il listino cambia il primo
+                  si aggiorna e il secondo no, e chi legge non sa a quale credere.
+                */}
                 <p className="mt-1 text-sm">
                   Scaricandone <strong>{risultato.lotto}</strong> si spendono{' '}
                   <strong>{(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} €</strong>
-                  <span className="text-testo-debole"> · 5 centesimi ad azienda</span>
+                  {(() => {
+                    const unitario = centesimiPerRiga(risultato.costoElencoCentesimi, risultato.lotto);
+                    if (unitario === null) return null;
+                    return (
+                      <span className="text-testo-debole">
+                        {' · '}
+                        {(unitario / 100).toFixed(2).replace('.', ',')} € ad azienda
+                      </span>
+                    );
+                  })()}
                 </p>
               </div>
               <p className="text-sm text-testo-tenue">
@@ -442,7 +469,7 @@ function Campo({
         defaultValue={valore}
         placeholder={segnaposto}
         inputMode={numerico ? 'numeric' : 'text'}
-        className={`w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none focus:border-marchio ${
+        className={`w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio ${
           numerico ? 'tabular' : ''
         } ${maiuscolo ? 'uppercase' : ''}`}
       />

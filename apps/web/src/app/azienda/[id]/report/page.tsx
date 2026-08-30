@@ -11,6 +11,9 @@ import { DettaglioRischi } from './DettaglioRischi';
 import { Avviso } from '@/components/ui';
 import { BottoneStampa } from './BottoneStampa';
 import { formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
+import { traduciDescrizioneArchivio } from '@/lib/traduzioni-archivio';
+import { avvisoIntestazione } from '@/lib/avviso-intestazione';
+import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +30,28 @@ export default async function PaginaReport({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ escludi?: string; profondita?: string }>;
+  /*
+    `approfondita` e `negativita` non c'erano, ed è il difetto.
+
+    Il report rilanciava l'analisi **nuda**: `analizzaAzienda(id)`. Chi apriva la scheda
+    con l'approfondimento comprato e poi premeva «Report per il cliente» riceveva un
+    documento costruito sull'analisi di base — cioè, nel documento che l'intermediario
+    consegna e allega al fascicolo di adeguatezza:
+
+      · «Le cariche sociali non sono comprese nei dati acquisiti», dopo che erano state
+        pagate — e sono il perimetro nominativo della D&O;
+      · il capitolo delle ubicazioni senza le unità locali, che l'approfondimento porta;
+      · score e fido stampati senza la riserva che la scheda mostra in testata.
+
+    Il livello si dichiara nell'indirizzo, come sulla scheda: non si acquista nulla di
+    nuovo, si chiede l'analisi al livello già acquistato, che è in cache.
+  */
+  searchParams: Promise<{
+    escludi?: string;
+    profondita?: string;
+    approfondita?: string;
+    negativita?: string;
+  }>;
 }) {
   await richiediSessione();
   const { id } = await params;
@@ -65,9 +89,13 @@ export default async function PaginaReport({
   */
   const profondita = leggiProfondita(parametri.profondita);
 
+  // Gli stessi due parametri della scheda, letti allo stesso modo.
+  const approfondita = parametri.approfondita === '1';
+  const conNegativita = parametri.negativita === '1';
+
   let analisi: AnalisiDto;
   try {
-    analisi = await analizzaAzienda(id);
+    analisi = await analizzaAzienda(id, { approfondita, eventiNegativi: conNegativita });
   } catch (errore) {
     return (
       <Avviso tono="critico" titolo="Report non disponibile">
@@ -131,10 +159,38 @@ export default async function PaginaReport({
   */
   const cap = numerazione();
 
+  /*
+    Se il documento esce anonimo, va detto prima di stamparlo.
+
+    L'intestazione mancante non blocca il report — un documento senza logo è incompleto,
+    uno che non si apre è un lavoro perso — ma finora non si vedeva: il frontespizio
+    semplicemente non compariva, e la carta usciva con la stessa faccia di quella
+    intestata. Su un documento che si intitola documentazione ai sensi dell'art. 58 del
+    Reg. IVASS 40/2018, la denominazione dell'intermediario e il numero RUI sono ciò che
+    quel regolamento chiede.
+
+    L'avviso sta **fuori dall'articolo** e in `no-print`: è un rilievo per chi consegna,
+    non una riga del documento che il cliente riceve.
+  */
+  const rilievoIntestazione = avvisoIntestazione(studio);
+
   return (
     <>
+      {rilievoIntestazione !== null && (
+        <div className="no-print mb-6">
+          <Avviso tono="attenzione" titolo="Il documento uscirebbe senza intestazione">
+            {rilievoIntestazione}
+          </Avviso>
+        </div>
+      )}
+
       <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Link href={`/azienda/${id}`} className="text-xs text-marchio hover:underline">
+        {/* Anche il ritorno porta con sé il livello: altrimenti si torna a un'analisi
+            di base, che è un secondo modo di perdere ciò che si è comprato. */}
+        <Link
+          href={`/azienda/${id}${acquistiNellIndirizzo(approfondita, conNegativita)}`}
+          className="text-xs text-marchio hover:underline"
+        >
           ← Torna all&apos;analisi
         </Link>
         <BottoneStampa />
@@ -435,7 +491,15 @@ export default async function PaginaReport({
                         <span key={`${c.nominativo}-${c.codiceFiscale ?? i}`}>
                           {i > 0 && '; '}
                           {c.nominativo}
-                          {c.ruolo !== '' && `, ${c.ruolo.toLowerCase()}`}
+                          {/*
+                            Il ruolo tradotto, non abbassato di maiuscola.
+
+                            IT-full risponde in inglese: qui usciva «MARELLA ROBERTO
+                            FRANCESCO, chairman of board of directors» nel documento che
+                            l'intermediario consegna al cliente. La traduzione viene da un
+                            elenco fisso, e ciò che l'elenco non prevede resta com'è.
+                          */}
+                          {c.ruolo !== '' && `, ${traduciDescrizioneArchivio(c.ruolo) ?? c.ruolo}`}
                           {c.dataNomina !== null && `, in carica dal ${formattaGiorno(c.dataNomina)}`}
                         </span>
                       ))}
@@ -795,6 +859,22 @@ export default async function PaginaReport({
               )}
             </p>
 
+            {/*
+              Contro **cosa** ci si deve assicurare.
+
+              Il capitolo diceva quali beni e con quali vincoli, e non nominava gli eventi:
+              `eventiCoperti` veniva calcolato dal motore, spedito al frontend e mai
+              stampato. È la prima cosa che un cliente chiede leggendo «obbligo
+              catastrofale», e la prima da confrontare con le condizioni di una polizza in
+              essere — una che copra il sisma e non l'alluvione non adempie l'obbligo.
+            */}
+            <p className="mt-3 font-medium">Eventi contro cui l&apos;obbligo impone la copertura</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
+              {catNat.eventiCoperti.map((evento) => (
+                <li key={evento}>{evento}</li>
+              ))}
+            </ul>
+
             <p className="mt-3 font-medium">Beni oggetto dell&apos;obbligo</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
               {catNat.beniInclusi.map((bene) => (
@@ -940,9 +1020,29 @@ function Capitolo({
 }
 
 function TabellaSintesi({ analisi }: { analisi: AnalisiDto }) {
+  /*
+    La riserva che la scheda mostra, sulla carta che il cliente riceve.
+
+    In testata alla scheda azienda score e fido portano «provvisorio: protesti e procedure
+    non verificati» — perché una procedura concorsuale aperta azzera il fido, e senza la
+    verifica quel numero è una cifra non controllata. Qui i due numeri uscivano nudi, cioè
+    proprio nel documento che l'intermediario consegna e allega al fascicolo.
+
+    La frase si compone dai valori, come ovunque: si guarda se gli eventi negativi ci
+    sono, e si dice quello.
+  */
+  const verificaEventiNegativi = analisi.eventiNegativi !== null;
+
   const righe: [string, string][] = [
-    ['Score di credito', `${analisi.sintesi.scoreCredito}/100 — classe ${analisi.sintesi.classeCredito}`],
-    ['Fido commerciale consigliato', analisi.sintesi.fidoConsigliato.formattato],
+    [
+      'Score di credito',
+      `${analisi.sintesi.scoreCredito}/100 — classe ${analisi.sintesi.classeCredito}` +
+        (verificaEventiNegativi ? '' : ' — provvisorio'),
+    ],
+    [
+      'Fido commerciale consigliato',
+      analisi.sintesi.fidoConsigliato.formattato + (verificaEventiNegativi ? '' : ' — provvisorio'),
+    ],
     ['Patrimonio esposto', analisi.sintesi.patrimonioEsposto?.formattato ?? 'da rilevare'],
     [
       'Esposizione non assicurata',
@@ -959,16 +1059,26 @@ function TabellaSintesi({ analisi }: { analisi: AnalisiDto }) {
   ];
 
   return (
-    <table className="mt-4 w-full text-sm">
-      <tbody>
-        {righe.map(([etichetta, valore]) => (
-          <tr key={etichetta} className="border-b border-bordo">
-            <td className="py-1.5 pr-4 text-testo-tenue">{etichetta}</td>
-            <td className="tabular py-1.5 text-right font-medium">{valore}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      <table className="mt-4 w-full text-sm">
+        <tbody>
+          {righe.map(([etichetta, valore]) => (
+            <tr key={etichetta} className="border-b border-bordo">
+              <td className="py-1.5 pr-4 text-testo-tenue">{etichetta}</td>
+              <td className="tabular py-1.5 text-right font-medium">{valore}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {!verificaEventiNegativi && (
+        <p className="mt-2 border-l-2 border-attenzione pl-3 text-xs leading-relaxed text-testo-tenue">
+          Score e fido sono <strong>provvisori</strong>: protesti, pregiudizievoli e procedure concorsuali
+          non sono stati verificati presso i registri, e una procedura aperta azzera il fido consigliato. La
+          verifica va condotta prima di fondare su questi valori una decisione di affidamento.
+        </p>
+      )}
+    </>
   );
 }
 

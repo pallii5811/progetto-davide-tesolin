@@ -18,6 +18,7 @@ import {
   capitaleDiPolizza,
   giorniAllaScadenza,
   indexPolizze,
+  isScaduta,
   soggettaARegolaProporzionale,
 } from './policy.js';
 import type { PolizzaInEssere } from './policy.js';
@@ -31,6 +32,7 @@ import { componiMotivazioneCopertura, obbligoPerImpresa } from './motivazione.js
 import type { ObbligoPerImpresa } from './motivazione.js';
 import type { CompanyFacts } from '../company/facts.js';
 import type { Confidence } from '../shared/provenance.js';
+import { formattaGiorno } from '../shared/tempo.js';
 
 export type GapStatus =
   /** Copertura necessaria e completamente assente. */
@@ -66,8 +68,22 @@ export interface CoverageGap {
   readonly rischiServiti: readonly AssessedRisk[];
   readonly livelloRischioMassimo: RiskLevel | null;
   readonly capitaleRaccomandato: Explained<Euro | null>;
+  /**
+   * Il capitale che una garanzia **in vigore oggi** assicura.
+   *
+   * `null` anche quando una polizza c'è ma è scaduta: un contratto cessato non garantisce
+   * un euro, e sottrarlo dall'esposizione la dichiarerebbe coperta da qualcosa che non
+   * esiste più.
+   */
   readonly capitaleInEssere: Euro | null;
   readonly polizza: PolizzaInEssere | null;
+  /**
+   * La polizza indicizzata per questa garanzia risulta scaduta alla data dell'analisi.
+   *
+   * Resta a fascicolo — va nominata, perché il cliente ce l'ha in mano e chiederà conto
+   * di che fine ha fatto — ma non conta come copertura.
+   */
+  readonly polizzaScaduta: boolean;
   readonly sottoassicurazione: Explained<Underinsurance | null> | null;
   /**
    * `true` solo quando l'obbligo grava su **questa** impresa.
@@ -181,7 +197,7 @@ export interface GapAnalysisInput {
 
 export function analyzeGaps(input: GapAnalysisInput): GapAnalysis {
   const { assessment, facts, sums, polizze, catNat, dannoMassimo, asOf } = input;
-  const indice = indexPolizze(polizze);
+  const indice = indexPolizze(polizze, asOf);
 
   // Coperture da valutare: quelle richieste dall'analisi dei rischi più quelle
   // già in portafoglio (vanno comunque verificate, e talvolta risultano superflue).
@@ -256,7 +272,8 @@ function buildGap(
   const livelloRischioMassimo = worstLevel(rischiServiti);
 
   const capitaleRaccomandato = capitalePerCopertura(coverageId, sums);
-  const capitaleInEssere = polizza === null ? null : capitaleDiPolizza(polizza);
+  const polizzaScaduta = polizza !== null && isScaduta(polizza, asOf);
+  const capitaleInEssere = polizza === null || polizzaScaduta ? null : capitaleDiPolizza(polizza);
 
   const { status, sottoassicurazione } = determinaStato(
     coverageId,
@@ -282,6 +299,7 @@ function buildGap(
     capitaleRaccomandato,
     capitaleInEssere,
     polizza,
+    polizzaScaduta,
     sottoassicurazione,
     obbligoDiLegge: obbligo.dovuto === true,
     obbligo,
@@ -325,6 +343,25 @@ function componiPiano(
       aCura: 'intermediario',
       motivazioneTermine:
         'Obbligo di legge: il termine è fissato dalla norma, non dalla pianificazione. Va documentato di averlo rappresentato al cliente anche se questi decide di non adempiere.',
+    };
+  }
+
+  /*
+    Garanzia cessata: la scopertura è in atto oggi, non è un termine da pianificare.
+
+    Prima questo caso cadeva nel ramo 'in-scadenza' e fissava come termine la data di
+    scadenza — cioè una data del passato — con urgenza «alla scadenza». Un piano che
+    programma un'azione per un giorno già trascorso non è un piano.
+  */
+  if (polizza !== null && isScaduta(polizza, asOf)) {
+    return {
+      urgenza: 'immediata',
+      termine: asOf,
+      aCura: 'intermediario',
+      motivazioneTermine:
+        'La garanzia risulta scaduta: il periodo scoperto è cominciato ed è in corso. Va verificato ' +
+        'se il contratto è stato rinnovato altrove e, in mancanza, ripristinata la copertura. ' +
+        'Ogni giorno di attesa è un giorno in cui il danno resta interamente a carico dell’impresa.',
     };
   }
 
@@ -418,10 +455,33 @@ function capitalePerCopertura(coverageId: CoverageId, sums: SumsInsured): Explai
     case 'danni-indiretti':
       return widen(sums.danniIndiretti);
     case 'rct':
-    case 'rc-inquinamento':
     case 'rc-professionale':
-    case 'tutela-legale':
       return widen(sums.massimaleRct);
+    /*
+      Due garanzie che prendevano in prestito il numero e la spiegazione della RCT.
+
+      Il benchmark RCT misura il danno risarcibile a terzi per classe di fatturato. Alla
+      tutela legale quel numero non si applica in nessun senso — le spese di difesa si
+      dimensionano per grado di giudizio — e l'esito era la riga «Attivare la copertura
+      Tutela legale con capitale di 10,0 Mln €», con allegata, parola per parola, la
+      motivazione della RCT: fatturato, settore pericoloso, «un solo evento con lesioni
+      gravi esaurisce un massimale da 1 M€». Priorità 80, in cima al piano d'azione.
+
+      Un capitale preso in prestito non è una stima prudente: è un numero senza base.
+      Meglio dire che va rilevato — che è vero — e dire cosa rilevare.
+    */
+    case 'tutela-legale':
+      return nonQuantificabile(
+        'Tutela legale',
+        'Dimensionare i massimali per grado di giudizio e per anno assicurativo: il benchmark della ' +
+          'RCT misura il danno risarcibile a terzi, non le spese di assistenza legale e peritale.',
+      );
+    case 'rc-inquinamento':
+      return nonQuantificabile(
+        'RC Inquinamento',
+        'Dimensionare il massimale sui costi di bonifica e di ripristino ambientale del sito, che ' +
+          'non seguono il benchmark della RCT e restano esclusi dalla RCT ordinaria.',
+      );
     case 'rco':
       return widen(sums.massimaleRcoPerPersona);
     case 'rc-prodotti':
@@ -522,6 +582,19 @@ function calcolaEsposizioneNonAssicurata(gaps: readonly CoverageGap[]): Euro {
     const raccomandato = gap.capitaleRaccomandato.value;
     if (raccomandato === null) continue;
 
+    /*
+      Ciò che è ignoto non entra nella somma: è la promessa scritta su
+      `coperturaDaQuantificare`, e qui non veniva mantenuta.
+
+      Una polizza in essere senza capitale dichiarato — il frontespizio che il broker non
+      ha ancora ricopiato — produceva `null`, e il `?? Money.ZERO` due righe più sotto lo
+      trattava come una garanzia da zero euro. Risultato: l'esposizione non assicurata era
+      **identica** nei due scenari «nessuna polizza» e «polizza dal capitale ignoto», e
+      dei due solo il primo era un accertamento. Lo stato di questi gap è già
+      'da-quantificare': si contano lì, e lì soltanto.
+    */
+    if (gap.status === 'da-quantificare') continue;
+
     const mancante = Money.max(
       Money.ZERO,
       Money.subtract(raccomandato, gap.capitaleInEssere ?? Money.ZERO),
@@ -542,6 +615,23 @@ function determinaStato(
   asOf: Date,
 ): { status: GapStatus; sottoassicurazione: Explained<Underinsurance | null> | null } {
   if (polizza === null) {
+    return { status: raccomandato === null ? 'da-quantificare' : 'assente', sottoassicurazione: null };
+  }
+
+  /*
+    Una polizza scaduta è una copertura assente, non una copertura in scadenza.
+
+    Il confronto con la soglia dei 90 giorni si faceva su un numero che per un contratto
+    cessato è negativo, e `-181 <= 90` è vero: la garanzia morta finiva fra le «coperture
+    adeguate» del riepilogo e il piano d'azione annunciava «in scadenza fra -181 giorni».
+    Il segno meno era l'unico indizio dato al broker.
+
+    Lo stato è 'assente' perché è ciò che è vero oggi: a questa data l'impresa, per questa
+    garanzia, non è coperta. Il contratto scaduto non sparisce — resta in `polizza` e
+    `polizzaScaduta` lo dichiara — ma non concorre né al capitale in essere né ai conteggi
+    di adeguatezza.
+  */
+  if (isScaduta(polizza, asOf)) {
     return { status: raccomandato === null ? 'da-quantificare' : 'assente', sottoassicurazione: null };
   }
 
@@ -646,6 +736,24 @@ function descriviAzione(
   polizza: PolizzaInEssere | null,
   asOf: Date,
 ): string {
+  /*
+    La garanzia c'era e non c'è più: è un'altra frase, non un'altra sfumatura.
+
+    Si compone dai valori — la data che sta sul contratto e i giorni passati — perché
+    «attivare la copertura» detto a chi una polizza l'aveva fatta suona come se nessuno
+    avesse guardato il suo fascicolo, e la prima cosa che il cliente risponde è che quella
+    polizza l'ha comprata.
+  */
+  if (polizza !== null && isScaduta(polizza, asOf)) {
+    const giorni = Math.abs(giorniAllaScadenza(polizza, asOf));
+    const premessa =
+      `Polizza ${definition.label} scaduta il ${formattaGiorno(polizza.dataScadenza)} ` +
+      `(${giorni} giorni fa): la garanzia non è in vigore.`;
+    return raccomandato === null
+      ? `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla: capitale da definire in sede di intervista.`
+      : `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla con capitale di ${Money.formatCompact(raccomandato)}.`;
+  }
+
   switch (status) {
     case 'assente':
       return raccomandato === null

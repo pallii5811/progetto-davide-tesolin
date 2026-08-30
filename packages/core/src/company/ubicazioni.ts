@@ -315,7 +315,11 @@ function peggiore(ubicazioni: readonly Ubicazione[]): {
   ubicazionePeggiore: Ubicazione | null;
 } {
   const rango = (u: Ubicazione): number => {
-    const punti = (l: 'alta' | 'media' | 'bassa'): number => (l === 'alta' ? 2 : l === 'media' ? 1 : 0);
+    // `null` è l'esposizione idraulica non misurata, e vale zero: la tabella conosce solo
+    // le province alte, quindi ciò che non vi compare non è alto. L'ordinamento non
+    // cambia rispetto al ripiego «media» che c'era prima, perché era uniforme su tutte.
+    const punti = (l: 'alta' | 'media' | 'bassa' | null): number =>
+      l === 'alta' ? 2 : l === 'media' ? 1 : 0;
     return punti(u.esposizione.sismica) + punti(u.esposizione.idraulica);
   };
 

@@ -60,6 +60,14 @@ export interface RiepilogoCostiDto {
 /** Accesso ai dati per conto di un singolo intermediario. */
 export interface ContestoTenant {
   readonly tenantId: string;
+  /**
+   * Chi sta lavorando, quando è una persona della piattaforma.
+   *
+   * `null` sulla porta pubblica del questionario, dove chi scrive è il cliente
+   * dell'intermediario: attribuire il suo lavoro a un collaboratore sarebbe una
+   * falsificazione dell'audit trail, non un'approssimazione.
+   */
+  readonly utenteId: string | null;
   readonly dossier: DossierStore;
   readonly portafoglio: PortafoglioStore;
   /** Le fotografie delle ubicazioni: si leggono solo quando si compone il report. */
@@ -86,7 +94,11 @@ export interface Persistenza {
   readonly descrizione: string;
   /** Intermediario creato al primo avvio: usato dai comandi di servizio e dai test. */
   readonly tenantPredefinito: string;
-  perTenant(tenantId: string): ContestoTenant;
+  /**
+   * @param utenteId chi compie l'operazione. Omesso significa «nessuna persona
+   * identificata»: la porta pubblica del questionario e i comandi di servizio.
+   */
+  perTenant(tenantId: string, utenteId?: string | null): ContestoTenant;
   chiudi(): Promise<void>;
 }
 
@@ -162,7 +174,7 @@ export async function creaPersistenza(options: PersistenzaOptions = {}): Promise
     db,
     descrizione: connessione.descrizione,
     tenantPredefinito,
-    perTenant: (tenantId: string) => creaContesto(db, tenantId),
+    perTenant: (tenantId: string, utenteId: string | null = null) => creaContesto(db, tenantId, utenteId),
     chiudi: () => connessione.chiudi(),
   };
 }
@@ -190,8 +202,8 @@ export async function creaPersistenza(options: PersistenzaOptions = {}): Promise
  * cambia: è deliberato. Il codice si scrive una volta e vale in entrambi gli ambienti,
  * invece di funzionare in sviluppo e scoprire in produzione che qualcosa non era collegato.
  */
-function creaContesto(db: Database, tenantId: string): ContestoTenant {
-  const su = (d: Database): ContestoTenant => creaContestoSu(d, tenantId);
+function creaContesto(db: Database, tenantId: string, utenteId: string | null): ContestoTenant {
+  const su = (d: Database): ContestoTenant => creaContestoSu(d, tenantId, utenteId);
 
   /** Esegue un metodo del contesto dentro una transazione che dichiara lo studio. */
   const dentro = <T>(azione: (c: ContestoTenant) => Promise<T>): Promise<T> =>
@@ -199,6 +211,7 @@ function creaContesto(db: Database, tenantId: string): ContestoTenant {
 
   return {
     tenantId,
+    utenteId,
     dossier: {
       get: (id) => dentro((c) => c.dossier.get(id)),
       upsert: (id, patch) => dentro((c) => c.dossier.upsert(id, patch)),
@@ -224,7 +237,7 @@ function creaContesto(db: Database, tenantId: string): ContestoTenant {
   };
 }
 
-function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
+function creaContestoSu(db: Database, tenantId: string, utenteId: string | null): ContestoTenant {
   const dossier: DossierStore = {
     async get(identificativo: string): Promise<DossierAzienda | null> {
       const chiave = normalizza(identificativo);
@@ -272,6 +285,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
         aziendaId,
         uniti as unknown as Record<string, unknown>,
         valutaCompletezza(uniti).percentuale,
+        utenteId,
       );
 
       if (patch.polizze !== undefined) {
@@ -280,6 +294,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
 
       await registraAudit(db, {
         tenantId,
+        utenteId,
         azione: 'dossier.aggiornato',
         entita: 'azienda',
         entitaId: aziendaId,
@@ -350,10 +365,12 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
       return contaImmagini(db, aziendaId, ubicazioneId);
     },
 
+    // Il parametro non si chiama `utenteId`: coprirebbe quello del contesto, e la riga
+    // dell'audit finirebbe a nominare chi capita.
     async aggiungi(
       identificativo: string,
       immagine: NuovaImmagine,
-      utenteId: string | null,
+      caricataDa: string | null,
     ): Promise<ImmagineUbicazione> {
       const chiave = normalizza(identificativo);
       /*
@@ -376,7 +393,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
         tipoMime: immagine.tipoMime,
         dati: immagine.dati,
         dimensioneByte: immagine.dimensioneByte,
-        caricataDa: utenteId,
+        caricataDa,
       });
 
       /*
@@ -386,6 +403,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
       */
       await registraAudit(db, {
         tenantId,
+        utenteId: caricataDa ?? utenteId,
         azione: 'immagine.caricata',
         entita: 'azienda',
         entitaId: aziendaId,
@@ -407,6 +425,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
       if (rimossa) {
         await registraAudit(db, {
           tenantId,
+          utenteId,
           azione: 'immagine.rimossa',
           entita: 'azienda',
           entitaId: aziendaId,
@@ -419,6 +438,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
 
   return {
     tenantId,
+    utenteId,
     dossier,
     portafoglio,
     studio,
@@ -453,6 +473,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
         aziendaId,
         tenantId,
         snapshotId,
+        eseguitaDa: utenteId,
         asOf: analisi.asOf,
         scoreCredito: analisi.sintesi.scoreCredito,
         classeCredito: analisi.sintesi.classeCredito,
@@ -508,6 +529,7 @@ function creaContestoSu(db: Database, tenantId: string): ContestoTenant {
 
       await registraAudit(db, {
         tenantId,
+        utenteId,
         azione: 'analisi.eseguita',
         entita: 'azienda',
         entitaId: aziendaId,

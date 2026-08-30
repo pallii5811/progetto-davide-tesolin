@@ -354,8 +354,12 @@ export function demoPolizze(): readonly PolizzaInEssere[] {
       massimale: null,
       franchigia: euro(2_500),
       scoperto: null,
-      dataEffetto: new Date('2024-06-30T00:00:00Z'),
-      dataScadenza: new Date('2026-06-30T00:00:00Z'),
+      // Rinnovata alla scadenza tenendo lo stesso capitale — è il motivo per cui la somma
+      // è ferma al 2019. La scadenza deve restare oltre DEMO_AS_OF: finché il motore non
+      // leggeva le scadenze non si vedeva, ma una polizza morta non mostra la
+      // sottoassicurazione, mostra un buco di copertura.
+      dataEffetto: new Date('2026-06-30T00:00:00Z'),
+      dataScadenza: new Date('2027-06-30T00:00:00Z'),
       premioAnnuo: euro(4_800),
       formaGaranzia: 'valore-a-nuovo',
       note: 'Somma assicurata non aggiornata dal 2019.',
@@ -369,8 +373,8 @@ export function demoPolizze(): readonly PolizzaInEssere[] {
       massimale: euro(1_000_000),
       franchigia: euro(500),
       scoperto: null,
-      dataEffetto: new Date('2024-06-30T00:00:00Z'),
-      dataScadenza: new Date('2026-06-30T00:00:00Z'),
+      dataEffetto: new Date('2026-06-30T00:00:00Z'),
+      dataScadenza: new Date('2027-06-30T00:00:00Z'),
       premioAnnuo: euro(3_200),
       formaGaranzia: null,
       note: null,
@@ -441,19 +445,30 @@ function indicatoriDimostrativi(): IndicatoriFornitore {
       cassaSuDebitiBancariBreve: 0.61,
       cassaSuDebitiFinanziariBreve: 0.61,
       cassaSuDebitiTotaliBreve: 0.19,
+      // Gli indici aggiunti in seguito restano `null` sull'azienda dimostrativa: non li
+      // conosciamo per lei, e riempirli con un valore plausibile è esattamente ciò che
+      // questo prodotto non fa.
+      fcfSuDebitiFinanziariBreve: null,
     },
-    leveFinanziarie: { ebitdaLevaLorda: 2.08, ebitdaLevaNetta: 1.63, pfnSuEbitda: 1.63 },
+    leveFinanziarie: {
+      ebitdaLevaLorda: 2.08,
+      ebitdaLevaNetta: 1.63,
+      pfnSuEbitda: 1.63,
+      ffoLevaNetta: null,
+    },
     coperturaOneri: {
       ebitdaSuInteressiLordi: 9.24,
       ebitdaSuInteressiNetti: 9.24,
       ebitSuInteressiLordi: 5.05,
       ebitSuInteressiNetti: 5.05,
+      ffoSuInteressiNetti: null,
     },
     strutturaFinanziaria: {
       composizioneDebitoFinanziario: 0.35,
       debitoFinanziarioLordoSuPatrimonio: 1.38,
       debitoFinanziarioNettoSuPatrimonio: 1.09,
       pfnSuPatrimonio: 1.09,
+      debitoNettoSuFontiTotali: null,
     },
     cicloFinanziario: {
       durataCreditiVersoClienti: 92.4,
@@ -462,7 +477,7 @@ function indicatoriDimostrativi(): IndicatoriFornitore {
       durataScorte: 52,
     },
     oneriFinanziari: { indiceDiOnerosita: 1.42, rod: 4.85, rodFinanziario: 4.85 },
-    efficienza: { rotazioneCreditiVersoClienti: 3.95, indiceDiRotazione: 1.17 },
+    efficienza: { rotazioneCreditiVersoClienti: 3.95, indiceDiRotazione: 1.17, rotazioneMagazzino: null },
     sviluppo: {
       valoreAggiunto: 7.4,
       variazioneEbit: 19.8,
@@ -484,6 +499,8 @@ function indicatoriDimostrativi(): IndicatoriFornitore {
     ],
     statisticheAddetti: {
       impiegati: 28,
+      // Meccanica: il resto è in officina, ed è la quota che pesa su RC lavoratori.
+      operai: 72,
       tempoDeterminato: 11,
       tempoIndeterminato: 89,
       tempoPieno: 94,
@@ -492,10 +509,12 @@ function indicatoriDimostrativi(): IndicatoriFornitore {
     qualifiche: {
       haCertificazioneSoa: true,
       esportatore: true,
+      paesiExport: 'UNIONE EUROPEA',
       importatore: true,
       pmiInnovativa: false,
       startUpInnovativa: false,
       impresaArtigiana: false,
+      numeroAlboArtigiani: null,
       numeroUnitaLocali: 2,
       appartieneAGruppoIva: false,
       capogruppoIva: false,
@@ -520,7 +539,9 @@ function indicatoriDimostrativi(): IndicatoriFornitore {
       haControllateEstere: false,
       email: 'amministrazione@meccanicabresciana.example',
       codiceSdi: 'M5UXCR1',
+      codiceLei: null,
       presenteSuiSocial: true,
+      profiliSocial: ['https://www.linkedin.com/company/meccanica-bresciana-example'],
       commercializzabile: true,
       aggiornatoIl: new Date('2026-08-18T00:00:00Z'),
     },

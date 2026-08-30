@@ -1,6 +1,12 @@
 # AEGIS — Architettura
 
-> **AEGIS** è il nome in codice della piattaforma. Sostituibile in qualsiasi momento (è isolato nello scope npm `@aegis/*` e in `packages/core/src/branding.ts`).
+> **AEGIS** è il nome in codice della piattaforma. Sostituibile, ma **non con una sola
+> modifica**: non esiste un `branding.ts` che lo raccolga in un punto solo. Il nome
+> compare in chiaro in undici file fra `packages/core/src` e `apps/web/src` — schermata
+> di accesso, intestazione, titolo del browser, riferimenti stampati accanto a score,
+> fido e benchmark di massimale — oltre che nello scope npm `@aegis/*` e nelle variabili
+> d'ambiente `AEGIS_API_URL` e `AEGIS_PREZZI_CENTESIMI`. Chi rinomina il prodotto li
+> cambia uno per uno.
 
 **Cosa è**: una piattaforma di _Credit & Insurance Risk Intelligence_ per intermediari assicurativi.
 Unisce ciò che oggi il broker ottiene da due mondi separati:
@@ -45,8 +51,12 @@ per quale importo. È l'innesco commerciale più forte del 2026 e diventa una _l
 ### 1.3 Rating di solidità della compagnia (rischio di controparte)
 
 Un broker che colloca una polizza espone il cliente al rischio che la compagnia non paghi.
-AEGIS assegna un **Carrier Strength Score** basato su Solvency Ratio (SFCR), qualità dei fondi propri,
-dimensione, statistiche reclami IVASS e tempi di liquidazione — e lo pesa nella raccomandazione finale.
+AEGIS assegna un **Carrier Strength Score** basato su Solvency Ratio (SFCR, peso 40%), qualità dei fondi
+propri (15%), dimensione (15%), statistiche reclami IVASS (20%) e rating di agenzia se disponibile (10%).
+Il punteggio compare **accanto a ogni polizza in essere** nella gap analysis, dove la compagnia dichiarata
+combacia con una di quelle censite. Non entra come fattore nel calcolo della raccomandazione: è
+un'informazione mostrata a chi decide, non un peso del motore — e il censimento delle compagnie va
+compilato a mano dall'amministratore dello studio, altrimenti la colonna resta vuota.
 → `packages/core/src/carrier/`
 
 ### 1.4 Scoring "a scatola di vetro"
@@ -59,24 +69,30 @@ input, la data del dato e un livello di confidenza. Non esistono numeri non spie
 ### 1.5 Il fascicolo di adeguatezza si genera da solo
 
 Il Reg. IVASS 40/2018 impone all'intermediario di rilevare richieste ed esigenze e di motivare
-l'adeguatezza (All. 4-ter). Oggi è carta. In AEGIS il fascicolo è il **sottoprodotto automatico**
-dell'analisi: risk register → esigenze → coperture proposte → motivazione → firma. Con audit trail
-immutabile. È il vero fossato competitivo: nessuno abbandona il sistema che custodisce le sue prove.
+l'adeguatezza (All. 4-ter). Oggi è carta. In AEGIS la catena `risk register → esigenze → coperture
+proposte → massimale → motivazione` si genera dall'analisi e si stampa nel report, su un registro
+di scritture inalterabili (nessun UPDATE, nessun DELETE). È il fossato competitivo a cui si punta:
+nessuno abbandona il sistema che custodisce le sue prove.
+
+**Tre pezzi del fascicolo però non ci sono ancora, e vanno detti qui perché è la sezione che li
+promette**: gli Allegati 3 e 4 non vengono prodotti, dell'Allegato 4-ter esiste il contenuto e non
+il modulo, la firma è quella su carta in calce al report e il rifiuto informato non si registra.
+Sono decisioni di prodotto aperte, elencate una per una in `DOMINIO.md` §9.
 
 ---
 
 ## 2. Scelte tecniche (e dove ho deviato dalla proposta iniziale)
 
-| Livello             | Scelta                                                                           | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Monorepo            | **npm workspaces** + TypeScript project references                               | `pnpm` non è installato sulla macchina; npm workspaces evita attrito zero-config. Migrazione a pnpm/turbo = 10 minuti quando serve.                                                                                                                                                                                                                                                                                                                                                                                   |
-| Linguaggio          | **TypeScript strict** (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`) | Il dominio assicurativo è pieno di casi limite: il compilatore deve fare da revisore.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Dominio             | `packages/core` **puro, zero dipendenze**                                        | Il motore di rischio non conosce HTTP, DB, React. Testabile in millisecondi, riusabile in batch/CLI/API/edge.                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Backend             | **Fastify + Zod**, non NestJS                                                    | _Deviazione consapevole_. I pacchetti di dominio sono ESM puro; NestJS oggi vive meglio in CommonJS con `emitDecoratorMetadata`, combinazione che avrebbe imposto o un doppio build (ESM+CJS) di tutti i pacchetti condivisi, o l'abbandono di `verbatimModuleSyntax`. Su una superficie di ~10 rotte il valore di moduli e DI non ripaga quel costo: la composizione avviene esplicitamente in `apps/api/src/server.ts`. Se il team crescerà al punto da richiedere NestJS, il confine da spostare è solo quel file. |
-| DB                  | **PostgreSQL + Drizzle ORM**                                                     | Schema unico. In sviluppo gira su **PGlite** (Postgres compilato in WASM) → nessun Docker richiesto, stesso SQL della produzione.                                                                                                                                                                                                                                                                                                                                                                                     |
-| Job/orchestrazione  | **BullMQ**, non Temporal                                                         | _Deviazione consapevole_: Temporal richiede un cluster dedicato e rallenta di settimane il time-to-first-demo. L'orchestrazione è dietro l'interfaccia `WorkflowRunner`: quando i flussi di monitoraggio diventeranno long-running e mission-critical si sostituisce l'implementazione senza toccare il dominio.                                                                                                                                                                                                      |
-| Frontend            | **Next.js 15 (App Router) + Tailwind**                                           | Server Components per i report pesanti, streaming, PDF lato server.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ML/scoring avanzato | Servizio Python separato, **non ora**                                            | Il confine c'è già (`ScoringModel` è un'interfaccia). Prima si costruisce il dataset, poi si addestra: un modello ML senza dati storici è teatro.                                                                                                                                                                                                                                                                                                                                                                     |
+| Livello             | Scelta                                                                           | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Monorepo            | **npm workspaces** + TypeScript project references                               | `pnpm` non è installato sulla macchina; npm workspaces evita attrito zero-config. Migrazione a pnpm/turbo = 10 minuti quando serve.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Linguaggio          | **TypeScript strict** (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`) | Il dominio assicurativo è pieno di casi limite: il compilatore deve fare da revisore.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Dominio             | `packages/core` **puro, zero dipendenze**                                        | Il motore di rischio non conosce HTTP, DB, React. Testabile in millisecondi, riusabile in batch/CLI/API/edge.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Backend             | **Fastify + Zod**, non NestJS                                                    | _Deviazione consapevole_. I pacchetti di dominio sono ESM puro; NestJS oggi vive meglio in CommonJS con `emitDecoratorMetadata`, combinazione che avrebbe imposto o un doppio build (ESM+CJS) di tutti i pacchetti condivisi, o l'abbandono di `verbatimModuleSyntax`. Su una superficie di ~10 rotte il valore di moduli e DI non ripaga quel costo: la composizione avviene esplicitamente in `apps/api/src/server.ts`. Se il team crescerà al punto da richiedere NestJS, il confine da spostare è solo quel file.                          |
+| DB                  | **PostgreSQL + Drizzle ORM**                                                     | Schema unico. In sviluppo gira su **PGlite** (Postgres compilato in WASM) → nessun Docker richiesto, stesso SQL della produzione.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Job/orchestrazione  | **Nessuna coda: né BullMQ, né Temporal**                                         | Va detto per primo, perché è la prima cosa che si verifica aprendo il `package.json`: nel repo non esiste alcuna coda di lavori, né alcuna interfaccia `WorkflowRunner`. L'unico timer del servizio è un `setInterval` che purga le sessioni scadute (`apps/api/src/server.ts`). Il monitoraggio è **a richiesta**: confronta le due analisi più recenti già salvate quando qualcuno apre la pagina, non gira per conto proprio. Introdurre una coda resta una decisione aperta, con il costo di esercizio che comporta (Redis o equivalente). |
+| Frontend            | **Next.js 15 (App Router) + Tailwind**                                           | Server Components per i report pesanti. Il PDF **non** si genera lato server: il report si stampa dalla finestra del browser («Salva come PDF»), scelta motivata per iscritto in `azienda/[id]/report/BottoneStampa.tsx` — la resa segue il CSS di stampa, che è già scritto e verificabile a schermo, e non serve un renderer headless. Il giorno in cui servirà l'invio automatico per email, il PDF lato server diventerà necessario.                                                                                                       |
+| ML/scoring avanzato | Servizio Python separato, **non ora**                                            | Il confine **non è ancora tracciato**: nel repo non esiste alcuna interfaccia `ScoringModel`. Lo score vive in `credit/score.ts` come funzione pura sul profilo canonico, quindi il punto in cui sostituirlo si riconosce, ma l'interfaccia va disegnata quando servirà. Prima si costruisce il dataset, poi si addestra: un modello ML senza dati storici è teatro.                                                                                                                                                                           |
 
 ---
 
@@ -86,21 +102,28 @@ immutabile. È il vero fossato competitivo: nessuno abbandona il sistema che cus
 aegis/
 ├── docs/
 │   ├── ARCHITETTURA.md          ← questo file
-│   └── DOMINIO.md               ← la conoscenza assicurativa codificata
+│   ├── DOMINIO.md               ← la conoscenza assicurativa codificata
+│   ├── CONFRONTO-CREDITSAFE-IADV.md
+│   └── CONSEGNA.md · PRIMA-SESSIONE.md · PROVARLO-TU.md
 ├── packages/
 │   ├── core/                    ← IL CUORE. Dominio puro, zero dipendenze.
 │   │   └── src/
 │   │       ├── shared/          ← Money, tipi branded, Explained<T>, provenance
 │   │       ├── company/         ← profilo canonico, bilancio riclassificato, indici, ATECO, dimensione UE
 │   │       ├── credit/          ← Altman Z'', score esplicabile, fido consigliato
-│   │       ├── risk/            ← tassonomia ISO 31000, motore a regole, matrice P×I
-│   │       ├── coverage/        ← coperture, somme assicurande, gap analysis, CAT NAT
+│   │       ├── risk/            ← tassonomia ISO 31000, motore a regole, matrice P×I, geo, ritenzione
+│   │       ├── coverage/        ← coperture, somme assicurande, gap analysis, CAT NAT, danno massimo
+│   │       ├── governance/      ← assetto proprietario, titolare effettivo, norme per forma giuridica
+│   │       ├── monitoring/      ← stato sorvegliato, rilevazione degli eventi
+│   │       ├── portfolio/       ← import/export del portafoglio
 │   │       ├── carrier/         ← Carrier Strength Score
+│   │       ├── fixtures/        ← azienda dimostrativa
 │   │       └── assessment/      ← orchestratore: azienda → valutazione completa
 │   ├── providers/               ← client OpenAPI.com + mapper verso il modello canonico
-│   └── db/                      ← schema Drizzle, migrazioni, repository
+│   └── db/                      ← schema Drizzle, migrazioni, repository, RLS
+├── collaudo/                    ← prove end-to-end (Playwright)
 └── apps/
-    ├── api/                     ← NestJS
+    ├── api/                     ← Fastify + Zod (non NestJS: vedi §2)
     └── web/                     ← Next.js
 ```
 

@@ -172,10 +172,21 @@ export async function contaEventiDaGestire(db: Database, tenantId: string): Prom
 }
 
 /**
- * Le due fotografie più recenti di ogni azienda del portafoglio.
+ * La fotografia più recente di ogni azienda, e l'ultima che sia **diversa** da essa.
  *
- * Il monitoraggio confronta l'ultima con la penultima. Le analisi senza fotografia —
- * eseguite prima che il monitoraggio esistesse — vengono semplicemente ignorate.
+ * Non la penultima riga: la penultima *fotografia*. Ogni apertura della scheda riesegue
+ * l'analisi e ne scrive una nuova, identica alla precedente perché nulla è cambiato nel
+ * frattempo. Confrontando le sole ultime due righe, cinque aperture in un quarto d'ora
+ * spingevano il termine di paragone in sesta posizione: il confronto diventava
+ * «seconda contro seconda», non trovava nulla, e la variazione che aveva davvero
+ * spostato una copertura spariva dalla coda di lavoro senza che nessuno la vedesse
+ * uscire.
+ *
+ * Il confronto è `IS DISTINCT FROM` su `jsonb`, che è un formato analizzato: l'ordine
+ * delle chiavi non conta, due fotografie con lo stesso contenuto risultano uguali.
+ *
+ * Le analisi senza fotografia — eseguite prima che il monitoraggio esistesse — vengono
+ * semplicemente ignorate.
  */
 export async function statiDaConfrontare(
   db: Database,
@@ -187,8 +198,10 @@ export async function statiDaConfrontare(
     precedente: unknown;
   }
 
-  // Auto-join sulla numerazione, non un raggruppamento: `jsonb` non ha operatore di
-  // ordinamento, quindi nessuna funzione di aggregazione può sceglierne una fra due.
+  // Sottoquery correlata e non un auto-join sulla posizione: la riga che serve non sta a
+  // una distanza fissa dall'ultima, è la prima risalendo indietro che porti un contenuto
+  // diverso. `jsonb` non ha operatore di ordinamento, quindi nessuna aggregazione può
+  // sceglierne una fra due: si ordina per data, che è ciò che si intende davvero.
   const risultato: unknown = await db.execute(sql`
     WITH ordinate AS (
       SELECT
@@ -201,10 +214,16 @@ export async function statiDaConfrontare(
     SELECT
       ultima.azienda_id,
       ultima.stato_sorvegliato AS corrente,
-      penultima.stato_sorvegliato AS precedente
+      (
+        SELECT precedente.stato_sorvegliato
+        FROM ordinate precedente
+        WHERE precedente.azienda_id = ultima.azienda_id
+          AND precedente.posizione > 1
+          AND precedente.stato_sorvegliato IS DISTINCT FROM ultima.stato_sorvegliato
+        ORDER BY precedente.posizione ASC
+        LIMIT 1
+      ) AS precedente
     FROM ordinate ultima
-    LEFT JOIN ordinate penultima
-      ON penultima.azienda_id = ultima.azienda_id AND penultima.posizione = 2
     WHERE ultima.posizione = 1
   `);
 

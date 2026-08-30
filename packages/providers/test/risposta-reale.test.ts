@@ -160,7 +160,18 @@ describe('Risposta reale IT-advanced', () => {
   it('recupera capitale, addetti e fatturato dai bilanci sintetici', () => {
     // Non sono campi anagrafici: senza questo ripiego resterebbero vuoti.
     expect(Money.toEuro(anagrafica.capitaleSocialeDeliberato!)).toBe(50_000);
-    expect(anagrafica.numeroAddetti).toBe(19);
+    /*
+      Venti, non diciannove: gli addetti si prendono dall'esercizio più recente che li
+      dichiara — il 2026, che ne porta venti — non dall'ultimo con gli aggregati di
+      bilancio, che è il 2025 e ne porta diciannove.
+
+      L'attesa era 19, ed era il difetto 16 dell'audit scritto dentro un collaudo: su
+      Acciaierie d'Italia lo stesso ripiego mostrava i 10.133 addetti del 2022 mentre il
+      record appena comprato ne dichiarava 9.762 per il 2026.
+    */
+    expect(anagrafica.numeroAddetti).toBe(20);
+    // Il fatturato invece viene dall'ultimo esercizio **con** gli aggregati: il 2026 non
+    // ne ha, e inventarne uno sarebbe l'errore opposto.
     expect(Money.toEuro(anagrafica.fatturatoDichiarato!)).toBe(5_696_858);
   });
 
@@ -210,8 +221,17 @@ describe('Soci da risposta reale', () => {
     expect(assetti.soci[0]?.tipo).toBe('persona-giuridica');
   });
 
-  it('converte percentShare da punti percentuali a quota', () => {
-    expect(assetti.soci[0]?.quotaPercentuale).toBeCloseTo(1, 6);
+  it('conserva percentShare in punti percentuali', () => {
+    /*
+      Cento, non uno.
+
+      Il fornitore risponde in punti — 100, 88, 50, 20, 6 sulle risposte registrate — e il
+      modello canonico li aspetta in punti: `SOGLIA_CONTROLLO = 50`, `SOGLIA_PARTECIPAZIONE
+      = 25`. L'attesa era 1, e con essa il socio unico totalitario non superava nessuna
+      soglia: niente controllo societario, niente art. 2497, titolare effettivo «non
+      determinabile».
+    */
+    expect(assetti.soci[0]?.quotaPercentuale).toBeCloseTo(100, 6);
   });
 });
 

@@ -213,12 +213,19 @@ export async function leggiDatiDichiarati(
   return { dati: (riga.dati ?? {}) as Record<string, unknown>, aggiornatoIl: riga.aggiornatoIl };
 }
 
+/**
+ * @param aggiornatoDa chi ha raccolto questi dati. `null` quando li ha inseriti il
+ * cliente dalla porta pubblica del questionario: la colonna referenzia gli utenti della
+ * piattaforma, e il cliente non lo è. Quel caso resta distinguibile dall'audit trail, che
+ * lo registra con un'azione propria.
+ */
 export async function salvaDatiDichiarati(
   db: Database,
   tenantId: string,
   aziendaId: string,
   dati: Record<string, unknown>,
   completezza: number | null,
+  aggiornatoDa: string | null = null,
 ): Promise<void> {
   await db
     .insert(schema.dossier)
@@ -227,6 +234,7 @@ export async function salvaDatiDichiarati(
       tenantId,
       datiDichiarati: dati,
       completezza: completezza === null ? null : completezza.toFixed(4),
+      aggiornatoDa,
       aggiornatoIl: new Date(),
     })
     .onConflictDoUpdate({
@@ -234,6 +242,7 @@ export async function salvaDatiDichiarati(
       set: {
         datiDichiarati: dati,
         completezza: completezza === null ? null : completezza.toFixed(4),
+        aggiornatoDa,
         aggiornatoIl: new Date(),
       },
     });
@@ -779,6 +788,11 @@ export interface DatiAnalisi {
   readonly aziendaId: string;
   readonly tenantId: string;
   readonly snapshotId: string;
+  /**
+   * Chi ha eseguito l'analisi. La colonna esisteva e non la scriveva nessuno: davanti a
+   * una contestazione, un'analisi senza autore è un documento che nessuno ha firmato.
+   */
+  readonly eseguitaDa?: string | null | undefined;
   readonly asOf: Date;
   readonly scoreCredito: number | null;
   readonly classeCredito: string | null;
@@ -822,6 +836,7 @@ export async function salvaAnalisi(db: Database, dati: DatiAnalisi): Promise<str
         aziendaId: dati.aziendaId,
         tenantId: dati.tenantId,
         snapshotId: dati.snapshotId,
+        eseguitaDa: dati.eseguitaDa ?? null,
         asOf: dati.asOf,
         scoreCredito: dati.scoreCredito,
         classeCredito: dati.classeCredito,
@@ -889,6 +904,23 @@ export interface VocePortafoglio {
 }
 
 /**
+ * Un importo in centesimi letto da una query grezza.
+ *
+ * Le colonne di denaro sono `bigint`, e un `bigint` **non entra sempre** in un numero
+ * JavaScript: per questo il driver di produzione lo restituisce come stringa. Chi legge
+ * con `db.execute` non passa dalla mappatura di Drizzle e riceve quel testo così com'è.
+ *
+ * **L'assenza resta assenza.** Un importo non calcolato non è zero euro: zero verrebbe
+ * sommato, ordinato e mostrato come un dato, e nessuno saprebbe più distinguerlo da
+ * un'esposizione davvero nulla.
+ */
+function importo(valore: string | number | null): number | null {
+  if (valore === null) return null;
+  const numero = typeof valore === 'number' ? valore : Number(valore);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+/**
  * Portafoglio: l'ultima analisi per ciascuna azienda.
  *
  * `DISTINCT ON` è specifico di PostgreSQL ed è il modo più diretto per dire «la riga più
@@ -910,7 +942,15 @@ export async function elencoPortafoglio(
     copertura_assente: number | null;
     copertura_da_quantificare: string | number | null;
     rischi_critici: number | null;
-    esposizione_non_assicurata_centesimi: number | null;
+    /*
+      `bigint`, quindi **stringa** su postgres.js.
+
+      La dichiarava `number | null`, ed era falso su PostgreSQL vero: `execute` non passa
+      dalla mappatura di Drizzle, quindi il tipo della colonna non viene applicato e
+      decide il driver. `postgres.js` non ha un convertitore per l'OID 20 e restituisce il
+      testo; PGlite lo converte, ed è la ragione per cui in sviluppo non si vedeva nulla.
+    */
+    esposizione_non_assicurata_centesimi: string | number | null;
     azione_prioritaria: string | null;
     completezza: string | number | null;
     creata_il: string;
@@ -954,7 +994,15 @@ export async function elencoPortafoglio(
     coperturaDaQuantificare:
       r.copertura_da_quantificare === null ? null : Number(r.copertura_da_quantificare),
     rischiCritici: r.rischi_critici,
-    esposizioneNonAssicurataCentesimi: r.esposizione_non_assicurata_centesimi,
+    /*
+      Convertito al confine del database, dove si sa cos'è.
+
+      Senza, l'«esposizione complessiva» del portafoglio non era una somma ma una
+      concatenazione: `0 + '150000' + '230000'` dà `'0150000230000'`, che diviso cento
+      diventa 1.500.002.300 € a schermo. Nessun errore, nessun `NaN`: un numero enorme e
+      plausibile in una schermata che il broker mostra al cliente.
+    */
+    esposizioneNonAssicurataCentesimi: importo(r.esposizione_non_assicurata_centesimi),
     azionePrioritaria: r.azione_prioritaria,
     // `numeric` torna come stringa dal driver: convertito qui, dove si sa cos'è.
     completezza: r.completezza === null ? null : Number(r.completezza),
@@ -966,11 +1014,23 @@ export async function elencoPortafoglio(
 // Audit e costi
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Append-only. Il permesso di UPDATE e DELETE va revocato a livello di database. */
+/**
+ * Append-only. Il permesso di UPDATE e DELETE va revocato a livello di database.
+ *
+ * `utenteId` è **la ragione per cui questo registro esiste**. La colonna c'era, la firma
+ * no: ogni riga usciva con l'autore a `NULL`, e il registro rispondeva «qualcuno, in
+ * questo studio, ha fatto questa cosa» — cioè non rispondeva alla sola domanda che
+ * un'ispezione pone.
+ *
+ * Resta facoltativo, e non per comodità: le azioni che arrivano dalla porta pubblica del
+ * questionario le compie **il cliente**, che un utente della piattaforma non è.
+ * Attribuirgliene una a un collaboratore sarebbe peggio che lasciare il campo vuoto.
+ */
 export async function registraAudit(
   db: Database,
   dati: {
     tenantId: string;
+    utenteId?: string | null | undefined;
     azione: string;
     entita: string;
     entitaId?: string | undefined;
@@ -979,6 +1039,7 @@ export async function registraAudit(
 ): Promise<void> {
   await db.insert(schema.auditLog).values({
     tenantId: dati.tenantId,
+    utenteId: dati.utenteId ?? null,
     azione: dati.azione,
     entita: dati.entita,
     entitaId: dati.entitaId ?? null,

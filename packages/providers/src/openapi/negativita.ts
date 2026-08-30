@@ -75,15 +75,41 @@ function mappaProtesti(radice: unknown): readonly Protesto[] {
 
   return elenco
     .map((p): Protesto | null => {
-      const data = date(p, 'data', 'date', 'dataProtesto', 'dataLevata', 'registrationDate');
+      /*
+        Le grafie **snake_case** vengono per prime, come sulle procedure concorsuali.
+
+        Il servizio risponde in snake_case: `data_provvedimento`, `descrizione_procedura`,
+        `codice_fiscale`, `data_nascita` — osservati su una risposta reale il 20/08/2026.
+        Sulle procedure i nomi camelCase avevano fatto scartare in silenzio quattro
+        provvedimenti, fra cui uno stato di insolvenza, e il prodotto dichiarava «procedure
+        presenti senza dettaglio» avendo il dettaglio in mano.
+
+        Le stesse grafie ipotizzate e mai verificate erano ancora qui, sui protesti e sulle
+        pregiudizievoli. Nessun campione registrato porta un protesto — non è ancora una
+        prova — ma coprire entrambe le grafie costa nulla, e la grafia che il servizio usa
+        davvero, dove è stata vista, è questa.
+      */
+      const data = date(
+        p,
+        'data_protesto',
+        'data_levata',
+        'data_registrazione',
+        'data',
+        'date',
+        'dataProtesto',
+        'dataLevata',
+        'registrationDate',
+      );
       if (data === null) return null;
       return {
         data,
-        importo: money(p, 'importo', 'amount') ?? moneyOrZero(p, 'importo'),
-        tipo: str(p, 'tipo', 'type', 'titolo', 'tipoTitolo') ?? 'Non specificato',
-        luogo: str(p, 'luogo', 'place', 'comune', 'piazza'),
+        importo: money(p, 'importo_protesto', 'importo', 'amount') ?? moneyOrZero(p, 'importo'),
+        tipo:
+          str(p, 'tipo_titolo', 'descrizione_titolo', 'tipo', 'type', 'titolo', 'tipoTitolo') ??
+          'Non specificato',
+        luogo: str(p, 'comune_protesto', 'luogo', 'place', 'comune', 'piazza'),
         // Un protesto «levato» (cancellato) pesa molto meno: va distinto.
-        levato: bool(p, 'levato', 'settled', 'cancellato', 'riabilitato') ?? false,
+        levato: bool(p, 'levato', 'riabilitato', 'settled', 'cancellato') ?? false,
       };
     })
     .filter((p): p is Protesto => p !== null);
@@ -97,13 +123,25 @@ function mappaPregiudizievoli(radice: unknown): readonly Pregiudizievole[] {
 
   return elenco
     .map((p): Pregiudizievole | null => {
-      const data = date(p, 'data', 'date', 'dataIscrizione', 'registrationDate');
+      // Le grafie snake_case per prime: vedi la nota sui protesti, qui sopra.
+      const data = date(
+        p,
+        'data_iscrizione',
+        'data_trascrizione',
+        'data_atto',
+        'data',
+        'date',
+        'dataIscrizione',
+        'registrationDate',
+      );
       if (data === null) return null;
-      const descrizione = str(p, 'descrizione', 'description', 'tipo', 'type') ?? 'Non specificata';
+      const descrizione =
+        str(p, 'descrizione_atto', 'tipo_atto', 'descrizione', 'description', 'tipo', 'type') ??
+        'Non specificata';
       return {
         data,
         tipo: classificaPregiudizievole(descrizione),
-        importo: money(p, 'importo', 'amount', 'importoIscritto', 'securedAmount'),
+        importo: money(p, 'importo_iscritto', 'importo', 'amount', 'importoIscritto', 'securedAmount'),
         descrizione,
       };
     })

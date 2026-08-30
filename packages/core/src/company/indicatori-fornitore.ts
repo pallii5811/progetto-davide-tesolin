@@ -77,12 +77,16 @@ export interface Liquidita {
   readonly cassaSuDebitiBancariBreve: number | null;
   readonly cassaSuDebitiFinanziariBreve: number | null;
   readonly cassaSuDebitiTotaliBreve: number | null;
+  /** Flusso di cassa libero sui debiti finanziari a breve: quanto genera contro quanto scade. */
+  readonly fcfSuDebitiFinanziariBreve: number | null;
 }
 
 export interface LeveFinanziarie {
   readonly ebitdaLevaLorda: number | null;
   readonly ebitdaLevaNetta: number | null;
   readonly pfnSuEbitda: number | null;
+  /** Leva calcolata sui fondi generati dalla gestione (FFO) invece che sull'EBITDA. */
+  readonly ffoLevaNetta: number | null;
 }
 
 /** Quante volte il margine copre gli interessi: sotto 1 gli oneri mangiano il risultato. */
@@ -91,6 +95,8 @@ export interface CoperturaOneri {
   readonly ebitdaSuInteressiNetti: number | null;
   readonly ebitSuInteressiLordi: number | null;
   readonly ebitSuInteressiNetti: number | null;
+  /** Copertura sugli interessi netti misurata sui fondi generati dalla gestione. */
+  readonly ffoSuInteressiNetti: number | null;
 }
 
 export interface StrutturaFinanziaria {
@@ -98,6 +104,8 @@ export interface StrutturaFinanziaria {
   readonly debitoFinanziarioLordoSuPatrimonio: number | null;
   readonly debitoFinanziarioNettoSuPatrimonio: number | null;
   readonly pfnSuPatrimonio: number | null;
+  /** Debito netto sul totale delle fonti: quanta parte dell'impresa è finanziata a debito. */
+  readonly debitoNettoSuFontiTotali: number | null;
 }
 
 /** Giorni: quanto ci mette a incassare, a pagare, e quanto capitale resta esposto. */
@@ -117,6 +125,8 @@ export interface OneriFinanziari {
 export interface Efficienza {
   readonly rotazioneCreditiVersoClienti: number | null;
   readonly indiceDiRotazione: number | null;
+  /** Quante volte l'anno ruota il magazzino: dice quanto valore giace assicurabile. */
+  readonly rotazioneMagazzino: number | null;
 }
 
 /** Variazioni percentuali rispetto all'esercizio precedente. */
@@ -148,6 +158,14 @@ export interface GarePubbliche {
 /** Composizione del personale, in percentuale sul totale degli addetti. */
 export interface StatisticheAddetti {
   readonly impiegati: number | null;
+  /**
+   * Quota di operai.
+   *
+   * È il dato che pesa di più sulla RC lavoratori e sugli infortuni, ed era l'unico della
+   * composizione del personale a non venire letto: nel riquadro che si intitola «pesa su
+   * RC lavoratori» mancava il sessantasette per cento di operai di un'impresa manifatturiera.
+   */
+  readonly operai: number | null;
   readonly tempoDeterminato: number | null;
   readonly tempoIndeterminato: number | null;
   readonly tempoPieno: number | null;
@@ -162,10 +180,19 @@ export interface StatisticheAddetti {
 export interface QualificheImpresa {
   readonly haCertificazioneSoa: boolean | null;
   readonly esportatore: boolean | null;
+  /**
+   * Dove esporta, come lo dichiara l'archivio.
+   *
+   * «Esporta: sì» non basta a proporre nulla: il rischio di credito estero, il trasporto e
+   * il rischio politico cambiano con l'area, e il dato dell'area era già pagato.
+   */
+  readonly paesiExport: string | null;
   readonly importatore: boolean | null;
   readonly pmiInnovativa: boolean | null;
   readonly startUpInnovativa: boolean | null;
   readonly impresaArtigiana: boolean | null;
+  /** Numero di iscrizione all'albo delle imprese artigiane, quando c'è. */
+  readonly numeroAlboArtigiani: string | null;
   readonly numeroUnitaLocali: number | null;
   readonly appartieneAGruppoIva: boolean | null;
   readonly capogruppoIva: boolean | null;
@@ -196,7 +223,19 @@ export interface QualificheImpresa {
   /** Recapiti ulteriori rispetto alla PEC. */
   readonly email: string | null;
   readonly codiceSdi: string | null;
+  /**
+   * Legal Entity Identifier: il codice con cui l'impresa è identificata sui mercati
+   * finanziari. Serve ai programmi internazionali e alle coperture finanziarie.
+   */
+  readonly codiceLei: string | null;
   readonly presenteSuiSocial: boolean | null;
+  /**
+   * Gli indirizzi dei profili social, non il solo «sì» che ne dichiara l'esistenza.
+   *
+   * Vuoto quando l'archivio non ne porta nessuno: un elenco vuoto e un «non lo sappiamo»
+   * qui coincidono, perché la presenza è già dichiarata a parte da `presenteSuiSocial`.
+   */
+  readonly profiliSocial: readonly string[];
   /** Se l'impresa è commercializzabile secondo l'archivio (consensi marketing). */
   readonly commercializzabile: boolean | null;
   /** Ultimo aggiornamento del record camerale: dice quanto è fresco il dato. */

@@ -42,9 +42,17 @@ import { asArray, bool, num, pick, str } from './parse.js';
  *
  * Un gruppo di soli `null` non è «un dato a zero»: è un dato che l'archivio non ha
  * restituito, e la differenza va conservata fino a schermo.
+ *
+ * Un elenco vuoto conta come assenza, non come valore: altrimenti un gruppo di soli
+ * `null` più un elenco vuoto risulterebbe «valorizzato» e la sezione comparirebbe a
+ * schermo piena di trattini, che comunica «il software non funziona» invece di «questo
+ * dato non è stato acquistato».
  */
 function seValorizzato<T extends object>(gruppo: T): T | null {
-  return Object.values(gruppo).some((v) => v !== null && v !== undefined) ? gruppo : null;
+  const qualcosa = Object.values(gruppo).some((v) =>
+    Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined,
+  );
+  return qualcosa ? gruppo : null;
 }
 
 export function mappaIndicatoriFornitore(raw: unknown): IndicatoriFornitore {
@@ -69,6 +77,65 @@ export function mappaIndicatoriFornitore(raw: unknown): IndicatoriFornitore {
     statisticheAddetti: leggiAddetti(pick(dati, 'employeesStatistic')),
     qualifiche: leggiQualifiche(dati),
   };
+}
+
+/**
+ * Fonde due letture degli indicatori: quella dell'anagrafica estesa e quella del profilo
+ * completo. **Si fonde, non si sostituisce.**
+ *
+ * I due servizi non sono uno il superset dell'altro. `IT-advanced` porta il gruppo IVA e
+ * il codice SDI, che `IT-full` non ha; `IT-full` porta i quarantotto indici, che
+ * `IT-advanced` non ha. Il prodotto teneva solo il secondo quando c'era, e chi pagava
+ * l'approfondimento — quaranta centesimi invece di dieci — vedeva **una bandiera in meno**
+ * di chi si fermava all'anagrafica. Pagare di più e vedere di meno è il difetto che
+ * nessuno cerca, perché nessuno lo immagina.
+ *
+ * Il confronto è campo per campo, non gruppo per gruppo: un gruppo del profilo completo
+ * che avesse un solo campo valorizzato azzererebbe gli altri se lo si prendesse intero.
+ *
+ * Chi arriva dopo vince, ma **solo dove ha un valore**: `null` non sovrascrive niente,
+ * perché «non lo porto» non è «non c'è».
+ */
+export function fondiIndicatori(
+  base: IndicatoriFornitore,
+  sopra: IndicatoriFornitore,
+): IndicatoriFornitore {
+  return {
+    redditivita: fondiGruppo(base.redditivita, sopra.redditivita),
+    risultatiOperativi: fondiGruppo(base.risultatiOperativi, sopra.risultatiOperativi),
+    solidita: fondiGruppo(base.solidita, sopra.solidita),
+    indebitamento: fondiGruppo(base.indebitamento, sopra.indebitamento),
+    liquidita: fondiGruppo(base.liquidita, sopra.liquidita),
+    leveFinanziarie: fondiGruppo(base.leveFinanziarie, sopra.leveFinanziarie),
+    coperturaOneri: fondiGruppo(base.coperturaOneri, sopra.coperturaOneri),
+    strutturaFinanziaria: fondiGruppo(base.strutturaFinanziaria, sopra.strutturaFinanziaria),
+    cicloFinanziario: fondiGruppo(base.cicloFinanziario, sopra.cicloFinanziario),
+    oneriFinanziari: fondiGruppo(base.oneriFinanziari, sopra.oneriFinanziari),
+    efficienza: fondiGruppo(base.efficienza, sopra.efficienza),
+    sviluppo: fondiGruppo(base.sviluppo, sopra.sviluppo),
+    kpi: fondiGruppo(base.kpi, sopra.kpi),
+    // Le gare arrivano come elenco intero: si prende quello che ce l'ha, non si mescolano
+    // due annate che potrebbero riferirsi a letture diverse dello stesso archivio.
+    gare: sopra.gare.length > 0 ? sopra.gare : base.gare,
+    statisticheAddetti: fondiGruppo(base.statisticheAddetti, sopra.statisticheAddetti),
+    qualifiche: fondiGruppo(base.qualifiche, sopra.qualifiche),
+  };
+}
+
+function fondiGruppo<T extends object>(base: T | null, sopra: T | null): T | null {
+  if (base === null) return sopra;
+  if (sopra === null) return base;
+
+  const fuso: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+  for (const [chiave, valore] of Object.entries(sopra)) {
+    // Un elenco vuoto non è una lettura: non deve cancellare quello di sotto.
+    if (Array.isArray(valore)) {
+      if (valore.length > 0) fuso[chiave] = valore;
+      continue;
+    }
+    if (valore !== null && valore !== undefined) fuso[chiave] = valore;
+  }
+  return fuso as T;
 }
 
 function leggiRedditivita(g: unknown): Redditivita | null {
@@ -122,6 +189,7 @@ function leggiLiquidita(g: unknown): Liquidita | null {
     cassaSuDebitiBancariBreve: num(g, 'cashShortTermBankDebt'),
     cassaSuDebitiFinanziariBreve: num(g, 'cashShortTermFinancialDebt'),
     cassaSuDebitiTotaliBreve: num(g, 'cashTotalShortTermDebt'),
+    fcfSuDebitiFinanziariBreve: num(g, 'fcfShortTermFinancialDebt'),
   });
 }
 
@@ -130,6 +198,7 @@ function leggiLeve(g: unknown): LeveFinanziarie | null {
     ebitdaLevaLorda: num(g, 'ebitdaGrossLeverage'),
     ebitdaLevaNetta: num(g, 'ebitdaNetLeverage'),
     pfnSuEbitda: num(g, 'pfnEbitda'),
+    ffoLevaNetta: num(g, 'ffoNetLeverage'),
   });
 }
 
@@ -139,6 +208,7 @@ function leggiCopertura(g: unknown): CoperturaOneri | null {
     ebitdaSuInteressiNetti: num(g, 'ebitdaNetInterestCoverage'),
     ebitSuInteressiLordi: num(g, 'ebitGrossInterestCoverage'),
     ebitSuInteressiNetti: num(g, 'ebitNetInterestCoverage'),
+    ffoSuInteressiNetti: num(g, 'ffoNetInterestCoverage'),
   });
 }
 
@@ -148,6 +218,7 @@ function leggiStruttura(g: unknown): StrutturaFinanziaria | null {
     debitoFinanziarioLordoSuPatrimonio: num(g, 'grossFinancialDebtNetWorth'),
     debitoFinanziarioNettoSuPatrimonio: num(g, 'netFinancialDebtEquityNetWorth'),
     pfnSuPatrimonio: num(g, 'pfnNetWorth'),
+    debitoNettoSuFontiTotali: num(g, 'netDebtTotalSources'),
   });
 }
 
@@ -172,6 +243,7 @@ function leggiEfficienza(g: unknown): Efficienza | null {
   return seValorizzato({
     rotazioneCreditiVersoClienti: num(g, 'accountsReceivableRotation'),
     indiceDiRotazione: num(g, 'turnoverIndex'),
+    rotazioneMagazzino: num(g, 'inventoryRotation'),
   });
 }
 
@@ -221,6 +293,9 @@ function leggiGare(g: unknown): readonly GarePubbliche[] {
 function leggiAddetti(g: unknown): StatisticheAddetti | null {
   return seValorizzato({
     impiegati: num(g, 'whiteCollar'),
+    // La quota di operai: il campo che pesa di più su RC lavoratori e infortuni, ed era
+    // l'unico dell'intera composizione del personale a non venire letto.
+    operai: num(g, 'blueCollar'),
     tempoDeterminato: num(g, 'fixedTermContract'),
     tempoIndeterminato: num(g, 'permanentContract'),
     tempoPieno: num(g, 'fullTimeContract'),
@@ -247,13 +322,21 @@ function leggiQualifiche(dati: unknown): QualificheImpresa | null {
   const gruppi = pick(dati, 'corporateGroups');
   const internazionale = pick(dati, 'internationalClassification');
 
+  const albo = pick(dati, 'artisanBusinessRegistry');
+
   return seValorizzato({
     haCertificazioneSoa: bool(pick(dati, 'soaCertification'), 'hasSoaCertification'),
     esportatore: bool(estero, 'isExporter'),
+    // «Esporta: sì» non basta per proporre nulla: credito estero, trasporto e rischio
+    // politico cambiano con l'area, e l'area era già dentro la risposta pagata.
+    paesiExport: str(estero, 'exportCountries'),
     importatore: bool(estero, 'isImporter'),
     pmiInnovativa: bool(innovativa, 'isInnovativeSme'),
     startUpInnovativa: bool(innovativa, 'isInnovativeStartUp'),
-    impresaArtigiana: bool(pick(dati, 'artisanBusinessRegistry'), 'belongsToArtisanBusinessRegistry'),
+    impresaArtigiana: bool(albo, 'belongsToArtisanBusinessRegistry'),
+    // Il numero d'iscrizione sta un livello più sotto, in un nodo che ripete il nome
+    // del contenitore: `artisanBusinessRegistry.artisanBusinessRegistry`.
+    numeroAlboArtigiani: str(pick(albo, 'artisanBusinessRegistry'), 'registrationNumber'),
     numeroUnitaLocali: num(pick(dati, 'branches'), 'numberOfBranches'),
     appartieneAGruppoIva: bool(gruppoIva, 'vatGroupParticipation'),
     capogruppoIva: bool(gruppoIva, 'isVatGroupLeader'),
@@ -280,12 +363,27 @@ function leggiQualifiche(dati: unknown): QualificheImpresa | null {
     // Una stringa vuota non è un indirizzo: vale come assente.
     email: vuotoComeAssente(str(pick(dati, 'mail'), 'email') ?? str(dati, 'email')),
     codiceSdi: str(dati, 'sdiCode'),
+    // Il LEI sta fra i dettagli societari, non fra i codici internazionali.
+    codiceLei: str(pick(dati, 'companyDetails'), 'leiCode'),
     presenteSuiSocial: bool(web, 'hasSocial'),
+    profiliSocial: profiliSocialDi(web),
     commercializzabile: bool(pick(dati, 'marketable'), 'isMarketable'),
     aggiornatoIl:
       dataDa(str(pick(dati, 'companyDetails'), 'lastUpdateDate')) ??
       daEpoca(num(dati, 'lastUpdateTimestamp')),
   });
+}
+
+/**
+ * Gli indirizzi dei profili social, nell'ordine in cui l'archivio li porta.
+ *
+ * `hasSocial: true` da solo non serve a nessuno: erano cinque indirizzi comprati e mai
+ * letti. Le chiavi sono elencate per esteso — non si scandisce l'oggetto — perché
+ * `webAndSocial` contiene anche `website` e `hasSocial`, che non sono profili.
+ */
+function profiliSocialDi(web: unknown): readonly string[] {
+  const CHIAVI = ['facebook', 'instagram', 'linkedin', 'pinterest', 'twitter', 'youtube'] as const;
+  return CHIAVI.map((chiave) => str(web, chiave)).filter((v): v is string => v !== null);
 }
 
 /** Data in forma ISO, oppure `null`: una data non interpretabile non va inventata. */

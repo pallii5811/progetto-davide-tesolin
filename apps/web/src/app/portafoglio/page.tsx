@@ -17,10 +17,25 @@ export default async function PaginaPortafoglio({
 
   const portafoglio = await leggiPortafoglio().catch(() => null);
 
+  /*
+    Due messaggi per lo stesso guasto, come sulla schermata di ricerca.
+
+    Qui ce n'era uno solo e diceva all'intermediario di «avviare il backend con
+    npm run dev:api». L'installazione consegnata parte da systemd: quel comando sulla sua
+    macchina non esiste, un terminale su cui lanciarlo non ce l'ha, e ciò che legge è un
+    prodotto che gli chiede una cosa fuori dalla sua portata. In sviluppo invece è
+    esattamente l'informazione che serve, e resta.
+  */
   if (portafoglio === null) {
-    return (
-      <Avviso tono="critico" titolo="Servizio non raggiungibile">
-        Avviare il backend con <code className="font-mono">npm run dev:api</code>.
+    return process.env.NODE_ENV === 'production' ? (
+      <Avviso tono="critico" titolo="Portafoglio momentaneamente non disponibile">
+        Non è al momento possibile leggere l&apos;elenco delle aziende analizzate. Nulla è andato perso: i
+        dati restano in archivio. Se la situazione persiste, segnalarlo all&apos;assistenza.
+      </Avviso>
+    ) : (
+      <Avviso tono="critico" titolo="Servizio API non raggiungibile">
+        Avviare il servizio con <code className="font-mono">npm run dev:api</code>, oppure indicare
+        l&apos;indirizzo corretto nella variabile <code className="font-mono">AEGIS_API_URL</code>.
       </Avviso>
     );
   }
@@ -76,13 +91,13 @@ export default async function PaginaPortafoglio({
           <a
             href={filtro === undefined ? '/portafoglio/esporta' : `/portafoglio/esporta?filtro=${filtro}`}
             download
-            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo"
           >
             Esporta in CSV
           </a>
           <Link
             href="/portafoglio/importa"
-            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
+            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo"
           >
             Importa elenco clienti
           </Link>
@@ -294,6 +309,21 @@ export default async function PaginaPortafoglio({
       {aziende.length === 0 && (
         <p className="mt-4 text-sm text-testo-tenue">Nessuna azienda corrisponde al filtro scelto.</p>
       )}
+
+      {/*
+        Dove sta il verdetto, detto una volta sola in fondo alla tabella.
+
+        L'elenco mostra il punteggio, non il giudizio: dalla proiezione di portafoglio non
+        si può sapere se protesti e procedure siano stati verificati per quella riga, e
+        colorare di verde uno score che la scheda della stessa azienda dichiara
+        «provvisorio» era una contraddizione che solo chi apriva la scheda poteva vedere.
+      */}
+      <p className="mt-4 text-xs leading-relaxed text-testo-debole">
+        Lo score è quello calcolato all&apos;ultima analisi. Se per quell&apos;azienda protesti,
+        pregiudizievoli e procedure concorsuali non sono stati verificati il punteggio è{' '}
+        <strong className="text-testo-tenue">provvisorio</strong>, e la scheda della singola azienda lo
+        dichiara accanto al numero: una procedura aperta azzera il fido consigliato.
+      </p>
     </>
   );
 }
@@ -318,17 +348,26 @@ function esposizione(azienda: VocePortafoglio): string {
     : azienda.esposizioneNonAssicurata.formattato;
 }
 
+/**
+ * Il punteggio in elenco, **senza il verdetto**.
+ *
+ * Qui il numero veniva colorato: verde sopra 65, rosso sotto 50. Ma su ogni azienda per
+ * cui protesti e procedure non sono stati verificati — il caso predefinito, perché quella
+ * verifica costa quarantacinque centesimi e si compra a parte — la scheda della **stessa**
+ * azienda dichiara in testata «provvisorio: protesti e procedure non verificati», e
+ * accanto al fido «una procedura concorsuale aperta lo azzera, e non è stata verificata».
+ * Un verde in elenco e una riserva sulla scheda sono due affermazioni opposte sullo stesso
+ * numero, e chi lavora sull'elenco vede solo la prima.
+ *
+ * La confidenza del credito esiste nel motore ed è esposta sulla scheda, ma **non passa
+ * dalla proiezione di portafoglio**: `VocePortafoglio` non la porta. Finché non c'è, qui
+ * si mostra ciò che si sa — il punteggio e la sua classe — e non un giudizio che questa
+ * riga non è in grado di sostenere. La nota sotto la tabella dice dove sta il verdetto.
+ */
 function PunteggioCredito({ azienda }: { azienda: VocePortafoglio }) {
-  const colore =
-    azienda.scoreCredito >= 65
-      ? 'text-basso'
-      : azienda.scoreCredito >= 50
-        ? 'text-rilevante'
-        : 'text-critico';
-
   return (
     <>
-      <span className={`tabular font-semibold ${colore}`}>{azienda.scoreCredito}</span>
+      <span className="tabular font-semibold">{azienda.scoreCredito}</span>
       <span className="ml-1 text-xs text-testo-debole">{azienda.classeCredito}</span>
     </>
   );

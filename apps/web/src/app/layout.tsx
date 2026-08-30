@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { autenticazioneRichiesta, utenteCorrente } from '@/lib/api';
 import type { UtenteCorrente } from '@/lib/api';
 import { esci } from './accedi/actions';
+import { NavigazionePrincipale } from './NavigazionePrincipale';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -30,54 +31,32 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </span>
             </Link>
 
+            {/*
+              Su telefono la barra va a capo, non fuori schermo.
+
+              Il contenitore esterno aveva `flex-wrap` e questo no: a 390 pixel il menu
+              arrivava a 550, e **ogni pagina del prodotto** scorreva in orizzontale di
+              centosessanta pixel. Non se n'era accorto nessuno perché l'unico collaudo
+              che lo misurava girava senza accesso, quindi misurava nove volte il modulo
+              di accesso, dove la barra non c'è.
+            */}
             {dentro && (
-              <div className="flex items-center gap-5">
-                <nav aria-label="Principale" className="flex gap-5 text-sm text-testo-tenue">
-                  <Link
-                    href="/"
-                    className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-                  >
-                    Ricerca
-                  </Link>
-                  <Link
-                    href="/prospect"
-                    className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-                  >
-                    Nuovi clienti
-                  </Link>
-                  <Link
-                    href="/portafoglio"
-                    className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-                  >
-                    Portafoglio
-                  </Link>
-                  <Link
-                    href="/monitoraggio"
-                    className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-                  >
-                    Monitoraggio
-                  </Link>
-                  <Link
-                    href="/catalogo"
-                    className="rounded hover:text-testo focus:outline-none focus:ring-2 focus:ring-marchio/40"
-                  >
-                    Catalogo rischi
-                  </Link>
-                </nav>
+              <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2">
+                <NavigazionePrincipale />
 
                 {richiesta && (
                   <div className="flex items-center gap-3 border-l border-bordo pl-5">
                     <Link
                       href="/impostazioni"
                       title={utente.email}
-                      className="rounded text-xs text-testo-debole underline-offset-2 hover:text-testo hover:underline focus:outline-none focus:ring-2 focus:ring-marchio/40"
+                      className="rounded text-xs text-testo-debole underline-offset-2 hover:text-testo hover:underline"
                     >
                       {utente.nome}
                     </Link>
                     <form action={esci}>
                       <button
                         type="submit"
-                        className="rounded text-xs text-testo-tenue underline-offset-2 hover:text-testo hover:underline focus:outline-none focus:ring-2 focus:ring-marchio/40"
+                        className="rounded text-xs text-testo-tenue underline-offset-2 hover:text-testo hover:underline"
                       >
                         Esci
                       </button>

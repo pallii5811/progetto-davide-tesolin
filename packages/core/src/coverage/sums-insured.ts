@@ -889,17 +889,33 @@ function calcolaBaseCatNat(
 ): Explained<Euro | null> {
   const noti = [fabbricati.value, contenuto.value].filter((v): v is Euro => v !== null);
 
-  return explain('Base assicurabile CAT NAT')
-    .formula('Terreni e fabbricati + Impianti e macchinari + Attrezzature industriali e commerciali')
-    .reference('Art. 2424 c.c., attivo B-II, numeri 1, 2 e 3 · L. 213/2023 · DM 18/2025')
-    .input('Fabbricati', formattaOppureIgnoto(fabbricati.value))
-    .input('Impianti, macchinari e attrezzature', formattaOppureIgnoto(contenuto.value))
-    .note('Le rimanenze non rientrano nell’obbligo di legge, pur essendo assicurabili separatamente.')
-    .noteIf(
-      noti.length === 0,
-      'Capitale non quantificabile con i dati disponibili. L’obbligo di legge sussiste comunque: ' +
-        'rilevare il valore dei beni prima di procedere alla quotazione.',
-    )
-    .inheritConfidence(fabbricati.confidence, contenuto.confidence)
-    .value<Euro | null>(noti.length === 0 ? null : Money.add(...noti));
+  return (
+    explain('Base assicurabile CAT NAT')
+      .formula('Terreni e fabbricati + Impianti e macchinari + Attrezzature industriali e commerciali')
+      .reference('Art. 2424 c.c., attivo B-II, numeri 1, 2 e 3 · L. 213/2023 · DM 18/2025')
+      .input('Fabbricati', formattaOppureIgnoto(fabbricati.value))
+      .input('Impianti, macchinari e attrezzature', formattaOppureIgnoto(contenuto.value))
+      .note('Le rimanenze non rientrano nell’obbligo di legge, pur essendo assicurabili separatamente.')
+      /*
+      La somma parziale si dichiara, come fa patrimonioEsposto per le stesse ragioni.
+
+      Senza i fabbricati restava la sola quota mobile, presentata come totale: il capitale
+      su cui l'impresa adempie a un obbligo di legge risultava una frazione del dovuto, e
+      nulla diceva che mancasse un addendo. È la somma su cui l'adempimento viene misurato
+      e su cui, al sinistro, opera la regola proporzionale.
+    */
+      .noteIf(
+        noti.length > 0 && noti.length < 2,
+        'Somma parziale: una delle due componenti dell’obbligo non è quantificabile con i dati ' +
+          'disponibili. Il totale è per difetto e va completato prima della quotazione, perché è la ' +
+          'base su cui l’adempimento viene misurato.',
+      )
+      .noteIf(
+        noti.length === 0,
+        'Capitale non quantificabile con i dati disponibili. L’obbligo di legge sussiste comunque: ' +
+          'rilevare il valore dei beni prima di procedere alla quotazione.',
+      )
+      .inheritConfidence(fabbricati.confidence, contenuto.confidence)
+      .value<Euro | null>(noti.length === 0 ? null : Money.add(...noti))
+  );
 }

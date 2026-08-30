@@ -53,11 +53,22 @@ export function Metrica({
   nota?: string;
   tono?: 'neutro' | 'positivo' | 'attenzione' | 'critico';
 }) {
+  /*
+    «Attenzione» non è la gravità «rilevante», ed è per questo che il token esiste.
+
+    Qui il tono «attenzione» disegnava `text-rilevante`, cioè il quarto gradino della
+    scala di gravità. Ma i due significati sono diversi: `rilevante` dice **quanto è
+    grave un rischio**, `attenzione` dice **che il numero accanto non è verificato** —
+    «provvisorio: protesti e procedure non verificati» sotto lo score, «valutazione
+    formulata su dati presuntivi» sotto un capitale. Sulla stessa schermata convivevano
+    le due letture, con lo stesso colore: chi legge non poteva distinguere una riserva
+    da una gravità.
+  */
   const colore =
     tono === 'positivo'
       ? 'text-basso'
       : tono === 'attenzione'
-        ? 'text-rilevante'
+        ? 'text-attenzione'
         : tono === 'critico'
           ? 'text-critico'
           : 'text-testo';
@@ -186,11 +197,12 @@ export function Avviso({
   titolo: string;
   children: ReactNode;
 }) {
+  /* Stessa distinzione della `Metrica`: la riserva ha il suo colore, la gravità il suo. */
   const classi =
     tono === 'critico'
       ? 'border-critico/40 bg-critico-fondo'
       : tono === 'attenzione'
-        ? 'border-rilevante/40 bg-rilevante-fondo'
+        ? 'border-attenzione/40 bg-attenzione-fondo'
         : 'border-marchio/30 bg-marchio-tenue';
 
   return (

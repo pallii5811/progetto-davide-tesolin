@@ -31,7 +31,7 @@ const RUOLI: { valore: RuoloUtente; etichetta: string; cosaPuoFare: string }[] =
 ];
 
 const CAMPO =
-  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none transition focus:border-marchio focus:ring-2 focus:ring-marchio/25';
+  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio';
 const ETICHETTA = 'mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole';
 
 export function GestioneUtenti({ utenti }: { utenti: UtenteElencoDto[] }) {
@@ -196,7 +196,7 @@ function Azione({
     <button
       type="submit"
       disabled={pending}
-      className={`rounded px-3 py-2 text-sm font-medium transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-marchio/40 ${classi}`}
+      className={`rounded px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${classi}`}
     >
       {pending ? inCorso : etichetta}
     </button>

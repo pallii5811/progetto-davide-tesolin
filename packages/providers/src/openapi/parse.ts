@@ -118,9 +118,16 @@ export function atecoOf(source: unknown, ...keys: readonly string[]): AtecoCode 
   return value === null ? null : parseAteco(value);
 }
 
-/** Percentuale: accetta sia `0,42` sia `42`. */
-export function percent(source: unknown, ...keys: readonly string[]): number | null {
-  const value = num(source, ...keys);
-  if (value === null) return null;
-  return value > 1 ? value / 100 : value;
-}
+/*
+  Qui c'era `percent()`, ed è stata tolta.
+
+  Decideva sul **singolo valore** se fosse una frazione o punti percentuali — `> 1` divide
+  per cento, altrimenti no — e su una scala che va da 0 a 100 quella decisione non si può
+  prendere guardando un numero solo. Il 99 % usciva «0,99 %» e l'1 % usciva «100,00 %»: la
+  stessa funzione sbagliava nei due versi opposti. Cadevano con lei il controllo societario,
+  la direzione e coordinamento (art. 2497) e il titolare effettivo, e sulla scheda compariva
+  «stallo decisionale, nessun socio ha la maggioranza» su una società posseduta al 99 %.
+
+  La scelta va fatta sull'intera compagine, dove i valori si sommano e la scala si vede:
+  `normalizzaQuote` in `mapper.ts`.
+*/

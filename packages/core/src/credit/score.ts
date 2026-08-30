@@ -25,6 +25,8 @@ import {
   ultimoBilancioSintetico,
 } from '../company/profile.js';
 import { altmanToScore, computeAltmanZ } from './altman.js';
+import type { ContestoAltman } from './altman.js';
+import { atecoSection } from '../shared/identifiers.js';
 import { formattaGiorno } from '../shared/tempo.js';
 
 export type ClasseDiMerito = 'A' | 'B' | 'C' | 'D' | 'E';
@@ -57,6 +59,17 @@ export interface CreditScore {
   readonly cap: string | null;
   /** Probabilità di default a 12 mesi, stimata dalla curva di calibrazione. */
   readonly probabilitaDefault: number;
+  /**
+   * La stessa probabilità con la formula, il riferimento e la confidenza che merita.
+   *
+   * Era l'unico numero della scheda che viaggiava nudo. «PD 12 mesi 0,80%» al centesimo
+   * di punto usciva da una curva di otto punti mai calibrata sui dati della piattaforma,
+   * e in un prodotto che vende la trasparenza del calcolo era proprio il numero che
+   * nessuno poteva ricalcolare né contestare.
+   *
+   * `value` è identico a `probabilitaDefault`: cambia la forma, non la cifra.
+   */
+  readonly probabilitaDefaultSpiegata: Explained<number>;
 }
 
 const PESI = {
@@ -88,7 +101,13 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   factors.push(fattoreRedditivita(indicatori));
   factors.push(fattoreLiquidita(indicatori));
   factors.push(fattoreSostenibilitaDebito(indicatori));
-  factors.push(fattoreAltman(bilancio));
+  const anagrafica = profile.anagrafica.value;
+  factors.push(
+    fattoreAltman(bilancio, {
+      formaGiuridica: anagrafica.formaGiuridica,
+      atecoSezione: anagrafica.atecoPrimario === null ? null : atecoSection(anagrafica.atecoPrimario),
+    }),
+  );
   factors.push(fattoreEventiNegativi(profile.eventiNegativi?.value ?? null, asOf));
   factors.push(fattoreAnzianita(profile, asOf));
 
@@ -113,6 +132,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
         factors,
         cap: 'Dati insufficienti',
         probabilitaDefault: probabilitaDefault(1),
+        probabilitaDefaultSpiegata: probabilitaDefaultSpiegata(1, 'bassa'),
       });
   }
 
@@ -199,6 +219,17 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     );
   }
 
+  /*
+    La PD entra anche negli input dello score, che è ciò che la scheda stampa.
+
+    La scheda mostra «PD 12 mesi 0,80%» accanto alla classe, e quel numero non aveva né
+    formula né riserva: `probabilitaDefaultSpiegata` gliele dà, ma vive in un campo che lo
+    strato di presentazione non inoltra ancora. Finché non lo fa, la riserva raggiunge lo
+    schermo per questa via — la spiegazione dello score, che il presentatore inoltra
+    intera.
+  */
+  const pd = probabilitaDefaultSpiegata(finale, confidenza);
+
   return builder
     .note(`Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`)
     .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
@@ -207,13 +238,16 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
       'Esercizio di riferimento',
       bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno),
     )
+    .input('Probabilità di default a 12 mesi', formatPercent(pd.value, 2))
+    .note(pd.explanation.notes.join(' '))
     .confidence(confidenza)
     .value({
       value: finale,
       classe,
       factors,
       cap,
-      probabilitaDefault: probabilitaDefault(finale),
+      probabilitaDefault: pd.value,
+      probabilitaDefaultSpiegata: pd,
     });
 }
 
@@ -497,12 +531,13 @@ function fattoreSostenibilitaDebito(ind: FinancialIndicators | null): ScoreFacto
   };
 }
 
-function fattoreAltman(bilancio: BilancioRiclassificato | null): ScoreFactor {
+function fattoreAltman(bilancio: BilancioRiclassificato | null, contesto: ContestoAltman): ScoreFactor {
   if (bilancio === null) {
     return notEvaluable('altman', "Altman Z''-score", PESI.altman, 'Bilancio non disponibile');
   }
 
-  const altman = computeAltmanZ(bilancio);
+  // Il contesto serve solo alle frasi: la formula e i coefficienti non cambiano.
+  const altman = computeAltmanZ(bilancio, contesto);
   if (altman.value === null) {
     return notEvaluable('altman', "Altman Z''-score", PESI.altman, 'Totale attivo non valorizzato');
   }
@@ -744,6 +779,18 @@ export function classifica(score: number): ClasseDiMerito {
   return 'E';
 }
 
+/** Gli otto punti della curva score → PD, in un posto solo. */
+const CURVA_PD: readonly { readonly x: number; readonly y: number }[] = [
+  { x: 1, y: 35 },
+  { x: 20, y: 18 },
+  { x: 35, y: 9 },
+  { x: 50, y: 4.5 },
+  { x: 65, y: 2 },
+  { x: 80, y: 0.8 },
+  { x: 90, y: 0.35 },
+  { x: 100, y: 0.15 },
+];
+
 /**
  * Curva di calibrazione score → probabilità di default a 12 mesi.
  *
@@ -753,18 +800,33 @@ export function classifica(score: number): ClasseDiMerito {
  * un intervento a un solo punto.
  */
 export function probabilitaDefault(score: number): number {
-  return (
-    interpolate(score, [
-      { x: 1, y: 35 },
-      { x: 20, y: 18 },
-      { x: 35, y: 9 },
-      { x: 50, y: 4.5 },
-      { x: 65, y: 2 },
-      { x: 80, y: 0.8 },
-      { x: 90, y: 0.35 },
-      { x: 100, y: 0.15 },
-    ]) / 100
-  );
+  return interpolate(score, CURVA_PD) / 100;
+}
+
+/**
+ * La stessa probabilità, nella forma che questo prodotto usa per ogni altro numero.
+ *
+ * La confidenza è **al più media**, e non per prudenza generica: la curva non è stimata
+ * sui default osservati dalla piattaforma, quindi la cifra è l'ordine di grandezza del
+ * rischio, non una misura. Eredita inoltre la confidenza dello score da cui nasce — una
+ * PD calcolata su un punteggio provvisorio non può essere più affidabile di lui.
+ */
+export function probabilitaDefaultSpiegata(score: number, confidenzaScore: Confidence): Explained<number> {
+  const pd = probabilitaDefault(score);
+  return explain('Probabilità di default a 12 mesi')
+    .formula('Interpolazione lineare dello score sulla curva di calibrazione score → PD')
+    .input('Score di credito', `${score}/100`)
+    .input('Punti della curva', CURVA_PD.map((p) => `${p.x} → ${formatNumber(p.y, 2)}%`).join(' · '))
+    .note(
+      `PD stimata: ${formatPercent(pd, 2)}. La curva è una calibrazione di riferimento sulla ` +
+        'distribuzione tipica del mercato italiano, non una stima sui default osservati dalla ' +
+        'piattaforma: la cifra indica l’ordine di grandezza del rischio, non va letta al centesimo ' +
+        'di punto.',
+    )
+    .reference('Metodologia AEGIS · docs/DOMINIO.md §4 — curva di calibrazione score → PD')
+    .confidence('media')
+    .inheritConfidence(confidenzaScore)
+    .value(pd);
 }
 
 function anniTra(from: Date, to: Date): number {

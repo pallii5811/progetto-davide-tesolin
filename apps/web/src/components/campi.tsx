@@ -40,8 +40,8 @@ function Guscio({
 }
 
 const CLASSI_CAMPO =
-  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm outline-none ' +
-  'transition focus:border-marchio focus:ring-2 focus:ring-marchio/25';
+  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm ' +
+  'transition focus:border-marchio';
 
 export function CampoTesto({
   etichetta,
@@ -141,7 +141,7 @@ export function CampoTriStato({
               type="button"
               aria-pressed={attiva}
               onClick={() => onChange(opzione.valore)}
-              className={`flex-1 rounded border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-marchio/25 ${
+              className={`flex-1 rounded border px-3 py-2 text-sm transition ${
                 attiva
                   ? 'border-marchio bg-azione text-azione-testo'
                   : 'border-bordo-forte bg-fondo hover:border-marchio/50'
