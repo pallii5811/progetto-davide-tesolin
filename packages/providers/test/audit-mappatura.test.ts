@@ -13,7 +13,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { INDICATORI_FORNITORE_VUOTI } from '@aegis/core';
 import {
   mappaAnagrafica,
@@ -127,7 +127,19 @@ describe('Difetto 61 · stato di attività', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe.runIf(conSonda)('Difetto 15 · unità locali cessate', () => {
-  const profilo = mappaProfiloCompleto(contenuto(sonda('prod-IT-full-01528120981.json')));
+  /*
+    La lettura sta in `beforeAll`, non nel corpo del describe.
+
+    `describe.runIf` salta i TEST, non il corpo: quello vitest lo esegue comunque in fase
+    di raccolta. Con la sonda assente — cioè su ogni macchina che non ha le risposte
+    comprate, la CI compresa — la lettura falliva prima di poter essere saltata, il modulo
+    non si caricava, e cadevano con lui i 46 test di questo file che non c'entravano
+    niente. In CI si vedevano 783 test invece di 834, e il conto non lo faceva nessuno.
+  */
+  let profilo: ReturnType<typeof mappaProfiloCompleto>;
+  beforeAll(() => {
+    profilo = mappaProfiloCompleto(contenuto(sonda('prod-IT-full-01528120981.json')));
+  });
 
   it('non mostra come ubicazione operativa una sede cessata', () => {
     /*
@@ -159,7 +171,11 @@ describe.runIf(conSonda)('Difetto 15 · unità locali cessate', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe.runIf(conSonda)('Difetti 42-43 · campi della sede', () => {
-  const profilo = mappaProfiloCompleto(contenuto(sonda('prod-IT-full-01528120981.json')));
+  // Differita, per la ragione spiegata al difetto 15.
+  let profilo: ReturnType<typeof mappaProfiloCompleto>;
+  beforeAll(() => {
+    profilo = mappaProfiloCompleto(contenuto(sonda('prod-IT-full-01528120981.json')));
+  });
 
   it('non spaccia per «attività» la descrizione inglese del tipo di sede', () => {
     // Era «Local units»: il tipo di sede, in inglese, messo dove va l'attività svolta.
@@ -274,7 +290,11 @@ describe('Difetto 21 · data di costituzione', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe.runIf(conSonda)('Difetto 38 · campi del profilo completo', () => {
-  const indicatori = mappaIndicatoriFornitore(contenuto(sonda('prod-IT-full-01528120981.json')));
+  // Differita, per la ragione spiegata al difetto 15.
+  let indicatori: ReturnType<typeof mappaIndicatoriFornitore>;
+  beforeAll(() => {
+    indicatori = mappaIndicatoriFornitore(contenuto(sonda('prod-IT-full-01528120981.json')));
+  });
 
   it('legge la quota di operai, che pesa su RC lavoratori', () => {
     expect(indicatori.statisticheAddetti?.operai).toBe(67);
