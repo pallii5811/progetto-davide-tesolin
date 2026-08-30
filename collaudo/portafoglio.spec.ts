@@ -46,9 +46,25 @@ test.describe('Portafoglio', () => {
 
     const scheda = page.locator('ul > li').first();
 
-    // Raggiungibile senza cercarla: la lista di lavoro non deve stare sotto una schermata
-    // intera di numeri riassuntivi.
-    await expect(scheda).toBeInViewport();
+    /*
+      Raggiungibile senza cercarla: la lista di lavoro non deve stare sotto una schermata
+      intera di numeri riassuntivi.
+
+      Si misura DI QUANTO manca, invece di affidarsi a `toBeInViewport`. Quello dice
+      «rapporto 0» e si ferma lì: chi legge il verbale sa che la scheda è fuori e non sa
+      se per cinque pixel o per trecento — cioè non sa se togliere una riga o rifare la
+      testata. La differenza conta soprattutto qui, dove il difetto non si riproduce sulla
+      macchina di sviluppo: dipende da quanto è largo il font, e su Linux le note delle
+      metriche vanno a capo dove qui stanno su una riga.
+    */
+    const altezzaSchermo = 844;
+    const inizioScheda = await scheda.evaluate((el) => el.getBoundingClientRect().top);
+    expect(
+      inizioScheda,
+      `la prima scheda del portafoglio comincia a ${Math.round(inizioScheda)}px, ` +
+        `oltre i ${altezzaSchermo}px dello schermo: manca di ${Math.round(inizioScheda - altezzaSchermo)}px. ` +
+        'Sopra di lei ci sono la testata, la navigazione e i quattro riquadri di sintesi.',
+    ).toBeLessThan(altezzaSchermo);
 
     // La tabella con scorrimento orizzontale lasciava fuori schermo proprio queste tre
     // cose, senza alcun indizio che ci fosse dell'altro.

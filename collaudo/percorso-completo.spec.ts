@@ -155,7 +155,27 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
       filtri diversi da quelli scritti a schermo. Qui la si ripretende nel punto esatto in
       cui i soldi escono.
     */
-    await expect(page.getByText(/€ ad azienda/)).toBeVisible();
+    /*
+      Il prezzo ora compare in DUE punti, e questo è un bene: prima era scritto a mano in
+      quattro posti diversi, e il commento del sorgente sosteneva che stesse in uno solo.
+      Centralizzato il valore, il testo che qui era unico non lo è più e la ricerca
+      trovava due elementi.
+
+      Si poteva mettere `.first()` e tacere. Ma quando due schermate mostrano lo stesso
+      prezzo, la cosa che vale la pena controllare non è che se ne veda uno: è che
+      DICANO LO STESSO NUMERO. È esattamente il difetto da cui questa correzione nasce.
+    */
+    const prezziAdAzienda = page.getByText(/€ ad azienda/);
+    await expect(prezziAdAzienda.first()).toBeVisible();
+
+    const cifre = (await prezziAdAzienda.allInnerTexts()).map(
+      (t) => /(\d+[.,]\d+)\s*€\s*ad azienda/.exec(t)?.[1] ?? t,
+    );
+    expect(
+      cifre.length,
+      'nessun prezzo per azienda a schermo prima del pulsante che spende',
+    ).toBeGreaterThan(0);
+    expect(new Set(cifre).size, `due prezzi diversi sulla stessa schermata: ${cifre.join(' / ')}`).toBe(1);
 
     // ── 2. Compra l'elenco ────────────────────────────────────────────────
     await page.getByTestId('scarica-elenco').click();

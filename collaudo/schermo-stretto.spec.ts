@@ -75,7 +75,10 @@ test.describe('Schermo stretto', () => {
       */
       const { eccedenza, colpevoli } = await page.evaluate(() => {
         const larghezza = document.documentElement.clientWidth;
-        const sborda = (e: Element): boolean => e.getBoundingClientRect().right > larghezza + 1;
+        const sfora = (e: Element): boolean => {
+          const r = e.getBoundingClientRect();
+          return r.right > larghezza + 1 || r.left < -1;
+        };
         const fuori: string[] = [];
 
         /*
@@ -85,25 +88,51 @@ test.describe('Schermo stretto', () => {
         */
         for (const el of Array.from(document.querySelectorAll<HTMLElement>('body *'))) {
           const r = el.getBoundingClientRect();
-          if (r.width === 0 || !sborda(el)) continue;
+          if (r.width === 0) continue;
 
           /*
-            Solo i colpevoli PIÙ ESTERNI. Se un contenitore sborda, sborda anche tutta la
-            sua discendenza: stampare venti righe per un difetto solo lo nasconde invece
-            di mostrarlo.
+            Tre cause distinte, e la prima versione ne guardava una sola.
+
+            Guardando solo il bordo destro, il verbale diceva «nessun elemento singolo
+            sborda» mentre la pagina era larga cinque pixel di troppo — vero e inservibile.
+            Un elemento che si estende a SINISTRA di zero allarga la pagina senza che il
+            suo bordo destro superi nulla; e un contenitore il cui contenuto trabocca
+            DENTRO di lui allarga il documento restando lui stesso nei limiti.
+          */
+          const aDestra = r.right > larghezza + 1;
+          const aSinistra = r.left < -1;
+
+          /*
+            Un contenitore che scorre PER SCELTA non è un difetto: la tabella del
+            portafoglio e la barra di navigazione dichiarano `overflow-x` apposta, e
+            segnalarle riempirebbe il verbale di rumore accanto al difetto vero. Conta
+            solo chi trabocca senza averlo previsto.
+          */
+          const scorrimentoVoluto = getComputedStyle(el).overflowX !== 'visible';
+          const dentro = !scorrimentoVoluto && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1;
+
+          if (!aDestra && !aSinistra && !dentro) continue;
+
+          /*
+            Solo i colpevoli PIÙ ESTERNI. Se un contenitore sfora, sfora anche tutta la sua
+            discendenza: stampare venti righe per un difetto solo lo nasconde invece di
+            mostrarlo. Il traboccamento interno non si eredita, quindi lì non si salta.
           */
           const padre = el.parentElement;
-          if (padre !== null && padre !== document.body && sborda(padre)) continue;
+          if (!dentro && padre !== null && padre !== document.body && sfora(padre)) continue;
 
-          const classi = el.className.toString().slice(0, 80);
-          fuori.push(
-            `<${el.tagName.toLowerCase()} class="${classi}"> sborda di ${Math.round(r.right - larghezza)}px`,
-          );
+          const classi = el.className.toString().slice(0, 70);
+          const motivo = aDestra
+            ? `sborda a destra di ${Math.round(r.right - larghezza)}px`
+            : aSinistra
+              ? `comincia a ${Math.round(r.left)}px, fuori a sinistra`
+              : `contiene ${el.scrollWidth - el.clientWidth}px che traboccano al suo interno`;
+          fuori.push(`<${el.tagName.toLowerCase()} class="${classi}"> ${motivo}`);
         }
 
         return {
           eccedenza: document.documentElement.scrollWidth - larghezza,
-          colpevoli: fuori.slice(0, 5),
+          colpevoli: fuori.slice(0, 6),
         };
       });
 
