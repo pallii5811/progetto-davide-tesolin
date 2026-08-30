@@ -49,18 +49,85 @@ export function averageDefined(values: readonly (number | null)[]): number | nul
   return defined.reduce((sum, v) => sum + v, 0) / defined.length;
 }
 
-/** Media pesata dei soli valori disponibili, con rinormalizzazione dei pesi. */
+/**
+ * La media pesata dei valori disponibili, insieme a **quanto modello ha davvero pesato**.
+ *
+ * La copertura non è un di più: senza, chi legge il numero non sa se poggia su sette
+ * fattori o su tre, e una media rinormalizzata su tre fattori scelti dall'assenza degli
+ * altri non è la stessa grandezza di una calcolata su sette. Prima veniva calcolata e
+ * buttata via dentro la funzione.
+ */
+export interface MediaPesata {
+  /** La media, oppure null se nessun valore era disponibile. */
+  readonly media: number | null;
+  /** Somma dei pesi dei valori effettivamente disponibili. */
+  readonly pesoDisponibile: number;
+  /** Somma di tutti i pesi dichiarati, disponibili o no. */
+  readonly pesoTotale: number;
+  /** Quota del peso complessivo su cui la media si regge, da 0 a 1. */
+  readonly copertura: number;
+  readonly valutati: number;
+  readonly totali: number;
+}
+
+export interface OpzioniMediaPesata {
+  /**
+   * Pavimento sulla copertura, da 0 a 1: il denominatore non scende sotto questa
+   * frazione del peso totale.
+   *
+   * Senza pavimento la rinormalizzazione **regala** il peso dei valori assenti a quelli
+   * presenti, e il risultato sale quando i superstiti sono i più alti — cioè il punteggio
+   * migliora togliendo dati. Il pavimento non attribuisce un valore ai mancanti (quello
+   * sarebbe inventarli, e l'assenza resta assenza): dice che oltre una certa quota di
+   * modello mancante la media smette di estrapolare, e non certifica più di quanto abbia
+   * misurato.
+   *
+   * Assente: nessun pavimento, comportamento storico.
+   */
+  readonly pavimentoDiCopertura?: number;
+}
+
+export function mediaPesataDefinita(
+  entries: readonly { readonly value: number | null; readonly weight: number }[],
+  opzioni: OpzioniMediaPesata = {},
+): MediaPesata {
+  let weightedSum = 0;
+  let pesoDisponibile = 0;
+  let pesoTotale = 0;
+  let valutati = 0;
+  for (const entry of entries) {
+    pesoTotale += entry.weight;
+    if (entry.value === null) continue;
+    weightedSum += entry.value * entry.weight;
+    pesoDisponibile += entry.weight;
+    valutati += 1;
+  }
+
+  const copertura = pesoTotale === 0 ? 0 : pesoDisponibile / pesoTotale;
+  const pavimento =
+    opzioni.pavimentoDiCopertura === undefined ? 0 : opzioni.pavimentoDiCopertura * pesoTotale;
+  const denominatore = Math.max(pesoDisponibile, pavimento);
+
+  return {
+    media: pesoDisponibile === 0 ? null : weightedSum / denominatore,
+    pesoDisponibile,
+    pesoTotale,
+    copertura,
+    valutati,
+    totali: entries.length,
+  };
+}
+
+/**
+ * Media pesata dei soli valori disponibili, con rinormalizzazione dei pesi.
+ *
+ * Delega a mediaPesataDefinita e ne scarta la copertura: due implementazioni della
+ * stessa domanda sono il modo con cui questo prodotto ha già pagato più di un difetto.
+ */
 export function weightedAverageDefined(
   entries: readonly { readonly value: number | null; readonly weight: number }[],
 ): number | null {
-  let weightedSum = 0;
-  let totalWeight = 0;
-  for (const entry of entries) {
-    if (entry.value === null) continue;
-    weightedSum += entry.value * entry.weight;
-    totalWeight += entry.weight;
-  }
-  return totalWeight === 0 ? null : weightedSum / totalWeight;
+  return mediaPesataDefinita(entries).media;
 }
 
 export function roundTo(value: number, decimals: number): number {

@@ -44,11 +44,44 @@ export function giorniAllaScadenza(polizza: PolizzaInEssere, asOf: Date): number
 }
 
 /**
+ * Su quale capitale la polizza indennizza — cioè il metro su cui l'art. 1907 c.c. si misura.
+ *
+ * Sono tre, non due, ed è il terzo che mancava. Il capitale che il motore calcola è a
+ * **valore di rimpiazzo a nuovo**: il coefficiente di riporto dal netto contabile vale 2,0.
+ * Una garanzia a valore allo stato d'uso indennizza invece il bene **degradato**, cioè un
+ * numero mediamente pari alla metà. Confrontare la somma di quella polizza con il capitale
+ * a nuovo non misura la sottoassicurazione: la fabbrica, e di circa il cinquanta per cento.
+ *
+ * - `valore-a-nuovo`: il metro coincide con il capitale calcolato. È il caso ordinario, ed
+ *   è anche il ramo prudente su cui cade la forma **non dichiarata** — dedurre da un campo
+ *   vuoto la forma più favorevole dichiarerebbe adeguata una polizza che al sinistro subisce
+ *   la riduzione.
+ * - `valore-allo-stato-duso`: il metro esiste ma non è questo, e il motore non lo possiede.
+ * - `limite-pattuito`: il primo rischio assoluto, dove la proporzionale non opera affatto.
+ */
+export type MetroDiIndennizzo = 'valore-a-nuovo' | 'valore-allo-stato-duso' | 'limite-pattuito';
+
+export function metroDiIndennizzo(polizza: PolizzaInEssere): MetroDiIndennizzo {
+  switch (polizza.formaGaranzia) {
+    case 'primo-rischio-assoluto':
+      return 'limite-pattuito';
+    case 'valore-allo-stato-duso':
+      return 'valore-allo-stato-duso';
+    case 'valore-a-nuovo':
+    case null:
+      return 'valore-a-nuovo';
+  }
+}
+
+/**
  * Il primo rischio assoluto esclude l'applicazione della regola proporzionale:
  * la sottoassicurazione, in quella forma, non produce riduzione dell'indennizzo.
+ *
+ * Si legge dal metro e non dal campo, perché la stessa domanda posta due volte è il modo
+ * in cui due risposte finiscono per divergere.
  */
 export function soggettaARegolaProporzionale(polizza: PolizzaInEssere): boolean {
-  return polizza.formaGaranzia !== 'primo-rischio-assoluto';
+  return metroDiIndennizzo(polizza) !== 'limite-pattuito';
 }
 
 /**

@@ -33,10 +33,27 @@ export function IndicatoriArchivio({
   const gruppi: readonly { titolo: string; nota: string; voci: readonly Voce[] }[] = [
     {
       titolo: 'Redditività',
-      nota: 'Un’impresa che non guadagna non compra coperture nuove e disdice quelle che ha.',
+      nota:
+        'Un’impresa che non guadagna non compra coperture nuove e disdice quelle che ha. ' +
+        'Il ROI arriva già calcolato dall’archivio, che non ne documenta il denominatore: ' +
+        'può divergere dal ROA monetario anche nel segno, e si confronta solo con sé stesso ' +
+        'nel tempo.',
       voci: [
         ['ROE — rendimento del capitale proprio', dati.redditivita?.roe, '%'],
-        ['ROI — rendimento del capitale investito', dati.redditivita?.roi, '%'],
+        /*
+          L'etichetta diceva «rendimento del capitale investito», che è la definizione con
+          cui questa stessa piattaforma calcola il ROI altrove: EBIT su totale attivo.
+          Il numero del fornitore non è quello. Sulla seconda impresa registrata l'EBIT è
+          positivo (1.070.081 €) e il ROI vale −323,28 %: un rapporto con numeratore
+          positivo ed esito negativo ha un denominatore negativo, e il totale attivo non
+          lo è mai. Accanto, il ROA monetario della stessa impresa vale +44,57 %.
+
+          Non si sceglie fra i due e non si sopprime il dato pagato: si degrada
+          l'affermazione a ciò che si sa, cioè che la base di calcolo è del fornitore e
+          non è documentata. La spiegazione sta nella nota del gruppo, dove la legge chi
+          confronta i due numeri.
+        */
+        ['ROI dell’archivio — base di calcolo non documentata', dati.redditivita?.roi, '%'],
         ['ROS — margine sulle vendite', dati.redditivita?.ros, '%'],
         ['ROA monetario', dati.redditivita?.roaMonetario, '%'],
         ['Incidenza gestione straordinaria', dati.redditivita?.incidenzaGestioneStraordinaria, '%'],
@@ -124,7 +141,20 @@ export function IndicatoriArchivio({
         ['Rotazione crediti verso clienti', dati.efficienza?.rotazioneCreditiVersoClienti, ''],
         ['Indice di rotazione', dati.efficienza?.indiceDiRotazione, ''],
         ['Rotazione dei debiti', dati.kpi?.rotazioneDebiti, ''],
-        ['Rotazione di magazzino', dati.kpi?.rotazioneMagazzino, ''],
+        /*
+          Qui c'era «Rotazione di magazzino», e portava `kpi.rotazioneMagazzino`, cioè il
+          campo `totalInventoryTurnover` del fornitore. Non è una rotazione: è la durata
+          delle scorte in giorni. Sulla prima impresa registrata vale 160,56 accanto a
+          «Durata delle scorte 160,56 gg» — lo stesso numero, due righe più su, con due
+          nomi opposti. Una rotazione di 161 volte l'anno su un'impresa con quasi tre
+          milioni di rimanenze, letta ad alta voce a un cliente, chiude la conversazione.
+
+          La rotazione vera il fornitore la manda davvero — `inventoryRotation`, 2,2421,
+          cioè 360 / 160,5641 sull'anno commerciale — ma non attraversa il DTO: quel campo
+          non esiste in `IndicatoriArchivioDto`. Finché non lo espone chi possiede il
+          confine, la riga si toglie: il numero che portava è già stampato, giusto e con
+          l'unità giusta, sotto «Durata delle scorte».
+        */
       ],
     },
     {
@@ -135,7 +165,15 @@ export function IndicatoriArchivio({
         ['Oneri finanziari su EBITDA', dati.kpi?.oneriFinanziariSuEbitda, ''],
         ['Patrimonio su totale attivo', dati.kpi?.patrimonioSuTotaleAttivo, ''],
         ['Valore aggiunto', dati.sviluppo?.valoreAggiunto, '%'],
-        ['Variazione EBIT', dati.sviluppo?.variazioneEbit, '%'],
+        /*
+          `ebitVariation` non è in punti percentuali: è il rapporto, e lo dimostra la
+          risposta stessa, che porta accanto i due EBIT da cui nasce. Sulla prima impresa
+          registrata (−751.012 € contro 257.340 €) il campo vale −3,9184, cioè un crollo
+          del 391,84 % che usciva a schermo come «−3,92 %». Sulla seconda un EBIT
+          triplicato (+200,5 %) usciva «+2 %» — ed è il caso peggiore, perché non sembra
+          un errore: sembra un'impresa ferma.
+        */
+        ['Variazione EBIT', dati.sviluppo?.variazioneEbit, 'frazione%'],
         ['MOL', dati.sviluppo?.mol, '%'],
         ['Valore della produzione', dati.sviluppo?.valoreDellaProduzione, '%'],
         ['Totale attivo', dati.sviluppo?.totaleAttivo, '%'],
@@ -379,6 +417,18 @@ function Riga({ etichetta, valore }: { etichetta: string; valore: string }) {
 function formatta(valore: number | null | undefined, unita: string): string {
   if (valore === null || valore === undefined) return 'n.d.';
   if (unita === '€') return valuta(valore);
+  /*
+    L'unità dichiara anche la SCALA, non solo il simbolo.
+
+    Alcuni campi dell'archivio arrivano in punti percentuali e altri come rapporto, e i
+    due si distinguono solo sapendo quale campo si sta leggendo. Scriverlo accanto alla
+    voce — invece di moltiplicare in silenzio da qualche parte — è ciò che rende la
+    differenza visibile a chi aggiunge la riga successiva.
+
+    La conversione sta qui, dopo il controllo sull'assenza: `null * 100` vale 0, e uno
+    zero su una variazione di EBIT è un'affermazione forte e falsa.
+  */
+  if (unita === 'frazione%') return percentuale(valore * 100);
   if (unita === '%') return percentuale(valore);
   if (unita === 'gg') return `${arrotonda(valore)} gg`;
   return arrotonda(valore);

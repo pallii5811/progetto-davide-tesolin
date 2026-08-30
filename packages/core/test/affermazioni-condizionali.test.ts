@@ -236,28 +236,48 @@ describe('L’obbligo di legge è dell’impresa, non della copertura', () => {
   // dall'obbligo CAT NAT perché coperta dal Fondo AGRICAT.
   const agricola = () => analizza(profilo({ ateco: '01.11.00' }));
 
+  /*
+    I tre `if (gap === undefined) return` che stavano qui facevano passare ogni prova
+    sull'agricola **anche sull'oggetto assente**.
+
+    L'intenzione era legittima — «se la copertura non è proposta affatto, va bene uguale» —
+    ma l'effetto no: misurato, il gap `catastrofali` c'è sempre (priorità 60, urgenza
+    `prossima-revisione`), quindi quei rami non sono mai stati eseguiti. Erano una rete che
+    non prendeva nulla oggi e avrebbe ingoiato in silenzio la regressione di domani: il
+    giorno in cui il gap sparisse, tutte e tre le prove diventerebbero verdi per assenza di
+    informazione.
+
+    È lo stesso difetto che il rapporto chiama «verde per assenza», e la correzione è la
+    stessa: si dichiara che l'oggetto dev'esserci, e lo si guarda.
+  */
+  const gapCatastrofali = (analisi: CompanyAnalysis) => {
+    const gap = analisi.gap.gaps.find((g) => g.definition.id === 'catastrofali');
+    expect(
+      gap,
+      'la copertura catastrofale non compare fra i gap: la prova non ha nulla da guardare',
+    ).toBeDefined();
+    return gap!;
+  };
+
   it('all’impresa agricola non afferma l’obbligo catastrofale', () => {
     const analisi = agricola();
     expect(analisi.catNat.value.soggetta).toBe(false);
 
-    const gap = analisi.gap.gaps.find((g) => g.definition.id === 'catastrofali');
-    if (gap === undefined) return; // non proposta affatto: va bene uguale
+    const gap = gapCatastrofali(analisi);
     expect(gap.obbligoDiLegge).toBe(false);
     expect(gap.motivazioneAdeguatezza).toContain('non è soggetta all’obbligo');
   });
 
   it('e non la mette in cima al piano con un termine già scaduto', () => {
-    const gap = agricola().gap.gaps.find((g) => g.definition.id === 'catastrofali');
-    if (gap === undefined) return;
+    const gap = gapCatastrofali(agricola());
     expect(gap.priorita).toBeLessThan(92);
     expect(gap.piano.urgenza).not.toBe('immediata');
   });
 
   it('il pannello CAT NAT e il piano d’azione non si contraddicono', () => {
     const analisi = agricola();
-    const gap = analisi.gap.gaps.find((g) => g.definition.id === 'catastrofali');
+    const gap = gapCatastrofali(analisi);
     const esclusa = analisi.catNat.value.soggetta === false;
-    if (gap === undefined) return;
     // Se un pannello dichiara l'esclusione, l'altro non può dichiarare l'inadempimento.
     expect(esclusa && gap.obbligoDiLegge).toBe(false);
   });
@@ -324,10 +344,23 @@ describe('Nessuna clausola condizionale dentro una frase fissa', () => {
   const contieneCondizionale = (testo: string): string | null =>
     CONDIZIONALI.find((c) => testo.toLowerCase().includes(c)) ?? null;
 
+  /*
+    Il titolo diceva «motivazioni, insidie e **riferimenti**», e i riferimenti non li
+    guardava: il ciclo scorreva `motivazioneTipo` e `insidie` e si fermava lì. Un titolo
+    che promette più di quel che il corpo esegue è il modo in cui un presidio smette di
+    esistere senza che nessuno lo cancelli.
+
+    ⚠ Resta scoperto ciò che questo guardiano non è costruito per vedere: una norma
+    **asserita a tutti**. I cinque frammenti qui sopra riconoscono una clausola
+    condizionale scritta in italiano dentro una frase fissa; non riconoscono un riferimento
+    come «D.Lgs. 138/2024 — NIS 2» citato a ogni impresa, perché in quella stringa non
+    compare nessuno dei cinque. È un difetto diverso, e chiuderlo richiede un presidio
+    diverso — non un frammento in più in questo elenco.
+  */
   it('nel catalogo delle coperture: motivazioni, insidie e riferimenti', () => {
     const colpevoli: string[] = [];
     for (const def of Object.values(COVERAGE_CATALOG)) {
-      for (const testo of [def.motivazioneTipo, ...def.insidie]) {
+      for (const testo of [def.motivazioneTipo, ...def.insidie, ...def.riferimenti]) {
         const trovata = contieneCondizionale(testo);
         if (trovata !== null) colpevoli.push(`${def.id}: «${trovata}»`);
       }

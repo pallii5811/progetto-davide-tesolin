@@ -195,7 +195,25 @@ export interface GapDto {
     premioAnnuo: MoneyDto | null;
   } | null;
   sottoassicurazione: {
+    /** Vera **solo** quando il limite è accertato insufficiente: non è la negazione di «adeguata». */
     sottoassicurata: boolean;
+    /**
+     * Se il capitale pattuito basti, in tre stati.
+     *
+     * `non-verificabile` non è un caso limite: è lo stato di ogni garanzia a primo rischio
+     * assoluto per cui non è stato stimato il danno atteso, cioè la forma ordinaria del
+     * furto. Leggerlo dal solo booleano `sottoassicurata` lo confonde con «adeguata».
+     */
+    adeguatezzaDelLimite: 'adeguata' | 'insufficiente' | 'non-verificabile';
+    /**
+     * Il capitale contro cui il limite è stato giudicato, e `null` se non c'era un metro.
+     *
+     * Su una garanzia a **valore intero** coincide con il capitale raccomandato, e lì la
+     * regola proporzionale dell'art. 1907 c.c. opera davvero. Su un **primo rischio
+     * assoluto** è il danno massimo probabile e sta sotto: su quella forma la
+     * proporzionale non si applica, e citarla nel documento afferma il falso.
+     */
+    riferimentoAdeguatezza: MoneyDto | null;
     gradoDiCopertura: number;
     scoperturaDiCapitale: MoneyDto;
     simulazione: { danno: MoneyDto; indennizzo: MoneyDto; aCaricoAssicurato: MoneyDto };
@@ -323,9 +341,22 @@ export interface AnalisiDto {
     fido: {
       importo: MoneyDto;
       vincoloAttivo: string;
-      limitePatrimoniale: MoneyDto;
-      limiteDimensionale: MoneyDto;
-      limiteFlusso: MoneyDto;
+      /**
+       * I tre vincoli, e `null` dove il servizio non ha potuto calcolarli.
+       *
+       * Il confine è HTTP: qui non c'è nessun compilatore che leghi questa dichiarazione a
+       * ciò che il server manda davvero, quindi un tipo scritto male non produce un errore
+       * — produce uno schianto a valle, o peggio un numero inventato. È già successo in
+       * questo file, con lo stato camerale dichiarato non nullabile mentre arrivava
+       * `null`, e una `.replace()` due righe più in là.
+       *
+       * Zero e assente sono due frasi opposte sotto lo stesso numero: «tre volte l'EBITDA
+       * vale zero, l'impresa non genera cassa» contro «l'EBITDA non lo so». Sotto il
+       * numero che decide quanto credito concedere, la differenza è tutta.
+       */
+      limitePatrimoniale: MoneyDto | null;
+      limiteDimensionale: MoneyDto | null;
+      limiteFlusso: MoneyDto | null;
       fattoreScore: number;
       spiegazione: ExplanationDto;
     };
@@ -472,7 +503,16 @@ export interface AnalisiDto {
       addetti: number | null;
       haCoordinate: boolean;
       sismica: 'alta' | 'media' | 'bassa';
-      idraulica: 'alta' | 'media' | 'bassa';
+      /**
+       * Etichetta idraulica, non livello: la tabella conosce le **sole** province alte.
+       *
+       * Qui c'era `alta | media | bassa`, e il server manda anche `non determinata`. Il
+       * tipo non descriveva ciò che arrivava, e a valle il badge dipingeva la quarta
+       * stringa con la classe del rischio basso: una provincia mai misurata veniva
+       * mostrata come misurata bassa. Un livello mancante non è un livello intermedio,
+       * e nemmeno un livello minimo.
+       */
+      idraulica: 'alta' | 'non determinata';
       piuEsposta: boolean;
       /**
        * Contesto fisico attorno all'ubicazione: caserme e attività confinanti.
@@ -1104,23 +1144,31 @@ export interface IndicatoriArchivioDto {
     cassaSuDebitiBancariBreve: number | null;
     cassaSuDebitiFinanziariBreve: number | null;
     cassaSuDebitiTotaliBreve: number | null;
+    /** Flusso di cassa libero sui debiti finanziari a breve: quanto genera contro quanto scade. */
+    fcfSuDebitiFinanziariBreve: number | null;
   } | null;
   leveFinanziarie: {
     ebitdaLevaLorda: number | null;
     ebitdaLevaNetta: number | null;
     pfnSuEbitda: number | null;
+    /** Leva calcolata sui fondi generati dalla gestione (FFO) invece che sull'EBITDA. */
+    ffoLevaNetta: number | null;
   } | null;
   coperturaOneri: {
     ebitdaSuInteressiLordi: number | null;
     ebitdaSuInteressiNetti: number | null;
     ebitSuInteressiLordi: number | null;
     ebitSuInteressiNetti: number | null;
+    /** Copertura sugli interessi netti misurata sui fondi generati dalla gestione. */
+    ffoSuInteressiNetti: number | null;
   } | null;
   strutturaFinanziaria: {
     composizioneDebitoFinanziario: number | null;
     debitoFinanziarioLordoSuPatrimonio: number | null;
     debitoFinanziarioNettoSuPatrimonio: number | null;
     pfnSuPatrimonio: number | null;
+    /** Debito netto sul totale delle fonti: quanta parte dell'impresa è finanziata a debito. */
+    debitoNettoSuFontiTotali: number | null;
   } | null;
   cicloFinanziario: {
     durataCreditiVersoClienti: number | null;
@@ -1133,7 +1181,12 @@ export interface IndicatoriArchivioDto {
     rod: number | null;
     rodFinanziario: number | null;
   } | null;
-  efficienza: { rotazioneCreditiVersoClienti: number | null; indiceDiRotazione: number | null } | null;
+  efficienza: {
+    rotazioneCreditiVersoClienti: number | null;
+    indiceDiRotazione: number | null;
+    /** Quante volte l'anno ruota il magazzino: dice quanto valore giace assicurabile. */
+    rotazioneMagazzino: number | null;
+  } | null;
   sviluppo: {
     valoreAggiunto: number | null;
     variazioneEbit: number | null;
@@ -1157,6 +1210,15 @@ export interface IndicatoriArchivioDto {
   }[];
   statisticheAddetti: {
     impiegati: number | null;
+    /**
+     * Quota di operai.
+     *
+     * È il dato che pesa di più sulla RC lavoratori e sugli infortuni, ed era l'unico
+     * della composizione del personale a non essere dichiarato: nel riquadro che si
+     * intitola «pesa su RC lavoratori» mancava il sessantasette per cento di operai di
+     * un'impresa manifatturiera, già pagato e già in transito nella risposta.
+     */
+    operai: number | null;
     tempoDeterminato: number | null;
     tempoIndeterminato: number | null;
     tempoPieno: number | null;
@@ -1165,10 +1227,24 @@ export interface IndicatoriArchivioDto {
   qualifiche: {
     haCertificazioneSoa: boolean | null;
     esportatore: boolean | null;
+    /**
+     * Dove esporta, come lo dichiara l'archivio.
+     *
+     * «Esporta: sì» non basta a proporre nulla: il rischio di credito estero, il trasporto
+     * e il rischio politico cambiano con l'area, e il dato dell'area era già pagato.
+     */
+    paesiExport: string | null;
     importatore: boolean | null;
     pmiInnovativa: boolean | null;
     startUpInnovativa: boolean | null;
     impresaArtigiana: boolean | null;
+    /**
+     * Numero di iscrizione all'albo delle imprese artigiane, quando c'è.
+     *
+     * È un identificatore, non un numero: resta stringa. Vale «108261» e vale anche
+     * quando comincia per zero.
+     */
+    numeroAlboArtigiani: string | null;
     numeroUnitaLocali: number | null;
     appartieneAGruppoIva: boolean | null;
     capogruppoIva: boolean | null;
@@ -1193,7 +1269,19 @@ export interface IndicatoriArchivioDto {
     haControllateEstere: boolean | null;
     email: string | null;
     codiceSdi: string | null;
+    /**
+     * Legal Entity Identifier: il codice con cui l'impresa è identificata sui mercati
+     * finanziari. Serve ai programmi internazionali e alle coperture finanziarie.
+     */
+    codiceLei: string | null;
     presenteSuiSocial: boolean | null;
+    /**
+     * Gli indirizzi dei profili social, non il solo «sì» che ne dichiara l'esistenza.
+     *
+     * Vuoto quando l'archivio non ne porta nessuno: qui elenco vuoto e «non lo sappiamo»
+     * coincidono, perché la presenza è già dichiarata a parte da `presenteSuiSocial`.
+     */
+    profiliSocial: string[];
     commercializzabile: boolean | null;
     aggiornatoIl: string | null;
   } | null;

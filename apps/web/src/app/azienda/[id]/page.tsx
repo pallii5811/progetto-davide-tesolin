@@ -14,12 +14,12 @@ import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegi
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
 import { RitornoAllElenco } from '../../prospect/UltimoElenco';
+import { livelloTerritoriale } from './esposizione-territoriale';
 import type {
   AnalisiDto,
   IndicatoriArchivioDto,
   CollegamentoSocietario,
   GapDto,
-  LivelloRischio,
   RischioDto,
   SoliditaCompagnia,
 } from '@/lib/api';
@@ -406,10 +406,10 @@ export default async function PaginaAzienda({
                         {u.superficieMq === null ? 'da rilevare' : `${u.superficieMq} m²`}
                       </td>
                       <td className="px-4 py-3">
-                        <BadgeRischio livello={livelloTerritoriale(u.sismica)} testo={u.sismica} />
+                        <BadgeEsposizione valore={u.sismica} />
                       </td>
                       <td className="px-4 py-3">
-                        <BadgeRischio livello={livelloTerritoriale(u.idraulica)} testo={u.idraulica} />
+                        <BadgeEsposizione valore={u.idraulica} />
                       </td>
                     </tr>
                   ))}
@@ -1230,14 +1230,29 @@ export default async function PaginaAzienda({
 
 /** Navigazione fra le sezioni: la pagina è lunga, e scorrere alla cieca è un difetto. */
 /**
- * L'esposizione territoriale sulla scala dei livelli di rischio.
+ * L'esposizione sismica o idraulica di un'ubicazione, con il colore che le compete.
  *
- * Le due scale sono distinte nel dominio — «alta/media/bassa» descrive un territorio,
- * «critico/alto/…» descrive un rischio valutato — e la conversione avviene qui, al
- * momento di disegnarle, invece di confonderle nel motore.
+ * Il badge di rischio ha cinque livelli e nessuno di essi significa «non lo so»: passargli
+ * un valore ignoto lo faceva cadere sul verde del rischio basso, e la riga diceva «non
+ * determinata» dipinta come una buona notizia. Un'assenza dipinta di verde è peggio di
+ * un'assenza taciuta, perché sembra un accertamento.
+ *
+ * Qui l'assenza ha una forma sua: la stessa cornice neutra con cui la scheda di un rischio
+ * dice «non assicurabile», che non appartiene alla scala della gravità e non si confonde
+ * con nessuno dei suoi gradini.
  */
-function livelloTerritoriale(livello: 'alta' | 'media' | 'bassa'): LivelloRischio {
-  return livello === 'alta' ? 'alto' : livello === 'media' ? 'moderato' : 'basso';
+function BadgeEsposizione({ valore }: { valore: string }) {
+  const livello = livelloTerritoriale(valore);
+
+  if (livello === null) {
+    return (
+      <span className="rounded border border-bordo-forte px-1.5 py-0.5 text-xs text-testo-debole">
+        {valore}
+      </span>
+    );
+  }
+
+  return <BadgeRischio livello={livello} testo={valore} />;
 }
 
 /**
@@ -1878,14 +1893,37 @@ function VoceGap({
         <span>a cura {ETICHETTE_A_CURA[voce.piano.aCura]}</span>
       </p>
 
-      {voce.sottoassicurazione?.sottoassicurata === true && (
-        <p className="mt-2 rounded border border-alto/30 bg-alto-fondo p-2.5 text-sm text-alto">
-          Regola proporzionale (art. 1907 c.c.): su un danno di{' '}
-          {voce.sottoassicurazione.simulazione.danno.formattato} l&apos;indennizzo sarebbe{' '}
-          {voce.sottoassicurazione.simulazione.indennizzo.formattato} —{' '}
-          <strong>{voce.sottoassicurazione.simulazione.aCaricoAssicurato.formattato}</strong> a carico
-          dell&apos;impresa.
-        </p>
+      {/*
+        La stessa correzione del fascicolo, e per la stessa ragione.
+
+        Il riquadro annunciava la riduzione proporzionale sul solo booleano
+        `sottoassicurata` — anche su una garanzia a primo rischio assoluto, dove quella
+        riduzione non esiste e la somma non si misura sul valore dei beni. Il motore
+        distingue i tre casi e scrive la frase di ciascuno: qui si stampa quella, con gli
+        importi che contiene.
+
+        E si legge lo stato a tre valori, non il booleano: quello è vero solo su
+        `insufficiente`, e il caso «non so giudicare il limite» — ogni primo rischio senza
+        danno atteso stimato — spariva dalla scheda, indistinguibile da «adeguata».
+      */}
+      {voce.sottoassicurazione !== null && voce.sottoassicurazione.adeguatezzaDelLimite !== 'adeguata' && (
+        <div
+          className={
+            voce.sottoassicurazione.adeguatezzaDelLimite === 'insufficiente'
+              ? 'mt-2 space-y-1.5 rounded border border-alto/30 bg-alto-fondo p-2.5 text-sm text-alto'
+              : 'mt-2 space-y-1.5 rounded border border-bordo-forte p-2.5 text-sm text-testo-tenue'
+          }
+        >
+          {voce.sottoassicurazione.spiegazione.note.length === 0 ? (
+            <p>[verifica del capitale: spiegazione non disponibile in questa analisi]</p>
+          ) : (
+            voce.sottoassicurazione.spiegazione.note.map((nota) => (
+              <p key={nota} className="leading-relaxed">
+                {nota}
+              </p>
+            ))
+          )}
+        </div>
       )}
 
       {voce.polizza !== null && (

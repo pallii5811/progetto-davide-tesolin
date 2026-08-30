@@ -16,8 +16,9 @@ import type { Explained } from '../shared/explain.js';
 import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import type { CompanyFacts } from '../company/facts.js';
+import type { FormaGiuridica, StatoAttivita } from '../company/profile.js';
 import type { CompanySize } from '../company/size.js';
-import { formattaGiorno } from '../shared/tempo.js';
+import { formattaGiorno, inizioDellaGiornata } from '../shared/tempo.js';
 
 export type CatNatStatus =
   /** Non soggetta all'obbligo. */
@@ -44,6 +45,35 @@ export interface CatNatAssessment {
 }
 
 /**
+ * L'ultimo istante del giorno indicato, letto a Roma.
+ *
+ * I termini erano scritti T23:59:59Z, che a Roma è l'01:59:59 del giorno dopo: sette
+ * termini di legge su sette uscivano stampati il giorno successivo a quello della tabella
+ * di docs/DOMINIO.md — 01/04/2025 invece di 31/03/2025, e così tutti gli altri. Le prove
+ * non lo vedevano perché confrontavano la stringa ISO della costante o getUTCFullYear,
+ * cioè il valore che dentro la costante è già corretto; il giorno che il cliente legge non
+ * è quello.
+ *
+ * Il fuso non si eredita dalla macchina: inizioDellaGiornata lo dichiara, ed è la stessa
+ * funzione con cui il resto del prodotto risponde alla stessa domanda.
+ *
+ * Un termine di legge scade alla fine del giorno che porta, non al suo inizio: qui si
+ * tiene l'ultimo millisecondo, così il giorno stampato e il giorno utile coincidono.
+ */
+function fineDelGiorno(giorno: string): Date {
+  const mezzogiorno = new Date(`${giorno}T12:00:00Z`);
+  /*
+    Trentasei ore da mezzanotte cadono dentro il giorno dopo che quel giorno duri 23, 24 o
+    25 ore: il cambio d'ora non sposta il risultato. Poi si riporta alla mezzanotte romana
+    e si toglie un millisecondo.
+  */
+  const giornoDopo = inizioDellaGiornata(
+    new Date(inizioDellaGiornata(mezzogiorno).getTime() + 36 * 3_600_000),
+  );
+  return new Date(giornoDopo.getTime() - 1);
+}
+
+/**
  * Scadenze per classe dimensionale.
  * Tabella volutamente isolata e datata: la materia è stata oggetto di proroghe ripetute
  * e va aggiornata qui, in un punto solo.
@@ -51,10 +81,10 @@ export interface CatNatAssessment {
  * Ultimo allineamento: agosto 2026.
  */
 export const TERMINI_CATNAT: Readonly<Record<CompanySize, Date>> = {
-  grande: new Date('2025-03-31T23:59:59Z'),
-  media: new Date('2025-10-01T23:59:59Z'),
-  piccola: new Date('2026-01-01T23:59:59Z'),
-  micro: new Date('2026-01-01T23:59:59Z'),
+  grande: fineDelGiorno('2025-03-31'),
+  media: fineDelGiorno('2025-10-01'),
+  piccola: fineDelGiorno('2026-01-01'),
+  micro: fineDelGiorno('2026-01-01'),
 };
 
 /**
@@ -64,9 +94,9 @@ export const TERMINI_CATNAT: Readonly<Record<CompanySize, Date>> = {
 export const PROROGHE_SETTORIALI: Readonly<
   Record<string, { readonly termine: Date; readonly settore: string }>
 > = {
-  '03': { termine: new Date('2026-12-31T23:59:59Z'), settore: 'pesca e acquacoltura' },
-  '55': { termine: new Date('2026-03-31T23:59:59Z'), settore: 'alloggio e strutture turistico-ricettive' },
-  '56': { termine: new Date('2026-03-31T23:59:59Z'), settore: 'somministrazione di alimenti e bevande' },
+  '03': { termine: fineDelGiorno('2026-12-31'), settore: 'pesca e acquacoltura' },
+  '55': { termine: fineDelGiorno('2026-03-31'), settore: 'alloggio e strutture turistico-ricettive' },
+  '56': { termine: fineDelGiorno('2026-03-31'), settore: 'somministrazione di alimenti e bevande' },
 };
 
 export const BENI_INCLUSI: readonly string[] = [
@@ -81,14 +111,49 @@ export const EVENTI_COPERTI: readonly string[] = [
   'Frane',
 ];
 
+/**
+ * «Si tiene conto», non «preclude».
+ *
+ * L'art. 1 c. 102 dispone che dell'inadempimento si tenga conto nell'assegnazione di
+ * contributi, sovvenzioni e agevolazioni di carattere finanziario a valere su risorse
+ * pubbliche, anche di quelli previsti in occasione di eventi calamitosi e catastrofali.
+ * Qui era scritto «nessun accesso ai sostegni statali straordinari: la ricostruzione resta
+ * interamente a carico dell'impresa», che è più severo della norma — e che si
+ * contraddiceva con la riga sopra a tre righe di distanza, dentro l'avviso critico letto
+ * dal cliente. Sovradichiarare un obbligo è pericoloso quanto tacerlo: al primo controllo
+ * fatto dal cliente, tutto il resto del documento perde credito.
+ *
+ * La formulazione corretta era già scritta nel prodotto — motivazione.ts, la regola
+ * obbligoCatNat — ed è quella che si copia qui invece di inventarne una terza.
+ */
 export const CONSEGUENZE_INADEMPIMENTO: readonly string[] = [
-  'L’inadempimento è considerato nell’assegnazione di contributi, sovvenzioni e agevolazioni ' +
+  'Dell’inadempimento si tiene conto nell’assegnazione di contributi, sovvenzioni e agevolazioni ' +
     'di carattere finanziario a valere su risorse pubbliche.',
-  'In caso di evento calamitoso, nessun accesso ai sostegni statali straordinari: la ricostruzione ' +
-    'resta interamente a carico dell’impresa.',
-  'Possibile rilievo nella valutazione degli adeguati assetti organizzativi ex art. 2086 c.c. ' +
-    'in capo all’organo amministrativo.',
+  'Se ne tiene conto anche per i contributi previsti in occasione di eventi calamitosi e ' +
+    'catastrofali: l’inadempimento è un elemento della valutazione, non una decadenza automatica.',
 ];
+
+/**
+ * Gli adeguati assetti, detti a chi la norma li chiede.
+ *
+ * L'art. 2086, c. 2, c.c. grava sull'imprenditore «che operi in forma societaria o
+ * collettiva»: alla ditta individuale non si applica, e affermarglielo in un documento
+ * firmato è un obbligo di legge inventato. Sulla forma non rilevata — 'altro' è il valore
+ * dell'ignoto — non si afferma nulla: l'assenza resta assenza.
+ */
+export const CONSEGUENZA_ASSETTI_ADEGUATI =
+  'Possibile rilievo nella valutazione degli adeguati assetti organizzativi ex art. 2086, c. 2, ' +
+  'c.c. in capo all’organo amministrativo.';
+
+/** Chi non opera in forma societaria o collettiva, e chi non si sa in quale forma operi. */
+const FORME_SENZA_ORGANO_AMMINISTRATIVO: readonly FormaGiuridica[] = ['ditta-individuale', 'altro'];
+
+function conseguenzeInadempimentoPer(facts: CompanyFacts): readonly string[] {
+  if (FORME_SENZA_ORGANO_AMMINISTRATIVO.includes(facts.formaGiuridica)) {
+    return CONSEGUENZE_INADEMPIMENTO;
+  }
+  return [...CONSEGUENZE_INADEMPIMENTO, CONSEGUENZA_ASSETTI_ADEGUATI];
+}
 
 export const VINCOLI_DI_PRODOTTO: readonly string[] = [
   'Scoperto o franchigia non superiore al 15% del danno indennizzabile per somme assicurate fino a 30 M€.',
@@ -148,8 +213,21 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
     );
   }
 
-  const giorniAlTermine = Math.ceil((termine.getTime() - asOf.getTime()) / 86_400_000);
-  const scaduto = giorniAlTermine < 0;
+  /*
+    La scadenza si decide sugli istanti, non sul segno di un arrotondamento.
+
+    Math.ceil di un valore fra -1 e 0 vale meno zero, e meno zero minore di zero è falso:
+    per ventiquattro ore piene dopo la scadenza il prodotto scriveva «Termine fra 0 giorni»
+    e la priorità non saliva. Era il giorno in cui la telefonata conta di più.
+
+    I giorni si contano fra due mezzanotti romane — è il numero che il cliente conta sul
+    calendario — e non fra due istanti divisi per 86.400.000: fra due mezzanotti separate
+    da un cambio d'ora ci sono 23 o 25 ore, e la divisione nuda perderebbe un giorno.
+  */
+  const scaduto = asOf.getTime() > termine.getTime();
+  const giorniAlTermine = Math.round(
+    (inizioDellaGiornata(termine).getTime() - inizioDellaGiornata(asOf).getTime()) / 86_400_000,
+  );
 
   const status: CatNatStatus = giaCoperta ? 'adempiente' : scaduto ? 'inadempiente' : 'in-scadenza';
 
@@ -173,6 +251,20 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
   } else {
     builder.note(
       'Copertura catastrofale risultante in portafoglio: verificarne la conformità ai vincoli di legge.',
+    );
+  }
+
+  /*
+    L'impresa iscritta ma ferma resta obbligata, e l'intermediario deve saperlo prima di
+    telefonare. Togliere l'obbligo sarebbe inventare un'esclusione che la norma non
+    concede; tacere lo stato la fa sembrare una posizione ordinaria in cima alla coda.
+  */
+  const statoNonOperativo = STATI_NON_OPERATIVI[facts.statoAttivita];
+  if (statoNonOperativo !== undefined) {
+    builder.note(
+      `L’impresa risulta ${statoNonOperativo}: resta iscritta al registro delle imprese e ` +
+        'l’obbligo permane, ma la posizione va verificata prima di trattarla come una lavorazione ' +
+        'ordinaria.',
     );
   }
 
@@ -201,7 +293,7 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
     beniInclusi: BENI_INCLUSI,
     eventiCoperti: EVENTI_COPERTI,
     vincoliDiProdotto: VINCOLI_DI_PRODOTTO,
-    conseguenzeInadempimento: status === 'adempiente' ? [] : CONSEGUENZE_INADEMPIMENTO,
+    conseguenzeInadempimento: status === 'adempiente' ? [] : conseguenzeInadempimentoPer(facts),
   });
 }
 
@@ -214,7 +306,70 @@ export function assessCatNat(input: CatNatInput): Explained<CatNatAssessment> {
  */
 export const DIVISIONE_PESCA = '03';
 
+/**
+ * Gli stati in cui l'impresa non è più in condizione di adempiere in proprio.
+ *
+ * Prima escludeva la sola 'cessata': fallita, in liquidazione, inattiva e sospesa uscivano
+ * soggette e inadempienti, con l'avviso critico e la priorità massima — cioè in cima alla
+ * coda di telefonate dell'intermediario.
+ *
+ * Terminali sono queste due, ed è la stessa coppia che il motore di credito tratta
+ * insieme in score.ts. Sulle altre non si inventa un'esclusione che la norma non concede:
+ * si dichiara lo stato, qui sotto.
+ */
+const STATI_TERMINALI: Partial<Readonly<Record<StatoAttivita, string>>> = {
+  cessata:
+    'impresa cessata: cancellata dal registro delle imprese, non è più tenuta all’iscrizione ex art. 2188 c.c.',
+  fallita:
+    'impresa in liquidazione giudiziale: con l’apertura della procedura l’imprenditore è spossessato ' +
+    'dei beni, che passano nella disponibilità del curatore',
+};
+
+/**
+ * Gli stati in cui l'impresa è ancora iscritta — l'obbligo permane — ma non sta operando.
+ * L'obbligo non si toglie; si dice all'intermediario che cosa ha davanti.
+ */
+const STATI_NON_OPERATIVI: Partial<Readonly<Record<StatoAttivita, string>>> = {
+  'in-liquidazione': 'in liquidazione',
+  inattiva: 'inattiva',
+  sospesa: 'sospesa',
+};
+
+/**
+ * Gli enti che non sono imprese tenute all'iscrizione nel registro delle imprese.
+ *
+ * L'art. 1 c. 101 della L. 213/2023 grava sulle imprese tenute all'iscrizione ex art. 2188
+ * c.c.; docs/DOMINIO.md lo dichiara allo stesso modo. valutaEsclusione non leggeva mai la
+ * forma giuridica: un comune usciva «soggetto e inadempiente», identico a una S.r.l.
+ *
+ * 'altro' non è in questo elenco: è il valore dell'ignoto, e l'ignoto non vale esclusione.
+ */
+const FORME_NON_IMPRENDITORIALI: Partial<Readonly<Record<FormaGiuridica, string>>> = {
+  associazione: 'associazione',
+  fondazione: 'fondazione',
+  'ente-pubblico': 'ente pubblico',
+};
+
 function valutaEsclusione(facts: CompanyFacts): string | null {
+  /*
+    Lo stato per primo, e non è un dettaglio d'ordine.
+
+    Questo controllo stava in fondo, dopo il ramo della sezione A — che ritorna sempre,
+    in tutti e tre i suoi esiti. Dentro la sezione A il controllo sullo stato era quindi
+    irraggiungibile, e un peschereccio cessato usciva soggetto e inadempiente.
+  */
+  const terminale = STATI_TERMINALI[facts.statoAttivita];
+  if (terminale !== undefined) return terminale;
+
+  const ente = FORME_NON_IMPRENDITORIALI[facts.formaGiuridica];
+  if (ente !== undefined) {
+    return (
+      `ente non imprenditoriale (${ente}): l’obbligo grava sulle imprese tenute all’iscrizione nel ` +
+      'registro delle imprese ex art. 2188 c.c.; se l’ente esercita un’attività d’impresa ' +
+      'commerciale iscritta l’obbligo sussiste e va verificato in intervista'
+    );
+  }
+
   /*
     L'esclusione è dell'attività agricola, non dell'intera sezione A.
 
@@ -237,9 +392,6 @@ function valutaEsclusione(facts: CompanyFacts): string | null {
     if (facts.atecoDivisione === null) return null;
     if (facts.atecoDivisione === DIVISIONE_PESCA) return null;
     return 'impresa agricola ex art. 2135 c.c., per la quale opera il Fondo AGRICAT';
-  }
-  if (facts.statoAttivita === 'cessata') {
-    return 'impresa cessata';
   }
   return null;
 }

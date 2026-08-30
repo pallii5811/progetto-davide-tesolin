@@ -11,13 +11,31 @@
  * manda una comunicazione quando lo fa.
  *
  * Il presidio non è quindi «li abbiamo verificati tutti» — è una promessa che nessuno può
- * mantenere. È: **il sistema se ne accorge da solo**. Ogni risposta viene confrontata con
+ * mantenere. È: **il sistema se ne accorge da solo**. Una risposta viene confrontata con
  * l'elenco dei campi noti, e ciò che non vi compare viene segnalato a chi gestisce la
  * piattaforma. Un dato nuovo smette di essere un dato perso in silenzio e diventa una
  * riga da leggere.
  *
  * Costa una passeggiata sull'oggetto già in memoria: nessuna chiamata, nessun ritardo
  * percepibile.
+ *
+ * ⚠ **NON È ANCORA COLLEGATA IN PRODUZIONE.** Fino al 29/08/2026 questo file diceva «ogni
+ * risposta viene confrontata», al presente, e due commenti altrove nel repo davano il
+ * presidio per attivo — mentre la classe non era mai stata istanziata in nessun punto del
+ * repo, test compresi. È il presidio che avrebbe dovuto segnalare le quattro procedure
+ * concorsuali perse il 20 agosto, e non poteva segnalare niente.
+ *
+ * Oggi gira sulle risposte registrate, in `test/presidi-vivi.test.ts`. Per accenderlo in
+ * produzione manca **una sola cucitura**, nel punto in cui le risposte grezze arrivano —
+ * `OpenApiProvider` in `provider.ts`: costruirne una istanza con `CAMPI_NOTI` e chiamare
+ * `esamina(servizio, raw)` dentro `#get`, `#fetchProfiloCompleto` e `#leggiNegativita`,
+ * con `onNuovo` collegato al registro della piattaforma. Quel file è fuori dalla corsia di
+ * chi scrive questa nota: la cucitura è una decisione del committente, non una svista da
+ * correggere di nascosto.
+ *
+ * Finché quella riga non c'è, questo commento dice il vero e il presidio è **spento**. Un
+ * presidio morto è peggio di nessun presidio, perché rassicura: se la decisione fosse di
+ * non collegarlo, si cancelli il file invece di lasciarlo a fare da garanzia.
  */
 
 /** Percorso di un campo mai letto, con il servizio da cui è arrivato. */
@@ -71,7 +89,19 @@ export class SorveglianzaCampi {
 
     for (const [percorso, valore] of foglie(raw)) {
       const nome = percorso.split('.').at(-1) ?? percorso;
-      if (this.#conosciuti.has(nome) || nome in SCARTATI_A_RAGION_VEDUTA) continue;
+      /*
+        `Object.hasOwn`, non l'operatore `in`.
+
+        `in` percorre la **catena dei prototipi**: `'constructor' in { … }` risponde `true`
+        su qualunque oggetto letterale, e così `toString`, `valueOf`, `hasOwnProperty`,
+        `__proto__`. Un campo che il fornitore chiamasse in uno di quei modi veniva quindi
+        trattato come «scartato a ragion veduta» — cioè taciuto, con la motivazione di un
+        altro campo.
+
+        È il modo peggiore in cui un presidio può sbagliare: non protesta, tace. E questo
+        presidio esiste soltanto per non tacere.
+      */
+      if (this.#conosciuti.has(nome) || Object.hasOwn(SCARTATI_A_RAGION_VEDUTA, nome)) continue;
 
       const chiave = `${servizio}:${percorso}`;
       if (this.#visti.has(chiave)) continue;

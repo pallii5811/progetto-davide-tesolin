@@ -105,7 +105,18 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
       'Manutenzione programmata degli impianti elettrici',
     ],
     assicurabile: true,
-    riferimenti: ['D.P.R. 151/2011 — prevenzione incendi'],
+    /*
+      La regola che identifica questo rischio è `SEMPRE`: la citazione la legge ogni
+      impresa, parrucchiere con un addetto compreso. Ma il D.P.R. 151/2011 non si applica
+      a chiunque — si applica alle attività elencate nel suo Allegato I, ottanta voci che
+      non si deducono da un codice ATECO.
+
+      Non si inventa qui il perimetro che il prodotto non sa calcolare, e non si toglie la
+      norma a chi ci rientra: si degrada l'affermazione a ciò che si sa davvero, cioè che
+      la norma esiste e vale per quelle attività. Chi legge deve poter capire se lo
+      riguarda, invece di leggere che lo riguarda.
+    */
+    riferimenti: ['D.P.R. 151/2011 — prevenzione incendi, per le attività dell’Allegato I'],
   },
   'furto-scorte': {
     id: 'furto-scorte',
@@ -144,8 +155,16 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
     id: 'catastrofale-sisma',
     category: 'patrimoniale',
     label: 'Evento sismico',
-    description:
-      'Danni da terremoto ai beni immobili e mobili strumentali. Rientra nell’obbligo assicurativo CAT NAT.',
+    /*
+      «Rientra nell'obbligo assicurativo CAT NAT» era scritto qui, in una descrizione che
+      legge **ogni** impresa — compresa quella che il motore CAT NAT aveva escluso, e che
+      due pagine più in là leggeva «non soggetta all'obbligo». Il documento si
+      contraddiceva al proprio interno.
+
+      La descrizione dice il pericolo, che c'è per tutti. Chi sia soggetto all'obbligo lo
+      dice il capitolo CAT NAT, che è l'unico a saperlo.
+    */
+    description: 'Danni da terremoto ai beni immobili e mobili strumentali.',
     baseLikelihood: 2,
     baseImpact: 5,
     coverages: ['catastrofali', 'danni-indiretti'],
@@ -161,8 +180,8 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
     id: 'catastrofale-alluvione',
     category: 'patrimoniale',
     label: 'Alluvione, inondazione, frana',
-    description:
-      'Danni da esondazione, allagamento e movimenti franosi ai beni aziendali. Rientra nell’obbligo CAT NAT.',
+    // Come per il sisma: il pericolo qui, l'obbligo nel capitolo che sa per chi vale.
+    description: 'Danni da esondazione, allagamento e movimenti franosi ai beni aziendali.',
     baseLikelihood: 2,
     baseImpact: 5,
     coverages: ['catastrofali', 'danni-indiretti'],
@@ -417,7 +436,11 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
       'Formazione anti-phishing del personale',
     ],
     assicurabile: true,
-    riferimenti: ['D.Lgs. 138/2024 — NIS 2'],
+    // Stessa forma della prevenzione incendi, e stesso rimedio: la regola è `SEMPRE`, ma
+    // la NIS 2 grava sui soggetti essenziali e importanti degli allegati I e II, sopra
+    // soglie dimensionali. Il perimetro non si deduce dai fatti che il prodotto possiede:
+    // si dichiara nella citazione invece di asserirlo all'impresa che la legge.
+    riferimenti: ['D.Lgs. 138/2024 (NIS 2) — per i soggetti essenziali e importanti degli allegati I e II'],
   },
   'data-breach': {
     id: 'data-breach',
@@ -603,9 +626,21 @@ export const RISK_CATALOG: Readonly<Record<RiskId, RiskDefinition>> = {
     id: 'inadempimento-catnat',
     category: 'normativo',
     label: 'Inadempimento dell’obbligo assicurativo CAT NAT',
+    /*
+      «Con esclusione dall'accesso» è più severo della norma.
+
+      L'art. 1 c. 102 della L. 213/2023 dice che dell'inadempimento **si tiene conto**
+      nell'assegnazione di contributi, sovvenzioni e agevolazioni a valere su risorse
+      pubbliche, anche di quelle previste in occasione di eventi calamitosi. Non è
+      un'esclusione automatica. Sovradichiarare un obbligo è pericoloso quanto tacerlo: al
+      primo controllo fatto dal cliente, tutto il resto del documento perde credito.
+
+      La lettura corretta è già scritta in `coverage/motivazione.ts`: è quella, non un'altra.
+    */
     description:
-      'Mancata stipula della copertura catastrofale obbligatoria, con esclusione dall’accesso a contributi, ' +
-      'incentivi e agevolazioni pubbliche e dai sostegni straordinari in caso di evento.',
+      'Mancata stipula della copertura catastrofale obbligatoria. Dell’inadempimento si tiene conto ' +
+      'nell’assegnazione di contributi, sovvenzioni e agevolazioni di carattere finanziario a valere ' +
+      'su risorse pubbliche, comprese quelle previste in occasione di eventi calamitosi.',
     baseLikelihood: 4,
     baseImpact: 3,
     coverages: ['catastrofali'],
@@ -663,15 +698,46 @@ export function riferimentiPerImpresa(
 
   if (id === 'rc-professionale') {
     /*
+      La struttura sanitaria ha un obbligo suo, e non è quello dell'albo.
+
+      L'art. 10 della L. 24/2017 impone alle strutture sanitarie e sociosanitarie,
+      pubbliche e private, la copertura per la responsabilità verso terzi e verso i
+      prestatori d'opera, anche per i danni cagionati dal personale a qualunque titolo
+      operante; l'art. 7 c. 1 ne fissa il titolo contrattuale. Il prodotto non lo nominava
+      affatto: misurato su 86.10.10 con sessanta dipendenti, quattordici coperture
+      richieste e nessuna responsabilità professionale.
+
+      La sezione Q comprende anche l'assistenza sociale non residenziale, per la quale la
+      qualificazione di «struttura sociosanitaria» va accertata: la citazione dichiara il
+      perimetro della norma e non lo attribuisce all'impresa.
+    */
+    if (facts.atecoSezione === 'Q') {
+      return [
+        ...base,
+        'Art. 7, c. 1, L. 24/2017 — responsabilità contrattuale della struttura',
+        'Art. 10 L. 24/2017 — obbligo di copertura per le strutture sanitarie e sociosanitarie',
+      ];
+    }
+
+    /*
       L'obbligo vale per chi è iscritto a un albo, non per una sezione ATECO.
 
       La sezione M raccoglie le attività professionali; J e K no — e la regola che
-      identifica questo rischio prende tutte e tre. Dentro la M l'iscrizione all'albo
-      resta da confermare in intervista, ma l'affermazione è almeno plausibile; fuori è
-      falsa e basta.
+      identifica questo rischio prende tutte e tre. Ma circa metà della M non ha albo:
+      agenzie pubblicitarie, design, traduzione, consulenza. Citare l'obbligo nudo a
+      un'agenzia pubblicitaria è affermarle un obbligo di legge che non ha, ed è lo stesso
+      fatto che `coverage/motivazione.ts` tratta con `suDatoIgnoto: true` e con la frase
+      «l'iscrizione all'albo va confermata».
+
+      Un elenco di stringhe non porta con sé un `suDatoIgnoto`: la condizione si scrive
+      dentro la citazione, che così dice di chi è l'obbligo invece di attribuirlo.
     */
     if (facts.atecoSezione !== 'M') return base;
-    return [...base, 'Art. 3, c. 5, lett. e) D.L. 138/2011', 'Art. 5 D.P.R. 137/2012'];
+    return [
+      ...base,
+      'Art. 3, c. 5, lett. e) D.L. 138/2011 — obbligo per i professionisti iscritti in albi o elenchi',
+      'Art. 5 D.P.R. 137/2012 — obbligo per i professionisti iscritti in albi o elenchi',
+    ];
   }
 
   return base;

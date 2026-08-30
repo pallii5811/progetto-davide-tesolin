@@ -20,7 +20,7 @@ import type { Money as Euro } from '../shared/money.js';
 import type { CompanyFacts } from '../company/facts.js';
 import { atecoStartsWith } from '../shared/identifiers.js';
 import type { RiskId } from './taxonomy.js';
-import { worstExposure } from './geo.js';
+import { territorialExposure, worstExposure } from './geo.js';
 import {
   categoriaSocietaria,
   normaResponsabilitaAmministratori,
@@ -143,10 +143,26 @@ function numeroOltre(value: number | null, soglia: number): Verdict {
   return value > soglia;
 }
 
+/*
+  «Non classificata» non è «zona 4».
+
+  Questa regola rispondeva `false` per trentatré province su centosette — Milano, Torino,
+  Venezia, Padova, Piacenza — perché la tabella non le contiene. E una regola con verdetto
+  falso non entra affatto nel registro (`engine.ts`): la modulazione sismica spariva senza
+  che nessuno potesse accorgersene, proprio dove non si sapeva.
+
+  Le province si guardano una per una e non attraverso `worstExposure`: quell'aggregato
+  restituisce il livello più alto fra quelli **noti**, e su un'impresa con una provincia
+  «media» e una non classificata risponderebbe «media», nascondendo l'ignoto dietro un
+  livello misurato. Finché una provincia operativa non è classificata, «no» non è una
+  risposta che il prodotto possa dare.
+*/
 function sismicaAlta(facts: CompanyFacts): Verdict {
-  const exposure = worstExposure(facts.provinceOperative);
-  if (exposure === null) return 'ignoto';
-  return exposure.sismica === 'alta';
+  if (facts.provinceOperative.length === 0) return 'ignoto';
+  const esposizioni = facts.provinceOperative.map(territorialExposure);
+  if (esposizioni.some((e) => e.sismica === 'alta')) return true;
+  if (esposizioni.some((e) => e.sismica === null)) return 'ignoto';
+  return false;
 }
 
 function idraulicaAlta(facts: CompanyFacts): Verdict {
@@ -291,7 +307,9 @@ export const RISK_RULES: readonly RiskRule[] = [
     id: 'alluvione/sempre',
     risk: 'catastrofale-alluvione',
     when: SEMPRE,
-    rationale: 'Rischio idrogeologico diffuso e ricompreso nell’obbligo assicurativo CAT NAT.',
+    // L'obbligo lo afferma il capitolo CAT NAT, che sa per chi vale: qui si dice il
+    // rischio, che c'è per tutti, non l'obbligo, che non è di tutti.
+    rationale: 'Rischio idrogeologico diffuso su gran parte del territorio nazionale.',
   },
   {
     kind: 'modula',
@@ -475,11 +493,19 @@ export const RISK_RULES: readonly RiskRule[] = [
       fornitore la responsabilità è **sussidiaria**: scatta solo se il produttore non è
       individuato e il fornitore non ne comunica l'identità entro tre mesi (art. 116 Cod.
       cons.). Dire a un negozio che risponde come chi ha fabbricato il prodotto è falso.
+
+      E l'art. 118 stava dalla parte sbagliata. Era citato accanto al 114 come fonte della
+      responsabilità del produttore, mentre è la norma delle **esimenti** — fra cui il
+      rischio da sviluppo. Il file gemello `coverage/taxonomy.ts` lo legge correttamente
+      da tempo («nei limiti delle esimenti previste dalla legge»): qui la copia rovesciata
+      era sopravvissuta, e stava nella frase che il broker legge al cliente. «Oggettiva»
+      senza riserve è la versione che il legale della controparte smonta per primo.
     */
     rationale: (f) =>
       f.produceBeniFinali === true
         ? 'Immissione sul mercato di prodotti finiti: il produttore risponde del danno da prodotto ' +
-          'difettoso a prescindere dalla colpa (artt. 114 e 118 D.Lgs. 206/2005).'
+          'difettoso a prescindere dalla colpa (art. 114 D.Lgs. 206/2005), nei limiti delle esimenti ' +
+          'previste dall’art. 118.'
         : f.produceBeniFinali === false
           ? 'Commercializzazione di prodotti: il fornitore risponde in via sussidiaria quando il ' +
             'produttore non è individuato (art. 116 D.Lgs. 206/2005).'
@@ -519,9 +545,31 @@ export const RISK_RULES: readonly RiskRule[] = [
     kind: 'identifica',
     id: 'rc-professionale/servizi-professionali',
     risk: 'rc-professionale',
-    when: (f) => sezione(f, 'M', 'J', 'K'),
-    rationale:
-      'Prestazione di servizi professionali e tecnici: esposizione al danno puramente patrimoniale.',
+    /*
+      La sezione Q mancava, e con lei l'unico obbligo di legge del gruppo.
+
+      Misurato su 86.10.10 con sessanta dipendenti: quattordici coperture richieste e
+      nessuna responsabilità professionale. L'art. 10 della L. 24/2017 impone alle
+      strutture sanitarie e sociosanitarie, pubbliche e private, la copertura per la
+      responsabilità civile verso terzi e verso i prestatori d'opera, anche per i danni
+      cagionati dal personale a qualunque titolo operante. Non è un rischio sottostimato:
+      è un obbligo che il prodotto non nominava, e l'intermediario che non lo nomina
+      risponde lui.
+    */
+    when: (f) => sezione(f, 'M', 'J', 'K', 'Q'),
+    /*
+      Il titolo di responsabilità non è lo stesso, e la frase lo deve dire.
+
+      Per la struttura sanitaria la responsabilità verso il paziente è contrattuale
+      (art. 7 c. 1 L. 24/2017); per lo studio professionale è il danno patrimoniale da
+      inesatta prestazione. Una frase sola per entrambi sarebbe vera per uno solo.
+    */
+    rationale: (f) =>
+      f.atecoSezione === 'Q'
+        ? 'Struttura sanitaria o sociosanitaria: risponde a titolo contrattuale dell’operato del ' +
+          'personale a qualunque titolo operante, e la copertura della responsabilità verso terzi e ' +
+          'verso i prestatori d’opera è imposta dalla legge.'
+        : 'Prestazione di servizi professionali e tecnici: esposizione al danno puramente patrimoniale.',
   },
 
   // ── Persone ───────────────────────────────────────────────────────────────
@@ -629,12 +677,29 @@ export const RISK_RULES: readonly RiskRule[] = [
     kind: 'identifica',
     id: 'd-and-o/societa-di-capitali',
     risk: 'responsabilita-amministratori',
+    /*
+      Consorzio, associazione e fondazione mancavano — e lo stesso file asseriva loro la
+      231.
+
+      Le due cose non stanno insieme: se un ente risponde in proprio dei reati commessi
+      nel suo interesse, ha un organo che quei reati può commetterli, e chi lo compone
+      risponde della gestione. Il consorzio con attività esterna, l'associazione
+      riconosciuta e la fondazione hanno amministratori distinti da chi conferisce i
+      mezzi, ed è esattamente la fattispecie che la D&O serve.
+
+      Restano fuori le forme in cui amministra chi possiede: società di persone e ditta
+      individuale. Lì il tema non è la responsabilità dell'organo verso l'ente, ma quella
+      patrimoniale del socio — che il prodotto tratta con `regimeDiResponsabilita`.
+    */
     when: (f) =>
       f.formaGiuridica === 'spa' ||
       f.formaGiuridica === 'srl' ||
       f.formaGiuridica === 'srls' ||
       f.formaGiuridica === 'sapa' ||
-      f.formaGiuridica === 'cooperativa',
+      f.formaGiuridica === 'cooperativa' ||
+      f.formaGiuridica === 'consorzio' ||
+      f.formaGiuridica === 'associazione' ||
+      f.formaGiuridica === 'fondazione',
     /*
       La norma non è la stessa per tutte. Qui c'era «artt. 2392 ss. c.c.» per tutte e
       cinque le forme: sono norme della S.p.A., citate a ogni S.r.l. — cioè alla forma
@@ -648,10 +713,23 @@ export const RISK_RULES: readonly RiskRule[] = [
     */
     rationale: (f) => {
       const norma = normaResponsabilitaAmministratori(f.formaGiuridica);
-      const categoria = categoriaSocietaria(f.formaGiuridica) ?? 'Ente con organo amministrativo';
-      return norma === null
-        ? `${categoria}: gli amministratori rispondono personalmente verso la società, i soci e i terzi.`
-        : `${categoria}: gli amministratori rispondono personalmente ex ${norma}`;
+      if (norma !== null) {
+        const categoria = categoriaSocietaria(f.formaGiuridica) ?? 'Ente con organo amministrativo';
+        return `${categoria}: gli amministratori rispondono personalmente ex ${norma}`;
+      }
+      /*
+        Senza norma nominata la frase non si completa con un default plausibile.
+
+        «Rispondono verso la società, i soci e i terzi» era la coda che restava quando la
+        norma mancava: in una fondazione non ci sono soci, e in un'associazione non c'è
+        una società. Si dice ciò che vale per ogni ente collettivo — la responsabilità di
+        chi amministra verso l'ente e verso i terzi — e non si nomina un articolo che il
+        prodotto non ha accertato.
+      */
+      return (
+        'Ente collettivo con organo amministrativo distinto da chi ne conferisce i mezzi: chi ' +
+        'amministra risponde personalmente, verso l’ente e verso i terzi, degli atti di gestione.'
+      );
     },
   },
   {
@@ -716,16 +794,38 @@ export const RISK_RULES: readonly RiskRule[] = [
 
       Le soglie erano un criterio commerciale di priorità travestito da perimetro
       normativo: la priorità resta, ma la dice la modulazione qui sotto, non l'esclusione.
+
+      Ma il perimetro ha **due** commi, e qui se ne leggeva uno solo. Il comma 3 esclude
+      lo Stato, gli enti pubblici territoriali, gli altri enti pubblici non economici e
+      gli enti con funzioni di rilievo costituzionale: il codice asseriva la 231 a un
+      comune. E la asseriva anche alla forma `'altro'`, che non è una forma — è il valore
+      in cui finisce ciò che non si è saputo classificare, cioè l'ignoto travestito da
+      dato.
+
+      Dichiarato: `'ente-pubblico'` è un secchio grosso. Il normalizzatore vi fa cadere
+      «comune», «provincia» e «regione» — enti territoriali, esclusi per nome dal comma 3
+      — insieme a un generico «ente pubblico», che potrebbe essere economico e quindi
+      dentro il perimetro. Si segue il comma che nomina la popolazione dominante; il caso
+      dell'ente pubblico economico resta un falso negativo consapevole, e si chiude solo
+      leggendo la natura dell'ente, che l'anagrafica camerale non porta.
     */
-    when: (f) =>
-      f.formaGiuridica === 'ditta-individuale'
-        ? // L'impresa individuale non è un ente distinto dalla persona: fuori perimetro.
-          false
-        : true,
-    rationale:
-      'La responsabilità amministrativa da reato riguarda gli enti e le società, senza soglie ' +
-      'dimensionali (art. 1, c. 2, D.Lgs. 231/2001). Le sanzioni comprendono misure interdittive ' +
-      'che possono sospendere l’attività.',
+    when: (f) => {
+      // L'impresa individuale non è un ente distinto dalla persona: fuori perimetro.
+      if (f.formaGiuridica === 'ditta-individuale') return false;
+      // Art. 1, c. 3: Stato, enti pubblici territoriali, enti pubblici non economici.
+      if (f.formaGiuridica === 'ente-pubblico') return false;
+      // Non una forma: il ripiego in cui cade ciò che non è stato riconosciuto.
+      if (f.formaGiuridica === 'altro') return 'ignoto';
+      return true;
+    },
+    rationale: (f) =>
+      f.formaGiuridica === 'altro'
+        ? 'Forma giuridica non riconosciuta dall’anagrafica: il perimetro del D.Lgs. 231/2001 ' +
+          'comprende gli enti e le società di diritto privato ed esclude lo Stato e gli enti pubblici ' +
+          'non economici (art. 1, cc. 2 e 3). Va accertata la natura dell’ente prima di concludere.'
+        : 'La responsabilità amministrativa da reato riguarda gli enti e le società, senza soglie ' +
+          'dimensionali (art. 1, c. 2, D.Lgs. 231/2001). Le sanzioni comprendono misure interdittive ' +
+          'che possono sospendere l’attività.',
   },
   {
     kind: 'modula',
@@ -827,15 +927,21 @@ export const RISK_RULES: readonly RiskRule[] = [
   },
 
   // ── Normativo ─────────────────────────────────────────────────────────────
-  {
-    kind: 'identifica',
-    id: 'catnat/imprese-registro-imprese',
-    risk: 'inadempimento-catnat',
-    // Le imprese agricole ex art. 2135 c.c. sono escluse: per loro opera il Fondo AGRICAT.
-    when: (f) => (f.atecoSezione === null ? 'ignoto' : f.atecoSezione !== 'A'),
-    rationale:
-      'Impresa iscritta al Registro delle Imprese, soggetta all’obbligo assicurativo catastrofale ex L. 213/2023.',
-  },
+  /*
+    Qui c'era `catnat/imprese-registro-imprese`, una **seconda** implementazione del
+    perimetro dell'obbligo catastrofale: `atecoSezione !== 'A'`.
+
+    Divergeva dal motore su tre popolazioni su tre, dentro lo stesso documento.
+    All'impresa cessata e all'agricola — che `coverage/catnat.ts` esclude — il registro
+    dichiarava «soggetta all'obbligo assicurativo catastrofale ex L. 213/2023» e apriva la
+    strada a ventidue coperture; alla pesca, che il motore dichiara soggetta perché il
+    Fondo AGRICAT non la copre, il registro taceva.
+
+    Il perimetro di un obbligo di legge non può avere due letture: sta in `catnat.ts`, che
+    conosce la forma giuridica, lo stato di attività e la divisione ATECO. Il registro
+    riceve l'esito già preso (`AssessRisksOptions.catNat`) e lo riporta. È lo schema che
+    `obbligoPerImpresa` adottava già leggendo `catNat.soggetta` invece di ricalcolarlo.
+  */
   {
     kind: 'modula',
     id: 'catnat/beni-rilevanti',

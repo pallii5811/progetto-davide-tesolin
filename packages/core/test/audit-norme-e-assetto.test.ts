@@ -310,9 +310,40 @@ describe('Esposizione idraulica: la tabella conosce solo le province alte (difet
     expect(ferrara.idraulicaEtichetta).toBe('alta');
   });
 
-  it('la sismica resta una misura a tre valori: lì il livello basso esiste davvero', () => {
-    expect(territorialExposure('MI').sismica).toBe('bassa');
+  /*
+    Questa prova diceva che sulla sismica il livello «bassa» esiste davvero, e portava
+    Milano come esempio. Non regge più — e non perché la correzione abbia sbagliato: è
+    esattamente ciò che la correzione ha scoperto.
+
+    La tabella di geo.ts contiene due insiemi, alta e media. Le province assenti da
+    entrambi uscivano «bassa», e il commento accanto dichiarava «zona 4, cioè esposizione
+    bassa accertata». Non era accertato niente: era l'assenza dalla tabella, letta come
+    una misura. Milano era una delle trentatré.
+
+    Ora quelle province rispondono null, e «bassa» non la produce nessuna: la
+    classificazione della zona 4 secondo l'OPCM 3519/2003 non è mai stata trascritta.
+
+    Il livello resta nel tipo perché il dominio ha tre gradi, e trascriverli è un lavoro
+    che si fa sulla fonte. Fino ad allora il prodotto dice «non determinata», che è vero,
+    invece di «bassa», che era una deduzione dall'ignoranza. Su un rischio sismico, dire
+    «basso» senza aver guardato è il verso che costa.
+  */
+  it('dove la misura c’è la sismica la dichiara, e dove non c’è non la inventa', () => {
     expect(territorialExposure('UD').sismica).toBe('alta');
+    expect(territorialExposure('MI').sismica).toBeNull();
+  });
+
+  it('nessuna provincia esce «bassa»: quella tabella non è ancora stata trascritta', () => {
+    /*
+      Presidio del DEBITO, non della correttezza. Il giorno in cui qualcuno trascrive la
+      zona 4 dall'OPCM questa prova diventa rossa, e sarà il segnale che va tolta — non un
+      difetto. Senza, l'assenza di quella tabella resterebbe invisibile, che è come è
+      rimasta finora.
+    */
+    const province = ['MI', 'TO', 'GE', 'VE', 'PD', 'MN', 'PC', 'UD', 'FE', 'RM'];
+    const livelli = province.map((p) => territorialExposure(p).sismica);
+    expect(livelli.length, 'l’elenco di prova non può essere vuoto').toBeGreaterThan(0);
+    expect(livelli).not.toContain('bassa');
   });
 
   it('la peggiore fra più province conserva l’unica esposizione idraulica misurata', () => {

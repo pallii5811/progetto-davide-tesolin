@@ -46,17 +46,35 @@ export function mappaNegativita(raw: unknown, osservatoIl: Date): Sourced<Eventi
     Leggere i soli elenchi significherebbe rispondere «nessun protesto» su un'impresa
     protestata — un certificato di buona salute falso, sul fattore che pesa il venti per
     cento dello score. Qui la discordanza viene conservata invece che appianata.
+
+    Gli indicatori si leggono chiamando `soloIndicatori`, non rileggendoli qui.
+
+    Erano due implementazioni della stessa domanda: quella esportata copriva le tre grafie
+    (`presenzaProtesti`, `hasProtests`, `protests`) e non aveva chiamanti applicativi;
+    questa ne leggeva **una sola** ed era l'unica viva. Su una risposta che dicesse
+    `hasProtests: true` la funzione esportata rispondeva «protesti dichiarati» e il
+    mappatore che alimenta lo score rispondeva niente — cioè «il registro non ha dichiarato
+    nulla», su un'impresa protestata.
+
+    È lo schema che il progetto ha già pagato con `classificaProcedura`, poche righe più
+    giù in questo stesso file: due copie della stessa regola sono due regole, e a correggersi
+    è sempre quella che non gira.
+
+    Si passa `raw`, non `radice`: `soloIndicatori` fa lo stesso identico scarto
+    dell'involucro (le sue prime due righe sono queste), e dargli lo stesso ingresso è
+    l'unico modo di garantire che le due letture non possano divergere.
   */
-  const dichiarati: ('protesti' | 'pregiudizievoli' | 'procedure')[] = [];
-  if (bool(radice, 'presenzaProtesti') === true && protesti.length === 0) {
-    dichiarati.push('protesti');
-  }
-  if (bool(radice, 'presenzaPregiudizievoli') === true && pregiudizievoli.length === 0) {
-    dichiarati.push('pregiudizievoli');
-  }
-  if (bool(radice, 'presenzaProcedure') === true && procedure.length === 0) {
-    dichiarati.push('procedure');
-  }
+  const indicatori = soloIndicatori(raw);
+
+  const CATEGORIE: readonly (readonly [string, 'protesti' | 'pregiudizievoli' | 'procedure', number])[] = [
+    ['protesti', 'protesti', protesti.length],
+    ['pregiudizievoli', 'pregiudizievoli', pregiudizievoli.length],
+    ['procedure concorsuali', 'procedure', procedure.length],
+  ];
+
+  const dichiarati = CATEGORIE.filter(
+    ([nome, , quanti]) => quanti === 0 && (indicatori?.quali.includes(nome) ?? false),
+  ).map(([, canonico]) => canonico);
 
   return fromProvider(
     { protesti, pregiudizievoli, procedure, presenzaDichiarataSenzaDettaglio: dichiarati },

@@ -19,7 +19,7 @@ import {
   giorniAllaScadenza,
   indexPolizze,
   isScaduta,
-  soggettaARegolaProporzionale,
+  metroDiIndennizzo,
 } from './policy.js';
 import type { PolizzaInEssere } from './policy.js';
 import type { SumsInsured } from './sums-insured.js';
@@ -606,6 +606,16 @@ function calcolaEsposizioneNonAssicurata(gaps: readonly CoverageGap[]): Euro {
   return Money.add(...perBase.values());
 }
 
+/**
+ * Il frammento fisso che spiega perché su una garanzia a valore allo stato d'uso il
+ * verdetto resta sospeso. Sta qui, e non dentro `computeUnderinsurance`, perché è questo
+ * modulo a sapere con quale metro il capitale raccomandato è stato calcolato.
+ */
+const METRO_STATO_DUSO =
+  'Garanzia prestata a valore allo stato d’uso: l’indennizzo si commisura al bene degradato, ' +
+  'mentre il capitale calcolato qui è a valore di rimpiazzo a nuovo. Il valore allo stato ' +
+  'd’uso dei beni non è fra i dati disponibili, e va rilevato prima di giudicare il capitale.';
+
 function determinaStato(
   coverageId: CoverageId,
   raccomandato: Euro | null,
@@ -654,12 +664,14 @@ function determinaStato(
       macchine riusarlo produrrebbe un numero vero in apparenza e senza base — un ladro
       non ragiona per carico d'incendio.
     */
-    const aValoreIntero = soggettaARegolaProporzionale(polizza);
+    const metro = metroDiIndennizzo(polizza);
+    const aValoreIntero = metro !== 'limite-pattuito';
     const riferimentoPrimoRischio =
       coverageId === 'incendio' && dannoMassimo !== null ? dannoMassimo.probabile : undefined;
 
     const verifica = computeUnderinsurance(raccomandato, inEssere, {
       soggettaARegolaProporzionale: aValoreIntero,
+      ...(metro === 'valore-allo-stato-duso' ? { metroNonOmogeneo: METRO_STATO_DUSO } : {}),
       ...(riferimentoPrimoRischio === undefined ? {} : { riferimentoAdeguatezza: riferimentoPrimoRischio }),
     });
 

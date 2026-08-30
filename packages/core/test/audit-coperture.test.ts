@@ -28,6 +28,7 @@ import type { BilancioRiclassificato } from '../src/company/financials.js';
 import type { ImmobileDichiarato } from '../src/company/profile.js';
 import type { AssessedRisk, RiskAssessment } from '../src/risk/engine.js';
 import type { CoverageId } from '../src/coverage/taxonomy.js';
+import { formattaGiorno } from '../src/shared/tempo.js';
 
 const OGGI = new Date('2026-08-30T00:00:00Z');
 /** 181 giorni prima di OGGI: il numero che il prodotto stampava col segno meno. */
@@ -323,14 +324,23 @@ describe('9 · L’obbligo CAT NAT e la sezione A', () => {
     expect(esito.motivoEsclusione).toBeNull();
   });
 
+  /*
+    Le due prove qui sotto confrontavano la stringa ISO dell'istante — 23:59:59.000Z — che
+    è il valore in cui il difetto delle sette date viveva: a Roma quell'istante è
+    l'01:59:59 del giorno DOPO, e il prodotto stampava 01/01/2027 dove la tabella di
+    docs/DOMINIO.md dice 31/12/2026. Confrontare l'istante nudo faceva passare la data
+    sbagliata; ora si confronta il giorno come lo legge il destinatario del documento.
+    Le due prove restano quelle di prima — la proroga raggiungibile, e riservata a micro e
+    piccole — solo guardate dal lato giusto.
+  */
   it('e la proroga della pesca smette di essere irraggiungibile', () => {
     // Prima: il ramo che applica PROROGHE_SETTORIALI['03'] non era raggiungibile,
     // perché l'esclusione della sezione A ritornava prima.
-    expect(valuta('03')?.termine?.toISOString()).toBe('2026-12-31T23:59:59.000Z');
+    expect(formattaGiorno(valuta('03').termine!)).toBe('31/12/2026');
   });
 
   it('la proroga resta riservata a micro e piccole, come la norma dispone', () => {
-    expect(valuta('03', 'grande')?.termine?.toISOString()).toBe('2025-03-31T23:59:59.000Z');
+    expect(formattaGiorno(valuta('03', 'grande').termine!)).toBe('31/03/2025');
   });
 
   it('l’impresa cessata resta esclusa', () => {

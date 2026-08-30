@@ -176,7 +176,19 @@ const regimeDaProdotto: Regola = (f) => {
         'L’impresa immette sul mercato prodotti finiti: risponde del danno da prodotto difettoso a ' +
         'prescindere dalla colpa, salve le esimenti di legge.',
       fondamento: 'Produzione di beni finali dichiarata in intervista.',
-      riferimento: 'Artt. 114 e 118 D.Lgs. 206/2005',
+      /*
+        L'art. 118 non fonda la responsabilità: la esclude.
+
+        Citato in coppia con il 114 diceva al lettore che è di lì che discende la
+        responsabilità oggettiva del produttore, mentre è l'elenco delle **esimenti** —
+        fra cui il rischio da sviluppo. È l'articolo che il legale della controparte apre
+        per primo, e trovarlo citato al rovescio dentro un fascicolo di adeguatezza toglie
+        credito anche a ciò che è giusto. La lettura corretta è quella già scritta in
+        coverage/taxonomy.ts: il 114 è la fonte, il 118 le esimenti, il 120 l'onere della
+        prova a carico del danneggiato.
+      */
+      riferimento:
+        'Art. 114 D.Lgs. 206/2005 — esimenti: art. 118 · onere della prova a carico del danneggiato: art. 120',
       suDatoIgnoto: false,
     };
   }

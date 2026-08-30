@@ -304,10 +304,16 @@ export function analyzeCompany(
     creditScore.value,
   );
 
-  // ── 3. Rischi ─────────────────────────────────────────────────────────────
-  const rischi = assessRisks(facts, asOf, {
-    includiRischiDaVerificare: options.includiRischiDaVerificare ?? true,
-  });
+  /*
+    I rischi si valutano **dopo** il CAT NAT, e non prima.
+
+    Il registro dei rischi si riscriveva per conto proprio il perimetro dell'obbligo
+    catastrofale, e divergeva dal motore su tre popolazioni su tre dentro lo stesso
+    documento. Ora lo riceve; ma per riceverlo dev'essere valutato dopo, ed è la sola
+    ragione per cui il passo 3 sta qui sotto invece che qui. Nulla fra questo punto e la
+    valutazione CAT NAT usa `rischi`: le ubicazioni, le somme assicurande e il danno
+    massimo si calcolano sui fatti.
+  */
 
   /*
     Le ubicazioni prima delle somme assicurande, e non dopo.
@@ -344,7 +350,6 @@ export function analyzeCompany(
     ubicazioni,
   );
 
-  const prevenzione = raccomandaPrevenzione(rischi.risks, facts);
   const ritenzione = valutaRitenzione(bilancio, profile.datiDichiarati.propensioneAlRischio);
 
   /*
@@ -385,6 +390,16 @@ export function analyzeCompany(
     ),
     asOf,
   });
+
+  // ── 3. Rischi ─────────────────────────────────────────────────────────────
+  // Il perimetro dell'obbligo catastrofale arriva dal motore che l'ha stabilito: il
+  // registro lo riporta, non lo ricalcola.
+  const rischi = assessRisks(facts, asOf, {
+    includiRischiDaVerificare: options.includiRischiDaVerificare ?? true,
+    catNat: catNat.value,
+  });
+
+  const prevenzione = raccomandaPrevenzione(rischi.risks, facts);
 
   // ── 6. Gap analysis ───────────────────────────────────────────────────────
   const gap = analyzeGaps({

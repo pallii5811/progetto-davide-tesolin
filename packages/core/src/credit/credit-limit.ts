@@ -28,9 +28,17 @@ export interface CreditLimit {
   readonly importo: Euro;
   /** Quale dei tre vincoli si è rivelato il più stringente. */
   readonly vincoloAttivo: 'patrimoniale' | 'dimensionale' | 'flusso' | 'nessuno';
-  readonly limitePatrimoniale: Euro;
-  readonly limiteDimensionale: Euro;
-  readonly limiteFlusso: Euro;
+  /**
+   * I tre vincoli, e `null` dove non si è potuto calcolarli.
+   *
+   * `null` e non zero: zero è un vincolo che vale zero — succede davvero, con un
+   * patrimonio netto negativo o un EBITDA nullo — e significa «il fido concedibile è
+   * nessuno». Sono due frasi opposte sotto lo stesso numero, e il documento le stampa
+   * entrambe accanto al credito che il broker sta per concedere.
+   */
+  readonly limitePatrimoniale: Euro | null;
+  readonly limiteDimensionale: Euro | null;
+  readonly limiteFlusso: Euro | null;
   readonly fattoreScore: number;
 }
 
@@ -47,6 +55,20 @@ export interface BasiDelFido {
   readonly patrimonioNettoTangibile: Euro | null;
   readonly ricavi: Euro | null;
   readonly ebitda: Euro | null;
+  /**
+   * Chi costruisce le basi dichiara qui se il patrimonio netto è al netto delle
+   * immobilizzazioni immateriali.
+   *
+   * Il campo si chiama «tangibile» ma in produzione riceve il patrimonio netto **lordo**
+   * degli aggregati sintetici, avviamento e marchi compresi — e la spiegazione lo
+   * stampava comunque come tangibile, in una riga aperta di default. Su una società con
+   * avviamento pari a un terzo del patrimonio, il limite patrimoniale esce sovrastimato
+   * del 50%.
+   *
+   * Assente significa «non dichiarato», non «lordo»: l'etichetta si degrada a ciò che si
+   * sa, invece di scegliere l'ipotesi comoda.
+   */
+  readonly alNettoDegliImmateriali?: boolean;
 }
 
 export function basiDaBilancio(bilancio: BilancioRiclassificato): BasiDelFido {
@@ -54,12 +76,26 @@ export function basiDaBilancio(bilancio: BilancioRiclassificato): BasiDelFido {
     patrimonioNettoTangibile: bilancio.sp.patrimonioNettoTangibile,
     ricavi: bilancio.ce.ricavi,
     ebitda: bilancio.ce.ebitda,
+    // Il riclassificato sottrae le immobilizzazioni immateriali: qui l'aggettivo è vero.
+    alNettoDegliImmateriali: true,
   };
+}
+
+/** L'etichetta che la scheda stampa accanto al patrimonio netto usato per il fido. */
+function etichettaPatrimonioNetto(basi: BasiDelFido): string {
+  if (basi.alNettoDegliImmateriali === true) return 'Patrimonio netto tangibile';
+  if (basi.alNettoDegliImmateriali === false) {
+    return 'Patrimonio netto (comprensivo delle immobilizzazioni immateriali)';
+  }
+  return 'Patrimonio netto (non dichiarato se al netto degli immateriali)';
 }
 
 export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Explained<CreditLimit> {
   const builder = explain('Fido commerciale consigliato')
-    .formula('min(20% PN tangibile; 10% ricavi; 3 × EBITDA) × fattore di score')
+    .formula(
+      'min(20% del patrimonio netto; 10% ricavi; 3 × EBITDA) × fattore di score, ' +
+        'con il fattore che modula da 0 a 1,00 e non oltre',
+    )
     .reference('Metodologia AEGIS · docs/DOMINIO.md §4');
 
   const azzerato: CreditLimit = {
@@ -120,6 +156,21 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
   const base = piuStringente.valore;
   const vincoloAttivo = piuStringente.nome;
 
+  /*
+    Il fattore di score modula verso il basso, mai verso l'alto.
+
+    Saliva fino a 1,25 su score 100, e a 1,15 su score 90: il fido usciva fino al 25% sopra
+    il vincolo che la nota stampata due righe più giù chiama «il più stringente fra quelli
+    calcolabili». Le due affermazioni non possono stare nello stesso documento.
+
+    Misurato sul percorso che gira in produzione: score 85, fattore 1,07×, fido 390.000 €
+    contro un limite patrimoniale di 366.000 €. Non era un caso limite — lo score senza
+    bilancio in schema CEE stava sopra 80 per costruzione.
+
+    Un merito eccellente resta il presupposto per concedere il fido pieno, che è quello che
+    il vincolo consente: non per superarlo. La curva si ferma quindi a 1,00, e interpolate
+    tiene l'ultimo valore oltre l'ultimo punto.
+  */
   const fattoreScore = interpolate(score.value, [
     { x: 1, y: 0 },
     { x: 25, y: 0.05 },
@@ -127,8 +178,6 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
     { x: 50, y: 0.4 },
     { x: 65, y: 0.7 },
     { x: 80, y: 1 },
-    { x: 90, y: 1.15 },
-    { x: 100, y: 1.25 },
   ]);
 
   const importo = Money.commercialRound(Money.multiply(base, fattoreScore));
@@ -138,7 +187,7 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
 
   return (
     builder
-      .input('Patrimonio netto tangibile', formatta(basi.patrimonioNettoTangibile))
+      .input(etichettaPatrimonioNetto(basi), formatta(basi.patrimonioNettoTangibile))
       .input('Ricavi', formatta(basi.ricavi))
       .input('EBITDA', formatta(basi.ebitda))
       .input(
@@ -166,15 +215,39 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
         score.value < 50,
         'Score inferiore a 50: valutare garanzie accessorie (fideiussione, assicurazione del credito) prima della concessione.',
       )
+      .noteIf(
+        basi.alNettoDegliImmateriali !== true && basi.patrimonioNettoTangibile !== null,
+        'Il patrimonio netto usato non è dichiarato al netto delle immobilizzazioni ' +
+          'immateriali: se l’impresa ha avviamento, marchi o software capitalizzati, il ' +
+          'limite patrimoniale qui indicato è sovrastimato di altrettanto.',
+      )
       // Un fido calcolato senza il vincolo di flusso è per costruzione meno affidabile:
       // è il vincolo che dice se l'azienda genera la cassa per ripagare la dilazione.
       .confidence(limiteFlusso === null ? 'media' : score.value >= 35 ? 'alta' : 'media')
+      /*
+        I tre vincoli non calcolabili escono `null`, non 0 €.
+
+        Uscivano zero, e la spiegazione accanto stampava correttamente «non calcolabile»:
+        chi leggeva il solo numero concludeva che tre volte l'EBITDA vale zero, cioè che
+        l'impresa non genera cassa. Era un'affermazione al posto di un'assenza, ed è la
+        regola 2d del progetto nel punto in cui costa di più — sotto il numero che il
+        broker usa per decidere quanto credito concedere.
+
+        Perché non bastava correggerlo al confine: `Money.max(ZERO, …)` produce uno zero
+        VERO su un patrimonio netto negativo. Zero calcolato e zero mancante arrivavano al
+        presenter indistinguibili, e lì il dato era già perduto per sempre. Le due cose si
+        possono ancora separare solo qui, dove si sa quale delle due è.
+
+        Il cambio di tipo attraversa tre corsie — questa, il presenter e il DTO del web —
+        e per questo era rimasto aperto: nessun agente poteva farlo senza rompere gli
+        altri due. Va in un commit solo, o il progetto non compila a metà strada.
+      */
       .value({
         importo,
         vincoloAttivo,
-        limitePatrimoniale: limitePatrimoniale ?? ZERO,
-        limiteDimensionale: limiteDimensionale ?? ZERO,
-        limiteFlusso: limiteFlusso ?? ZERO,
+        limitePatrimoniale,
+        limiteDimensionale,
+        limiteFlusso,
         fattoreScore,
       })
   );

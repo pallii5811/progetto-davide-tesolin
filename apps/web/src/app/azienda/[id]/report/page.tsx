@@ -664,7 +664,19 @@ export default async function PaginaReport({
                       Base di calcolo: {voce.spiegazione.formula}
                     </p>
                   )}
-                  {voce.spiegazione.note.slice(0, 1).map((nota) => (
+                  {/*
+                    Tutte le note, non la prima.
+
+                    `slice(0, 1)` non teneva la nota più importante: teneva quella scritta
+                    per prima. E in questi elenchi la prima è sempre l'incondizionata —
+                    quella che esce a ogni esecuzione, qualunque cosa sia successa. Le
+                    condizionali vengono dopo per costruzione, e sono quelle che avvertono:
+                    la somma parziale della base CAT NAT, che dichiara il totale per
+                    difetto, veniva scartata ogni volta. È la base su cui si misura
+                    l'adempimento a un obbligo di legge e su cui, al sinistro, opera la
+                    proporzionale.
+                  */}
+                  {voce.spiegazione.note.map((nota) => (
                     <p key={nota} className="mt-1 text-xs leading-relaxed text-testo-tenue">
                       {nota}
                     </p>
@@ -806,17 +818,47 @@ export default async function PaginaReport({
                     {voce.piano.motivazioneTermine}
                   </p>
 
-                  {voce.sottoassicurazione?.sottoassicurata === true && (
-                    <p className="mt-1.5 border-l-4 border-alto bg-alto-fondo p-2.5 text-sm">
-                      La somma attualmente assicurata è inferiore al valore reale del bene. Ai sensi
-                      dell&apos;art. 1907 c.c. l&apos;indennizzo verrebbe ridotto in proporzione: a fronte
-                      di un danno di {voce.sottoassicurazione.simulazione.danno.formattato}{' '}
-                      l&apos;indennizzo sarebbe di{' '}
-                      {voce.sottoassicurazione.simulazione.indennizzo.formattato}, con{' '}
-                      {voce.sottoassicurazione.simulazione.aCaricoAssicurato.formattato} a carico
-                      dell&apos;impresa.
-                    </p>
-                  )}
+                  {/*
+                    La frase la scrive il motore, non questo file.
+
+                    Qui c'era un paragrafo composto sul solo booleano `sottoassicurata`, e
+                    diceva due cose false su una garanzia a primo rischio assoluto: che
+                    opera la riduzione proporzionale, e che il metro è il valore reale del
+                    bene. Su quella forma la norma non opera affatto, e il metro è la
+                    perdita attesa in un solo sinistro.
+
+                    Il motore quella distinzione la fa — tre stati, non un booleano — e la
+                    frase giusta l'ha già composta, con gli stessi importi. Stamparla
+                    invece di riscriverla è l'unico modo perché le due non divergano mai
+                    più: non ci sono due frasi da tenere allineate, ce n'è una.
+
+                    Si legge adeguatezzaDelLimite e non il booleano, perché il booleano è
+                    vero solo su «insufficiente»: leggere lui solo faceva sparire
+                    «non-verificabile», cioè lo stato di ogni garanzia a primo rischio di
+                    cui non è stato stimato il danno atteso. Il documento taceva, e
+                    tacere una cosa che non si sa giudicare la fa passare per adeguata.
+                    Quel caso ha una cornice neutra: è una riserva, non un allarme.
+                  */}
+                  {voce.sottoassicurazione !== null &&
+                    voce.sottoassicurazione.adeguatezzaDelLimite !== 'adeguata' && (
+                      <div
+                        className={
+                          voce.sottoassicurazione.adeguatezzaDelLimite === 'insufficiente'
+                            ? 'mt-1.5 space-y-1.5 border-l-4 border-alto bg-alto-fondo p-2.5 text-sm'
+                            : 'mt-1.5 space-y-1.5 border-l-4 border-bordo-forte p-2.5 text-sm text-testo-tenue'
+                        }
+                      >
+                        {voce.sottoassicurazione.spiegazione.note.length === 0 ? (
+                          <p>[verifica del capitale: spiegazione non disponibile in questa analisi]</p>
+                        ) : (
+                          voce.sottoassicurazione.spiegazione.note.map((nota) => (
+                            <p key={nota} className="leading-relaxed">
+                              {nota}
+                            </p>
+                          ))
+                        )}
+                      </div>
+                    )}
 
                   {voce.rischiServiti.length > 0 && (
                     <p className="mt-1.5 text-xs text-testo-tenue">
@@ -853,11 +895,32 @@ export default async function PaginaReport({
                 </>
               ) : (
                 <>
-                  Il capitale da assicurare, determinato sui beni indicati dalla norma, ammonta a{' '}
+                  Il capitale da assicurare sui beni indicati dalla norma è quantificato in{' '}
                   <strong>{catNat.baseAssicurabile.formattato}</strong>.
                 </>
               )}
             </p>
+
+            {/*
+              Ciò che il motore ha da dire su questo capitolo, reso invece che scartato.
+
+              `catNat.spiegazione` veniva calcolata, spedita e mai stampata: al suo posto
+              il capitolo dichiarava il capitale «determinato sui beni indicati dalla
+              norma», che è un'affermazione di completezza. Le riserve che il motore
+              scrive — la sezione ATECO A senza divisione, per cui l'esclusione delle
+              agricole non è verificabile; la base non quantificata — restavano dentro
+              l'API, e il documento firmato non le portava.
+
+              Il verbo è cambiato di conseguenza: «quantificato in» dice quanto si è
+              misurato, «determinato» dichiarava anche che non manca nulla.
+            */}
+            {catNat.spiegazione.note.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-testo-tenue">
+                {catNat.spiegazione.note.map((nota) => (
+                  <li key={nota}>{nota}</li>
+                ))}
+              </ul>
+            )}
 
             {/*
               Contro **cosa** ci si deve assicurare.

@@ -146,14 +146,34 @@ function obbligoCatNat(
       descrizione: inadempiente
         ? 'Il termine di legge per la copertura contro terremoto, alluvione e frana è decorso e, fra le polizze censite, non ne risulta alcuna che lo adempia.'
         : 'Il termine di legge per la copertura contro terremoto, alluvione e frana si avvicina.',
+      /*
+        «Si tiene conto», non «preclude». E l'art. 2086 non è di tutti.
+
+        Due sovradichiarazioni in una riga, e sono le due che il cliente può controllare
+        da solo in dieci minuti. L'art. 1 c. 102 della L. 213/2023 prevede che
+        dell'inadempimento si tenga conto nell'assegnazione di contributi, sovvenzioni e
+        agevolazioni a valere su risorse pubbliche, comprese quelle previste in occasione
+        di eventi calamitosi: non è un'esclusione automatica dai sostegni. La lettura
+        corretta è già scritta in `coverage/motivazione.ts`, ed è quella che si copia.
+
+        Il comma 2 dell'art. 2086 c.c. grava sull'imprenditore «che operi in forma
+        societaria o collettiva»: alla ditta individuale non si applica. La fotografia
+        sorvegliata porta la forma giuridica come descrizione camerale, non come categoria
+        normalizzata — quindi non si indovina la forma, si dichiara il perimetro della
+        norma, che è vero per chiunque legga.
+      */
       conseguenza:
-        'Se l’obbligo risultasse davvero non adempiuto, l’inadempimento è considerato nell’assegnazione di contributi e agevolazioni pubbliche, e in caso di evento calamitoso preclude l’accesso ai sostegni straordinari. Può inoltre rilevare nella valutazione degli assetti organizzativi in capo agli amministratori.',
+        'Se l’obbligo risultasse davvero non adempiuto, dell’inadempimento si tiene conto nell’assegnazione di contributi, sovvenzioni e agevolazioni di carattere finanziario a valere su risorse pubbliche, comprese quelle previste in occasione di eventi calamitosi. Per l’imprenditore che operi in forma societaria o collettiva può inoltre rilevare nella valutazione degli adeguati assetti organizzativi in capo all’organo amministrativo.',
       azioneSuggerita:
         'Verificare con il cliente se la copertura CAT NAT esista già; se non esiste, presentarne una quotazione. È un obbligo di legge, non una proposta commerciale, e va documentato di averlo rappresentato.',
       rilevanza: inadempiente ? 5 : 4,
       valorePrecedente: precedente?.statoCatNat ?? null,
       valoreNuovo: corrente.statoCatNat,
-      riferimenti: ['L. 213/2023 art. 1 co. 101-111', 'DM 30/01/2025 n. 18', 'Art. 2086 c.c.'],
+      riferimenti: [
+        'L. 213/2023 art. 1 co. 101-111',
+        'DM 30/01/2025 n. 18',
+        'Art. 2086, c. 2, c.c. — per l’imprenditore che operi in forma societaria o collettiva',
+      ],
     },
   ];
 }

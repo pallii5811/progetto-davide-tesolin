@@ -206,12 +206,39 @@ export function stimaDannoMassimo(
         : 'Valori concentrati in un’unica ubicazione: non esiste una parte del patrimonio che il sinistro non possa raggiungere.',
     );
   } else if (ubicazioni !== null && ubicazioni.complessiIncendio.length > 1) {
+    /*
+      La nota diceva una cosa che il numero smentiva tre righe sotto.
+
+      «Il danno massimo non li comprende tutti» è falso: `probabile` è il valore INTERO dei
+      beni per la quota di settore, cioè li comprende tutti. Escluderli davvero richiede di
+      sapere quanto patrimonio sta in ciascun complesso, e la ripartizione dei capitali per
+      ubicazione non è fra i dati raccolti. Finché non c'è, il capitale resta sul totale —
+      che è il verso prudente — e la nota lo ammette invece di promettere uno sconto che
+      non è stato fatto.
+
+      E la separazione va dichiarata per quello che è. Senza coordinate ogni ubicazione
+      diventa un complesso a sé per ipotesi prudenziale, non per distanza misurata: in
+      produzione nessuna unità locale ha coordinate, quindi il ramo che qui si accende è
+      quasi sempre quello non misurato — su qualunque impresa con due indirizzi, anche nello
+      stesso comune e anche a cento metri l'uno dall'altro.
+    */
+    const misurati = ubicazioni.ubicazioni.every((u) => u.haCoordinate);
     costruttore.note(
-      `Valori distribuiti su ${ubicazioni.complessiIncendio.length} complessi separati${
-        ubicazioni.distanzaMassimaKm === null
-          ? ''
-          : ` (fino a ${ubicazioni.distanzaMassimaKm} km di distanza)`
-      }: il danno massimo non li comprende tutti.`,
+      misurati
+        ? `Valori distribuiti su ${ubicazioni.complessiIncendio.length} complessi separati` +
+            `${
+              ubicazioni.distanzaMassimaKm === null
+                ? ''
+                : ` (fino a ${ubicazioni.distanzaMassimaKm} km di distanza)`
+            }: un solo incendio difficilmente li raggiunge tutti.`
+        : `Le ${ubicazioni.ubicazioni.length} ubicazioni note sono state contate come complessi ` +
+            'separati per assenza di coordinate, non per distanza misurata: potrebbero sorgere sullo ' +
+            'stesso sito. Confermarlo in intervista.',
+    );
+    costruttore.note(
+      'Il danno probabile resta calcolato sul valore complessivo dei beni: la ripartizione del ' +
+        'patrimonio fra le ubicazioni non è stata rilevata, e senza di essa non si può togliere dal ' +
+        'conto ciò che il sinistro non raggiunge. La stima è quindi per eccesso.',
     );
   }
 

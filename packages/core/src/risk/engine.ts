@@ -12,6 +12,7 @@
  */
 
 import type { CompanyFacts } from '../company/facts.js';
+import type { CatNatAssessment } from '../coverage/catnat.js';
 import type { CoverageId } from '../coverage/taxonomy.js';
 import { clampImpact, clampLikelihood, riskLevel, riskScore, suggestTreatment } from './assessment.js';
 import type { Impact, Likelihood, RiskLevel, RiskTreatment } from './assessment.js';
@@ -75,7 +76,25 @@ export interface AssessRisksOptions {
    * efficace per lasciare un cliente scoperto.
    */
   readonly includiRischiDaVerificare?: boolean | undefined;
+  /**
+   * L'esito del motore CAT NAT per questa impresa.
+   *
+   * Il registro dei rischi non ha, e non deve avere, un'opinione sul perimetro di un
+   * obbligo di legge: quel perimetro conosce la forma giuridica, lo stato di attività e
+   * la divisione ATECO, e vive in `coverage/catnat.ts`. Quando `rules.ts` se lo
+   * riscriveva per conto proprio le due letture divergevano su tre popolazioni su tre,
+   * dentro lo stesso documento.
+   *
+   * `undefined` significa **non ancora valutato**, e non è né «soggetta» né «non
+   * soggetta»: il rischio compare marcato da verificare, perché su un obbligo di legge
+   * «non sei obbligato» è il verso che espone il cliente e l'intermediario che gliel'ha
+   * detto.
+   */
+  readonly catNat?: Pick<CatNatAssessment, 'soggetta' | 'motivoEsclusione'> | undefined;
 }
+
+/** Il rischio che dipende per intero dal perimetro stabilito dal motore CAT NAT. */
+const RISCHIO_CATNAT: RiskId = 'inadempimento-catnat';
 
 export function assessRisks(
   facts: CompanyFacts,
@@ -92,6 +111,25 @@ export function assessRisks(
     const verdict = safeEvaluate(rule, facts);
     if (verdict === false) continue;
 
+    /*
+      Un controllo su dato ignoto non è un controllo in essere.
+
+      Qui finivano fra i controlli applicati anche le protezioni che nessuno aveva
+      dichiarato, con il loro motivo intatto: a questionario vuoto il documento stampava
+      nove righe «Impianto di allarme dichiarato presente. (da verificare)», precedute
+      dalla UI da «controllo in essere:». Affermava protezioni che non esistono.
+
+      E lo stesso insieme veniva letto da `raccomandaPrevenzione` come l'elenco di ciò che
+      è già stato fatto: il piano di prevenzione usciva con **zero** raccomandazioni
+      proprio alla prima visita, quando ce n'è più bisogno. Un difetto solo, due facce
+      opposte.
+
+      Escluso da qui, il controllo riappare dove gli compete — fra le raccomandazioni, con
+      `accertataAssente: false`, che è la distinzione a due stati che `prevenzione.ts`
+      modella già. I delta erano comunque azzerati, quindi nessun punteggio si muove.
+    */
+    if (rule.kind === 'controllo' && verdict === 'ignoto') continue;
+
     const applied = toAppliedRule(rule, verdict, facts);
     const bucket =
       rule.kind === 'identifica' ? identificati : rule.kind === 'modula' ? modulazioni : controlli;
@@ -101,6 +139,33 @@ export function assessRisks(
     } else {
       existing.push(applied);
     }
+  }
+
+  /*
+    Il perimetro CAT NAT arriva dal motore, e il registro lo riporta.
+
+    Non è una regola in più in `rules.ts`: è la rimozione della seconda opinione. Se il
+    motore ha escluso l'impresa, il rischio di inadempimento non esiste e non va proposto
+    — è ciò che faceva dichiarare a un'impresa cessata «soggetta all'obbligo assicurativo
+    catastrofale» e le apriva ventidue coperture. Se il motore la dichiara soggetta, il
+    registro non può tacere, come faceva con la pesca.
+  */
+  identificati.delete(RISCHIO_CATNAT);
+  if (options.catNat?.soggetta !== false) {
+    const accertato = options.catNat?.soggetta === true;
+    identificati.set(RISCHIO_CATNAT, [
+      {
+        ruleId: 'catnat/perimetro-dal-motore',
+        rationale: accertato
+          ? 'Il motore di conformità ha accertato che l’impresa è soggetta all’obbligo assicurativo ' +
+            'contro i rischi catastrofali (L. 213/2023 art. 1 cc. 101-111).'
+          : 'Il perimetro dell’obbligo assicurativo catastrofale non è stato valutato per questa ' +
+            'impresa. (dato da confermare)',
+        likelihoodDelta: 0,
+        impactDelta: 0,
+        suDatoIgnoto: !accertato,
+      },
+    ]);
   }
 
   const risks: AssessedRisk[] = [];
@@ -121,11 +186,25 @@ export function assessRisks(
       ...RISK_CATALOG[riskId],
       riferimenti: riferimentiPerImpresa(riskId, facts),
     };
-    const modulationRules = modulazioni.get(riskId) ?? [];
-    const controlRules = controlli.get(riskId) ?? [];
-
     const daVerificare = identificationRules.every((r) => r.suDatoIgnoto) && identificationRules.length > 0;
     if (daVerificare && !includiDaVerificare) continue;
+
+    /*
+      I delta che si stampano devono essere quelli che hanno agito.
+
+      La scala si ferma a 5, e dove il tetto morde una regola non sposta niente: una
+      s.n.c. edile leggeva «+1 impatto» due volte e ne contava uno soltanto. Il lettore
+      del documento ha un solo controllo a disposizione — sommare i delta e ritrovare il
+      livello — e non tornava.
+
+      I delta si applicano quindi uno alla volta, e ciascuno porta la differenza che ha
+      davvero prodotto. Il totale è identico a quello di prima: le modulazioni non
+      abbassano e i controlli non alzano, quindi il tetto morde nello stesso punto.
+    */
+    const modulationRules = applicaConTetto(modulazioni.get(riskId) ?? [], {
+      likelihood: definition.baseLikelihood,
+      impact: definition.baseImpact,
+    });
 
     // ── Rischio inerente ────────────────────────────────────────────────────
     const likelihood = clampLikelihood(
@@ -135,6 +214,7 @@ export function assessRisks(
     const inherentScore = riskScore(likelihood, impact);
 
     // ── Rischio residuo ─────────────────────────────────────────────────────
+    const controlRules = applicaConTetto(controlli.get(riskId) ?? [], { likelihood, impact });
     const residualLikelihood = clampLikelihood(likelihood + sum(controlRules, (r) => r.likelihoodDelta));
     const residualImpact = clampImpact(impact + sum(controlRules, (r) => r.impactDelta));
     const residualScore = riskScore(residualLikelihood, residualImpact);
@@ -262,6 +342,36 @@ function toAppliedRule(rule: RiskRule, verdict: Verdict, facts: CompanyFacts): A
     impactDelta: suDatoIgnoto ? 0 : (rule.impact ?? 0),
     suDatoIgnoto,
   };
+}
+
+/**
+ * Le regole applicate una alla volta, ciascuna con il delta che ha davvero prodotto.
+ *
+ * Dove la scala satura, una regola non sposta nulla e il suo delta esce zero: è la sola
+ * forma in cui la somma dei numeri stampati coincide con la differenza fra il livello di
+ * partenza e quello di arrivo. Il livello finale non cambia — le modulazioni hanno delta
+ * non negativi e i controlli delta non positivi, quindi saturare a ogni passo o alla fine
+ * porta allo stesso punto.
+ */
+function applicaConTetto(
+  regole: readonly AppliedRule[],
+  da: { readonly likelihood: number; readonly impact: number },
+): readonly AppliedRule[] {
+  let probabilita = da.likelihood;
+  let impatto = da.impact;
+
+  return regole.map((regola) => {
+    const nuovaProbabilita = clampLikelihood(probabilita + regola.likelihoodDelta);
+    const nuovoImpatto = clampImpact(impatto + regola.impactDelta);
+    const applicata: AppliedRule = {
+      ...regola,
+      likelihoodDelta: nuovaProbabilita - probabilita,
+      impactDelta: nuovoImpatto - impatto,
+    };
+    probabilita = nuovaProbabilita;
+    impatto = nuovoImpatto;
+    return applicata;
+  });
 }
 
 function sum<T>(items: readonly T[], selector: (item: T) => number): number {

@@ -11,7 +11,15 @@
 import { explain } from '../shared/explain.js';
 import type { Explained } from '../shared/explain.js';
 import { Money } from '../shared/money.js';
-import { clamp, formatNumber, formatPercent, interpolate, weightedAverageDefined } from '../shared/math.js';
+import type { Money as Euro } from '../shared/money.js';
+import {
+  clamp,
+  formatNumber,
+  formatPercent,
+  interpolate,
+  mediaPesataDefinita,
+  weightedAverageDefined,
+} from '../shared/math.js';
 import { ageInMonths, weakestConfidence } from '../shared/provenance.js';
 import type { Confidence, Sourced } from '../shared/provenance.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
@@ -72,16 +80,67 @@ export interface CreditScore {
   readonly probabilitaDefaultSpiegata: Explained<number>;
 }
 
-const PESI = {
-  solidita: 0.2,
-  redditivita: 0.15,
-  liquidita: 0.15,
-  sostenibilitaDebito: 0.15,
-  altman: 0.15,
-  eventiNegativi: 0.2,
+/**
+ * I sette pesi del modello, nella scala in cui sono stati decisi: punti percentuali.
+ *
+ * La loro somma vale **105**, non 100 — l'anzianità viveva fuori dalla tabella e nessuno
+ * aveva rifatto la somma. Un fattore stampato «peso 20%» che del modello ne decide 20/105
+ * è un'affermazione falsa in una scheda che l'intermediario firma, e sette righe che
+ * sommano al 105% sono la prima cosa che un cliente attento verifica.
+ *
+ * I pesi usati dal calcolo sono questi divisi per la loro somma: la normalizzazione non
+ * cambia nessun rapporto fra i fattori, quindi non sposta nessun punteggio di un
+ * centesimo. Cambia solo ciò che la scheda dichiara di aver fatto.
+ */
+const PUNTI = {
+  solidita: 20,
+  redditivita: 15,
+  liquidita: 15,
+  sostenibilitaDebito: 15,
+  altman: 15,
+  eventiNegativi: 20,
+  anzianita: 5,
 } as const;
 
-const PESO_ANZIANITA = 0.05;
+const PUNTI_TOTALI: number =
+  PUNTI.solidita +
+  PUNTI.redditivita +
+  PUNTI.liquidita +
+  PUNTI.sostenibilitaDebito +
+  PUNTI.altman +
+  PUNTI.eventiNegativi +
+  PUNTI.anzianita;
+
+const PESI = {
+  solidita: PUNTI.solidita / PUNTI_TOTALI,
+  redditivita: PUNTI.redditivita / PUNTI_TOTALI,
+  liquidita: PUNTI.liquidita / PUNTI_TOTALI,
+  sostenibilitaDebito: PUNTI.sostenibilitaDebito / PUNTI_TOTALI,
+  altman: PUNTI.altman / PUNTI_TOTALI,
+  eventiNegativi: PUNTI.eventiNegativi / PUNTI_TOTALI,
+  anzianita: PUNTI.anzianita / PUNTI_TOTALI,
+} as const;
+
+/**
+ * Quanto modello deve aver pesato perché il punteggio possa dirsi un punteggio.
+ *
+ * Sotto questa quota la media pesata non redistribuisce ai fattori superstiti il peso di
+ * quelli mancanti: non li conta zero — un fattore non valutato resta non valutato, e la
+ * scheda lo stampa — ma smette di estrapolare da metà modello il giudizio sull'intero.
+ *
+ * Metà è la sola soglia che non richiede di inventare un numero: sopra, la media poggia
+ * sulla maggioranza del modello; sotto, no. È esportata perché sia contestabile.
+ */
+export const PAVIMENTO_DI_COPERTURA = 0.5;
+
+/**
+ * La soglia della classe A, in un posto solo.
+ *
+ * La usa classifica() per attribuire la classe e la usa il tetto di copertura per negarla:
+ * scritta due volte, la seconda sarebbe diventata falsa il giorno in cui qualcuno sposta
+ * la prima.
+ */
+const SOGLIA_CLASSE_A = 80;
 
 export interface CreditScoreInput {
   readonly profile: CompanyProfile;
@@ -116,10 +175,30 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   // punteggio può essere considerato definitivo.
   const eventi = profile.eventiNegativi?.value ?? NESSUN_EVENTO_NEGATIVO;
 
-  const base = weightedAverageDefined(factors.map((f) => ({ value: f.score, weight: f.weight })));
+  /*
+    Il punteggio non può salire perché mancano dei dati.
+
+    La rinormalizzazione senza pavimento regalava il peso dei fattori assenti a quelli
+    presenti. Misurato sulla stessa impresa, unico ingresso cambiato: con il bilancio in
+    schema CEE 76 e classe B; togliendolo, 85 e classe A «Rischio molto basso» — perché i
+    tre fattori superstiti erano i più alti e si spartivano il peso degli altri quattro.
+    E il percorso senza bilancio in schema CEE è l'unico che gira in produzione.
+
+    Il pavimento non attribuisce un valore ai fattori mancanti: quelli restano non
+    valutati e la scheda li stampa così. Impedisce soltanto che il punteggio venga
+    estrapolato da meno di metà del modello come se il modello fosse intero.
+  */
+  const misura = mediaPesataDefinita(
+    factors.map((f) => ({ value: f.score, weight: f.weight })),
+    { pavimentoDiCopertura: PAVIMENTO_DI_COPERTURA },
+  );
+  const base = misura.media;
 
   const builder = explain('Score di credito AEGIS')
-    .formula('Media pesata dei fattori, rinormalizzata sui soli fattori valutabili')
+    .formula(
+      'Media pesata dei fattori valutabili, con pavimento di copertura al ' +
+        `${formatPercent(PAVIMENTO_DI_COPERTURA, 0)} del peso del modello`,
+    )
     .reference('Metodologia AEGIS · docs/DOMINIO.md §4');
 
   if (base === null) {
@@ -155,9 +234,39 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     cap ??= 'Impresa in liquidazione';
   }
 
-  if (bilancio !== null && !Money.isPositive(bilancio.sp.patrimonioNetto)) {
+  /*
+    Il tetto sul patrimonio netto negativo leggeva il solo bilancio in schema CEE.
+
+    In produzione quel bilancio è sempre nullo, quindi il tetto non è mai scattato.
+    Misurato con patrimonio netto −1.200.000 € su attivo 3.000.000 €: 53/100, classe C
+    «Rischio medio», nessun tetto e nessun avviso — mentre il fido, nella stessa
+    esecuzione, stampava il patrimonio netto negativo fra i propri input. Il dato non
+    mancava: mancava il percorso che lo legge.
+
+    È la fattispecie degli artt. 2446-2447 e 2482-bis/ter c.c. Se il patrimonio netto non
+    è noto da nessuna delle due fonti resta null, e nessun tetto viene applicato: assenza,
+    non zero.
+  */
+  const patrimonioNetto = patrimonioNettoNoto(profile, bilancio);
+  if (patrimonioNetto !== null && !Money.isPositive(patrimonioNetto)) {
     value = Math.min(value, 35);
     cap ??= 'Patrimonio netto negativo (perdita di capitale sociale)';
+  }
+
+  /*
+    «Rischio molto basso» non si afferma su metà modello.
+
+    Il pavimento sopra impedisce al punteggio di salire per assenza; questo impedisce
+    all'etichetta di dirlo comunque. Un'impresa con solidità, eventi negativi e anzianità
+    tutti ottimi può ancora superare 80 su tre fattori su sette: quel numero è vero come
+    media dei tre, ma «Rischio molto basso» è un giudizio sull'impresa, e su quattro
+    fattori mai calcolati non si può dare.
+  */
+  if (misura.copertura < PAVIMENTO_DI_COPERTURA && value >= SOGLIA_CLASSE_A) {
+    value = SOGLIA_CLASSE_A - 1;
+    cap ??=
+      `Copertura del modello ${formatPercent(misura.copertura, 1)} ` +
+      `(${misura.valutati} fattori su ${misura.totali}): classe A non attribuibile`;
   }
 
   // ── Obsolescenza del bilancio ─────────────────────────────────────────────
@@ -181,9 +290,30 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   if (profile.eventiNegativi === null) {
     confidenza = 'bassa';
     builder.note(
-      '⚠ Protesti e pregiudizievoli non acquisiti: il fattore che pesa il 20% dello score non è ' +
-        'stato valutato. Una procedura concorsuale aperta resterebbe invisibile. Il punteggio va ' +
-        'considerato provvisorio.',
+      '⚠ Protesti e pregiudizievoli non acquisiti: il fattore che pesa il ' +
+        `${formatPercent(PESI.eventiNegativi, 0)} dello score non è stato valutato. Una ` +
+        'procedura concorsuale aperta resterebbe invisibile. Il punteggio va considerato ' +
+        'provvisorio.',
+    );
+  } else if (eventi.presenzaDichiarataSenzaDettaglio.length > 0) {
+    /*
+      Chi sappiamo protestato non può risultare più affidabile di chi non abbiamo
+      controllato.
+
+      La sezione non acquistata abbassava la confidenza a bassa e avvisava la testata; la
+      presenza dichiarata dal registro senza elenco no — restava a confidenza media e
+      senza una riga. Cioè l'impresa di cui il registro dice «ha protesti» veniva
+      presentata come più solida di quella su cui non abbiamo speso nulla. La visura è
+      stata pagata e ha detto qualcosa di sfavorevole: quel qualcosa deve arrivare a
+      schermo, anche se non si può pesare.
+    */
+    confidenza = weakestConfidence(confidenza, 'bassa');
+    builder.note(
+      `⚠ Il registro dichiara la presenza di ${eventi.presenzaDichiarataSenzaDettaglio.join(', ')} ` +
+        "senza fornirne l'elenco: il fattore che pesa il " +
+        `${formatPercent(PESI.eventiNegativi, 0)} dello score non è valutabile, e non perché ` +
+        'non sia stato acquistato ma perché il dettaglio non è arrivato. Richiedere la visura ' +
+        'dedicata prima di formulare una proposta: il punteggio va considerato provvisorio.',
     );
   }
 
@@ -212,10 +342,49 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   const finale = Math.round(clamp(value, 1, 100));
   const classe = classifica(finale);
 
+  /*
+    Il peso stampato è quello che ha pesato.
+
+    La riga diceva «peso 20%» accanto a un fattore che, essendo uno dei tre superstiti, di
+    quel punteggio ne aveva deciso il 44,4%. Due numeri diversi con lo stesso nome: chi
+    legge non ha modo di accorgersene, e il fattore che conta davvero non è quello che la
+    scheda indica. Ora la riga porta entrambi — quanto vale nel modello e quanto ha pesato
+    qui — e il secondo compare solo per i fattori che hanno davvero pesato.
+  */
   for (const factor of factors) {
+    const effettivo =
+      factor.score === null || misura.pesoDisponibile === 0
+        ? null
+        : factor.weight / Math.max(misura.pesoDisponibile, PAVIMENTO_DI_COPERTURA * misura.pesoTotale);
     builder.input(
-      `${factor.label} (peso ${formatPercent(factor.weight, 0)})`,
-      factor.score === null ? 'non valutabile' : `${Math.round(factor.score)}/100`,
+      `${factor.label} (peso ${formatPercent(factor.weight, 1)} del modello)`,
+      factor.score === null
+        ? 'non valutabile'
+        : `${Math.round(factor.score)}/100 · peso effettivo su questo punteggio ${formatPercent(effettivo ?? 0, 1)}`,
+    );
+  }
+
+  /*
+    Su quanti fattori il punteggio si regge, detto a schermo e non solo calcolato.
+
+    Il fascicolo stampava «Score 85/100 — classe A» senza dire che quattro fattori su
+    sette non erano stati valutati. Questa riga è ciò che rende il numero leggibile: le
+    note e gli input della spiegazione sono inoltrati per intero dallo strato di
+    presentazione, quindi arrivano davvero sotto gli occhi di chi decide.
+  */
+  const nonValutati = factors.filter((f) => f.score === null);
+  builder.input(
+    'Copertura del modello',
+    `${misura.valutati} fattori su ${misura.totali} · ${formatPercent(misura.copertura, 1)} del peso`,
+  );
+  if (nonValutati.length > 0) {
+    builder.note(
+      `Punteggio calcolato su ${misura.valutati} fattori su ${misura.totali} ` +
+        `(${formatPercent(misura.copertura, 1)} del peso del modello): ` +
+        `${nonValutati.map((f) => f.label).join(', ')} non valutabili. ` +
+        'Il peso dei fattori mancanti non viene redistribuito ai superstiti oltre il ' +
+        `pavimento del ${formatPercent(PAVIMENTO_DI_COPERTURA, 0)}: un punteggio non può ` +
+        'salire perché mancano dei dati.',
     );
   }
 
@@ -586,11 +755,30 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
   let punteggio = 100;
   const details: string[] = [];
 
-  // I protesti pesano in funzione dell'importo e della freschezza: uno di 8 anni fa,
-  // levato, non racconta la stessa storia di uno di sei mesi fa ancora aperto.
+  /*
+    I protesti pesano in funzione dell'importo e della freschezza: uno di 8 anni fa,
+    levato, non racconta la stessa storia di uno di sei mesi fa ancora aperto.
+
+    Ma il taglio ai dieci anni avveniva **prima** di scrivere in details, e il controllo
+    che più sotto impedisce la contraddizione guardava perciò un elenco già svuotato.
+    Misurato: due protesti e un'ipoteca giudiziale da 800.000 € del 2014 davano fattore
+    100 su 100 e la frase «Nessun protesto, pregiudizievole o procedura concorsuale a
+    carico della società», mentre la schermata li elencava tutti e tre con data e importo.
+
+    Oltre i dieci anni la penalità è zero — la curva di decadimento ci arriva da sola — ma
+    l'evento c'è, ed è stato trovato: va scritto, perché è quello che l'intermediario si
+    sente contestare in sede di quotazione.
+  */
   for (const protesto of eventi.protesti) {
     const anni = anniTra(protesto.data, asOf);
-    if (anni > 10) continue;
+    if (anni > 10) {
+      details.push(
+        `Protesto ${formatDate(protesto.data)} · ${Money.formatCompact(protesto.importo)}` +
+          `${protesto.levato ? ' (levato)' : ''} → oltre dieci anni fa: nessuna penalità sul ` +
+          'punteggio, resta da citare in sede di quotazione',
+      );
+      continue;
+    }
     const decadimento = interpolate(anni, [
       { x: 0, y: 1 },
       { x: 2, y: 0.7 },
@@ -613,7 +801,16 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
 
   for (const p of eventi.pregiudizievoli) {
     const anni = anniTra(p.data, asOf);
-    if (anni > 10) continue;
+    // Stessa ragione dei protesti: la penalità decade, la pregiudizievole no. Un'iscrizione
+    // ipotecaria conserva effetto vent'anni (art. 2847 c.c.), e tacerla perché il modello
+    // non la pesa più significa smentire l'elenco stampato due riquadri sotto.
+    if (anni > 10) {
+      details.push(
+        `${p.descrizione} del ${formatDate(p.data)} → oltre dieci anni fa: nessuna penalità ` +
+          'sul punteggio, resta da citare in sede di quotazione',
+      );
+      continue;
+    }
     const decadimento = interpolate(anni, [
       { x: 0, y: 1 },
       { x: 3, y: 0.6 },
@@ -660,6 +857,19 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
   const dichiaratiSenzaDettaglio = eventi.presenzaDichiarataSenzaDettaglio;
   if (dichiaratiSenzaDettaglio.length > 0) {
     const elenco = dichiaratiSenzaDettaglio.join(', ');
+    /*
+      La discordanza è quasi sempre **parziale**: il registro tace l'elenco di una
+      categoria e manda per intero quello di un'altra. Il ramo scartava tutti i dettagli
+      già calcolati, e la scheda finiva per affermare che nessun elenco era stato fornito
+      accanto a una pregiudizievole che aveva data, importo e descrizione. Il protesto
+      vero spariva dal fattore mentre tre righe dichiaravano il contrario.
+
+      Qui si conserva ciò che è arrivato e si dichiara mancante solo ciò che manca. Il
+      punteggio resta comunque non attribuito: senza importi e date della parte taciuta
+      sarebbe inventato, e il pavimento di copertura fa sì che l'assenza di questo
+      fattore si veda nel punteggio invece di regalarne il peso agli altri.
+    */
+    const trovato = details.length > 0;
     return {
       key: 'eventi-negativi',
       label: 'Eventi negativi',
@@ -668,11 +878,16 @@ function fattoreEventiNegativi(eventi: EventiNegativi | null, asOf: Date): Score
       rationale:
         `Il registro dichiara la presenza di ${elenco}, senza fornirne il dettaglio: ` +
         'la valutazione resta incompleta finché non si acquisisce la visura specifica. ' +
-        'Non si attribuisce un punteggio, perché senza importi e date sarebbe inventato.',
+        'Non si attribuisce un punteggio, perché senza importi e date sarebbe inventato.' +
+        (trovato
+          ? ' Gli eventi di cui il dettaglio è invece arrivato restano elencati qui sotto e ' +
+            'vanno citati in sede di quotazione.'
+          : ''),
       details: [
-        `Presenza dichiarata dal registro: ${elenco}.`,
-        'Elenchi non forniti: nessun importo, nessuna data, nessuna possibilità di pesarli.',
-        'Richiedere la visura protesti dedicata prima di formulare una proposta.',
+        ...details,
+        `Presenza dichiarata dal registro, senza elenco: ${elenco}.`,
+        `Di ${elenco} non è arrivato nessun importo e nessuna data: non c'è modo di pesarli.`,
+        'Richiedere la visura dedicata prima di formulare una proposta.',
       ],
     };
   }
@@ -741,7 +956,7 @@ function fattoreAnzianita(profile: CompanyProfile, asOf: Date): ScoreFactor {
   return {
     key: 'anzianita',
     label: 'Anzianità e continuità',
-    weight: PESO_ANZIANITA,
+    weight: PESI.anzianita,
     score,
     rationale:
       anni === null
@@ -760,6 +975,22 @@ function fattoreAnzianita(profile: CompanyProfile, asOf: Date): ScoreFactor {
 // Utilità
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Il patrimonio netto, da dove c'è.
+ *
+ * Dal bilancio in schema CEE quando arriva; altrimenti dagli aggregati sintetici, che è
+ * la stessa fonte da cui il fido prende il patrimonio nella medesima esecuzione. Se non
+ * c'è né l'uno né gli altri restituisce null, e chi chiama non applica nessun tetto: un
+ * patrimonio netto ignoto non è un patrimonio netto azzerato.
+ */
+function patrimonioNettoNoto(
+  profile: CompanyProfile,
+  bilancio: BilancioRiclassificato | null,
+): Euro | null {
+  if (bilancio !== null) return bilancio.sp.patrimonioNetto;
+  return ultimoBilancioSintetico(profile)?.value.patrimonioNetto ?? null;
+}
+
 function notEvaluable(key: string, label: string, weight: number, motivo: string): ScoreFactor {
   return {
     key,
@@ -772,7 +1003,7 @@ function notEvaluable(key: string, label: string, weight: number, motivo: string
 }
 
 export function classifica(score: number): ClasseDiMerito {
-  if (score >= 80) return 'A';
+  if (score >= SOGLIA_CLASSE_A) return 'A';
   if (score >= 65) return 'B';
   if (score >= 50) return 'C';
   if (score >= 35) return 'D';

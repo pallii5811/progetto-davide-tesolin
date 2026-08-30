@@ -89,6 +89,17 @@ export function computeUnderinsurance(
      * valore intero — che è il confronto sbagliato per costruzione.
      */
     readonly riferimentoAdeguatezza?: Euro | undefined;
+    /**
+     * Perché `valoreReale` **non** è il metro su cui questa polizza indennizza.
+     *
+     * Si valorizza soltanto quando i due numeri non sono omogenei — una garanzia a valore
+     * allo stato d'uso confrontata con un capitale calcolato a valore di rimpiazzo a nuovo,
+     * che è il solo caso oggi. Il testo è un frammento fisso composto da chi chiama, perché
+     * è lui a conoscere la ragione; qui serve a **sospendere** il verdetto invece di
+     * dedurre un'insufficienza da un confronto sbagliato per costruzione — esattamente ciò
+     * che `non-verificabile` già fa per il primo rischio senza metro.
+     */
+    readonly metroNonOmogeneo?: string | undefined;
   } = {},
 ): Explained<Underinsurance | null> {
   const builder = explain('Verifica di sottoassicurazione')
@@ -103,6 +114,7 @@ export function computeUnderinsurance(
   }
 
   const soggetta = opzioni.soggettaARegolaProporzionale ?? true;
+  const metroNonOmogeneo = opzioni.metroNonOmogeneo ?? null;
   const gradoDiCopertura = Math.min(1, sommaAssicurata / valoreReale);
   const quotaACarico = 1 - gradoDiCopertura;
   const scoperturaDiCapitale = Money.max(ZERO, Money.subtract(valoreReale, sommaAssicurata));
@@ -120,7 +132,21 @@ export function computeUnderinsurance(
     era stata scelta. E la stessa Explained conteneva già la nota che dice che la
     proporzionale non si applica: la spiegazione e il verdetto si contraddicevano.
   */
-  const riferimentoAdeguatezza = soggetta ? valoreReale : (opzioni.riferimentoAdeguatezza ?? null);
+  /*
+    E c'era un secondo modo di sbagliare metro, opposto e altrettanto silenzioso.
+
+    Anche restando dentro la regola proporzionale, il valore contro cui si misura deve
+    essere quello su cui la polizza indennizza. Con `formaGaranzia` a valore allo stato
+    d'uso l'esito era identico carattere per carattere a quello di una garanzia a nuovo —
+    stessa percentuale, stessa cifra a carico — mentre il capitale contro cui si misurava
+    era a nuovo. Su quelle polizze il prodotto dichiarava sottoassicurata di circa il
+    cinquanta per cento un'impresa che non lo era.
+  */
+  const riferimentoAdeguatezza = soggetta
+    ? metroNonOmogeneo === null
+      ? valoreReale
+      : null
+    : (opzioni.riferimentoAdeguatezza ?? null);
 
   const adeguatezzaDelLimite: AdeguatezzaDelLimite =
     riferimentoAdeguatezza === null
@@ -132,12 +158,24 @@ export function computeUnderinsurance(
   const sottoassicurata = adeguatezzaDelLimite === 'insufficiente';
 
   builder
-    .input('Valore reale del bene', Money.formatCompact(valoreReale))
-    .input('Somma assicurata', Money.formatCompact(sommaAssicurata))
-    .input('Grado di copertura', formatPercent(gradoDiCopertura, 0))
-    .input('Danno simulato', Money.formatCompact(danno))
-    .input('Indennizzo atteso', Money.formatCompact(indennizzo))
-    .input('A carico dell’assicurato', Money.formatCompact(aCaricoAssicurato));
+    .input(
+      metroNonOmogeneo === null
+        ? 'Valore reale del bene'
+        : 'Capitale calcolato a valore di rimpiazzo a nuovo',
+      Money.formatCompact(valoreReale),
+    )
+    .input('Somma assicurata', Money.formatCompact(sommaAssicurata));
+
+  // Su un metro non omogeneo il grado di copertura e la simulazione sono numeri esatti e
+  // privi di significato: misurano il rapporto fra due grandezze diverse. Non si stampano,
+  // perché un numero mostrato viene letto, e questo verrebbe letto come una scopertura.
+  if (metroNonOmogeneo === null) {
+    builder
+      .input('Grado di copertura', formatPercent(gradoDiCopertura, 0))
+      .input('Danno simulato', Money.formatCompact(danno))
+      .input('Indennizzo atteso', Money.formatCompact(indennizzo))
+      .input('A carico dell’assicurato', Money.formatCompact(aCaricoAssicurato));
+  }
 
   // Su un primo rischio il «grado di copertura» sul valore intero è un numero vero e
   // fuorviante — l'8% di una polizza scritta bene sembra un disastro. Accanto va detto
@@ -169,6 +207,13 @@ export function computeUnderinsurance(
           `(${Money.formatCompact(riferimentoAdeguatezza)}), e senza regola proporzionale.`,
       );
     }
+  } else if (metroNonOmogeneo !== null) {
+    builder.note(metroNonOmogeneo);
+    builder.note(
+      'Il verdetto resta sospeso: confrontare la somma assicurata con un capitale espresso su ' +
+        'un altro metro non misurerebbe la sottoassicurazione, la produrrebbe. Rilevare il valore ' +
+        'dei beni sul metro di questa polizza è ciò che rende il giudizio possibile.',
+    );
   } else if (sottoassicurata) {
     builder.note(
       `⚠ SOTTOASSICURAZIONE del ${formatPercent(quotaACarico, 0)}. Su un danno di ` +

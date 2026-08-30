@@ -120,7 +120,8 @@ export function computeSumsInsured(
   options: SumsInsuredOptions = {},
 ): SumsInsured {
   const fabbricati = calcolaFabbricati(facts, bilancio, immobili, options);
-  const contenuto = calcolaContenuto(facts, bilancio, options);
+  const contenutoCalcolato = calcolaContenuto(facts, bilancio, options);
+  const contenuto = contenutoCalcolato.capitale;
   const scorte = calcolaScorte(facts, bilancio, options);
   const danniIndiretti = calcolaDanniIndiretti(facts, bilancio, options);
   const monteSalari = calcolaMonteSalari(facts, bilancio);
@@ -152,7 +153,7 @@ export function computeSumsInsured(
     massimaleDandO: calcolaMassimaleDandO(facts),
     massimaleCyber: calcolaMassimaleCyber(facts),
     fidoClienti: calcolaFidoClienti(facts),
-    baseCatNat: calcolaBaseCatNat(fabbricati, contenuto),
+    baseCatNat: calcolaBaseCatNat(fabbricati, contenutoCalcolato),
     patrimonioEsposto,
   };
 }
@@ -190,15 +191,45 @@ function calcolaFabbricati(
     }
 
     const inLocazione = immobili.filter((i) => i.titolo === 'locazione');
+
+    /*
+      La somma parziale si dichiara, come fa `calcolaBaseCatNat` in fondo a questo file.
+
+      Un immobile senza superficie rilevata **valeva zero** dentro il totale, e il totale
+      usciva a confidenza 'alta' senza una riga che lo dicesse: tre capannoni di cui due
+      non misurati producevano 1,5 milioni al posto di 4,9, e nulla nel documento
+      distingueva quel numero da un rilievo completo. Non è un caso limite: in prima
+      compilazione ogni immobile nasce con la superficie a `null`.
+
+      Il totale resta quello misurato — inventare una superficie sarebbe peggio — ma smette
+      di presentarsi come completo, e nomina ciò che ha lasciato fuori.
+    */
+    const senzaSuperficie = immobili.filter((i) => i.superficieMq === null || i.superficieMq <= 0);
+    const esclusi = senzaSuperficie.map((i) => i.descrizione).join(', ');
+    const cartograficaDisponibile =
+      options.superficieCartograficaMq !== undefined && options.superficieCartograficaMq > 0;
+
     return builder
       .formula('Σ (superficie mq × costo di ricostruzione €/mq)')
+      .noteIf(
+        senzaSuperficie.length > 0,
+        `Somma parziale: ${senzaSuperficie.length} immobile/i senza superficie rilevata non ` +
+          `concorre/concorrono al capitale (${esclusi}). Il totale è per difetto, ed è la base su ` +
+          'cui al sinistro opera la regola proporzionale: rilevarne i metri quadri prima di quotare.',
+      )
+      .noteIf(
+        senzaSuperficie.length > 0 && cartograficaDisponibile,
+        'Per questi immobili è disponibile la superficie coperta rilevata da cartografia, che non ' +
+          'viene applicata: mescolare un rilievo e un’impronta a terra dentro lo stesso totale ' +
+          'renderebbe il capitale non attribuibile a nessuno dei due metodi.',
+      )
       .noteIf(
         inLocazione.length > 0,
         `${inLocazione.length} immobile/i in locazione: verificare la ripartizione contrattuale ` +
           'dell’onere assicurativo e inserire la rinuncia alla rivalsa verso il locatore.',
       )
       .note('Il costo €/mq va confermato con perizia per gli immobili di valore rilevante.')
-      .confidence('alta')
+      .confidence(senzaSuperficie.length > 0 ? 'media' : 'alta')
       .value(Money.commercialRoundUp(totale));
   }
 
@@ -285,11 +316,29 @@ function formattaOppureIgnoto(valore: Euro | null): string {
 
 // ── Contenuto: macchinari, impianti, attrezzature ────────────────────────────
 
+/**
+ * Il capitale del contenuto, e la quota di esso che l'obbligo CAT NAT chiede davvero.
+ *
+ * Sono due numeri e non uno perché i perimetri sono due. La copertura del contenuto
+ * assicura tutte le immobilizzazioni materiali mobili; l'obbligo di legge grava sulle sole
+ * voci B-II 1, 2 e 3 dell'art. 2424 c.c. — terreni e fabbricati, impianti e macchinari,
+ * attrezzature industriali e commerciali. Le voci B-II 4 e 5 — altri beni, cioè automezzi e
+ * mobili d'ufficio, e immobilizzazioni in corso e acconti — restano fuori.
+ *
+ * `quotaCatNat` è `null` quando l'aggregato letto **non è scomponibile**: il costo storico
+ * da nota integrativa è un totale, e le due voci non se ne separano. Distinguere quel caso
+ * da uno zero è ciò che permette di dichiarare l'ipotesi invece di spacciarla per un calcolo.
+ */
+interface ContenutoCalcolato {
+  readonly capitale: Explained<Euro | null>;
+  readonly quotaCatNat: Euro | null;
+}
+
 function calcolaContenuto(
   facts: CompanyFacts,
   bilancio: BilancioRiclassificato | null,
   options: SumsInsuredOptions,
-): Explained<Euro | null> {
+): ContenutoCalcolato {
   const builder = explain('Somma assicuranda — Macchinari e attrezzature').reference(
     'Valore di rimpiazzo a nuovo',
   );
@@ -307,41 +356,52 @@ function calcolaContenuto(
     const netto = facts.valoreImpiantiNetto;
 
     if (lordo !== null && Money.isPositive(lordo)) {
-      const stima = Money.multiply(lordo, COEFF_LORDO_A_RIMPIAZZO);
-      return builder
-        .formula('Costo storico lordo di impianti e attrezzature × adeguamento a nuovo')
-        .input('Costo storico lordo dichiarato', Money.formatCompact(lordo))
-        .input('Adeguamento a nuovo', `${formatNumber(COEFF_LORDO_A_RIMPIAZZO)}×`)
-        .note(
-          'Valore rilevato in intervista dal bilancio depositato. Il costo storico è la base corretta ' +
-            'per il valore a nuovo: ne risponde chi lo ha dichiarato.',
-        )
-        .confidence('media')
-        .value<Euro | null>(Money.commercialRoundUp(stima));
+      const stima = Money.commercialRoundUp(Money.multiply(lordo, COEFF_LORDO_A_RIMPIAZZO));
+      // Il dichiarato in intervista è la voce «impianti e attrezzature», cioè B-II 2 e 3:
+      // è già il perimetro dell'obbligo, e non contiene automezzi né acconti.
+      return {
+        capitale: builder
+          .formula('Costo storico lordo di impianti e attrezzature × adeguamento a nuovo')
+          .input('Costo storico lordo dichiarato', Money.formatCompact(lordo))
+          .input('Adeguamento a nuovo', `${formatNumber(COEFF_LORDO_A_RIMPIAZZO)}×`)
+          .note(
+            'Valore rilevato in intervista dal bilancio depositato. Il costo storico è la base corretta ' +
+              'per il valore a nuovo: ne risponde chi lo ha dichiarato.',
+          )
+          .confidence('media')
+          .value<Euro | null>(stima),
+        quotaCatNat: stima,
+      };
     }
 
     if (netto !== null && Money.isPositive(netto)) {
       const coefficiente = options.coefficienteRivalutazione ?? COEFF_NETTO_A_RIMPIAZZO;
-      const stima = Money.multiply(netto, coefficiente);
-      return builder
-        .formula('Valore netto contabile dichiarato × coefficiente di riporto a nuovo')
-        .input('Impianti e attrezzature, netti', Money.formatCompact(netto))
-        .input('Coefficiente di riporto', `${formatNumber(coefficiente)}×`)
-        .note(
-          'STIMA su valore rilevato in intervista. Il netto contabile è già decurtato dagli ' +
-            'ammortamenti: chiedere il costo storico dalla nota integrativa alza la precisione di molto.',
-        )
-        .confidence('bassa')
-        .value<Euro | null>(Money.commercialRoundUp(stima));
+      const stima = Money.commercialRoundUp(Money.multiply(netto, coefficiente));
+      return {
+        capitale: builder
+          .formula('Valore netto contabile dichiarato × coefficiente di riporto a nuovo')
+          .input('Impianti e attrezzature, netti', Money.formatCompact(netto))
+          .input('Coefficiente di riporto', `${formatNumber(coefficiente)}×`)
+          .note(
+            'STIMA su valore rilevato in intervista. Il netto contabile è già decurtato dagli ' +
+              'ammortamenti: chiedere il costo storico dalla nota integrativa alza la precisione di molto.',
+          )
+          .confidence('bassa')
+          .value<Euro | null>(stima),
+        quotaCatNat: stima,
+      };
     }
 
-    return builder
-      .note(
-        'Il valore di impianti e attrezzature non compare fra gli aggregati sintetici del registro: ' +
-          'si rileva dalle voci B-II-2 e B-II-3 del bilancio depositato, che l’impresa ha già in mano.',
-      )
-      .confidence('bassa')
-      .value<Euro | null>(null);
+    return {
+      capitale: builder
+        .note(
+          'Il valore di impianti e attrezzature non compare fra gli aggregati sintetici del registro: ' +
+            'si rileva dalle voci B-II-2 e B-II-3 del bilancio depositato, che l’impresa ha già in mano.',
+        )
+        .confidence('bassa')
+        .value<Euro | null>(null),
+      quotaCatNat: null,
+    };
   }
 
   const attivo = bilancio.origine.attivo;
@@ -351,15 +411,21 @@ function calcolaContenuto(
     const soloMobili = Money.subtract(costoStorico, attivo.terreniEFabbricati);
     const base = Money.max(ZERO, soloMobili);
     const stima = Money.multiply(base, COEFF_LORDO_A_RIMPIAZZO);
-    return builder
-      .formula('(Costo storico immobilizzazioni materiali − fabbricati) × adeguamento a nuovo')
-      .input('Costo storico lordo', Money.formatCompact(costoStorico))
-      .input('Adeguamento a nuovo', `${formatNumber(COEFF_LORDO_A_RIMPIAZZO)}×`)
-      .note(
-        'Calcolo basato sul costo storico da nota integrativa: è la base corretta per il valore a nuovo.',
-      )
-      .confidence('alta')
-      .value(Money.commercialRoundUp(stima));
+    // Il costo storico da nota integrativa è il totale delle immobilizzazioni materiali:
+    // le voci B-II 4 e 5 stanno dentro e non se ne separano. `quotaCatNat` resta `null`,
+    // ed è `calcolaBaseCatNat` a dichiarare l'ipotesi che ne consegue.
+    return {
+      capitale: builder
+        .formula('(Costo storico immobilizzazioni materiali − fabbricati) × adeguamento a nuovo')
+        .input('Costo storico lordo', Money.formatCompact(costoStorico))
+        .input('Adeguamento a nuovo', `${formatNumber(COEFF_LORDO_A_RIMPIAZZO)}×`)
+        .note(
+          'Calcolo basato sul costo storico da nota integrativa: è la base corretta per il valore a nuovo.',
+        )
+        .confidence('alta')
+        .value<Euro | null>(Money.commercialRoundUp(stima)),
+      quotaCatNat: null,
+    };
   }
 
   const netto = Money.add(
@@ -368,28 +434,38 @@ function calcolaContenuto(
     attivo.altreImmobilizzazioniMateriali,
   );
   if (!Money.isPositive(netto)) {
-    return builder
-      .note('Nessuna immobilizzazione materiale mobile iscritta a bilancio.')
-      .confidence('media')
-      .value(ZERO);
+    return {
+      capitale: builder
+        .note('Nessuna immobilizzazione materiale mobile iscritta a bilancio.')
+        .confidence('media')
+        .value<Euro | null>(ZERO),
+      quotaCatNat: ZERO,
+    };
   }
 
   const coefficiente = options.coefficienteRivalutazione ?? COEFF_NETTO_A_RIMPIAZZO;
   const stima = Money.multiply(netto, coefficiente);
 
-  return builder
-    .formula('(Impianti + Attrezzature + Altri beni, netti) × coefficiente di riporto a nuovo')
-    .input('Impianti e macchinario', Money.formatCompact(attivo.impiantiEMacchinario))
-    .input('Attrezzature industriali e commerciali', Money.formatCompact(attivo.attrezzature))
-    .input('Altri beni', Money.formatCompact(attivo.altreImmobilizzazioniMateriali))
-    .input('Coefficiente di riporto', `${formatNumber(coefficiente)}×`)
-    .note(
-      'STIMA. Il valore netto contabile è già decurtato dagli ammortamenti e non rappresenta il costo ' +
-        'di riacquisto: assicurare il netto contabile equivale a dichiararsi sottoassicurati in partenza.',
-    )
-    .note('Richiedere il registro dei cespiti per un calcolo puntuale sul costo storico.')
-    .confidence('media')
-    .value(Money.commercialRoundUp(stima));
+  // Qui le voci sono lette una per una, quindi il perimetro dell'obbligo si ritaglia
+  // esattamente: B-II 2 e 3, senza gli altri beni e senza le immobilizzazioni in corso.
+  const nettoCatNat = Money.add(attivo.impiantiEMacchinario, attivo.attrezzature);
+
+  return {
+    capitale: builder
+      .formula('(Impianti + Attrezzature + Altri beni, netti) × coefficiente di riporto a nuovo')
+      .input('Impianti e macchinario', Money.formatCompact(attivo.impiantiEMacchinario))
+      .input('Attrezzature industriali e commerciali', Money.formatCompact(attivo.attrezzature))
+      .input('Altri beni', Money.formatCompact(attivo.altreImmobilizzazioniMateriali))
+      .input('Coefficiente di riporto', `${formatNumber(coefficiente)}×`)
+      .note(
+        'STIMA. Il valore netto contabile è già decurtato dagli ammortamenti e non rappresenta il costo ' +
+          'di riacquisto: assicurare il netto contabile equivale a dichiararsi sottoassicurati in partenza.',
+      )
+      .note('Richiedere il registro dei cespiti per un calcolo puntuale sul costo storico.')
+      .confidence('media')
+      .value<Euro | null>(Money.commercialRoundUp(stima)),
+    quotaCatNat: Money.commercialRoundUp(Money.multiply(nettoCatNat, coefficiente)),
+  };
 }
 
 // ── Scorte ───────────────────────────────────────────────────────────────────
@@ -734,7 +810,50 @@ function calcolaMassimaleDandO(facts: CompanyFacts): Explained<Euro | null> {
   const builder = explain('Massimale consigliato — D&O');
   if (norma !== null) builder.reference(norma);
 
-  if (!haOrganoAmministrativo(facts.formaGiuridica)) {
+  /*
+    La nota era rovesciata in entrambe le sue metà per gli enti non societari.
+
+    «Priva di organo amministrativo distinto dalla proprietà» detto a una fondazione è
+    falso due volte: una fondazione non ha proprietà — è un patrimonio destinato a uno
+    scopo — e ha un consiglio di amministrazione i cui membri rispondono verso l'ente
+    secondo le norme del mandato (art. 18 c.c.), e negli enti del terzo settore anche
+    verso l'ente, i creditori sociali e i terzi per il richiamo dell'art. 28 D.Lgs.
+    117/2017 alle norme delle società di capitali. La garanzia non è impertinente: è
+    esattamente il caso in cui una D&O serve, perché il patrimonio dell'ente non copre
+    l'amministratore.
+
+    `haOrganoAmministrativo` non viene toccata: elenca le forme **societarie** con organo
+    distinto dai soci ed è usata altrove per quella domanda. Qui la domanda è un'altra —
+    se esistano amministratori che rispondono — e la risposta si dà per esteso.
+  */
+  const enteNonSocietario =
+    facts.formaGiuridica === 'associazione' || facts.formaGiuridica === 'fondazione';
+
+  if (enteNonSocietario) {
+    builder
+      .reference('Art. 18 c.c. — responsabilità degli amministratori verso l’ente')
+      .reference('Art. 28 D.Lgs. 117/2017 — enti del terzo settore')
+      .note(
+        'Ente non societario con organo amministrativo: gli amministratori rispondono verso l’ente ' +
+          'secondo le norme del mandato (art. 18 c.c.) e, se iscritto al RUNTS, secondo il rinvio ' +
+          'dell’art. 28 D.Lgs. 117/2017 alla disciplina delle società di capitali.',
+      )
+      .note(
+        'L’iscrizione al registro unico del terzo settore non risulta dai dati camerali e va ' +
+          'verificata: cambia il perimetro della responsabilità, non la sua esistenza.',
+      );
+  } else if (facts.formaGiuridica === 'altro') {
+    // 'altro' è il valore dell'ignoto, non una forma giuridica: affermarci sopra che la
+    // garanzia non serve è la stessa assenza-fatta-dato che il prodotto combatte altrove.
+    return builder
+      .note(
+        'La forma giuridica non è determinata: la pertinenza della garanzia non si può giudicare ' +
+          'senza sapere se esista un organo amministrativo distinto dalla proprietà. Va rilevata ' +
+          'dalla visura prima di escludere la copertura.',
+      )
+      .confidence('bassa')
+      .value(null);
+  } else if (!haOrganoAmministrativo(facts.formaGiuridica)) {
     return builder
       .note(
         'Forma giuridica priva di organo amministrativo distinto dalla proprietà: garanzia non pertinente.',
@@ -885,17 +1004,48 @@ function calcolaFidoClienti(facts: CompanyFacts): Explained<Euro | null> {
 
 function calcolaBaseCatNat(
   fabbricati: Explained<Euro | null>,
-  contenuto: Explained<Euro | null>,
+  contenuto: ContenutoCalcolato,
 ): Explained<Euro | null> {
-  const noti = [fabbricati.value, contenuto.value].filter((v): v is Euro => v !== null);
+  /*
+    La formula stampata escludeva le voci B-II 4 e 5; il numero le comprendeva.
+
+    `contenuto` è il capitale della copertura, che assicura tutte le immobilizzazioni
+    materiali mobili — automezzi, mobili d'ufficio, acconti compresi. L'obbligo della
+    L. 213/2023 grava sulle sole B-II 1, 2 e 3. Prendere il primo per il secondo sbagliava
+    **sempre per eccesso**: con la sola voce «altri beni» valorizzata a un milione, la base
+    dell'obbligo usciva di due milioni su beni che la norma non chiede, e su quella cifra si
+    misura sia l'adempimento sia, al sinistro, la regola proporzionale.
+  */
+  const scomponibile = contenuto.quotaCatNat !== null;
+  const componenteContenuto = contenuto.quotaCatNat ?? contenuto.capitale.value;
+  const escluso =
+    contenuto.capitale.value !== null && contenuto.quotaCatNat !== null
+      ? Money.subtract(contenuto.capitale.value, contenuto.quotaCatNat)
+      : ZERO;
+
+  const noti = [fabbricati.value, componenteContenuto].filter((v): v is Euro => v !== null);
 
   return (
     explain('Base assicurabile CAT NAT')
       .formula('Terreni e fabbricati + Impianti e macchinari + Attrezzature industriali e commerciali')
       .reference('Art. 2424 c.c., attivo B-II, numeri 1, 2 e 3 · L. 213/2023 · DM 18/2025')
       .input('Fabbricati', formattaOppureIgnoto(fabbricati.value))
-      .input('Impianti, macchinari e attrezzature', formattaOppureIgnoto(contenuto.value))
+      .input('Impianti, macchinari e attrezzature', formattaOppureIgnoto(componenteContenuto))
       .note('Le rimanenze non rientrano nell’obbligo di legge, pur essendo assicurabili separatamente.')
+      // Ciò che è stato escluso si dichiara: altrimenti un capitale più basso del previsto
+      // sembra un errore di calcolo invece di un perimetro di legge.
+      .noteIf(
+        Money.isPositive(escluso),
+        `Escluse dalla base le voci B-II 4 e 5 dell’attivo — altri beni, fra cui automezzi e mobili ` +
+          `d’ufficio, e immobilizzazioni in corso e acconti — per ${Money.formatCompact(escluso)}: ` +
+          'l’obbligo non le comprende. Restano assicurabili con la copertura incendio.',
+      )
+      .noteIf(
+        !scomponibile && contenuto.capitale.value !== null,
+        'L’aggregato delle immobilizzazioni materiali letto a bilancio non è scomponibile: comprende ' +
+          'anche le voci B-II 4 e 5, che l’obbligo non richiede. La base qui indicata è quindi per ' +
+          'eccesso, e la quota dovuta va isolata dal registro dei cespiti prima di quotare.',
+      )
       /*
       La somma parziale si dichiara, come fa patrimonioEsposto per le stesse ragioni.
 
@@ -915,7 +1065,13 @@ function calcolaBaseCatNat(
         'Capitale non quantificabile con i dati disponibili. L’obbligo di legge sussiste comunque: ' +
           'rilevare il valore dei beni prima di procedere alla quotazione.',
       )
-      .inheritConfidence(fabbricati.confidence, contenuto.confidence)
+      // Un aggregato non scomponibile è un'ipotesi dichiarata, non una misura: la
+      // confidenza non può restare quella di un calcolo fatto voce per voce.
+      .inheritConfidence(
+        fabbricati.confidence,
+        contenuto.capitale.confidence,
+        ...(scomponibile || contenuto.capitale.value === null ? [] : (['media'] as const)),
+      )
       .value<Euro | null>(noti.length === 0 ? null : Money.add(...noti))
   );
 }

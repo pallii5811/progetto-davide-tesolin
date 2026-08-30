@@ -272,12 +272,26 @@ function raggruppaPerContiguita(ubicazioni: readonly Ubicazione[]): readonly Agg
   // l'ipotesi prudente per il conteggio dei complessi ma va dichiarata.
   for (const u of senzaCoordinate) gruppi.push([u]);
 
+  /*
+    «Isolata» è il risultato di una misura, e va fatta per poterlo dire.
+
+    Il motivo era uno solo per tutti i gruppi da una ubicazione, e affermava una
+    separazione **misurata** anche là dove non c'era nulla da misurare: senza coordinate il
+    gruppo singolo nasce dall'ipotesi prudenziale scritta dieci righe più su, non da una
+    distanza. In produzione è il caso normale — nessuna unità locale porta coordinate nelle
+    risposte registrate — quindi la frase falsa era quella che compariva sempre.
+
+    È la stessa distinzione che `domande` fa già con «considerate separate dalle altre:
+    confermare se sorgono nello stesso sito».
+  */
   return gruppi.map((g) => ({
     ubicazioni: g,
     motivo:
-      g.length === 1
-        ? 'Ubicazione isolata rispetto alle altre note.'
-        : `${g.length} ubicazioni entro ${RAGGIO_COMPLESSO_METRI} m: un incendio può interessarle tutte.`,
+      g.length > 1
+        ? `${g.length} ubicazioni entro ${RAGGIO_COMPLESSO_METRI} m: un incendio può interessarle tutte.`
+        : g[0]!.haCoordinate
+          ? 'Ubicazione isolata rispetto alle altre note.'
+          : 'Coordinate non rilevate: l’ubicazione è contata come complesso a sé per ipotesi prudenziale, non per distanza misurata.',
   }));
 }
 

@@ -454,9 +454,10 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
       superficieMq: x.superficieMq,
       addetti: x.addetti,
       haCoordinate: x.haCoordinate,
-      sismica: x.esposizione.sismica,
-      // L'etichetta e non il livello: la tabella idraulica conosce le sole province alte,
-      // e per le altre non ha misurato. Il dominio la compone, qui si inoltra e basta.
+      // L'etichetta e non il livello, per **entrambe**: le due tabelle sismiche coprono 74
+      // province su 107, la idraulica conosce le sole province alte, e per le altre non
+      // hanno misurato. Il dominio compone la frase, qui si inoltra e basta.
+      sismica: x.esposizione.sismicaEtichetta,
       idraulica: x.esposizione.idraulicaEtichetta,
       piuEsposta: x.id === u.ubicazionePeggiore?.id,
       contesto:
@@ -565,9 +566,12 @@ function presentCredito(analisi: CompanyAnalysis) {
     fido: {
       importo: money(analisi.creditLimit.value.importo),
       vincoloAttivo: analisi.creditLimit.value.vincoloAttivo,
-      limitePatrimoniale: money(analisi.creditLimit.value.limitePatrimoniale),
-      limiteDimensionale: money(analisi.creditLimit.value.limiteDimensionale),
-      limiteFlusso: money(analisi.creditLimit.value.limiteFlusso),
+      // moneyOrNull e non money: un vincolo non calcolabile deve arrivare a schermo come
+      // assenza, non come «0 €». La spiegazione accanto stampava già «non calcolabile», e
+      // per un'intera versione le due righe si sono contraddette dentro lo stesso oggetto.
+      limitePatrimoniale: moneyOrNull(analisi.creditLimit.value.limitePatrimoniale),
+      limiteDimensionale: moneyOrNull(analisi.creditLimit.value.limiteDimensionale),
+      limiteFlusso: moneyOrNull(analisi.creditLimit.value.limiteFlusso),
       fattoreScore: analisi.creditLimit.value.fattoreScore,
       spiegazione: explanation(analisi.creditLimit.explanation),
     },
@@ -890,6 +894,24 @@ function presentGap(gap: CoverageGap) {
         ? null
         : {
             sottoassicurata: gap.sottoassicurazione.value.sottoassicurata,
+            /*
+              Il verdetto a tre stati esce intero, e non compresso nel booleano accanto.
+
+              `sottoassicurata` è vera solo quando il limite è accertato insufficiente:
+              «limite congruo» e «limite non giudicabile» le danno entrambe il valore
+              falso, e al confine diventavano lo stesso caso. Chi stampa il documento
+              non poteva più distinguerli, e su una garanzia a primo rischio assoluto —
+              la forma ordinaria del furto e frequentissima sull'incendio delle PMI —
+              invocava l'art. 1907 c.c., che su quella forma non opera.
+
+              `riferimentoAdeguatezza` è il metro su cui il limite è stato giudicato: il
+              valore dei beni per una garanzia a valore intero, il danno massimo probabile
+              per un primo rischio, `null` quando un metro non c'era. È il campo che
+              permette di riconoscere la forma senza dedurla, e resta `null` invece di
+              ripiegare sul valore dei beni: l'assenza di metro non è un metro.
+            */
+            adeguatezzaDelLimite: gap.sottoassicurazione.value.adeguatezzaDelLimite,
+            riferimentoAdeguatezza: moneyOrNull(gap.sottoassicurazione.value.riferimentoAdeguatezza),
             gradoDiCopertura: gap.sottoassicurazione.value.gradoDiCopertura,
             scoperturaDiCapitale: money(gap.sottoassicurazione.value.scoperturaDiCapitale),
             simulazione: {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEMO_AS_OF,
+  DIVISIONE_PESCA,
   Money,
   analyzeCompany,
   assessCatNat,
@@ -15,6 +16,7 @@ import {
   reclassify,
   squadraturaBilancio,
 } from '../src/index.js';
+import type { CreditLimit } from '../src/index.js';
 
 const profilo = demoCompanyProfile();
 const polizze = demoPolizze();
@@ -132,11 +134,59 @@ describe('Analisi completa', () => {
     }
   });
 
-  it('il fido consigliato non supera nessuno dei tre vincoli', () => {
-    const fido = analisi.creditLimit.value;
-    expect(fido.importo).toBeLessThanOrEqual(fido.limitePatrimoniale);
-    expect(fido.importo).toBeLessThanOrEqual(fido.limiteDimensionale);
-    expect(fido.importo).toBeLessThanOrEqual(fido.limiteFlusso);
+  /*
+    Il fido non supera il vincolo che il documento chiama il più stringente.
+
+    Questa prova girava sulla sola fixture dimostrativa — cioè dove non poteva fallire: lì
+    lo score è 76, il fattore vale meno di 1,00 e il fido resta sotto ogni vincolo per
+    costruzione. Ma la fixture ha il bilancio in schema CEE, e **il percorso che gira in
+    produzione non ce l'ha**: senza, lo score sale a 85 (l'assenza di fattori rinormalizza
+    la media verso i superstiti, che erano i più alti) e con esso il fattore di score
+    supera 1,00.
+
+    Si confronta contro il vincolo indicato da `vincoloAttivo`, non contro tutti e tre: i
+    vincoli non calcolabili escono `0 €` invece che nulli, e confrontarsi con quello zero
+    misurerebbe un secondo difetto insieme al primo, rendendo illeggibile quale dei due ha
+    parlato.
+  */
+  const vincoloPiuStringente = (fido: CreditLimit): CreditLimit['limitePatrimoniale'] | null => {
+    switch (fido.vincoloAttivo) {
+      case 'patrimoniale':
+        return fido.limitePatrimoniale;
+      case 'dimensionale':
+        return fido.limiteDimensionale;
+      case 'flusso':
+        return fido.limiteFlusso;
+      default:
+        return null;
+    }
+  };
+
+  it('il fido consigliato non supera il vincolo che dichiara più stringente', () => {
+    const percorsi = {
+      'fixture con bilancio CEE': analisi,
+      // Il bilancio in schema CEE non raggiunge mai il motore in produzione: questo è il
+      // percorso vero, e finora nessuna prova lo esercitava.
+      'percorso di produzione, senza bilancio CEE': analyzeCompany(
+        { ...profilo, bilanci: [] },
+        polizze,
+        DEMO_AS_OF,
+      ),
+    };
+
+    for (const [nome, esito] of Object.entries(percorsi)) {
+      const fido = esito.creditLimit.value;
+      const vincolo = vincoloPiuStringente(fido);
+      // Nessun vincolo calcolabile: non c'è nulla che il fido possa superare.
+      if (vincolo === null) continue;
+
+      expect(
+        Money.toEuro(fido.importo),
+        `${nome}: fido ${Money.toEuro(fido.importo)} € oltre il vincolo ${fido.vincoloAttivo} ` +
+          `di ${Money.toEuro(vincolo)} € (score ${esito.creditScore.value.value}, ` +
+          `fattore ${fido.fattoreScore.toFixed(2)}×)`,
+      ).toBeLessThanOrEqual(Money.toEuro(vincolo));
+    }
   });
 
   it('identifica i rischi ordinandoli per gravità residua decrescente', () => {
@@ -337,15 +387,57 @@ describe('Regola proporzionale (art. 1907 c.c.)', () => {
 describe('Obbligo CAT NAT', () => {
   const facts = deriveFacts(profilo, bilancio, DEMO_AS_OF);
 
-  it('esclude le imprese agricole per le quali opera il Fondo AGRICAT', () => {
-    const agricola = assessCatNat({
-      facts: { ...facts, atecoSezione: 'A' },
+  /*
+    L'esclusione è dell'**attività agricola**, non della sezione A intera.
+
+    Questa prova costruiva una sezione A lasciando la divisione della fixture, che è la 25:
+    una sezione A con divisione 25 non esiste — la sezione A ha le divisioni 01, 02 e 03 —
+    e su un codice incoerente qualunque lettura risponde «agricola». Passava quindi
+    identica sul codice **precedente** alla correzione che dichiara di proteggere, quello
+    che escludeva la sezione intera e dichiarava non soggetto a un obbligo di legge anche
+    un peschereccio.
+
+    Le tre prove qui sotto sono la distinzione per intero: due divisioni escluse, una
+    soggetta, e il caso in cui la divisione non è stata rilevata. Solo tenendole insieme si
+    separa la lettura giusta dalla precedente.
+  */
+  const sezioneA = (atecoDivisione: string | null) =>
+    assessCatNat({
+      facts: { ...facts, atecoSezione: 'A', atecoDivisione },
       baseAssicurabile: euro(500_000),
       giaCoperta: false,
       asOf: DEMO_AS_OF,
-    });
-    expect(agricola.value.soggetta).toBe(false);
-    expect(agricola.value.motivoEsclusione).toContain('AGRICAT');
+    }).value;
+
+  it('esclude le sole divisioni agricole ex art. 2135 c.c., per le quali opera il Fondo AGRICAT', () => {
+    // 01 coltivazione e allevamento, 02 selvicoltura: è l'attività dell'art. 2135 c.c.
+    for (const divisione of ['01', '02']) {
+      const agricola = sezioneA(divisione);
+      expect(agricola.soggetta, `divisione ${divisione}`).toBe(false);
+      expect(agricola.motivoEsclusione, `divisione ${divisione}`).toContain('AGRICAT');
+    }
+  });
+
+  it('ma NON la pesca: il Fondo AGRICAT non la copre e la norma la obbliga', () => {
+    /*
+      È la riga che il collaudo precedente non poteva scrivere.
+
+      Escludere la sezione A intera rendeva irraggiungibile il ramo della pesca, mentre
+      nello stesso file la tabella delle proroghe assegna alla divisione 03 un termine
+      prorogato: un termine non si proroga a chi non è obbligato. La proroga era scritta,
+      documentata e morta.
+    */
+    const pesca = sezioneA(DIVISIONE_PESCA);
+    expect(pesca.soggetta).toBe(true);
+    expect(pesca.motivoEsclusione).toBeNull();
+  });
+
+  it('senza divisione non deduce l’esclusione: prosegue come soggetta e lo dichiara', () => {
+    // Su un obbligo di legge «non sei obbligato» è il verso che espone il cliente, e
+    // l'intermediario che gliel'ha detto. Nel dubbio si resta soggetti, dichiarandolo.
+    const ignota = sezioneA(null);
+    expect(ignota.soggetta).toBe(true);
+    expect(ignota.motivoEsclusione).toBeNull();
   });
 
   it('applica alle piccole imprese il termine del 1° gennaio 2026', () => {
