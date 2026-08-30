@@ -136,14 +136,37 @@ export default async function PaginaPortafoglio({
           valore={String(riepilogo.coperturaAssenteTotale)}
           nota="Somma delle garanzie assenti"
         />
+        {/*
+          Il numero grande in forma breve, la cifra esatta nella nota.
+
+          «8.147.000 €» a schermo intero è quasi centottanta pixel: in un riquadro che a
+          390 pixel ne ha centotrentatré non ci sta, e le due vie d'uscita sono entrambe
+          difetti. Lasciarlo uscire spinge fuori l'intera pagina; mandarlo a capo alza il
+          riquadro e caccia sotto la piega la lista di lavoro, che è la ragione per cui
+          questa schermata si apre. Il collaudo ha misurato prima l'uno — cinque pixel di
+          traboccamento — e poi l'altro: trenta pixel di lista perduta.
+
+          La terza via è non far dipendere la sintesi dalla lunghezza di un numero.
+          «8,1 Mln €» sta ovunque, e la cifra al centesimo resta leggibile subito sotto,
+          in un testo piccolo che può andare a capo senza conseguenze. Su una scheda di
+          sintesi è anche la forma giusta: il dettaglio è nella tabella, due dita più giù.
+        */}
         <Metrica
           etichetta="Esposizione complessiva"
           valore={new Intl.NumberFormat('it-IT', {
             style: 'currency',
             currency: 'EUR',
-            maximumFractionDigits: 0,
+            notation: 'compact',
+            // Il minimo a zero toglie il decimale quando non dice niente: senza, un
+            // portafoglio vuoto mostra «0,0 €» e uno da 950 mila «950,0K €».
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1,
           }).format(riepilogo.esposizioneComplessivaEuro)}
-          nota="Patrimonio non assicurato dei clienti seguiti"
+          nota={`${new Intl.NumberFormat('it-IT', {
+            style: 'currency',
+            currency: 'EUR',
+            maximumFractionDigits: 0,
+          }).format(riepilogo.esposizioneComplessivaEuro)} · patrimonio non assicurato dei clienti seguiti`}
           tono="attenzione"
         />
       </div>
