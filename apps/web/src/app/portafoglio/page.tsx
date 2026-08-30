@@ -103,7 +103,19 @@ export default async function PaginaPortafoglio({
           </Link>
         </div>
       </div>
-      <p className="mb-6 max-w-3xl text-sm leading-relaxed text-testo-tenue">
+      {/*
+        Interlinea stretta e margine corto finché lo schermo è stretto.
+
+        A 390 pixel queste due frasi occupano cinque righe: con l'interlinea larga sono
+        oltre cento pixel, più di qualunque riquadro di sintesi, e sono la ragione per cui
+        la lista di lavoro finiva diciannove pixel sotto la piega. Una piccola ironia,
+        visto che il paragrafo dice di non essere un cruscotto da guardare: nel dirlo
+        spingeva giù le telefonate.
+
+        Non si nasconde niente e non si accorcia niente: si stringe la spaziatura dove lo
+        spazio costa, e da `sm` in su resta com'era.
+      */}
+      <p className="mb-4 max-w-3xl text-sm leading-snug text-testo-tenue sm:mb-6 sm:leading-relaxed">
         Ordinato per urgenza: prima le posizioni non conformi a un obbligo di legge, poi per esposizione
         patrimoniale scoperta. Non è un cruscotto da guardare, è una lista di telefonate da fare.
       </p>
