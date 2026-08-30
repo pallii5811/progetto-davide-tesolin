@@ -65,15 +65,59 @@ test.describe('Schermo stretto', () => {
       await expect(page).not.toHaveURL(/\/accedi/);
       await page.waitForLoadState('networkidle');
 
-      const eccedenza = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
+      /*
+        Si misura l'eccedenza e si nomina CHI la causa.
+
+        «5px di contenuto fuori schermo» è vero e inservibile: chi lo legge deve poi
+        aprire il browser e cercare a mano l'elemento che sborda. L'elenco dei colpevoli
+        costa una manciata di righe e trasforma un fallimento frustrante in una
+        correzione di un minuto.
+      */
+      const { eccedenza, colpevoli } = await page.evaluate(() => {
+        const larghezza = document.documentElement.clientWidth;
+        const sborda = (e: Element): boolean => e.getBoundingClientRect().right > larghezza + 1;
+        const fuori: string[] = [];
+
+        /*
+          Array.from e non un for-of sulla NodeList: senza DOM.Iterable fra le librerie di
+          TypeScript l'iterazione diretta produce `any`, e con essa sedici errori di lint
+          che nascondono quelli veri.
+        */
+        for (const el of Array.from(document.querySelectorAll<HTMLElement>('body *'))) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || !sborda(el)) continue;
+
+          /*
+            Solo i colpevoli PIÙ ESTERNI. Se un contenitore sborda, sborda anche tutta la
+            sua discendenza: stampare venti righe per un difetto solo lo nasconde invece
+            di mostrarlo.
+          */
+          const padre = el.parentElement;
+          if (padre !== null && padre !== document.body && sborda(padre)) continue;
+
+          const classi = el.className.toString().slice(0, 80);
+          fuori.push(
+            `<${el.tagName.toLowerCase()} class="${classi}"> sborda di ${Math.round(r.right - larghezza)}px`,
+          );
+        }
+
+        return {
+          eccedenza: document.documentElement.scrollWidth - larghezza,
+          colpevoli: fuori.slice(0, 5),
+        };
+      });
 
       /*
         Qualche pixel di tolleranza: gli arrotondamenti del motore di rendering non sono un
         difetto. Oltre, c'è del contenuto che nessuno vedrà.
       */
-      expect(eccedenza, `${nome}: ${eccedenza}px di contenuto fuori schermo`).toBeLessThanOrEqual(2);
+      expect(
+        eccedenza,
+        `${nome}: ${eccedenza}px di contenuto fuori schermo.\n` +
+          (colpevoli.length > 0
+            ? `Elementi che sbordano:\n  ${colpevoli.join('\n  ')}`
+            : 'Nessun elemento singolo sborda: guardare margini negativi e larghezze minime.'),
+      ).toBeLessThanOrEqual(2);
     });
   }
 });

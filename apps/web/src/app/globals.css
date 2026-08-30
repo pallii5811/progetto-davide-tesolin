@@ -83,8 +83,17 @@
 
      Ambra a 75, fra il moderato (100) e il rilevante (65): una cautela, non una gravità.
      Stesso metodo degli altri — il più chiaro che supera 4,5:1 sul proprio fondo.
+
+     La luminosità era 0,53, scelta contro il token -fondo. Ma a schermo quel testo sta
+     quasi sempre su bg-attenzione/15, cioè l'ambra al 15% composito sulla superficie:
+     un fondo diverso, e più scuro. Su quello il rapporto è 4,41 — bocciato — e axe l'ha
+     detto alla prima esecuzione in cui il tema chiaro è stato prodotto davvero, dopo
+     anni in cui il ramo chiaro del collaudo misurava gli stessi pixel di quello scuro.
+
+     Ricalcolato sul fondo vero (#f0e7d9): 0,53 dà 4,41, 0,52 dà 4,60, 0,50 dà 5,01.
+     Presa 0,50 per avere margine su una composizione che può variare di poco.
   */
-  --color-attenzione: oklch(0.53 0.14 75);
+  --color-attenzione: oklch(0.5 0.14 75);
   --color-attenzione-fondo: oklch(0.96 0.045 75);
 
   --font-sans:
