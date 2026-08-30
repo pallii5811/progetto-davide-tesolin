@@ -74,15 +74,34 @@ export function Metrica({
           : 'text-testo';
 
   return (
-    <Scheda>
+    // min-w-0 anche qui, perché è QUESTO il figlio della griglia: è il riquadro a
+    // rifiutarsi di restringersi, non il dl che ha dentro.
+    <Scheda className="min-w-0">
       {/*
         Coppia termine/definizione e non due paragrafi: un lettore di schermo annuncia
         «Patrimonio esposto, 9.400.000 €» come una cosa sola, invece di leggere
         un'etichetta e più avanti un numero senza sapere a cosa appartenga.
       */}
-      <dl data-testid={`metrica-${chiave(etichetta)}`}>
+      {/*
+        min-w-0 sul termine/definizione: senza, in una griglia il riquadro si rifiuta di
+        restringersi sotto la larghezza del proprio contenuto, e un numero lungo esce
+        invece di adattarsi.
+
+        Il numero è più piccolo finché lo schermo è stretto, e non è una scelta estetica.
+        A 390 pixel la griglia a due colonne lascia circa 133 pixel di contenuto per
+        riquadro: «8.147.000 €» a 24 pixel ne occupa quasi centottanta, e su Linux — dove
+        il ripiego dei font è più largo del Segoe UI di Windows — il collaudo ha misurato
+        46 pixel di traboccamento dentro questo dl, che risalivano fino a spingere l'intera
+        pagina fuori schermo. Gli stessi quattro punti di altezza risparmiati riportano la
+        lista di lavoro del portafoglio sopra la piega, che mancava di dieci pixel.
+
+        break-words è la rete: un importo che non stia comunque va a capo invece di uscire.
+      */}
+      <dl data-testid={`metrica-${chiave(etichetta)}`} className="min-w-0">
         <dt className="text-xs font-medium uppercase tracking-wide text-testo-debole">{etichetta}</dt>
-        <dd className={`tabular mt-1.5 text-2xl font-semibold ${colore}`}>{valore}</dd>
+        <dd className={`tabular mt-1.5 break-words text-xl font-semibold sm:text-2xl ${colore}`}>
+          {valore}
+        </dd>
         {nota !== undefined && <dd className="mt-1 text-xs leading-snug text-testo-tenue">{nota}</dd>}
       </dl>
     </Scheda>
