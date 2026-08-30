@@ -37,16 +37,24 @@ ATTIVO                                PASSIVO
   Attivo immobilizzato                  Passività consolidate
     Immobilizzazioni immateriali          Debiti finanziari a m/l
     Immobilizzazioni materiali            TFR e fondi
-    Immobilizzazioni finanziarie        Patrimonio netto
+    Immobilizzazioni finanziarie          Altri debiti a m/l
+                                        Patrimonio netto
 ```
+
+Le liquidità differite comprendono, oltre ai crediti verso clienti, gli altri crediti,
+i crediti verso soci e i ratei e risconti attivi; gli altri debiti a breve comprendono
+i debiti tributari e i ratei e risconti passivi. Sono raggruppamenti, non voci di
+bilancio: chi cerca la corrispondenza uno-a-uno con lo schema CEE la trova in
+`reclassify()`, non qui.
 
 **Conto economico a valore aggiunto**
 
 ```
   Ricavi delle vendite
 + Variazione rimanenze prodotti
++ Altri ricavi
 = Valore della produzione
-− Costi esterni (materie prime, servizi, godimento beni terzi)
+− Costi esterni (materie prime, servizi, godimento beni terzi, oneri diversi di gestione)
 = VALORE AGGIUNTO
 − Costo del personale
 = EBITDA (Margine Operativo Lordo)
@@ -106,12 +114,22 @@ peso e motivazione testuale.
 | Eventi negativi          | 20% (penalità) | protesti, pregiudizievoli, procedure concorsuali |
 | Anzianità e continuità   | 5%             | anni di attività, continuità dei depositi        |
 
-Modificatori: procedura concorsuale aperta → score forzato a ≤ 10.
+**Tetti bloccanti**, applicati dopo la somma pesata. Non riducono il punteggio: lo tagliano.
+
+| Situazione rilevata                              | Score forzato a non più di |
+| ------------------------------------------------ | -------------------------- |
+| Impresa cessata o fallita                        | 5                          |
+| Procedura concorsuale aperta                     | 10                         |
+| Impresa in liquidazione                          | 20                         |
+| Patrimonio netto negativo (perdita del capitale) | 35                         |
+
 Bilancio più vecchio di 24 mesi → confidenza ridotta e penalità.
 → `credit/score.ts`
 
 **Fido consigliato**: `min(20% del PN tangibile, 10% del fatturato, 3× EBITDA)` modulato dal fattore
-di score (da 0.10 a 1.25) e arrotondato per difetto a taglio commerciale.
+di score e arrotondato per difetto a taglio commerciale. Il fattore va **da 0 a 1,25**: sotto uno
+score di 25 vale 0,05 e a score 1 è zero — cioè il prodotto arriva a dire «nessun fido», che è una
+risposta e non un difetto di calcolo.
 → `credit/credit-limit.ts`
 
 ---
@@ -182,17 +200,17 @@ fatturato, presenza di immobili, export, dipendenti, veicoli, trattamento dati p
 
 Il punto in cui la piattaforma crea più valore. Fonte: bilancio + visura + dichiarazioni.
 
-| Copertura                                   | Base di calcolo                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Fabbricati**                              | Valore di ricostruzione a nuovo = mq × costo di ricostruzione/mq per tipologia costruttiva. Se i mq non sono stati rilevati in intervista si usa l'impronta a terra da OpenStreetMap, dichiarata come stima (misura il coperto, non lo sviluppato: su più piani sottostima). Ultimo ripiego: "terreni e fabbricati" B.II.1 al **valore netto contabile × 2,0**, con confidenza bassa — non il costo storico lordo, che l'anagrafica camerale non porta. |
-| **Contenuto: macchinari e attrezzature**    | Se il costo storico lordo è dichiarato in intervista: lordo × **1,25** (adeguamento inflattivo). Altrimenti "impianti e macchinari" + "attrezzature" + "altri beni" al netto contabile × **2,0** — il coefficiente copre due scarti, l'ammortamento e l'aumento del costo di riacquisto.                                                                                                                                                                |
-| **Merci e scorte**                          | Rimanenze di bilancio × coefficiente di picco stagionale (default 1.30: il bilancio fotografa il 31/12, tipicamente il minimo dell'anno)                                                                                                                                                                                                                                                                                                                |
-| **Danni indiretti / Business Interruption** | **Margine di contribuzione** = Ricavi − Costi variabili (materie prime + servizi variabili). Moltiplicato per il periodo di indennizzo scelto (6/12/18/24 mesi). È l'errore più frequente del mercato: si assicura il fatturato, non il margine.                                                                                                                                                                                                        |
-| **RCO** (resp. civile verso prestatori)     | Monte salari annuo, con massimali per sinistro e per persona                                                                                                                                                                                                                                                                                                                                                                                            |
-| **RCT** massimale                           | Benchmark per classe di fatturato e pericolosità del settore, sulla scala 1 / 2,5 / 5 / 10 / 15 / 25 M€ (`SCALA_MASSIMALI`)                                                                                                                                                                                                                                                                                                                             |
-| **D&O**                                     | Benchmark su totale attivo e fatturato                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Cyber**                                   | Benchmark su fatturato × intensità di trattamento dati (ATECO)                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Credito**                                 | Fido complessivo concesso ai clienti = crediti verso clienti a bilancio                                                                                                                                                                                                                                                                                                                                                                                 |
+| Copertura                                   | Base di calcolo                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fabbricati**                              | Valore di ricostruzione a nuovo = mq × costo di ricostruzione/mq per tipologia costruttiva. Se i mq non sono stati rilevati in intervista si usa l'impronta a terra da OpenStreetMap, dichiarata come stima (misura il coperto, non lo sviluppato: su più piani sottostima). Ultimo ripiego: "terreni e fabbricati" B.II.1 al **valore netto contabile × 2,0**, con confidenza bassa — non il costo storico lordo, che l'anagrafica camerale non porta.     |
+| **Contenuto: macchinari e attrezzature**    | Se il costo storico lordo è dichiarato in intervista: lordo × **1,25** (adeguamento inflattivo). Altrimenti "impianti e macchinari" + "attrezzature" + "altri beni" al netto contabile × **2,0** — il coefficiente copre due scarti, l'ammortamento e l'aumento del costo di riacquisto.                                                                                                                                                                    |
+| **Merci e scorte**                          | Rimanenze di bilancio × coefficiente di picco stagionale (default 1.30: il bilancio fotografa il 31/12, tipicamente il minimo dell'anno)                                                                                                                                                                                                                                                                                                                    |
+| **Danni indiretti / Business Interruption** | **Margine di contribuzione** = Valore della produzione − Costi variabili, dove i costi variabili sono i consumi di materie prime più il **60%** dei costi per servizi (quota configurabile: B.7 è un calderone, e lavorazioni esterne e trasporti sono variabili mentre consulenze e assicurazioni no). Moltiplicato per il periodo di indennizzo scelto (6/12/18/24 mesi). È l'errore più frequente del mercato: si assicura il fatturato, non il margine. |
+| **RCO** (resp. civile verso prestatori)     | Monte salari annuo, con massimali per sinistro e per persona                                                                                                                                                                                                                                                                                                                                                                                                |
+| **RCT** massimale                           | Benchmark per classe di fatturato e pericolosità del settore, sulla scala 1 / 2,5 / 5 / 10 / 15 / 25 M€ (`SCALA_MASSIMALI`)                                                                                                                                                                                                                                                                                                                                 |
+| **D&O**                                     | Benchmark su totale attivo e fatturato                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Cyber**                                   | Benchmark su fatturato × intensità di trattamento dati (ATECO)                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Credito**                                 | Fido complessivo concesso ai clienti = crediti verso clienti a bilancio                                                                                                                                                                                                                                                                                                                                                                                     |
 
 → `coverage/sums-insured.ts`
 
@@ -327,8 +345,20 @@ DL Milleproroghe successivi.
 
 **Chi è obbligato**: tutte le imprese con sede legale in Italia o con stabile organizzazione in Italia
 iscritte al Registro delle Imprese.
-**Escluse**: imprese agricole ex art. 2135 c.c. (coperte dal Fondo AGRICAT) e imprese con immobili
-abusivi o privi di titoli edilizi.
+
+**Chi il prodotto dichiara escluso, e su quale dato.** L'esclusione va tenuta stretta, perché
+sbagliarla nel verso «non sei obbligato» espone il cliente e l'intermediario che gliel'ha detto:
+
+| Esclusione                                                  | La riconosce il prodotto?                                                                                                                                           |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Impresa agricola ex art. 2135 c.c. (opera il Fondo AGRICAT) | **Sì**, sulle divisioni ATECO 01 e 02. La divisione 03 — pesca e acquacoltura — **non** è esclusa: il Fondo non la copre, e infatti ha un termine prorogato         |
+| Sezione A senza divisione rilevata                          | **No, e lo dichiara**: agricoltura e pesca non si distinguono, quindi l'obbligo è trattato come sussistente e il report chiede il codice ATECO completo             |
+| Impresa cessata                                             | **Sì**, dallo stato attività                                                                                                                                        |
+| Beni immobili abusivi o privi di titolo edilizio            | **No.** La norma li tiene fuori dai beni assicurabili, ma l'abuso edilizio non risulta da alcun dato camerale: è una domanda da porre in intervista, e oggi non c'è |
+
+Fuori dal prodotto restano anche la verifica della sede legale in Italia e quella
+dell'iscrizione al Registro: la fonte dati è camerale italiana, quindi si assumono vere per
+provenienza del dato, non perché siano state accertate.
 
 **Beni da assicurare** (art. 2424 c.c., attivo, B-II):
 
@@ -372,6 +402,13 @@ fino a 30 M€; limiti di indennizzo differenziati per fascia dimensionale.
 Soglie di riferimento sul Solvency Ratio: < 100% critico · 100-150% debole · 150-200% adeguato ·
 200-250% solido · > 250% molto solido (la media di mercato italiana è intorno al 260-274%).
 
+**Queste soglie non producono l'etichetta.** Servono a due allerte — sotto il 150% si suggerisce
+di ripartire il rischio, sotto il 100% si dichiara l'inadeguatezza patrimoniale ai sensi di
+Solvency II. L'etichetta che compare accanto alla polizza (Critica · Debole · Adeguata · Solida ·
+Molto solida) nasce invece dal **punteggio composto** 0-100, con soglie a 40, 55, 70 e 85: una
+compagnia al 180% di solvency può quindi uscire con un'etichetta diversa da «Adeguata» se le altre
+quattro componenti dicono altro. → `carrier/solidity.ts`
+
 ---
 
 ## 8-bis. Assetto proprietario, gruppo e persona chiave
@@ -406,8 +443,12 @@ in poi mette in dubbio anche i numeri.
 
 L'implementazione è in un punto solo — `governance/norme.ts`, funzione
 `normaResponsabilitaAmministratori` — che restituisce `null` dove la norma non esiste.
-Lo stesso file porta `regimeDiResponsabilita`, con cinque rami perché cinque sono i
-regimi di responsabilità patrimoniale (artt. 2291, 2313, 2452, 2740, 2325/2462 c.c.).
+Lo stesso file porta `regimeDiResponsabilita`, con **sei** rami: cinque per i regimi di
+responsabilità patrimoniale che l'anagrafica camerale permette di riconoscere (artt. 2291,
+2313, 2452, 2740, 2325/2462 c.c.) e un sesto, residuale, per cooperative, consorzi,
+associazioni, fondazioni ed enti — dove l'autonomia patrimoniale quasi sempre c'è ma il
+regime dipende dallo statuto, che l'anagrafica non porta. Lì si afferma il meno possibile,
+sull'art. 2043 c.c.: una frase vera e generica invece di una precisa e sbagliata.
 → `governance/norme.ts`
 
 **Soglie.** Controllo: quota _superiore_ al 50% — metà esatta non è maggioranza, e due soci al
@@ -461,13 +502,13 @@ dichiarare perché il prodotto è adeguato (Allegato 4-ter).
 
 Mappatura in AEGIS:
 
-| Obbligo normativo                              | Cosa il prodotto genera oggi                                                                                                                              |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rilevazione richieste ed esigenze              | Risk register ISO 31000 con rischi residui ponderati                                                                                                      |
-| Motivazione dell'adeguatezza                   | Catena `rischio → esigenza → copertura → massimale → motivazione`, stampata nel capitolo «Coperture proposte e motivazione dell'adeguatezza» del report   |
-| Informativa precontrattuale                    | **Niente.** Nessun Allegato 3, 4 o 4-ter viene compilato o prodotto — vedi sotto                                                                          |
-| Conservazione della documentazione             | Snapshot, analisi e registro di audit in sola aggiunta (`REVOKE UPDATE, DELETE` in `db/rls.ts`). Il registro **non è leggibile dal prodotto**: vedi sotto |
-| Eventuale inadeguatezza dichiarata dal cliente | **Niente.** Non esiste alcuna registrazione del rifiuto informato — vedi sotto                                                                            |
+| Obbligo normativo                              | Cosa il prodotto genera oggi                                                                                                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rilevazione richieste ed esigenze              | Risk register ISO 31000 con rischi residui ponderati                                                                                                                                                 |
+| Motivazione dell'adeguatezza                   | Catena `rischio → esigenza → copertura → massimale → motivazione`, stampata nel capitolo «Coperture proposte e motivazione dell'adeguatezza» del report                                              |
+| Informativa precontrattuale                    | **Niente.** Nessun Allegato 3, 4 o 4-ter viene compilato o prodotto — vedi sotto                                                                                                                     |
+| Conservazione della documentazione             | Snapshot, analisi e registro di audit vengono scritti e mai riscritti **dal codice**. L'inalterabilità imposta dal database **non è attiva**, e il registro non è leggibile dal prodotto: vedi sotto |
+| Eventuale inadeguatezza dichiarata dal cliente | **Niente.** Non esiste alcuna registrazione del rifiuto informato — vedi sotto                                                                                                                       |
 
 ### Le tre righe che il prodotto oggi non copre per intero
 
@@ -493,15 +534,32 @@ rilevate, dichiarando la conformità all'All. 4-ter. È la sostanza della dichia
 adeguatezza, ma è un capitolo di un documento nostro: **non è il modello dell'allegato
 compilato**, e chi si aspetta il modulo dell'IVASS non lo trova.
 
-**2. Il registro di audit non si può esibire.** Ciò che è vero e verificato è
-l'inalterabilità: su `audit_log`, `snapshot_azienda` e `analisi` il ruolo applicativo non
-ha il permesso di UPDATE né di DELETE (`packages/db/src/rls.ts`), quindi una riga scritta
-resta. Ciò che manca è la lettura: **nessuna schermata e nessuna rotta espongono il
-registro**. In ispezione non c'è modo di mostrarlo senza interrogare il database a mano —
-e un registro che nessuno può esibire non è documentazione, è una tabella.
+**2. Il registro di audit non è né inalterabile né esibibile.** Sono due cose distinte, ed
+entrambe mancano.
 
-Finché la lettura non esiste, la riga qui sopra dice «in sola aggiunta» e non «conformità
-IVASS», che sono due cose diverse.
+_L'inalterabilità non è attiva._ Il SQL che la impone esiste ed è corretto — `REVOKE UPDATE,
+DELETE` su `audit_log`, `snapshot_azienda` e `analisi` — ma vive dentro la funzione
+`sqlAbilitaRls()` di `packages/db/src/rls.ts`, che **nessuno chiama**: non è una migrazione,
+e nelle dieci migrazioni applicate non compare alcun `REVOKE` né alcuna policy. Verificabile
+in un comando: `grep -rn sqlAbilitaRls apps packages` restituisce la definizione e un
+collaudo, nessun chiamante. Oggi, quindi, il ruolo applicativo **può** aggiornare e
+cancellare quelle righe; ciò che le tiene ferme è che nessun percorso del codice lo fa.
+
+Non è una dimenticanza, ed è scritto nel file stesso: accendere quelle policy adesso
+spegnerebbe il prodotto. Diciannove funzioni raggiungono ancora una tabella protetta senza
+impostare `app.tenant_id` — fra queste la ricerca dell'utente per indirizzo email, che
+avviene **prima** di sapere di quale studio si tratti. Con le policy attive `current_setting`
+torna vuoto, ogni riga sparisce, e nessuno riesce più ad accedere senza un errore che lo
+spieghi. L'elenco è misurato, non stimato, da `packages/db/test/isolamento-rls.test.ts`, che
+fallisce se si allunga. Quando sarà vuoto, `sqlAbilitaRls()` diventerà una migrazione.
+
+_La lettura non esiste._ **Nessuna schermata e nessuna rotta espongono il registro.** In
+ispezione non c'è modo di mostrarlo senza interrogare il database a mano — e un registro che
+nessuno può esibire non è documentazione, è una tabella.
+
+Finché non esistono entrambe, la riga qui sopra dice «scritti e mai riscritti dal codice» e
+non «conformità IVASS»: sono due affermazioni molto diverse, e la seconda in ispezione va
+dimostrata.
 
 **3. Il rifiuto informato non si registra.** Non esiste un percorso per dichiarare che il
 contraente ha rifiutato una copertura proposta, non esiste un'azione di audit

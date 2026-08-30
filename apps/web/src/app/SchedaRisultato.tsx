@@ -37,7 +37,21 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
             Lo stato camerale prima dell'analisi: analizzare un'impresa cessata spende
             credito per un profilo che non serve a nessun preventivo.
           */}
-          {azienda.statoAttivita === 'attiva' ? (
+          {azienda.statoAttivita === null ? (
+            /*
+              Le aziende ritrovate in archivio non portano lo stato camerale: la tabella non
+              ha quella colonna. Prima qui usciva un bollino verde «attiva» per tutte, che
+              era un'affermazione inventata; ora il campo vale null e va detto, non
+              colorato. Un riquadro rosso sarebbe l'errore opposto e altrettanto falso:
+              «non lo so» non è «cessata».
+            */
+            <span
+              className="rounded border border-bordo px-1.5 py-0.5 text-xs font-medium text-testo-debole"
+              title="Lo stato camerale non è fra i dati in archivio: si rileva con l’analisi."
+            >
+              stato non rilevato
+            </span>
+          ) : azienda.statoAttivita === 'attiva' ? (
             <span className="rounded border border-basso/30 bg-basso-fondo px-1.5 py-0.5 text-xs font-medium text-basso">
               attiva
             </span>
@@ -159,7 +173,15 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
               <li key={`${s.denominazione}-${s.codiceFiscale ?? ''}`} className="text-sm">
                 <span className="font-medium">{s.denominazione}</span>
                 {s.quotaPercentuale !== null && (
-                  <span className="tabular"> · {(s.quotaPercentuale * 100).toFixed(2)}%</span>
+                  /*
+                    La quota arriva già in punti percentuali, come nelle altre sei schermate
+                    e come le soglie del motore (SOGLIA_CONTROLLO = 50). Qui c'era una
+                    moltiplicazione per cento: il socio unico al 100 % usciva «10000.00 %».
+                  */
+                  <span className="tabular">
+                    {' · '}
+                    {s.quotaPercentuale.toFixed(s.quotaPercentuale % 1 === 0 ? 0 : 2)}%
+                  </span>
                 )}
                 {s.codiceFiscale !== null && (
                   <span className="tabular text-testo-debole"> · {s.codiceFiscale}</span>

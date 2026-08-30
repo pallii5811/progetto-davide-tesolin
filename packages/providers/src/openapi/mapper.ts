@@ -154,13 +154,27 @@ function normalizzaTipoUnitaLocale(valore: string | null): TipoUnitaLocale {
  *
  * Le risposte reali del fornitore sono sempre in punti — 100, 88, 50, 20, 6 — e questa
  * funzione le lascia come sono. Il ramo delle frazioni esiste perché il modello canonico
- * accetta anche quella grafia (`SOGLIA_CONTROLLO = 50`, `SOGLIA_PARTECIPAZIONE = 25` sono
+ * accetta anche quella grafia (SOGLIA_CONTROLLO = 50, SOGLIA_PARTECIPAZIONE = 25 sono
  * punti percentuali) e un domani il fornitore potrebbe cambiarla senza dirlo.
+ *
+ * Due condizioni servono a non dedurre la scala da un solo numero, e vanno tenute
+ * distinte dalla somma:
+ *
+ *  - **la compagine dev'essere completa.** Con una quota ignota la somma non prova
+ *    niente: `[1, null]` sommerebbe a uno e il socio all'1 % diventerebbe totalitario,
+ *    trascinandosi dietro controllo societario, art. 2497 e titolare effettivo.
+ *  - **i soci devono essere più d'uno.** `[1]` da solo resta ambiguo anche guardando
+ *    l'insieme, perché l'insieme è quel numero. Lì la funzione non sceglie: lascia il
+ *    valore com'è, cioè l'1 %. È il verso prudente — dichiarare un controllo che non
+ *    c'è è molto peggio che non dichiararne uno che c'è, e sui dati veri un socio unico
+ *    arriva comunque come `100`, non come `1`.
  */
 export function normalizzaQuote(quote: readonly (number | null)[]): readonly (number | null)[] {
   const noti = quote.filter((q): q is number => q !== null);
   const somma = noti.reduce((t, q) => t + q, 0);
-  const sonoFrazioni = noti.length > 0 && somma > 0 && somma <= 1.01 && noti.every((q) => q <= 1);
+  const compagineCompleta = noti.length === quote.length;
+  const sonoFrazioni =
+    compagineCompleta && noti.length > 1 && somma > 0 && somma <= 1.01 && noti.every((q) => q <= 1);
   return sonoFrazioni ? quote.map((q) => (q === null ? null : q * 100)) : quote;
 }
 

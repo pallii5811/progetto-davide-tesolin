@@ -1,12 +1,15 @@
 # AEGIS — Architettura
 
 > **AEGIS** è il nome in codice della piattaforma. Sostituibile, ma **non con una sola
-> modifica**: non esiste un `branding.ts` che lo raccolga in un punto solo. Il nome
-> compare in chiaro in undici file fra `packages/core/src` e `apps/web/src` — schermata
-> di accesso, intestazione, titolo del browser, riferimenti stampati accanto a score,
-> fido e benchmark di massimale — oltre che nello scope npm `@aegis/*` e nelle variabili
-> d'ambiente `AEGIS_API_URL` e `AEGIS_PREZZI_CENTESIMI`. Chi rinomina il prodotto li
-> cambia uno per uno.
+> modifica**: non esiste un `branding.ts` che lo raccolga in un punto solo.
+> `grep -rl AEGIS packages/core/src apps/web/src` dà **tredici file**, e non sono tutti
+> uguali: in **cinque** il nome è testo che l'utente vede o che finisce stampato —
+> schermata di accesso e intestazione (`accedi/page.tsx`, `layout.tsx`, che porta anche
+> il titolo del browser), e il riferimento stampato accanto a score, fido e benchmark di
+> massimale (`credit/score.ts`, `credit/credit-limit.ts`, `coverage/sums-insured.ts`).
+> Negli altri otto è il nome della variabile d'ambiente `AEGIS_API_URL` o un commento.
+> A questi vanno aggiunti lo scope npm `@aegis/*` e le variabili `AEGIS_API_URL` e
+> `AEGIS_PREZZI_CENTESIMI`. Chi rinomina il prodotto li cambia uno per uno.
 
 **Cosa è**: una piattaforma di _Credit & Insurance Risk Intelligence_ per intermediari assicurativi.
 Unisce ciò che oggi il broker ottiene da due mondi separati:
@@ -70,14 +73,16 @@ input, la data del dato e un livello di confidenza. Non esistono numeri non spie
 
 Il Reg. IVASS 40/2018 impone all'intermediario di rilevare richieste ed esigenze e di motivare
 l'adeguatezza (All. 4-ter). Oggi è carta. In AEGIS la catena `risk register → esigenze → coperture
-proposte → massimale → motivazione` si genera dall'analisi e si stampa nel report, su un registro
-di scritture inalterabili (nessun UPDATE, nessun DELETE). È il fossato competitivo a cui si punta:
-nessuno abbandona il sistema che custodisce le sue prove.
+proposte → massimale → motivazione` si genera dall'analisi e si stampa nel report. È il fossato
+competitivo a cui si punta: nessuno abbandona il sistema che custodisce le sue prove.
 
-**Tre pezzi del fascicolo però non ci sono ancora, e vanno detti qui perché è la sezione che li
-promette**: gli Allegati 3 e 4 non vengono prodotti, dell'Allegato 4-ter esiste il contenuto e non
-il modulo, la firma è quella su carta in calce al report e il rifiuto informato non si registra.
-Sono decisioni di prodotto aperte, elencate una per una in `DOMINIO.md` §9.
+**Quattro pezzi del fascicolo però non ci sono ancora, e vanno detti qui perché è la sezione che
+li promette**: gli Allegati 3 e 4 non vengono prodotti, dell'Allegato 4-ter esiste il contenuto e
+non il modulo, la firma è quella su carta in calce al report e il rifiuto informato non si
+registra. Il quarto è il registro stesso: **le scritture non sono ancora inalterabili a livello di
+database** — il `REVOKE UPDATE, DELETE` è scritto e non applicato (vedi §5) — e nessuna schermata
+lo espone, quindi in ispezione non si può esibire. Sono decisioni di prodotto aperte, elencate una
+per una in `DOMINIO.md` §9.
 
 ---
 
@@ -176,20 +181,57 @@ aegis/
 
 ## 5. Modello dati: i tre principi
 
-1. **Immutabilità degli snapshot.** Un dato di provider non si aggiorna mai in place: si scrive un nuovo
-   `company_snapshot`. Una valutazione fatta a marzo deve restare riproducibile a dicembre, con i dati
-   di marzo. È un requisito legale, non un vezzo (contenzioso sull'adeguatezza).
+1. **Immutabilità degli snapshot.** Un dato di provider non si aggiorna mai in place: si scrive una
+   nuova riga in `snapshot_azienda`. Una valutazione fatta a marzo deve restare riproducibile a
+   dicembre, con i dati di marzo. È un requisito legale, non un vezzo (contenzioso
+   sull'adeguatezza). Oggi è il **codice** a non riscrivere mai quelle righe: il divieto a livello
+   di database è scritto e non applicato — vedi il punto 3.
 2. **Provenance ovunque.** `Sourced<T> = { value, source, observedAt, confidence }`. Se un campo non ha
    fonte, non entra nel modello.
-3. **Multi-tenant per intermediario.** Ogni riga porta `tenant_id`, isolato a livello di repository e di
-   Row Level Security PostgreSQL. Il portafoglio di un broker non è mai visibile ad un altro.
+3. **Multi-tenant per intermediario.** Ogni riga di dati di studio porta `tenant_id`, e l'isolamento
+   oggi è **applicativo**: un `where tenant_id = …` in ogni query, tramite `conTenant`.
+
+   **La Row Level Security è scritta e non è accesa**, e va detto perché è la differenza fra «se il
+   codice sbaglia PostgreSQL restituisce zero righe» e «se il codice sbaglia i dati escono». Le
+   policy stanno in `sqlAbilitaRls()` (`packages/db/src/rls.ts`), coprono undici tabelle, e nessuna
+   migrazione le esegue. Accenderle adesso non metterebbe in sicurezza il prodotto: lo
+   spegnerebbe. Diciannove funzioni raggiungono ancora una tabella protetta senza impostare
+   `app.tenant_id` — fra queste la ricerca dell'utente per email, che avviene prima di sapere di
+   quale studio si tratti — e con le policy attive `current_setting` torna vuoto, ogni riga
+   sparisce e nessuno riesce più ad accedere.
+
+   L'elenco di quei diciannove punti è **misurato leggendo il codice**, non scritto a mano, da
+   `packages/db/test/isolamento-rls.test.ts`, che fallisce se si allunga e verifica anche che
+   nessuna tabella con `tenant_id` resti fuori dalle policy senza una ragione scritta. Tre
+   esclusioni sono motivate e restano tali: `sessioni` e `inviti_questionario`, dove il tenant si
+   scopre _dalla_ riga, e `audit_log`, dove `tenant_id` è facoltativo. Quando l'elenco sarà vuoto,
+   `sqlAbilitaRls()` diventerà una migrazione — e con essa il `REVOKE UPDATE, DELETE` su
+   `audit_log`, `snapshot_azienda` e `analisi` che oggi, per la stessa ragione, non è applicato.
+
+   Prima di allora restano da decidere le operazioni che attraversano gli studi **per disegno** —
+   l'elenco degli studi, la spesa complessiva della piattaforma, la creazione del primo
+   amministratore di un nuovo studio: con `FORCE ROW LEVEL SECURITY` nemmeno il proprietario delle
+   tabelle le vede, e servirà un ruolo distinto, non una deroga sparsa.
 
 ---
 
 ## 6. Costi dati: il problema che affonda i progetti come questo
 
-Ogni chiamata a OpenAPI.com costa. Un'analisi completa di un'azienda ne richiede 5-8.
-Senza governo, il costo variabile mangia il margine.
+Ogni chiamata a OpenAPI.com costa, e il costo variabile mangia il margine se nessuno lo governa.
+
+Quante ne serve davvero, contate su `costoAnalisi()` in `providers/src/openapi/config.ts`: **una**
+ai livelli base, esteso e completo — `IT-advanced` porta in una sola risposta anagrafica, ATECO,
+forma giuridica, PEC, REA, dieci esercizi di bilancio sintetico e i soci; **due** al livello
+approfondito, perché `IT-full` (cariche, sedi, gruppo, indicatori) si **somma** all'anagrafica
+estesa invece di sostituirla. La verifica di protesti, pregiudizievoli e procedure (`IT-negativita`,
+45 centesimi) è un acquisto a parte, con il suo pulsante e il suo prezzo scritto sopra: entra nel
+conto quando la si chiede, e non prima. È anche l'unica **asincrona** — si apre una pratica, se ne
+legge lo stato, se ne legge il risultato — ma si paga una volta sola. Il bilancio riclassificato
+(`IT-balance-sheet`, ~5 €) è dichiarato non verificato e per questo non viene chiamato mai: è il
+solo servizio che farebbe saltare l'ordine di grandezza.
+
+Il numero conta perché regge il modello: un'analisi utile costa **10 centesimi**, non la somma di
+sei servizi. Da qui in giù, le contromisure servono a tenerlo tale.
 
 Contromisure implementate in `packages/providers`:
 

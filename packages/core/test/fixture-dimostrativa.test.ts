@@ -75,3 +75,61 @@ describe('E la dimostrazione mostra ancora ciò per cui esiste', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * La compagine dimostrativa è scritta nella scala che tutto il resto usa.
+ *
+ * La fixture dichiarava le quote come frazioni — 0,6 e 0,4 — mentre le soglie del motore
+ * (SOGLIA_CONTROLLO = 50, SOGLIA_PARTECIPAZIONE = 25) e tutte e sei le schermate che
+ * stampano una quota usano i punti percentuali.
+ *
+ * Attenzione a cosa questo controllo prova e cosa NON prova, perché la prima volta la
+ * conclusione sbagliata l'ho tratta io. La divergenza di scala **non** impediva di
+ * riconoscere il socio maggioritario: `analizzaAssetto` normalizza per conto suo, e con
+ * 0,6 il tipo di controllo usciva già corretto. Il danno era un altro e più sottile — due
+ * grafie della stessa cosa che convivono, ciascuna corretta solo grazie a un adattatore
+ * che qualcuno deve ricordarsi di attraversare. È così che è nato il difetto della scheda
+ * di ricerca, dove un `* 100` di troppo mostrava il socio unico come «10000,00 %».
+ *
+ * Qui si tiene ferma la convenzione — punti percentuali — così che l'adattatore diventi
+ * una rete e non un requisito.
+ */
+describe('Le quote dimostrative sono nella scala che il motore confronta', () => {
+  const profilo = demoCompanyProfile();
+  const soci = profilo.assetti?.value.soci ?? [];
+
+  it('la compagine non è vuota, altrimenti non si sta controllando niente', () => {
+    expect(soci.length).toBeGreaterThan(0);
+  });
+
+  it('le quote sono in punti percentuali, non in frazioni', () => {
+    const somma = soci
+      .map((s) => s.quotaPercentuale)
+      .filter((q): q is number => q !== null)
+      .reduce((t, q) => t + q, 0);
+
+    expect(
+      somma,
+      `le quote dimostrative sommano a ${somma}. Il motore le confronta con 50 e 25, che sono ` +
+        'punti percentuali: scritte come frazioni nessuna soglia scatta mai.',
+    ).toBeGreaterThan(1.01);
+  });
+
+  it('e il socio maggioritario viene effettivamente riconosciuto', () => {
+    const analisi = analyzeCompany(profilo, demoPolizze(), DEMO_AS_OF);
+    expect(
+      analisi.assetto.tipoControllo,
+      'il socio al 60 % non risulta maggioritario: la scala delle quote non è quella che il motore confronta',
+    ).toBe('maggioranza-persona-fisica');
+  });
+
+  it('la quota del primo socio arriva al motore in punti, non in frazioni', () => {
+    /*
+      Il controllo sopra guarda la conseguenza; questo guarda il numero. Servono
+      entrambi: se un domani il tipo di controllo venisse dedotto per un'altra via,
+      quello resterebbe verde mentre la quota torna sbagliata.
+    */
+    const analisi = analyzeCompany(profilo, demoPolizze(), DEMO_AS_OF);
+    expect(analisi.assetto.quotaPrimoSocio).toBe(60);
+  });
+});

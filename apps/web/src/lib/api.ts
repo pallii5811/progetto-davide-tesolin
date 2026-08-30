@@ -47,7 +47,16 @@ export interface RisultatoRicerca {
   provincia: string | null;
   ateco: string | null;
   attiva: boolean;
-  statoAttivita: 'attiva' | 'inattiva' | 'sospesa' | 'cessata' | 'in-liquidazione' | 'fallita';
+  /**
+   * Lo stato camerale, oppure `null` quando non è stato rilevato.
+   *
+   * Le aziende ritrovate in archivio non lo portano: quella tabella non ha la colonna, e
+   * fino a ieri il servizio ci scriveva sopra `'attiva'` fisso — un bollino verde su ogni
+   * riga, indipendentemente dalla realtà. Ora arriva `null`, e il tipo deve dirlo:
+   * dichiararlo non nullabile non impediva lo `null`, impediva solo di vederlo, e la
+   * schermata di ricerca ci finiva sopra con un `.replace()`.
+   */
+  statoAttivita: 'attiva' | 'inattiva' | 'sospesa' | 'cessata' | 'in-liquidazione' | 'fallita' | null;
   providerId: string;
   /**
    * I numeri che il record acquistato porta già con sé.

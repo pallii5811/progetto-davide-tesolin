@@ -190,7 +190,11 @@ export function demoCompanyProfile(): CompanyProfile {
             // di essa la modalità dimostrativa non mostrerebbe affatto quella funzione.
             codiceFiscale: 'RSSGNN70A01A944X',
             tipo: 'persona-fisica',
-            quotaPercentuale: 0.6,
+            // In PUNTI percentuali, non in frazioni: il motore confronta con
+            // SOGLIA_CONTROLLO = 50 e SOGLIA_PARTECIPAZIONE = 25. Scritta 0,6 la quota si
+            // stampava giusta a schermo — 60 % — ma nessuna soglia scattava, e il socio
+            // maggioritario dell'azienda dimostrativa non veniva riconosciuto.
+            quotaPercentuale: 60,
             socioDal: new Date('2004-03-11T00:00:00Z'),
             quotaValore: euro(300_000),
           },
@@ -198,7 +202,7 @@ export function demoCompanyProfile(): CompanyProfile {
             denominazione: 'ROSSI MARTA',
             codiceFiscale: 'RSSMRT75E41A944R',
             tipo: 'persona-fisica',
-            quotaPercentuale: 0.4,
+            quotaPercentuale: 40,
             socioDal: new Date('2004-03-11T00:00:00Z'),
             quotaValore: euro(200_000),
           },

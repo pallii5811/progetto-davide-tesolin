@@ -141,6 +141,23 @@ describe('25 · il tema chiaro esiste nel CSS emesso', () => {
 
   it('ogni variabile del tema scuro ha una gemella chiara, e nessuna coincide', async () => {
     const { chiara, scura } = await tavolozze();
+
+    /*
+      Prima di confrontare le due tavolozze si controlla che ce ne siano due.
+
+      Senza queste due righe il controllo era verde sul codice difettoso, e lo era per la
+      ragione peggiore: con lo at-theme annidato dentro la media query la tavolozza scura
+      usciva VUOTA, quindi «nessuna orfana» e «nessuna coincidente» erano vere di un
+      insieme vuoto. Provato: sul sorgente di prima della correzione questo controllo
+      passava mentre gli altri due dello stesso blocco fallivano. Un verdetto verde per
+      assenza di informazione e' esattamente cio' che la regola 2h vieta.
+    */
+    expect(scura.size, 'la tavolozza scura e vuota: non c e nulla da confrontare').toBeGreaterThan(20);
+    expect(
+      chiara.size,
+      'la tavolozza chiara ha meno voci della scura: qualche colore vive in un tema solo',
+    ).toBeGreaterThanOrEqual(scura.size);
+
     const orfane = [...scura.keys()].filter((nome) => !chiara.has(nome));
     expect(orfane, `variabili scure senza gemella chiara: ${orfane.join(', ')}`).toEqual([]);
 
@@ -237,6 +254,17 @@ describe('76 · il tono «attenzione» usa il proprio token', () => {
     );
   });
 
+  /*
+    Guardia contro una ricaduta, NON la prova del reperto 76 — e va detto, perche' un
+    controllo scambiato per quello che non e' vale meno di nessun controllo.
+
+    Il token --color-attenzione esisteva gia' prima di questa correzione, quindi questo
+    blocco e' verde anche sul codice difettoso: misurato, e' uno dei due soli su
+    quarantadue che non diventano rossi riportando i sorgenti a prima. Cio' che prova e'
+    l'altra meta' della storia — che in Tailwind v4 una classe senza variabile in at-theme
+    non produce un byte di CSS, e le nove classi «attenzione» erano rimaste senza colore.
+    La prova del 76 e' il controllo qui sopra, che rosso lo diventa.
+  */
   it('il compilatore genera davvero le classi «attenzione» usate da Avviso', async () => {
     const css = await compilaCss();
     for (const classe of ['bg-attenzione-fondo', 'text-attenzione']) {
@@ -333,9 +361,30 @@ describe('28 · il questionario del cliente non porta al login con il suo token'
     ).not.toMatch(/\/azienda\/\$\{/);
   });
 
-  it('la pagina del questionario non passa all’editor alcun collegamento all’analisi', () => {
-    const pagina = leggi('app/questionario/[token]/page.tsx');
-    expect(pagina).not.toMatch(/collegamentoAnalisi=\{[^}]*[^n]\}/);
+  /*
+    Le due rotte si guardano INSIEME, e nessuna delle due basta da sola.
+
+    Cercare solo l'assenza sul percorso del cliente era verde anche prima della
+    correzione, quando la proprieta' non esisteva affatto: il difetto era che l'editor si
+    costruiva l'indirizzo da se'. Un controllo che passa sul codice rotto non e' un
+    controllo, quindi qui si chiede anche il verso positivo — la rotta interna DEVE
+    passare il collegamento. Cosi' la coppia distingue le tre situazioni: il collegamento
+    solo dove l'utente e' l'intermediario, mai dove e' il cliente, e la proprieta' viva.
+  */
+  it('il collegamento all’analisi esiste sulla rotta interna e non su quella del cliente', () => {
+    const cliente = senzaCommenti(leggi('app/questionario/[token]/page.tsx'));
+    expect(
+      cliente,
+      'sul percorso pubblico l’identificativo È il token: passargli un collegamento ' +
+        'all’analisi lo rimette nella barra dell’indirizzo, nella cronologia e nel referrer',
+    ).not.toMatch(/collegamentoAnalisi/);
+
+    const interna = senzaCommenti(leggi('app/azienda/[id]/dati/page.tsx')).replace(/\s+/g, ' ');
+    expect(
+      interna,
+      'nessuna rotta passa più il collegamento: la proprietà è morta e il controllo qui ' +
+        'sopra passerebbe per assenza, non per merito',
+    ).toMatch(/collegamentoAnalisi=\{`\/azienda\/\$\{id\}`\}/);
   });
 });
 
@@ -346,18 +395,38 @@ describe('28 · il questionario del cliente non porta al login con il suo token'
 describe('17 · il report vede ciò che è stato pagato', () => {
   const report = () => leggi('app/azienda/[id]/report/page.tsx');
 
+  /*
+    Senza commenti, qui e nei due controlli che seguono.
+
+    La spiegazione della correzione, in cima al file, nomina per forza la cosa corretta e
+    ne cita la forma difettosa. Leggere anche quelle righe significa cercare la prova nel
+    racconto invece che nel codice, ed e' il modo in cui un controllo smette di poter
+    fallire — misurato altrove in questo stesso file, sul capitolo CAT NAT.
+  */
   it('il report accetta i parametri di acquisto', () => {
-    expect(report(), 'searchParams del report conosce solo `escludi` e `profondita`').toMatch(
-      /searchParams:\s*Promise<\{[^}]*approfondita\?[^}]*negativita\?/s,
-    );
+    expect(
+      senzaCommenti(report()),
+      'searchParams del report conosce solo `escludi` e `profondita`',
+    ).toMatch(/searchParams:\s*Promise<\{[^}]*approfondita\?[^}]*negativita\?/s);
   });
 
   it('e li passa all’analisi, invece di rilanciarla nuda', () => {
+    const sorgente = senzaCommenti(report()).replace(/\s+/g, ' ');
+
     expect(
-      report().replace(/\s+/g, ' '),
+      sorgente,
       'analizzaAzienda(id) senza opzioni: le cariche pagate risultano non acquisite, ' +
         'le unità locali spariscono dal capitolo ubicazioni',
     ).toMatch(/analizzaAzienda\(\s*id,\s*\{/);
+
+    /*
+      E le opzioni devono venire dall'indirizzo, non da due costanti. Passare
+      { approfondita: false } soddisferebbe la forma e ricostruirebbe il difetto intero.
+    */
+    expect(sorgente, 'i due livelli non sono letti dai parametri della richiesta').toMatch(
+      /approfondita = parametri\.approfondita === '1'/,
+    );
+    expect(sorgente).toMatch(/conNegativita = parametri\.negativita === '1'/);
   });
 
   it('il collegamento al report porta con sé i parametri di acquisto', () => {
@@ -517,8 +586,18 @@ describe('22 · nulla viene scartato in silenzio', () => {
   });
 
   it('l’editor si ferma invece di scartare, e non filtra più in silenzio', () => {
-    const editor = leggi('app/azienda/[id]/dati/EditorDossier.tsx');
-    expect(editor, 'la validazione non passa dal modulo condiviso').toMatch(/righeIncomplete/);
+    const editor = senzaCommenti(leggi('app/azienda/[id]/dati/EditorDossier.tsx'));
+    expect(editor, 'la validazione non passa dal modulo condiviso').toMatch(/righeIncomplete\(/);
+
+    /*
+      Chiamarlo non basta: il difetto era lo scarto SILENZIOSO, quindi cio' che conta e'
+      che il salvataggio si FERMI. Calcolare le righe incomplete e proseguire lo stesso
+      lascerebbe il cliente con «Risposte inviate. Grazie» davanti a una polizza persa.
+    */
+    expect(
+      editor.replace(/\s+/g, ' '),
+      'le righe incomplete sono calcolate e il salvataggio prosegue lo stesso',
+    ).toMatch(/if \(incomplete\.length > 0\) \{.{0,160}?return;/);
     expect(
       editor.replace(/\s+/g, ' '),
       'il filtro silenzioso sulle polizze è ancora al suo posto',
@@ -549,7 +628,19 @@ describe('23 · un servizio giù non è un collegamento revocato', () => {
   });
 
   it('la pagina del questionario usa la classificazione', () => {
-    expect(leggi('app/questionario/[token]/page.tsx')).toMatch(/esitoApertura/);
+    const pagina = senzaCommenti(leggi('app/questionario/[token]/page.tsx')).replace(/\s+/g, ' ');
+
+    // La chiamata, non il nome: la riga di import soddisfa una ricerca del solo nome.
+    expect(pagina, 'esitoApertura è importato e mai chiamato').toMatch(/esitoApertura\(/);
+
+    /*
+      E il codice di stato ci deve arrivare davvero. Passandogli sempre null si tornerebbe
+      al difetto per un'altra strada: ogni esito diventerebbe «servizio irraggiungibile»,
+      e un token davvero revocato smetterebbe di essere riconosciuto.
+    */
+    expect(pagina, 'a esitoApertura non arriva il codice di stato della risposta').toMatch(
+      /esitoApertura\([^)]*status/,
+    );
   });
 });
 
@@ -580,12 +671,27 @@ describe('24 · il portafoglio non emette un verdetto che non può sostenere', (
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('44 · il capitolo CAT NAT stampa gli eventi coperti', () => {
+  /*
+    Si legge il report SENZA i commenti, ed e' la differenza fra un controllo e un'ombra.
+
+    La prima stesura cercava eventiCoperti nel sorgente grezzo. Ma la spiegazione della
+    correzione, tre righe sopra il codice, NOMINA la cosa corretta — «eventiCoperti veniva
+    calcolato dal motore, spedito al frontend e mai stampato» — e quel commento da solo
+    bastava a far passare il controllo. Provato togliendo le quattro righe di JSX e
+    lasciando il commento: il controllo restava verde. Un capitolo che non dice piu' contro
+    cosa assicurarsi sarebbe tornato in produzione senza che nulla diventasse rosso.
+  */
   it('eventiCoperti arriva sulla carta', () => {
+    const report = senzaCommenti(leggi('app/azienda/[id]/report/page.tsx')).replace(/\s+/g, ' ');
+
     expect(
-      leggi('app/azienda/[id]/report/page.tsx'),
+      report,
       'eventiCoperti è calcolato, spedito e mai stampato: il capitolo dice quali beni ' +
         'assicurare e non contro cosa',
-    ).toMatch(/eventiCoperti/);
+    ).toMatch(/catNat\.eventiCoperti\.map\(/);
+
+    // E la lista ha un'intestazione: un elenco puntato senza titolo non dice di che parla.
+    expect(report, 'gli eventi arrivano in pagina senza dire che cosa sono').toMatch(/Eventi contro cui/);
   });
 });
 
@@ -621,8 +727,18 @@ describe('73 · il documento dell’art. 58 dichiara quando non è intestato', (
     expect(senzaNome).not.toBeNull();
   });
 
+  /*
+    Si cerca la CHIAMATA e la resa, non il nome. La riga di import basta a soddisfare una
+    ricerca del solo nome, e un import inutilizzato non cambia un pixel del documento.
+  */
   it('il report mostra l’avviso', () => {
-    expect(leggi('app/azienda/[id]/report/page.tsx')).toMatch(/avvisoIntestazione/);
+    const report = senzaCommenti(leggi('app/azienda/[id]/report/page.tsx')).replace(/\s+/g, ' ');
+    expect(report, 'avvisoIntestazione non viene mai chiamato').toMatch(/avvisoIntestazione\(studio\)/);
+    expect(
+      report,
+      'l’avviso è calcolato e mai reso: il documento esce anonimo senza dirlo, ' +
+        'ed è lo stesso difetto di eventiCoperti un capitolo più in là',
+    ).toMatch(/rilievoIntestazione !== null &&/);
   });
 });
 
