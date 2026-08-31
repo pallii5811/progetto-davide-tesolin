@@ -112,6 +112,19 @@ export function IndicatoriArchivio({
           dati.strutturaFinanziaria?.composizioneDebitoFinanziario,
           '',
         ],
+        /*
+          I DUE INDICI SUI FONDI GENERATI DALLA GESTIONE, comprati e mai mostrati.
+
+          Stavano nel modello di dominio, ciascuno con il commento che ne spiega il senso, e
+          nessuna schermata li nominava: pagati con il profilo, portati fino al client e
+          fermi lì. Contati: quindici campi di questo blocco finivano così.
+
+          Non sono doppioni delle leve su EBITDA qui sopra. L'EBITDA è un margine contabile;
+          l'FFO sono i fondi che la gestione ha davvero prodotto — e quando i due divergono,
+          la divergenza è essa stessa la notizia da portare al cliente.
+        */
+        ['Leva netta su FFO — fondi generati dalla gestione', dati.leveFinanziarie?.ffoLevaNetta, ''],
+        ['Debito netto su fonti totali', dati.strutturaFinanziaria?.debitoNettoSuFontiTotali, ''],
       ],
     },
     {
@@ -128,6 +141,14 @@ export function IndicatoriArchivio({
         ['Indice di onerosità', dati.oneriFinanziari?.indiceDiOnerosita, ''],
         ['ROD — costo del debito', dati.oneriFinanziari?.rod, '%'],
         ['ROD finanziario', dati.oneriFinanziari?.rodFinanziario, '%'],
+        // Gli altri due misurati e mai mostrati: la copertura e la generazione di cassa
+        // viste dai fondi della gestione invece che dal margine contabile.
+        ['FFO su interessi netti', dati.coperturaOneri?.ffoSuInteressiNetti, ''],
+        [
+          'Flusso di cassa libero su debiti finanziari a breve',
+          dati.liquidita?.fcfSuDebitiFinanziariBreve,
+          '',
+        ],
       ],
     },
     {
@@ -231,6 +252,15 @@ export function IndicatoriArchivio({
             l’esposizione e la stagionalità del rischio.
           </p>
           <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-5">
+            {/*
+              GLI OPERAI mancavano, ed è il dato che pesa di più proprio dove il riquadro
+              dice di pesare. Il modello di dominio lo porta e lo documenta con queste
+              parole: «era l'unico della composizione del personale a non venire letto: nel
+              riquadro che si intitola pesa su RC lavoratori mancava il sessantasette per
+              cento di operai di un'impresa manifatturiera». Era stato aggiunto al modello e
+              mai collegato allo schermo.
+            */}
+            <Riga etichetta="Operai" valore={percentuale(dati.statisticheAddetti.operai)} />
             <Riga etichetta="Impiegati" valore={percentuale(dati.statisticheAddetti.impiegati)} />
             <Riga
               etichetta="Tempo indeterminato"
@@ -298,6 +328,24 @@ function Qualifiche({
     ['Controllate estere', q.haControllateEstere, 'programmi assicurativi internazionali'],
     ['Controllanti estere', q.haControllantiEstere, 'programmi assicurativi internazionali'],
     ['Gruppo IVA', q.appartieneAGruppoIva, 'perimetro fiscale del gruppo'],
+    // Essere DENTRO un gruppo IVA e ESSERNE la capogruppo non sono la stessa cosa: la
+    // seconda risponde per le obbligazioni del gruppo. Il registro lo distingue e il
+    // prodotto comprava la distinzione senza mostrarla.
+    ['Capogruppo IVA', q.capogruppoIva, 'risponde per il perimetro del gruppo'],
+    /*
+      IL CONSENSO AL CONTATTO COMMERCIALE, che era comprato e taciuto.
+
+      L'archivio dichiara se l'impresa sia commercializzabile, cioè se i consensi marketing
+      lo permettano. Per un intermediario che lavora una lista di telefonate non è un
+      dettaglio: chiamare a freddo chi risulta non contattabile è un'esposizione sua, non
+      del prodotto — e il prodotto lo sapeva.
+    */
+    [
+      'Contattabile per fini commerciali',
+      q.commercializzabile,
+      'consensi marketing dichiarati dall’archivio',
+    ],
+    ['Presente sui social', q.presenteSuiSocial, 'canali pubblici da guardare prima di telefonare'],
   ];
 
   const attive = bandiere.filter(([, valore]) => valore === true);
@@ -312,6 +360,14 @@ function Qualifiche({
     // UE, e in italiano si dice da sempre «piccola impresa».
     ['Dimensione', traduciDescrizioneArchivioMaiuscola(q.dimensioneImpresa)],
     ['Fascia di fatturato', q.fasciaDiFatturato],
+    /*
+      L'ANNO DEL FATTURATO, che mancava.
+
+      Una fascia di fatturato e un andamento senza l'esercizio a cui si riferiscono sono
+      ambigui: chi legge non sa se sta guardando l'ultimo bilancio o quello di due anni fa,
+      e su questa base propone capitali. Il dato era comprato e non usciva.
+    */
+    ['Esercizio del fatturato', valoreONull(intero(q.annoFatturato))],
     ['Andamento fatturato', valoreONull(percentuale(q.andamentoFatturatoPercentuale))],
     ['Addetti', valoreONull(intero(q.addetti))],
     ['Fascia addetti', q.fasciaAddetti],
@@ -322,9 +378,36 @@ function Qualifiche({
     ['ATECO secondario', q.atecoSecondario],
     ['NACE', q.codiceNace],
     ['SIC', [q.codiceSicPrimario, q.codiceSicSecondario].filter(Boolean).join(' / ') || null],
+    /*
+      I PAESI DI ESPORTAZIONE, e questo è il più importante dei campi che mancavano.
+
+      Il modello lo dice già: «Esporta: sì non basta a proporre nulla: il rischio di credito
+      estero, il trasporto e il rischio politico cambiano con l'area, e il dato dell'area
+      era già pagato». Sopra, la qualifica «Esportatore» compariva senza dire DOVE — mentre
+      il registro l'aveva mandato.
+
+      Vale anche in senso opposto: il questionario chiede all'intermediario se l'impresa
+      esporta verso Stati Uniti e Canada, perché là il regime risarcitorio raddoppia il
+      massimale di RC Prodotti. Chiedere una cosa che si è comprata è il modo più sicuro di
+      farsi rispondere «non lo so».
+    */
+    ['Paesi di esportazione', q.paesiExport],
     ['Sito web', q.sitoWeb],
     ['Telefono', q.telefono],
     ['Posta elettronica', q.email],
+    ['Fax', q.fax],
+    /*
+      Gli identificativi. Non servono a valutare un rischio, servono a EMETTERE: il codice
+      SDI è quello a cui va la fattura elettronica del premio, il LEI identifica la
+      controparte nelle operazioni finanziarie, il numero all'albo artigiani apre regimi
+      dedicati. Erano tutti comprati e nessuno arrivava a schermo.
+    */
+    ['Codice SDI — fatturazione elettronica', q.codiceSdi],
+    ['Codice LEI', q.codiceLei],
+    ['Numero albo artigiani', q.numeroAlboArtigiani],
+    // Gli indirizzi, non il solo «sì» che sta fra le qualifiche: prima di telefonare a
+    // un'impresa si guarda cosa pubblica di sé, e l'archivio li aveva già mandati.
+    ['Profili social', q.profiliSocial.length > 0 ? q.profiliSocial.join(' · ') : null],
   ];
   const righeValorizzate = vociRiquadro.filter(
     (v): v is readonly [string, string] => v[1] !== null && v[1] !== '',
@@ -400,10 +483,22 @@ function Qualifiche({
 }
 
 function Riga({ etichetta, valore }: { etichetta: string; valore: string }) {
+  /*
+    `min-w-0` sulla cella e `break-words` sul valore, e non è ornamento.
+
+    In una griglia la cella si rifiuta di restringersi sotto la larghezza del proprio
+    contenuto: un valore che non ci sta non va a capo, esce — e spinge fuori schermo
+    l'intera pagina. Misurato a 390px subito dopo aver aggiunto i campi che mancavano:
+    centoventidue pixel di documento fuori dalla finestra, con gli indirizzi dei profili
+    social a fare da leva.
+
+    È lo stesso rimedio già applicato alla `Metrica` in `components/ui.tsx`, per la stessa
+    causa: là un importo lungo, qui un elenco di indirizzi.
+  */
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-xs text-testo-debole">{etichetta}</dt>
-      <dd className="mt-0.5 text-sm font-medium">{valore}</dd>
+      <dd className="mt-0.5 break-words text-sm font-medium">{valore}</dd>
     </div>
   );
 }
