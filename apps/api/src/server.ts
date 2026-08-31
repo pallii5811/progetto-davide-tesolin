@@ -1357,7 +1357,38 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const livello = fetchLevelSchema.parse(
       (request.query as Record<string, unknown>)['livello'] ?? 'completo',
     );
-    const profilo = await caricaProfilo(provider, request.params.id, livello);
+
+    /*
+      QUESTA ROTTA SPENDE, e per una versione intera lo ha fatto fuori da ogni controllo.
+
+      Il livello predefinito è `completo`: chiamarla compra l'anagrafica estesa, dieci
+      centesimi a impresa. Mancavano tutte e due le difese che ogni altra spesa ha —
+      il tetto verificato PRIMA, e la registrazione del costo nel registro. Cioè: si poteva
+      superare il limite che l'intermediario si è dato, e la spesa non compariva da nessuna
+      parte nel rendiconto.
+
+      Nessuna schermata la chiama e nessun collaudo la esercita: la usa solo la sua stessa
+      prova. È il modo in cui un difetto sul denaro sopravvive — nessuno ci passa, quindi
+      nessuno se ne accorge, finché un giorno qualcuno ci passa.
+
+      Non la tolgo: cancellare una rotta pubblica è una decisione di prodotto e non mia.
+      La porto dentro i controlli, che è ciò che serviva.
+    */
+    const esitoTetto = await oltreIlTetto(request);
+    if (esitoTetto !== null) {
+      return reply.status(429).send({
+        errore: messaggioTetto(
+          esitoTetto,
+          'Le aziende già in archivio restano consultabili senza spendere.',
+        ),
+      });
+    }
+
+    const { risultato: profilo, eventi } = await conCostiDellaRichiesta(() =>
+      caricaProfilo(provider, request.params.id, livello),
+    );
+    await registraSpese(request, eventi);
+
     if (profilo === null) return reply.status(404).send({ errore: 'Azienda non trovata' });
 
     return {

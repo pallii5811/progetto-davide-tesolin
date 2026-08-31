@@ -452,6 +452,19 @@ function classificaStatus(status: number): ProviderError['kind'] {
   if (status === 406) return 'non-trovato';
   if (status === 401 || status === 403) return 'autenticazione';
   if (status === 429) return 'quota';
+  /*
+    408 e 425 sono transitori quanto un 500, e finivano in «sconosciuto».
+
+    Il 408 è il fornitore che dichiara di non avercela fatta in tempo; il 425 è «riprova
+    fra poco, questa richiesta è arrivata troppo presto». In entrambi i casi la cosa giusta
+    da fare è ritentare — ed è esattamente ciò che «sconosciuto» impediva, perché non è
+    ritentabile e a schermo diventa «il servizio dati non è al momento disponibile».
+
+    La distinzione conta due volte: decide se il client riprova da solo, e decide quale
+    frase legge l'intermediario. Un guasto momentaneo raccontato come indisponibilità gli
+    fa chiudere la scheda e rifare tutto più tardi.
+  */
+  if (status === 408 || status === 425) return 'temporaneo';
   if (status >= 500) return 'temporaneo';
   return 'sconosciuto';
 }
