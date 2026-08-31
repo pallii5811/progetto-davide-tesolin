@@ -16,10 +16,14 @@ export function Sezione({
   azione,
   children,
 }: {
-  id?: string;
+  // `?: T | undefined` e non `?: T`: con `exactOptionalPropertyTypes` le due forme non
+  // sono la stessa cosa. La prima accetta sia la proprietà assente sia un `undefined`
+  // passato apposta — che è quello che fa chi scrive `sottotitolo={forse}` — mentre la
+  // seconda accetta solo l'assenza. È la convenzione già usata nel resto del progetto.
+  id?: string | undefined;
   titolo: string;
-  sottotitolo?: string;
-  azione?: ReactNode;
+  sottotitolo?: string | undefined;
+  azione?: ReactNode | undefined;
   children: ReactNode;
 }) {
   return (

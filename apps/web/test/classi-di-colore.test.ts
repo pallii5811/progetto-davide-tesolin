@@ -40,7 +40,11 @@ function classiUsate(): ReadonlySet<string> {
       if (!['.tsx', '.ts'].includes(extname(voce))) continue;
       const testo = readFileSync(percorso, 'utf8');
       for (const m of testo.matchAll(/\b(?:text|bg|border)-([a-z]+(?:-[a-z]+)*)(?:\/\d+)?\b/g)) {
-        trovate.add(m[1]);
+        // Il gruppo di cattura è tipizzato `string | undefined`, e la guardia non è
+        // cerimoniale: senza, un `undefined` entrerebbe nell'insieme dei colori trovati e
+        // il confronto con quelli definiti nel tema fallirebbe su un nome che non esiste.
+        const token = m[1];
+        if (token !== undefined) trovate.add(token);
       }
     }
   };
@@ -51,7 +55,9 @@ function classiUsate(): ReadonlySet<string> {
 /** I token di colore che il tema definisce davvero. */
 function tokenDefiniti(): ReadonlySet<string> {
   const testo = readFileSync(CSS, 'utf8');
-  return new Set([...testo.matchAll(/--color-([a-z-]+):/g)].map((m) => m[1]));
+  return new Set(
+    [...testo.matchAll(/--color-([a-z-]+):/g)].flatMap((m) => (m[1] === undefined ? [] : [m[1]])),
+  );
 }
 
 describe('Ogni colore usato esiste nel tema', () => {

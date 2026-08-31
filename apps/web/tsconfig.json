@@ -1,4 +1,16 @@
 {
+  // NON estende `tsconfig.base.json`, e non per distrazione: la base dichiara `module`
+  // NodeNext, `lib` senza DOM, `composite` e `declaration`, che a Next non servono e in
+  // parte gli impediscono di compilare. Le opzioni di MODULO restano quelle di Next.
+  //
+  // Le opzioni di SICUREZZA no. Fino al 31 agosto 2026 questo file era quello generato da
+  // Next e basta: quattro progetti su cinque ereditavano le regole severe del progetto, e
+  // l'unico che non lo faceva era quello che il cliente guarda. L'indice di un array si
+  // presentava come sempre valorizzato, un `break` dimenticato in uno `switch` compilava
+  // in silenzio, e `catch (e)` dava `any`.
+  //
+  // Misurato prima di attivarle: nove errori in tutto, sette dello stesso tipo. Il costo
+  // di aver tenuto le schermate meno severe del motore era di nove righe.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -13,6 +25,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+
     "plugins": [{ "name": "next" }],
     "paths": { "@/*": ["./src/*"] }
   },

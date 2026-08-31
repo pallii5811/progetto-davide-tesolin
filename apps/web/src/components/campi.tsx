@@ -21,8 +21,8 @@ function Guscio({
   children,
 }: {
   etichetta: string;
-  aiuto?: string;
-  htmlFor?: string;
+  aiuto?: string | undefined;
+  htmlFor?: string | undefined;
   children: ReactNode;
 }) {
   return (
@@ -53,7 +53,7 @@ export function CampoTesto({
   etichetta: string;
   valore: string;
   onChange: (valore: string) => void;
-  aiuto?: string;
+  aiuto?: string | undefined;
   placeholder?: string;
 }) {
   const id = useId();
@@ -83,10 +83,10 @@ export function CampoNumero({
   etichetta: string;
   valore: number | null;
   onChange: (valore: number | null) => void;
-  aiuto?: string;
-  suffisso?: string;
-  min?: number;
-  step?: number;
+  aiuto?: string | undefined;
+  suffisso?: string | undefined;
+  min?: number | undefined;
+  step?: number | undefined;
 }) {
   const id = useId();
   return (
@@ -122,7 +122,7 @@ export function CampoTriStato({
   etichetta: string;
   valore: boolean | null;
   onChange: (valore: boolean | null) => void;
-  aiuto?: string;
+  aiuto?: string | undefined;
 }) {
   const opzioni: { testo: string; valore: boolean | null }[] = [
     { testo: 'Sì', valore: true },
@@ -167,7 +167,7 @@ export function CampoSelezione<T extends string>({
   valore: T | null;
   opzioni: readonly { valore: T; testo: string }[];
   onChange: (valore: T | null) => void;
-  aiuto?: string;
+  aiuto?: string | undefined;
 }) {
   const id = useId();
   return (
@@ -199,7 +199,7 @@ export function CampoPercentuale({
   /** Valore in quota 0-1; l'utente digita in punti percentuali. */
   valore: number | null;
   onChange: (valore: number | null) => void;
-  aiuto?: string;
+  aiuto?: string | undefined;
 }) {
   return (
     <CampoNumero
