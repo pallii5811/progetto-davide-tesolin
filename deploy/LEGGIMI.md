@@ -1,6 +1,12 @@
 # Messa in produzione
 
-Procedura per Ubuntu 24.04 LTS su una macchina virtuale da 2 vCPU e 4 GB di RAM.
+Procedura per Ubuntu **24.04 o 26.04 LTS** su una macchina virtuale da 2 vCPU e 4 GB di RAM.
+
+> La macchina in esercizio oggi è una **26.04**, mentre questa riga diceva soltanto «24.04»:
+> chi avesse ripreso in mano il server dopo la consegna avrebbe letto istruzioni che non
+> corrispondono a ciò che trova. La differenza è reale e sta in `01-macchina.sh`: sulla
+> 24.04 Node 22 va preso da NodeSource, dalla 26.04 lo pacchettizza Ubuntu.
+
 I comandi si eseguono nell'ordine in cui compaiono. Ogni passo dice **cosa verifica**
 prima di dichiararsi riuscito: un passaggio che «sembra andato» e non lo è costa più del
 passaggio che fallisce subito.

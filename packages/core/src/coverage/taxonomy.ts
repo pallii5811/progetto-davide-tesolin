@@ -544,7 +544,16 @@ export const COVERAGE_CATALOG: Readonly<Record<CoverageId, CoverageDefinition>> 
     insidie: [
       'La libera scelta del legale e i massimali per grado di giudizio sono i due elementi che ne determinano l’utilità reale.',
     ],
-    riferimenti: ['D.Lgs. 209/2005, artt. 163-164'],
+    /*
+      L'articolo che regge l'insidia mancava.
+
+      163 e 164 sono l'ambito della tutela giudiziaria e la gestione dei sinistri; la LIBERA
+      SCELTA DEL LEGALE — che l'insidia qui sopra indica come uno dei due elementi che
+      determinano l'utilità della garanzia — è l'art. 165. La scheda affermava una cosa e
+      citava gli articoli che non la coprono: davanti a un intermediario vigilato è
+      esattamente il tipo di imprecisione che toglie credibilità a tutto il resto.
+    */
+    riferimenti: ['D.Lgs. 209/2005, artt. 163-165'],
   },
 };
 

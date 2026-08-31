@@ -44,10 +44,35 @@ export default async function PaginaMonitoraggio({
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="mb-1.5 text-2xl font-bold tracking-tight">Monitoraggio</h1>
+          {/*
+            QUESTA SCHERMATA DEVE DIRE ANCHE CIÒ CHE NON FA, e prima non lo diceva.
+
+            «Cosa è cambiato nelle aziende seguite» si legge come una sorveglianza continua:
+            è così che la parola «monitoraggio» funziona nei prodotti concorrenti, dove un
+            protesto iscritto stamattina arriva per posta nel pomeriggio. Qui no, e scoprirlo
+            dopo la firma è il modo più veloce di perdere la fiducia di un cliente su tutto
+            il resto.
+
+            La verità è a metà e va detta intera: il confronto sulle fotografie già salvate
+            è gratuito e coglie tutto ciò che dipende dalla data di oggi — scadenze, termini
+            di legge, obblighi che maturano. Un fatto NUOVO del registro, invece, entra solo
+            rianalizzando quell'impresa, e quella è una spesa.
+
+            Dichiararlo qui costa tre righe. Non dichiararlo costa il cliente.
+          */}
           <p className="max-w-3xl text-sm leading-relaxed text-testo-tenue">
             Cosa è cambiato nelle aziende seguite, e cosa comporta per le loro coperture. Ordinato per
             quanto costa <em>non</em> intervenire: in cima ci sono le situazioni in cui una garanzia già
             pagata potrebbe non indennizzare.
+          </p>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-testo-debole">
+            <strong className="text-testo-tenue">Come funziona:</strong> il confronto è{' '}
+            <strong className="text-testo-tenue">a richiesta</strong>, non automatico — nessun controllo
+            parte da solo e non viene inviata nessuna comunicazione. «Aggiorna» rilegge le analisi già
+            salvate: è gratuito e coglie tutto ciò che dipende dalla data di oggi, come una polizza in
+            scadenza o un termine di legge che matura. Un fatto nuovo del registro — un protesto, una
+            procedura — compare invece solo{' '}
+            <strong className="text-testo-tenue">rianalizzando quell’impresa</strong>, e quella è una spesa.
           </p>
         </div>
         <BottoneAggiorna />
