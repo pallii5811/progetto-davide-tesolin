@@ -35,10 +35,57 @@
  * anche un campo aggiunto domani entra nell'istantanea senza che nessuno se ne ricordi.
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEMO_AS_OF, analyzeCompany, demoCompanyProfile, demoPolizze } from '@aegis/core';
 import type { CompanyProfile } from '@aegis/core';
+
+/**
+ * L'istantanea gira sul COMPILATO, e il compilato può essere vecchio.
+ *
+ * La riga di import qui sopra dice `@aegis/core`, cioè `packages/core/dist`. Chi confronta
+ * un «prima» e un «dopo» mettendo da parte i sorgenti fra le due esecuzioni non cambia
+ * nulla se in mezzo non ricompila: entrambe le istantanee escono dallo stesso `dist`, e il
+ * confronto risponde «NESSUNA DIFFERENZA» perché ha guardato due volte lo stesso codice.
+ *
+ * È successo davvero, con questo script, su una correzione che cambiava sette frasi. Il
+ * verdetto verde non era una prova di non-regressione: era l'assenza di una misura, e le
+ * due cose si scrivono uguali sullo schermo.
+ *
+ * Quindi qui si rifiuta di partire quando un sorgente è più recente del compilato. Non è
+ * un avviso: un avviso in cima a un output lungo non lo legge nessuno, e questo strumento
+ * esiste per essere creduto.
+ */
+function esigiCompilatoFresco(): void {
+  const radice = process.cwd();
+  const sorgenti = join(radice, 'packages', 'core', 'src');
+  const compilato = join(radice, 'packages', 'core', 'dist');
+
+  if (!existsSync(compilato)) {
+    process.stderr.write('\n  packages/core/dist non esiste: eseguire `npm run build` prima.\n\n');
+    process.exit(2);
+  }
+
+  const piuRecente = (cartella: string): number => {
+    let massimo = 0;
+    for (const voce of readdirSync(cartella, { withFileTypes: true })) {
+      const percorso = join(cartella, voce.name);
+      massimo = Math.max(massimo, voce.isDirectory() ? piuRecente(percorso) : statSync(percorso).mtimeMs);
+    }
+    return massimo;
+  };
+
+  if (piuRecente(sorgenti) > piuRecente(compilato)) {
+    process.stderr.write(
+      '\n  I sorgenti sono più recenti del compilato: questa istantanea uscirebbe dal codice\n' +
+        '  VECCHIO e il confronto direbbe «nessuna differenza» senza averne guardata una.\n' +
+        '  Eseguire `npm run build` e ripetere.\n\n',
+    );
+    process.exit(2);
+  }
+}
+
+esigiCompilatoFresco();
 
 /** Data fissa: un'istantanea che dipende dall'orologio non si può confrontare con niente. */
 const QUANDO = DEMO_AS_OF;
