@@ -24,7 +24,7 @@ import {
 import type { PolizzaInEssere } from './policy.js';
 import type { SumsInsured } from './sums-insured.js';
 import { COVERAGE_CATALOG } from './taxonomy.js';
-import type { CoverageDefinition, CoverageId } from './taxonomy.js';
+import type { BasiDiCalcolo, CoverageDefinition, CoverageId } from './taxonomy.js';
 import { computeUnderinsurance } from './underinsurance.js';
 import type { Underinsurance } from './underinsurance.js';
 import type { DannoMassimo } from './danno-massimo.js';
@@ -740,6 +740,36 @@ function calcolaPriorita(
   return Math.round(priorita);
 }
 
+/**
+ * Il dato che manca, garanzia per garanzia.
+ *
+ * «Rilevare i dati necessari a dimensionare X» compariva **identica su nove schede della
+ * stessa pagina**: nove volte la stessa istruzione col nome cambiato, cioè nessuna
+ * istruzione. Chi la legge deve presentarsi dal cliente sapendo QUALE domanda fare, ed è
+ * esattamente la cosa che quella riga non diceva.
+ *
+ * Il catalogo però lo sa già: ogni garanzia dichiara la propria `base` di calcolo. Qui
+ * quella base diventa la domanda da fare, composta con frammenti fissi — nessuna frase
+ * generata e **nessun capitale inventato**, perché un massimale plausibile letto ad alta
+ * voce a un cliente è peggio di un massimale mancante.
+ *
+ * Due basi valgono `null` di proposito. `massimale-benchmark` e `da-definire` non hanno
+ * un dato da chiedere: la prima si fissa per confronto con il settore, la seconda caso per
+ * caso. Fingere una domanda precisa dove non c'è sarebbe la stessa colpa della frase che
+ * questo blocco sostituisce, commessa con più parole.
+ */
+const DATO_MANCANTE: Readonly<Record<BasiDiCalcolo, string | null>> = {
+  'valore-ricostruzione':
+    'il costo di ricostruzione a nuovo dei fabbricati, non il valore contabile netto',
+  'valore-rimpiazzo': 'il valore di rimpiazzo a nuovo di macchinari e attrezzature',
+  'valore-scorte': 'il valore delle scorte al picco stagionale',
+  'margine-contribuzione': 'il margine di contribuzione e il periodo di indennizzo da garantire',
+  'monte-salari': 'il monte salari annuo',
+  'fido-clienti': 'il fido complessivo concesso ai clienti',
+  'massimale-benchmark': null,
+  'da-definire': null,
+};
+
 function descriviAzione(
   definition: CoverageDefinition,
   status: GapStatus,
@@ -788,8 +818,15 @@ function descriviAzione(
       const giorni = polizza === null ? 0 : giorniAllaScadenza(polizza, asOf);
       return `Polizza in scadenza fra ${giorni} giorni: avviare la verifica di rinnovo e la riquotazione.`;
     }
-    case 'da-quantificare':
-      return `Rilevare i dati necessari a dimensionare ${definition.label}.`;
+    case 'da-quantificare': {
+      const dato = DATO_MANCANTE[definition.base];
+      if (dato !== null) {
+        return `Per dimensionare ${definition.label} serve ${dato}: da rilevare in sede di intervista.`;
+      }
+      return definition.base === 'massimale-benchmark'
+        ? `Fissare il massimale di ${definition.label} per confronto con il settore e la classe dimensionale, da concordare in sede di intervista.`
+        : `Dimensionare ${definition.label} in sede di intervista: il capitale si determina caso per caso.`;
+    }
     case 'adeguata':
       return 'Copertura congrua: nessun intervento richiesto in questa fase.';
   }

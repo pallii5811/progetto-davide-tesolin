@@ -62,7 +62,16 @@ export const COVERAGE_CATEGORY_LABEL: Readonly<Record<CoverageCategory, string>>
 
 /**
  * Su quale base si determina il capitale da assicurare.
- * Guida il motore di calcolo delle somme assicurande.
+ *
+ * ATTENZIONE A COSA FA DAVVERO, perché questo commento diceva il falso. Diceva «guida il
+ * motore di calcolo delle somme assicurande», e per otto varianti scritte con cura il
+ * campo era letto **in un posto solo**: la rotta che lo ricopia verso il client. Il
+ * calcolo delle somme non lo consultava mai.
+ *
+ * Oggi guida la frase che dice all'intermediario quale dato andare a chiedere al cliente
+ * — vedi `DATO_MANCANTE` in `gap.js` — e nient'altro. Dimensionare per benchmark di
+ * settore richiederebbe tabelle di settore che questo prodotto non ha: finché non ci
+ * sono, `massimale-benchmark` dichiara un metodo, non lo esegue.
  */
 export type BasiDiCalcolo =
   /** Valore di ricostruzione a nuovo dei fabbricati. */
