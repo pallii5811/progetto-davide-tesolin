@@ -1,6 +1,6 @@
 import { richiediSessione } from '@/lib/sessione';
 import { leggiUtenti } from '@/lib/api';
-import { Avviso } from '@/components/ui';
+import { Avviso, ServizioNonRaggiungibile } from '@/components/ui';
 import { GestioneUtenti } from './GestioneUtenti';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +23,10 @@ export default async function PaginaUtenti() {
 
   if (elenco === null) {
     return (
-      <Avviso tono="critico" titolo="Servizio non raggiungibile">
-        Non è stato possibile leggere l&apos;elenco degli utenti. Verificare che l&apos;API sia avviata.
-      </Avviso>
+      <ServizioNonRaggiungibile
+        titolo="Servizio non raggiungibile"
+        cosa="l’elenco dei collaboratori"
+      />
     );
   }
 

@@ -155,11 +155,27 @@ export function EditorDossier({
   datiIniziali,
   polizzeIniziali,
   salva,
+  lettore,
   collegamentoAnalisi = null,
 }: {
   identificativo: string;
   datiIniziali: DatiForm;
   polizzeIniziali: PolizzaForm[];
+  /**
+   * CHI STA LEGGENDO QUESTO MODULO.
+   *
+   * Lo stesso componente serve due porte: l'intermediario, che compila durante
+   * l'intervista, e il CLIENTE, che riceve un collegamento e compila da solo. Finora le
+   * spiegazioni erano scritte per il primo e le leggeva anche il secondo — cioè l'azienda
+   * assicurata leggeva «è la domanda più redditizia dell'intera intervista» accanto alla
+   * casella dell'export, e «cinque minuti che valgono quanto il servizio a pagamento da
+   * 5 € per impresa», che le scopre quanto costa il dato al suo intermediario.
+   *
+   * OBBLIGATORIA, senza valore predefinito. Un default avrebbe fatto ricomparire i testi
+   * del venditore il giorno in cui qualcuno apre una terza porta verso il cliente e si
+   * dimentica di dichiararla: qui il compilatore lo impedisce.
+   */
+  lettore: 'intermediario' | 'cliente';
   /**
    * Dove porta il pulsante «Vedi l'analisi», quando ha senso che ci sia.
    *
@@ -186,6 +202,22 @@ export function EditorDossier({
   const [esito, setEsito] = useState<{ ok: boolean; messaggio: string } | null>(null);
   const [inCorso, avvia] = useTransition();
 
+  /*
+    C'È QUALCOSA DI NON SALVATO?
+
+    Serve al pulsante «Vedi l'analisi», che stava accanto a «Salva» e navigava via
+    all'istante: un'intervista lunga si perdeva senza una domanda, e chi la stava
+    conducendo era seduto davanti al cliente.
+
+    Si confronta con l'ULTIMO SALVATAGGIO e non con i dati iniziali: dopo un salvataggio
+    riuscito le proprietà in ingresso restano quelle di prima — sono proprietà, non stato —
+    e il modulo risulterebbe modificato per sempre.
+  */
+  const [ultimoSalvato, setUltimoSalvato] = useState<string>(() =>
+    JSON.stringify({ dati: datiIniziali, polizze: polizzeIniziali }),
+  );
+  const modificato = JSON.stringify({ dati, polizze }) !== ultimoSalvato;
+
   const aggiorna = <K extends keyof DatiForm>(chiave: K, valore: DatiForm[K]): void => {
     setDati((precedente) => ({ ...precedente, [chiave]: valore }));
     setEsito(null);
@@ -199,7 +231,7 @@ export function EditorDossier({
     setEsito(null);
   };
 
-  const onSalva = (): void => {
+  const onSalva = (dopoIlSalvataggio?: () => void): void => {
     /*
       Ciò che non si può salvare si dice, non si butta.
 
@@ -239,7 +271,13 @@ export function EditorDossier({
       });
 
       setEsito(risultato);
-      if (risultato.ok) router.refresh();
+      if (risultato.ok) {
+        setUltimoSalvato(JSON.stringify({ dati, polizze }));
+        router.refresh();
+        // Si naviga SOLO a salvataggio riuscito: andarsene dopo un errore perderebbe
+        // esattamente ciò che si stava cercando di mettere al sicuro.
+        dopoIlSalvataggio?.();
+      }
     });
   };
 
@@ -266,7 +304,11 @@ export function EditorDossier({
       */}
       <GruppoCampi
         titolo="Voci dal bilancio depositato"
-        descrizione="Si leggono dal bilancio che l’impresa ha già: cinque minuti che valgono quanto il servizio a pagamento da 5 € per impresa. Senza, contenuto, scorte, danni indiretti e credito restano non quantificabili."
+        descrizione={
+          lettore === 'cliente'
+            ? 'Si leggono dal bilancio depositato, che l’impresa ha già. Senza queste voci, contenuto, scorte, danni indiretti e credito commerciale restano non quantificabili.'
+            : 'Si leggono dal bilancio che l’impresa ha già: cinque minuti che valgono quanto il servizio a pagamento da 5 € per impresa. Senza, contenuto, scorte, danni indiretti e credito restano non quantificabili.'
+        }
       >
         <CampoNumero
           etichetta="Esercizio di riferimento"
@@ -434,7 +476,11 @@ export function EditorDossier({
       {/* ── Attività e mercati ───────────────────────────────────────────── */}
       <GruppoCampi
         titolo="Attività e mercati"
-        descrizione="L’export verso USA e Canada raddoppia il massimale RC Prodotti consigliato: è la domanda più redditizia dell’intera intervista."
+        descrizione={
+          lettore === 'cliente'
+            ? 'L’export verso Stati Uniti e Canada raddoppia il massimale di RC Prodotti consigliato: là il regime risarcitorio è più severo e ammette danni punitivi.'
+            : 'L’export verso USA e Canada raddoppia il massimale RC Prodotti consigliato: è la domanda più redditizia dell’intera intervista.'
+        }
       >
         <CampoNumero
           etichetta="Dipendenti"
@@ -493,7 +539,11 @@ export function EditorDossier({
           valore={dati.propensioneAlRischio}
           opzioni={PROPENSIONI}
           onChange={(v) => aggiorna('propensioneAlRischio', v)}
-          aiuto="Si chiede, non si deduce: un imprenditore prudente con mezzi solidi ha ogni diritto di assicurare tutto. Dimezza o raddoppia la franchigia proponibile, ed è una domanda da trenta secondi."
+          aiuto={
+            lettore === 'cliente'
+              ? 'Non si deduce dai numeri: un imprenditore prudente con mezzi solidi ha ogni diritto di assicurare tutto. La risposta dimezza o raddoppia la franchigia proposta, e non incide sul giudizio sull’impresa.'
+              : 'Si chiede, non si deduce: un imprenditore prudente con mezzi solidi ha ogni diritto di assicurare tutto. Dimezza o raddoppia la franchigia proponibile, ed è una domanda da trenta secondi.'
+          }
         />
       </GruppoCampi>
 
@@ -700,18 +750,55 @@ export function EditorDossier({
           </div>
 
           <div className="flex items-center gap-3">
+            {/*
+              CON MODIFICHE APERTE, QUESTO PULSANTE SALVA PRIMA DI ANDARSENE.
+
+              Stava accanto a «Salva» e faceva `router.push` all'istante: un'intervista
+              compilata a metà spariva senza una domanda, e chi la stava conducendo era
+              seduto davanti al cliente.
+
+              Chiedere «vuoi salvare?» sarebbe stato il rimedio ovvio e il peggiore dei
+              due: in un caso su due la risposta giusta è sì, e chiederla significa solo
+              spostare sull'utente una decisione che il prodotto sa già prendere. Qui non
+              si perde niente in nessuno dei due rami.
+
+              L'ETICHETTA RESTA UNA SOLA, e il motivo è arrivato da una prova rossa. La
+              prima versione diventava «Salva e vedi l'analisi» quando c'erano modifiche:
+              accanto a «Salva e ricalcola» facevano due pulsanti che cominciano entrambi
+              con la stessa parola, uno di fianco all'altro. Il collaudo, che ne cercava
+              uno, ne ha trovati due — ma prima ancora è chi guarda a non sapere più quale
+              premere. Ciò che sta per succedere si dice nella riga qui accanto, dove non
+              compete con il nome dell'azione.
+            */}
             {collegamentoAnalisi !== null && (
-              <button
-                type="button"
-                onClick={() => router.push(collegamentoAnalisi)}
-                className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio"
-              >
-                Vedi l&apos;analisi
-              </button>
+              <div className="flex items-center gap-2">
+                {modificato && (
+                  <span className="hidden text-xs text-testo-debole sm:inline">
+                    le modifiche verranno salvate
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={inCorso}
+                  onClick={() => {
+                    if (!modificato) {
+                      router.push(collegamentoAnalisi);
+                      return;
+                    }
+                    onSalva(() => router.push(collegamentoAnalisi));
+                  }}
+                  className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Vedi l’analisi
+                </button>
+              </div>
             )}
             <button
               type="button"
-              onClick={onSalva}
+              // `() => onSalva()` e non `onSalva`: da quando la funzione accetta un seguito
+              // facoltativo, passarla nuda a React le consegnerebbe l'evento del mouse al
+              // posto di quel seguito, e il salvataggio proverebbe a eseguirlo.
+              onClick={() => onSalva()}
               disabled={inCorso}
               className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
             >

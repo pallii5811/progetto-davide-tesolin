@@ -4,6 +4,7 @@ import { cercaProspect } from '@/lib/api';
 import type { RisultatoProspezione } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { SelettoreLotto } from './SelettoreLotto';
+import { BottoneElenco } from './BottoneElenco';
 import { ConfrontoConElencoComprato, RicordaElenco, UltimoElenco } from './UltimoElenco';
 import { centesimiPerRiga } from '@/lib/prezzo-prospect';
 
@@ -283,16 +284,12 @@ export default async function PaginaProspect({
 
               Sta qui accanto al conteggio e non più in fondo alla pagina: il conteggio non
               deve essere un passaggio obbligato per arrivare all'elenco.
+
+              È un componente a sé perché deve SPEGNERSI dopo il primo clic: la pagina non
+              cambia finché il servizio non risponde, e un secondo clic è un secondo
+              acquisto. Il pulsante di accesso, che non costa niente, si disabilitava già.
             */}
-            <button
-              type="submit"
-              name="scarica"
-              value="1"
-              data-testid="scarica-elenco"
-              className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
-            >
-              Dammi l&apos;elenco
-            </button>
+            <BottoneElenco etichetta="Dammi l’elenco" />
           </div>
         </form>
       </Scheda>

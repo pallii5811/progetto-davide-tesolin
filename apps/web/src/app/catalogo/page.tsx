@@ -1,7 +1,7 @@
 import { richiediSessione } from '@/lib/sessione';
 import { leggiCatalogoCoperture, leggiCatalogoRischi } from '@/lib/api';
 import type { RischioCatalogo } from '@/lib/api';
-import { Avviso, Scheda, Sezione } from '@/components/ui';
+import { Scheda, ServizioNonRaggiungibile, Sezione } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +18,10 @@ export default async function PaginaCatalogo() {
 
   if (rischi === null || coperture === null) {
     return (
-      <Avviso tono="critico" titolo="Cataloghi non disponibili">
-        Non è stato possibile leggere i cataloghi di riferimento. Verificare che l&apos;API sia avviata.
-      </Avviso>
+      <ServizioNonRaggiungibile
+        titolo="Cataloghi non disponibili"
+        cosa="i cataloghi di riferimento"
+      />
     );
   }
 

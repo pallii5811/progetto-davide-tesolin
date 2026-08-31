@@ -54,6 +54,28 @@ test.describe('Questionario compilato dal cliente', () => {
     await expect(paginaCliente.getByRole('link', { name: 'Portafoglio' })).toHaveCount(0);
     await expect(paginaCliente.getByRole('link', { name: 'Monitoraggio' })).toHaveCount(0);
 
+    /*
+      E NON VEDE NEMMENO I TESTI SCRITTI PER CHI GLI VENDE LA POLIZZA.
+
+      Il modulo è lo stesso componente dei due lati — al cliente cambia solo la funzione di
+      salvataggio — e le spiegazioni erano scritte per l'intermediario. Accanto alla casella
+      dell'export l'impresa assicurata leggeva «è la domanda più redditizia dell'intera
+      intervista», cioè che quella domanda fa guadagnare il suo broker; e più sopra «cinque
+      minuti che valgono quanto il servizio a pagamento da 5 € per impresa», che le scopre
+      quanto costa il dato a chi la sta assistendo.
+
+      Si controlla il TESTO RESO, non il codice: il componente ora riceve un `lettore`
+      obbligatorio, ma una prova sul tipo direbbe solo che la porta è dichiarata, non che
+      da questa porta esce la frase giusta.
+    */
+    const testoCliente = (await paginaCliente.locator('body').innerText()).toLowerCase();
+    for (const frase of ['redditizia', '5 € per impresa', 'si chiede, non si deduce']) {
+      expect(
+        testoCliente,
+        `il questionario del cliente contiene un testo scritto per l’intermediario: «${frase}»`,
+      ).not.toContain(frase.toLowerCase());
+    }
+
     const veicoli = paginaCliente.getByLabel(/veicoli/i).first();
     await expect(veicoli).toBeVisible();
     await veicoli.fill('17');

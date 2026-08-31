@@ -153,6 +153,9 @@ export default async function PaginaQuestionario({ params }: { params: Promise<{
         datiIniziali={unisciDati(apertura.datiDichiarati, null)}
         polizzeIniziali={convertiPolizze(apertura.polizze)}
         salva={salvaQuestionarioCliente}
+        // Chi apre questo collegamento è l'impresa assicurata, non chi le vende la polizza:
+        // le spiegazioni scritte per l'intermediario qui non devono comparire.
+        lettore="cliente"
       />
     </div>
   );

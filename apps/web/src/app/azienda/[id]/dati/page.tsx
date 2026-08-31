@@ -130,6 +130,7 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
         datiIniziali={datiIniziali}
         polizzeIniziali={polizzeIniziali}
         salva={salvaDossier}
+        lettore="intermediario"
         collegamentoAnalisi={`/azienda/${id}`}
       />
     </>

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { richiediSessione } from '@/lib/sessione';
 import { leggiMonitoraggio } from '@/lib/api';
 import type { EventoMonitoraggioDto } from '@/lib/api';
-import { Avviso, Scheda } from '@/components/ui';
+import { Scheda, ServizioNonRaggiungibile } from '@/components/ui';
 import { BottoneAggiorna } from './BottoneAggiorna';
 import { segnaGestito } from './actions';
 import { formattaGiorno } from '@aegis/core/tempo';
@@ -35,9 +35,7 @@ export default async function PaginaMonitoraggio({
 
   if (monitoraggio === null) {
     return (
-      <Avviso tono="critico" titolo="Monitoraggio non disponibile">
-        Non è stato possibile leggere la coda degli eventi. Verificare che l&apos;API sia avviata.
-      </Avviso>
+      <ServizioNonRaggiungibile titolo="Monitoraggio non disponibile" cosa="la coda degli eventi" />
     );
   }
 

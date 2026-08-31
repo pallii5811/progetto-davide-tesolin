@@ -613,3 +613,68 @@ describe('Controllo societario: facts e assetto rispondono allo stesso modo (dif
     expect(deriveFacts(profilo, bilancioDemo, DEMO_AS_OF).quotaSocioDiControllo).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capitale eroso oltre un terzo — artt. 2446 e 2482-bis c.c.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Il capitale eroso oltre un terzo viene detto, non lasciato dedurre', () => {
+  /** Lo stesso profilo, con il capitale sociale che si vuole e il patrimonio netto scelto. */
+  const conCapitaleEPatrimonio = (
+    capitaleEuro: number,
+    patrimonioEuro: number,
+  ): ReturnType<typeof computeCreditScore> =>
+    computeCreditScore({
+      profile: {
+        ...profiloDemo,
+        anagrafica: {
+          ...profiloDemo.anagrafica,
+          value: {
+            ...profiloDemo.anagrafica.value,
+            capitaleSocialeDeliberato: euro(capitaleEuro),
+          },
+        },
+      },
+      bilancio: {
+        ...bilancioDemo,
+        sp: { ...bilancioDemo.sp, patrimonioNetto: euro(patrimonioEuro) },
+      },
+      indicatori: computeIndicators(bilancioDemo),
+      livelloDati: 'completo',
+      asOf: DEMO_AS_OF,
+    });
+
+  it('lo dice, con i due importi e l’articolo giusto per la forma societaria', () => {
+    /*
+      Il caso reale che ha fatto nascere il controllo: patrimonio netto 8.485 € contro un
+      capitale deliberato di 210.000 €. Il prodotto mostrava entrambi i numeri su schermate
+      diverse e non li confrontava mai, mentre è la fattispecie che obbliga gli
+      amministratori a convocare l'assemblea — e per un intermediario è il segnale che vende
+      una D&O.
+    */
+    const note = conCapitaleEPatrimonio(210_000, 8_485).explanation.notes.join(' | ');
+
+    expect(note).toContain('capitale sociale');
+    expect(note).toMatch(/2482-bis|2446/);
+    // Gli importi, perché una frase senza i numeri non si può contestare.
+    expect(note).toContain('210.000');
+  });
+
+  it('sopra i due terzi non dice niente: è il verso che rende il controllo un controllo', () => {
+    // Senza questa prova la precedente passerebbe anche se la nota comparisse SEMPRE, che è
+    // il modo più comune in cui un avviso smette di significare qualcosa.
+    const note = conCapitaleEPatrimonio(210_000, 200_000).explanation.notes.join(' | ');
+    expect(note).not.toMatch(/2482-bis|2446/);
+  });
+
+  it('non sposta il punteggio: è un fatto di governance, non una misura di merito', () => {
+    /*
+      Il tetto per patrimonio netto NEGATIVO esiste già e resta. Questo gradino sta prima, e
+      farne un secondo tetto cambierebbe punteggi che nessuno ha chiesto di cambiare —
+      per giunta due volte sulla stessa causa.
+    */
+    const eroso = conCapitaleEPatrimonio(210_000, 8_485);
+    const sano = conCapitaleEPatrimonio(10_000, 8_485);
+    expect(eroso.value.value).toBe(sano.value.value);
+  });
+});

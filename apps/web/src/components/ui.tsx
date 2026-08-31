@@ -235,3 +235,36 @@ export function Avviso({
     </div>
   );
 }
+
+/**
+ * Il servizio dati non risponde, detto a chi lo sta leggendo.
+ *
+ * DUE LETTORI, DUE RIMEDI. Chi sviluppa deve sapere quale indirizzo non risponde e con
+ * quale comando riavviarlo; un intermediario non può lanciare comandi, e leggersi
+ * «Verificare che l'API sia avviata» davanti a un cliente gli fa sembrare rotto il
+ * prodotto invece del servizio — e per giunta gli chiede una cosa fuori dalla sua portata,
+ * che è il modo più veloce di far sentire incapace chi paga.
+ *
+ * La pagina iniziale faceva già questa distinzione, con il commento che la spiega. Tre
+ * pagine — catalogo, elenco utenti, monitoraggio — no: dicevano la frase da sviluppatore a
+ * chiunque, anche in esercizio. Qui la distinzione sta in un posto solo, così la prossima
+ * schermata che ne ha bisogno non deve ricordarsene.
+ */
+export function ServizioNonRaggiungibile({ cosa, titolo }: { cosa: string; titolo: string }) {
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <Avviso tono="critico" titolo={titolo}>
+        Non è stato possibile leggere {cosa}. I dati già acquisiti restano consultabili dal
+        portafoglio. Se la situazione persiste, segnalarlo all’assistenza.
+      </Avviso>
+    );
+  }
+
+  return (
+    <Avviso tono="critico" titolo={titolo}>
+      Non è stato possibile leggere {cosa}. Avviare il servizio con{' '}
+      <code className="font-mono">npm run dev:api</code>, oppure indicare l’indirizzo corretto
+      nella variabile <code className="font-mono">AEGIS_API_URL</code>.
+    </Avviso>
+  );
+}

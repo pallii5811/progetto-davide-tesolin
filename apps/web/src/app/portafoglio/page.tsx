@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { leggiPortafoglio } from '@/lib/api';
 import type { VocePortafoglio } from '@/lib/api';
 import { applicaFiltroPortafoglio } from '@aegis/core';
+// Il fuso è dichiarato dentro il formattatore, non dedotto da chi rende la pagina.
+import { formattaGiorno } from '@aegis/core/tempo';
 import { Avviso, Metrica, Scheda } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -115,9 +117,22 @@ export default async function PaginaPortafoglio({
         Non si nasconde niente e non si accorcia niente: si stringe la spaziatura dove lo
         spazio costa, e da `sm` in su resta com'era.
       */}
+      {/*
+        «Scoperta» qui NON si può usare, e non è una questione di stile.
+
+        In una polizza lo «scoperto» è la quota di ogni sinistro che resta a carico
+        dell'assicurato — il prodotto stesso lo usa in quel senso: `scoperto: number | null`
+        fra le condizioni di una polizza, e la soglia del 15% citata dalla norma CAT NAT.
+        Chiamare «esposizione scoperta» il patrimonio NON ASSICURATO dà alla stessa parola
+        due significati nella stessa applicazione, davanti all'unico lettore che li
+        distingue entrambi per mestiere.
+
+        La scheda dell'impresa la chiamava già «esposizione non assicurata»: adesso le due
+        schermate dicono lo stesso nome per la stessa grandezza.
+      */}
       <p className="mb-4 max-w-3xl text-sm leading-snug text-testo-tenue sm:mb-6 sm:leading-relaxed">
         Ordinato per urgenza: prima le posizioni non conformi a un obbligo di legge, poi per esposizione
-        patrimoniale scoperta. Non è un cruscotto da guardare, è una lista di telefonate da fare.
+        patrimoniale non assicurata. Non è un cruscotto da guardare, è una lista di telefonate da fare.
       </p>
 
       {/*
@@ -229,6 +244,11 @@ export default async function PaginaPortafoglio({
                 <p className="text-xs text-testo-debole">
                   {azienda.provincia ?? '—'} · {azienda.atecoDescrizione ?? 'settore n.d.'}
                 </p>
+                {/* Anche sullo schermo stretto: la freschezza del dato non è un dettaglio
+                    da desktop. */}
+                <p className="text-xs text-testo-debole">
+                  analizzata il {formattaGiorno(azienda.analizzataIl)}
+                </p>
               </div>
               <StatoCatNat azienda={azienda} />
             </div>
@@ -241,7 +261,7 @@ export default async function PaginaPortafoglio({
                 </dd>
               </div>
               <div className="text-right">
-                <dt className="text-xs text-testo-debole">Esposizione scoperta</dt>
+                <dt className="text-xs text-testo-debole">Esposizione non assicurata</dt>
                 <dd className="tabular font-medium">{esposizione(azienda)}</dd>
               </div>
             </dl>
@@ -285,7 +305,7 @@ export default async function PaginaPortafoglio({
                 CAT NAT
               </th>
               <th scope="col" className="px-4 py-2.5 text-right font-medium">
-                Esposizione scoperta
+                Esposizione non assicurata
               </th>
               <th scope="col" className="px-4 py-2.5 font-medium">
                 Prossima azione
@@ -301,8 +321,18 @@ export default async function PaginaPortafoglio({
                   <p className="text-xs text-testo-debole">
                     {azienda.provincia ?? '—'} · {azienda.atecoDescrizione ?? 'settore n.d.'}
                   </p>
+                  {/*
+                    QUANDO È STATA FATTA, che è ciò che decide se questa riga si lavora oggi.
+
+                    La data viaggiava già dentro il DTO e finiva nel CSV esportato, sotto
+                    l'intestazione «Analizzata il»: sullo schermo non compariva da nessuna
+                    parte. Un portafoglio è una lista di telefonate, e senza la data un'analisi
+                    di sei mesi fa è indistinguibile da una di ieri — con i punteggi, i fidi e
+                    le esposizioni che nel frattempo si sono mossi.
+                  */}
                   <p className="mt-0.5 text-xs text-testo-debole">
-                    Dati di intervista {Math.round(azienda.completezza * 100)}%
+                    Dati di intervista {Math.round(azienda.completezza * 100)}% · analizzata il{' '}
+                    {formattaGiorno(azienda.analizzataIl)}
                   </p>
                 </td>
 
@@ -371,7 +401,7 @@ export default async function PaginaPortafoglio({
  * seconda dello schermo, e non saprebbe a quale credere.
  */
 /**
- * L'esposizione scoperta, con la distinzione fra «zero» e «ignoto».
+ * L'esposizione non assicurata, con la distinzione fra «zero» e «ignoto».
  *
  * Su un'azienda che deposita il bilancio in forma abbreviata nessun capitale è ricavabile:
  * la somma delle esposizioni quantificate vale legittimamente zero, ma stampare «0 €» in

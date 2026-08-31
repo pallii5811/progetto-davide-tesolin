@@ -36,6 +36,10 @@ import { altmanToScore, computeAltmanZ } from './altman.js';
 import type { ContestoAltman } from './altman.js';
 import { atecoSection } from '../shared/identifiers.js';
 import { formattaGiorno } from '../shared/tempo.js';
+// La norma sta in un posto solo: qui si cita, non si riscrive quale articolo valga per
+// quale forma societaria — sbagliarne uno davanti a un intermediario vigilato è un danno
+// che nessuna spiegazione recupera.
+import { normaRiduzioneCapitalePerPerdite } from '../governance/norme.js';
 
 /**
  * `ND` non è una sesta classe: è il rifiuto di attribuirne una.
@@ -326,6 +330,55 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     value = Math.min(value, 35);
     cap ??= 'Patrimonio netto negativo (perdita di capitale sociale)';
     fattoBloccante = true;
+  }
+
+  /*
+    IL GRADINO PRIMA DEL PATRIMONIO NEGATIVO, che il motore non guardava.
+
+    Sopra c'è il caso estremo: patrimonio netto sotto zero. Ma la norma scatta molto prima,
+    quando la perdita ha eroso più di un terzo del capitale sociale — artt. 2446 c.c. per la
+    S.p.A. e 2482-bis per la S.r.l.: gli amministratori devono convocare l'assemblea «senza
+    indugio», e chi non lo fa ne risponde di persona.
+
+    Il prodotto aveva entrambi i numeri e non li confrontava mai. Il capitale sociale lo
+    mostra sulla scheda («Capitale sociale deliberato»), il patrimonio netto lo usa per il
+    primo vincolo del fido, e l'unico posto in cui l'articolo era nominato è la spiegazione
+    dell'Altman — dove però si limita a citarlo, senza verificare la fattispecie. Per un
+    intermediario è il segnale che vende una D&O, ed è anche il motivo per cui quel cliente
+    potrebbe non essere lì l'anno prossimo.
+
+    NON TOCCA IL PUNTEGGIO, di proposito. È un fatto di governance con conseguenze legali,
+    non una misura di merito creditizio già coperta dagli indici: farne un tetto sposterebbe
+    numeri che nessuno ha chiesto di spostare. Diventa una riga del fascicolo, che è dove
+    serve.
+
+    E LA FRASE DICHIARA IL PROPRIO LIMITE. La soglia di legge si calcola sulla perdita al
+    netto delle riserve, che il bilancio sintetico non espone: il confronto fra patrimonio
+    netto e due terzi del capitale è l'indizio corretto, non l'accertamento. Dirlo come
+    certo sarebbe la regola 4 violata sul punto in cui costa una consulenza legale.
+  */
+  const capitaleDeliberato =
+    profile.anagrafica.value.capitaleSocialeDeliberato ??
+    ultimoBilancioSintetico(profile)?.value.capitaleSociale ??
+    null;
+
+  if (
+    patrimonioNetto !== null &&
+    Money.isPositive(patrimonioNetto) &&
+    capitaleDeliberato !== null &&
+    Money.isPositive(capitaleDeliberato) &&
+    Money.compare(patrimonioNetto, Money.multiply(capitaleDeliberato, 2 / 3)) < 0
+  ) {
+    const norma = normaRiduzioneCapitalePerPerdite(profile.anagrafica.value.formaGiuridica);
+    builder.note(
+      `Patrimonio netto ${Money.format(patrimonioNetto)} contro un capitale sociale di ` +
+        `${Money.format(capitaleDeliberato)}: sotto i due terzi del deliberato. ` +
+        (norma === null
+          ? 'In questa forma societaria non c’è un capitale minimo da ricostituire, ma la perdita arriva al patrimonio personale dei soci. '
+          : `È la soglia della disciplina sulla riduzione del capitale per perdite (${norma}): l’assemblea va convocata senza indugio, e chi amministra risponde di persona se non lo fa. `) +
+        'Da verificare sul bilancio depositato: la perdita rilevante si calcola al netto delle riserve, ' +
+        'che il bilancio sintetico non espone.',
+    );
   }
 
   /*
