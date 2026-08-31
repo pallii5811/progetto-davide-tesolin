@@ -229,6 +229,18 @@ export class MockCompanyProvider implements CompanyDataProvider {
     });
   }
 
+  /**
+   * In modalità dimostrativa nessun clic addebita niente: la risposta è sempre «sì».
+   *
+   * Non è una scorciatoia. La domanda che questo metodo risponde è «premendo, spendo?», e
+   * qui la risposta vera è che non si spende mai — le aziende sono inventate e nessun
+   * fornitore viene interrogato. Rispondere «no» farebbe annunciare a schermo un prezzo che
+   * non verrà addebitato, che è esattamente il difetto per cui il metodo esiste.
+   */
+  acquistoSenzaSpesa(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+
   fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile> {
     const normalizzato = identifier.replace(/\s/g, '');
     const nota = VARIANTI.find((v) => v.partitaIva === normalizzato);

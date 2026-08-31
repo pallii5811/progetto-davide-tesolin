@@ -22,6 +22,15 @@ import type {
  * Governa direttamente il costo: ogni livello superiore attiva chiamate aggiuntive
  * a pagamento. Si acquisisce il minimo necessario e si sale solo quando l'analisi lo richiede.
  */
+/**
+ * I due acquisti che l'intermediario aggiunge a un'analisi già fatta, con il loro pulsante.
+ *
+ * Sono elencati perché ciascuno ha un prezzo dichiarato a schermo, e quel prezzo va detto
+ * solo quando c'è davvero un addebito: entrambe le risposte restano in archivio trenta
+ * giorni, e per tutto quel tempo il secondo clic non costa nulla.
+ */
+export type AcquistoFacoltativo = 'approfondimento' | 'eventi-negativi';
+
 export type FetchLevel =
   /** Solo anagrafica di base. Costo minimo, sufficiente per la ricerca e la qualificazione. */
   | 'base'
@@ -238,6 +247,21 @@ export interface CompanyDataProvider {
     level: FetchLevel,
     opzioni?: { readonly conEventiNegativi?: boolean | undefined },
   ): Promise<CompanyProfile>;
+
+  /**
+   * Questo acquisto, su questa impresa, costerebbe — oppure è già pagato?
+   *
+   * Sta nella porta e non solo nell'implementazione perché riguarda il DENARO di chi usa il
+   * prodotto, e chi disegna una schermata deve poterlo chiedere senza sapere da quale
+   * fornitore arrivi il dato.
+   *
+   * I due pulsanti annunciavano «+0,30 €» e «+0,45 €» anche quando la risposta era in
+   * archivio, comprata il giorno prima e valida per un altro mese. Un prezzo dichiarato
+   * dove non c'è addebito ferma il lavoro esattamente come un addebito taciuto tradisce la
+   * fiducia: il primo si paga in lavoro non fatto, il secondo in credibilità, e questo
+   * prodotto non deve commettere nessuno dei due.
+   */
+  acquistoSenzaSpesa(identifier: string, cosa: AcquistoFacoltativo): Promise<boolean>;
 }
 
 /** Errori di provider distinti per poter reagire in modo diverso: ritentare, degradare, fallire. */

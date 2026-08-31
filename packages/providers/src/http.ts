@@ -184,6 +184,26 @@ export class HttpProviderClient {
    */
   readonly #inVolo = new Map<string, Promise<unknown>>();
 
+  /**
+   * Questa richiesta si può servire senza spendere?
+   *
+   * Serve a dire all'intermediario, PRIMA che prema, se il dato che sta per chiedere è già
+   * stato pagato. Un pulsante che annuncia «+0,30 €» su un dato già in archivio non è
+   * prudente: è falso nella direzione che ferma il lavoro. È successo — la risposta era in
+   * cache, valida per altri ventinove giorni, e chi guardava lo schermo non aveva modo di
+   * saperlo e ha smesso di cliccare.
+   *
+   * Costruisce la chiave passando dallo STESSO `#buildUrl` della richiesta vera. Ricavarla
+   * altrove sarebbe la solita tabella scritta due volte: identiche oggi, divergenti il
+   * giorno che una delle due cambia, e a quel punto il prodotto direbbe «già pagato» su
+   * qualcosa da pagare.
+   */
+  async serviblePerCache(options: RequestOptions): Promise<boolean> {
+    if (options.cacheTtlSeconds <= 0) return false;
+    const chiave = `${options.method ?? 'GET'} ${this.#buildUrl(options)}`;
+    return (await this.#options.cache?.get(chiave)) !== undefined;
+  }
+
   async request<T>(options: RequestOptions): Promise<T> {
     const url = this.#buildUrl(options);
     const cacheKey = `${options.method ?? 'GET'} ${url}`;

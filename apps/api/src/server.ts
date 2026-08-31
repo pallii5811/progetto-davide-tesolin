@@ -1577,7 +1577,30 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       OPENAPI_DEFAULT_CONFIG.services.eventiNegativi.verificato &&
       !provider.name.startsWith('Demo');
 
-    return { ...presentAnalysis(analisi), accertamentiInCorso };
+    /*
+      QUALI DEI DUE ACQUISTI FACOLTATIVI SONO GIÀ PAGATI, per questa impresa.
+
+      I due pulsanti dichiarano il proprio prezzo — «+0,30 €» e «+0,45 €» — ed è la regola
+      giusta: nessuno deve spendere senza saperlo. Ma su un'impresa già approfondita quel
+      prezzo è FALSO: la risposta resta in archivio trenta giorni, e in quel periodo il
+      secondo clic non addebita nulla.
+
+      È successo davvero. L'approfondimento era stato comprato il giorno prima, la risposta
+      era valida per altri ventinove giorni, e il pulsante continuava ad annunciare trenta
+      centesimi: chi guardava lo schermo ha smesso di cliccare per non ripagare un dato che
+      possedeva già. Un prezzo dichiarato dove non c'è addebito non è prudenza — è lavoro
+      che non si fa su dati che si sono pagati.
+
+      Si chiede al fornitore, non alla tabella della cache: la chiave la costruisce lui,
+      dalle stesse opzioni della richiesta vera, e così non esiste una seconda copia che
+      possa divergere.
+    */
+    const senzaSpesa = {
+      approfondimento: await provider.acquistoSenzaSpesa(request.params.id, 'approfondimento'),
+      eventiNegativi: await provider.acquistoSenzaSpesa(request.params.id, 'eventi-negativi'),
+    };
+
+    return { ...presentAnalysis(analisi), accertamentiInCorso, senzaSpesa };
   });
 
   // ── Salvataggio dei dati di intervista, senza ricalcolo ─────────────────────

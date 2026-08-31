@@ -1801,13 +1801,31 @@ function Intestazione({
             «+0,48 €» su un servizio che ne costa trenta: un numero rimasto indietro, che
             nessuno poteva accorgersi fosse sbagliato perché non veniva da nessuna parte.
           */}
+          {/*
+            IL PREZZO SI DICHIARA SOLO DOVE C'È UN ADDEBITO.
+
+            Il commento sopra resta vero: chi spende deve saperlo prima di premere. Ma la
+            risposta di un servizio resta in archivio trenta giorni, e per tutto quel tempo
+            il secondo clic NON costa niente — mentre il pulsante continuava a scrivere
+            «+0,30 €».
+
+            È successo: l'approfondimento era stato comprato il giorno prima ed era valido
+            per altri ventinove giorni; chi guardava lo schermo ha smesso di cliccare per
+            non ripagarlo. Il prodotto gli ha impedito di usare un dato suo, per un prezzo
+            che non avrebbe addebitato. Un prezzo scritto dove non c'è addebito costa lavoro
+            non fatto, esattamente come un addebito taciuto costa fiducia.
+          */}
           {!conNegativita && (
             <Link
               href={`/azienda/${identificativo}?negativita=1${approfondita ? '&approfondita=1' : ''}`}
               className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Verifica protesti e procedure{' '}
-              <span className="text-testo-debole">{prezzo(listino?.costoEventiNegativiCentesimi)}</span>
+              {analisi.senzaSpesa.eventiNegativi ? (
+                <span className="text-basso">già acquistata</span>
+              ) : (
+                <span className="text-testo-debole">{prezzo(listino?.costoEventiNegativiCentesimi)}</span>
+              )}
             </Link>
           )}
           {!approfondita && (
@@ -1816,7 +1834,11 @@ function Intestazione({
               className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Analisi approfondita{' '}
-              <span className="text-testo-debole">{prezzo(listino?.costoApprofondimentoCentesimi)}</span>
+              {analisi.senzaSpesa.approfondimento ? (
+                <span className="text-basso">già acquistata</span>
+              ) : (
+                <span className="text-testo-debole">{prezzo(listino?.costoApprofondimentoCentesimi)}</span>
+              )}
             </Link>
           )}
           <Link

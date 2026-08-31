@@ -431,6 +431,17 @@ export interface AnalisiDto {
    * include, e non costa nulla perché la pratica resta in memoria.
    */
   accertamentiInCorso: boolean;
+  /**
+   * Quali dei due acquisti facoltativi sono già pagati per QUESTA impresa.
+   *
+   * La risposta di un servizio resta in archivio trenta giorni: in quel periodo il pulsante
+   * non deve annunciare un prezzo, perché non addebiterà nulla. Un prezzo scritto dove non
+   * c'è addebito ferma chi lavora davanti a un dato che ha già comprato.
+   */
+  senzaSpesa: {
+    approfondimento: boolean;
+    eventiNegativi: boolean;
+  };
   /** Le quattro fasce di impatto, con importo e giorni di fermo equivalenti. */
   metricheDiImpatto: MetricheDiImpattoDto;
   /** Da quali voci nasce il margine di contribuzione, e con quali quote. */

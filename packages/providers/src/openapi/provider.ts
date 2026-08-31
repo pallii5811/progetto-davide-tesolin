@@ -25,11 +25,12 @@ import type {
   Sourced,
 } from '@aegis/core';
 import { HttpProviderClient } from '../http.js';
-import type { Cache, CostLedger } from '../http.js';
+import type { Cache, CostLedger, RequestOptions } from '../http.js';
 import { ProviderError } from '../port.js';
 import type {
   CompanyDataProvider,
   CompanySearchResult,
+  AcquistoFacoltativo,
   CriteriProspezione,
   FetchLevel,
   RisultatoProspezione,
@@ -373,6 +374,28 @@ export class OpenApiProvider implements CompanyDataProvider {
     };
   }
 
+  /**
+   * L'approfondimento di questa impresa è già stato pagato?
+   *
+   * IL DIFETTO CHE L'HA RESA NECESSARIA. Il pulsante annunciava «Analisi approfondita
+   * +0,30 €» anche su un'impresa approfondita il giorno prima, la cui risposta era in
+   * archivio e valida per altri ventinove giorni. Chi lo leggeva non aveva modo di sapere
+   * che quel clic non costava niente, e ha smesso di cliccare — cioè il prodotto ha
+   * impedito di usare un dato già comprato, per un prezzo che non avrebbe addebitato.
+   *
+   * Il salto da «completo» a «profondito» acquista UN servizio, il profilo completo: la
+   * domanda ha quindi una risposta sola e non ambigua. Se un giorno l'approfondimento ne
+   * comprasse due, questa funzione dovrà chiederli entrambi — «senza spesa» è vero solo se
+   * lo sono tutti.
+   */
+  async acquistoSenzaSpesa(identifier: string, cosa: AcquistoFacoltativo): Promise<boolean> {
+    const servizio =
+      cosa === 'approfondimento'
+        ? this.#config.services.profiloCompleto
+        : this.#config.services.eventiNegativi;
+    return this.#company.serviblePerCache(this.#opzioniDi(servizio, identifier));
+  }
+
   async fetchProfile(
     identifier: string,
     level: FetchLevel,
@@ -672,12 +695,25 @@ export class OpenApiProvider implements CompanyDataProvider {
   }
 
   async #get(service: ServiceConfig, identifier: string): Promise<unknown> {
-    return this.#company.request<unknown>({
+    return this.#company.request<unknown>(this.#opzioniDi(service, identifier));
+  }
+
+  /**
+   * Le opzioni della richiesta, costruite in un posto solo.
+   *
+   * Stavano dentro `#get`. Sono uscite di lì perché servono anche SENZA eseguire la
+   * richiesta — per sapere se quel dato è già in archivio — e la chiave della cache nasce
+   * proprio da queste opzioni. Ricostruirle una seconda volta significherebbe due tabelle
+   * identiche oggi e divergenti il giorno in cui una cambia: e allora il prodotto
+   * annuncerebbe «già pagato» su qualcosa che invece pagherà.
+   */
+  #opzioniDi(service: ServiceConfig, identifier: string): RequestOptions {
+    return {
       service: service.path,
       path: service.path.replace('{id}', encodeURIComponent(identifier)),
       cacheTtlSeconds: service.ttlSeconds,
       costoCentesimi: service.costoCentesimi,
-    });
+    };
   }
 
   /**
