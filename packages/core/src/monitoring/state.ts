@@ -52,7 +52,15 @@ export interface StatoSorvegliato {
   readonly annoUltimoBilancio: number | null;
   readonly patrimonioNetto: Euro | null;
 
-  readonly scoreCredito: number;
+  /**
+   * `null` quando il punteggio non era determinabile alla data dell'istantanea.
+   *
+   * Conta per il confronto fra due istantanee: un'impresa passata da «non misurabile» a 62
+   * non è migliorata di 62 punti, ha smesso di essere ignota. Trattare quel `null` come
+   * uno zero produrrebbe un allarme di variazione enorme il giorno in cui si compra il
+   * profilo completo — cioè un allarme per ogni impresa approfondita.
+   */
+  readonly scoreCredito: number | null;
   readonly classeCredito: string;
   readonly proceduraConcorsualeAperta: boolean;
   readonly eventiNegativiPresenti: boolean;

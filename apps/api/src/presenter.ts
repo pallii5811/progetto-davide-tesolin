@@ -523,7 +523,11 @@ function presentSintesi(analisi: CompanyAnalysis) {
     scoreCredito: s.scoreCredito,
     classeCredito: s.classeCredito,
     probabilitaDefault: analisi.creditScore.value.probabilitaDefault,
-    fidoConsigliato: money(s.fidoConsigliato),
+    // moneyOrNull e non money: un fido non determinabile non è un fido di zero euro. Zero
+    // euro, qui, è la raccomandazione più severa che il prodotto sappia dare — pagamento
+    // anticipato o garanzia reale — e non si rivolge a un'impresa di cui non si è potuto
+    // misurare il merito.
+    fidoConsigliato: moneyOrNull(s.fidoConsigliato),
     rischiIdentificati: s.rischiIdentificati,
     rischiDaTrasferire: s.rischiDaTrasferire,
     rischiCritici: s.rischiCritici,
@@ -564,7 +568,8 @@ function presentCredito(analisi: CompanyAnalysis) {
             spiegazione: explanation(analisi.altman.explanation),
           },
     fido: {
-      importo: money(analisi.creditLimit.value.importo),
+      // Vale per l'importo complessivo ciò che valeva già per i tre vincoli qui sotto.
+      importo: moneyOrNull(analisi.creditLimit.value.importo),
       vincoloAttivo: analisi.creditLimit.value.vincoloAttivo,
       // moneyOrNull e non money: un vincolo non calcolabile deve arrivare a schermo come
       // assenza, non come «0 €». La spiegazione accanto stampava già «non calcolabile», e

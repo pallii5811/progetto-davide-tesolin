@@ -325,7 +325,11 @@ function creaContestoSu(db: Database, tenantId: string, utenteId: string | null)
           partitaIva: v.partitaIva,
           provincia: v.provincia,
           atecoDescrizione: v.atecoPrimario,
-          scoreCredito: v.scoreCredito ?? 0,
+          // `?? 0` toglieva alla colonna una distinzione che la colonna aveva già:
+          // annullabile nel database, schiacciata a zero qui. E zero, in un portafoglio,
+          // non è un buco — è il punteggio peggiore possibile, che ordina l'impresa in
+          // cima alla lista dei rischi.
+          scoreCredito: v.scoreCredito,
           classeCredito: v.classeCredito ?? '—',
           statoCatNat: v.statoCatNat ?? 'non-soggetta',
           catNatConforme: v.statoCatNat === 'adempiente' || v.statoCatNat === 'non-soggetta',

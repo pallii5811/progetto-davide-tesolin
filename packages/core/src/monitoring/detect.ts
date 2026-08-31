@@ -390,7 +390,25 @@ function variazioneScore(
   opzioni: OpzioniRilevazione,
 ): readonly EventoMonitoraggio[] {
   const soglia = opzioni.sogliaScorePunti ?? SOGLIA_SCORE_PREDEFINITA;
-  const delta = corrente.scoreCredito - precedente.scoreCredito;
+
+  /*
+    Una VARIAZIONE richiede due misure.
+
+    Da quando il punteggio può valere `null` — «non determinabile su questi dati» — la
+    sottrazione fatta a occhi chiusi darebbe il numero pieno come se l'altro capo fosse
+    zero: comprando il profilo completo di un'impresa prima ignota uscirebbe «Merito
+    creditizio in miglioramento: 0 → 62, rilevanza 4», un allarme per ogni approfondimento,
+    su un miglioramento mai avvenuto. È la regola 2d del progetto nel punto in cui produce
+    rumore invece che silenzio.
+
+    Passare da ignoto a misurato non è un evento del mondo, è un acquisto appena fatto
+    dall'utente: non gli si segnala ciò che ha appena deciso lui.
+  */
+  const adesso = corrente.scoreCredito;
+  const prima = precedente.scoreCredito;
+  if (adesso === null || prima === null) return [];
+
+  const delta = adesso - prima;
   if (Math.abs(delta) < soglia) return [];
 
   const peggiorato = delta < 0;

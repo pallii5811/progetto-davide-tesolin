@@ -27,6 +27,7 @@ import { assessRisks } from '../src/risk/engine.js';
 import { territorialExposure, worstExposure } from '../src/risk/geo.js';
 import { computeAltmanZ } from '../src/credit/altman.js';
 import { computeCreditScore } from '../src/credit/score.js';
+import { computeIndicators } from '../src/company/indicators.js';
 import { deriveFacts } from '../src/company/facts.js';
 import { reclassify } from '../src/company/financials.js';
 import { euro } from '../src/shared/money.js';
@@ -471,10 +472,23 @@ describe('Riduzione del capitale per perdite: la norma segue la forma (difetto 5
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Probabilità di default: formula, riferimento e confidenza (difetto 68)', () => {
+  /*
+    LA FIXTURE ORA PORTA GLI INDICI, e il motivo va scritto perché non è una comodità.
+
+    Prima passava `indicatori: null` con un bilancio completo: tre fattori su sette, cioè
+    sotto il pavimento di copertura. Da quando il modello si rifiuta di attribuire un
+    punteggio a chi non ha visto abbastanza, quella combinazione non produce più una PD —
+    e queste due prove, che parlano della CURVA di calibrazione, finivano a interrogare il
+    ramo in cui la curva non viene nemmeno applicata.
+
+    Non è la prova ad avere torto: è la sua fixture a essere diventata un altro caso. Il
+    caso nuovo ha una prova sua, qui sotto, invece di essere assorbito in silenzio da
+    questa.
+  */
   const score = computeCreditScore({
     profile: profiloDemo,
     bilancio: bilancioDemo,
-    indicatori: null,
+    indicatori: computeIndicators(bilancioDemo),
     livelloDati: 'completo',
     asOf: DEMO_AS_OF,
   });
@@ -488,6 +502,57 @@ describe('Probabilità di default: formula, riferimento e confidenza (difetto 68
   it('non si dichiara affidabile: la curva non è calibrata sui dati della piattaforma', () => {
     expect(score.value.probabilitaDefaultSpiegata.confidence).not.toBe('alta');
     expect(score.value.probabilitaDefaultSpiegata.explanation.notes.join(' | ')).toContain('calibr');
+  });
+
+  it('senza punteggio non c’è probabilità di default, e non ne inventa una', () => {
+    /*
+      Il caso da cui è nata la classe ND. Su un profilo comprato al livello base il modello
+      valutava un fattore su sette e la scheda stampava «4/100 · classe E · rischio molto
+      alto», con una PD a due decimali sotto. Un giudizio severissimo su un'impresa di cui
+      il prodotto non sapeva quasi niente — e il gemello esatto del difetto opposto, quello
+      che faceva uscire «classe A» quando i dati mancavano.
+    */
+    const senzaDati = computeCreditScore({
+      profile: profiloDemo,
+      bilancio: null,
+      indicatori: null,
+      livelloDati: 'assente',
+      asOf: DEMO_AS_OF,
+    });
+
+    expect(senzaDati.value.classe).toBe('ND');
+    expect(senzaDati.value.value).toBeNull();
+    expect(senzaDati.value.probabilitaDefault).toBeNull();
+    expect(senzaDati.value.probabilitaDefaultSpiegata.value).toBeNull();
+
+    // E lo dice, invece di lasciarlo dedurre da un campo vuoto.
+    expect(senzaDati.explanation.notes.join(' | ')).toMatch(/non si attribuisce|non determinabile/i);
+  });
+
+  it('ma un fatto accertato vale un giudizio anche su pochi indici', () => {
+    /*
+      Il rovescio, e senza questa prova la correzione sarebbe pericolosa: se `ND` scattasse
+      anche in presenza di un fatto bloccante, il prodotto smetterebbe di dire «questa
+      impresa è cessata» proprio a chi sta per farle credito. Un'impresa cessata si giudica
+      con un indice solo, e il giudizio è fondato.
+    */
+    const cessata = computeCreditScore({
+      profile: {
+        ...profiloDemo,
+        anagrafica: {
+          ...profiloDemo.anagrafica,
+          value: { ...profiloDemo.anagrafica.value, statoAttivita: 'cessata' },
+        },
+      },
+      bilancio: null,
+      indicatori: null,
+      livelloDati: 'assente',
+      asOf: DEMO_AS_OF,
+    });
+
+    expect(cessata.value.classe).not.toBe('ND');
+    expect(cessata.value.value).not.toBeNull();
+    expect(cessata.value.cap).toContain('cessata');
   });
 
   it('il valore resta quello della curva: la forma cambia, il numero no', () => {

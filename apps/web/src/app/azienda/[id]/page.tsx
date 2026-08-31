@@ -186,33 +186,65 @@ export default async function PaginaAzienda({
           aver guardato è il danno più grande che questo software possa fare, e costa
           quarantacinque centesimi evitarlo.
         */}
+        {/*
+          I DUE NUMERI CHE POSSONO NON ESSERCI, e sono i due più grandi della pagina.
+
+          Il motore ha smesso di attribuire un punteggio quando non ha visto abbastanza del
+          modello: prima usciva «4/100 · classe E · rischio molto alto» su un profilo
+          comprato al livello base, cioè un giudizio severissimo su un'impresa di cui il
+          prodotto non sapeva quasi nulla. Qui quel caso diventa visibile invece di essere
+          travestito da cifra.
+
+          Il tono resta neutro: colorare di rosso un'assenza la farebbe leggere come una
+          brutta notizia, che è esattamente l'errore da cui veniamo.
+        */}
         <Metrica
           etichetta="Score di credito"
-          valore={`${sintesi.scoreCredito}/100`}
+          valore={sintesi.scoreCredito === null ? 'Non determinabile' : `${sintesi.scoreCredito}/100`}
           nota={
-            analisi.eventiNegativi === null
-              ? `Classe ${sintesi.classeCredito} · provvisorio: protesti e procedure non verificati`
-              : `Classe ${sintesi.classeCredito} · PD 12 mesi ${(sintesi.probabilitaDefault * 100).toFixed(2)}%`
+            sintesi.scoreCredito === null
+              ? 'Il modello non ha visto abbastanza dati per esprimere un punteggio: acquistare il profilo completo o rilevarli in intervista'
+              : analisi.eventiNegativi === null
+                ? `Classe ${sintesi.classeCredito} · provvisorio: protesti e procedure non verificati`
+                : // `?? 0` scriverebbe «PD 12 mesi 0,00%», cioè la notizia più rassicurante
+                  // possibile al posto di un'assenza. Oggi questo ramo non ci arriva — la PD
+                  // è nulla solo quando lo è il punteggio, e quel caso è già gestito sopra —
+                  // ma la difesa non deve poggiare su un'invariante che nessuno vede.
+                  `Classe ${sintesi.classeCredito} · PD 12 mesi ${
+                    sintesi.probabilitaDefault === null
+                      ? 'non determinabile'
+                      : `${(sintesi.probabilitaDefault * 100).toFixed(2)}%`
+                  }`
           }
           tono={
-            analisi.eventiNegativi === null
-              ? 'attenzione'
-              : sintesi.scoreCredito >= 65
-                ? 'positivo'
-                : sintesi.scoreCredito >= 50
-                  ? 'attenzione'
-                  : 'critico'
+            sintesi.scoreCredito === null
+              ? 'neutro'
+              : analisi.eventiNegativi === null
+                ? 'attenzione'
+                : sintesi.scoreCredito >= 65
+                  ? 'positivo'
+                  : sintesi.scoreCredito >= 50
+                    ? 'attenzione'
+                    : 'critico'
           }
         />
         <Metrica
           etichetta="Fido consigliato"
-          valore={sintesi.fidoConsigliato.formattato}
+          valore={sintesi.fidoConsigliato?.formattato ?? 'Non determinabile'}
           nota={
-            analisi.eventiNegativi === null
-              ? 'Provvisorio: una procedura concorsuale aperta lo azzera, e non è stata verificata'
-              : `Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`
+            sintesi.fidoConsigliato === null
+              ? 'Il fido si dimensiona sul merito creditizio: senza punteggio non se ne consiglia uno, e zero euro sarebbe una raccomandazione'
+              : analisi.eventiNegativi === null
+                ? 'Provvisorio: una procedura concorsuale aperta lo azzera, e non è stata verificata'
+                : `Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`
           }
-          tono={analisi.eventiNegativi === null ? 'attenzione' : 'neutro'}
+          tono={
+            sintesi.fidoConsigliato === null
+              ? 'neutro'
+              : analisi.eventiNegativi === null
+                ? 'attenzione'
+                : 'neutro'
+          }
         />
         {/*
           La didascalia elenca **ciò che è dentro il numero**, non ciò che il numero
@@ -1107,11 +1139,22 @@ export default async function PaginaAzienda({
       <Sezione
         id="credito"
         titolo="Merito creditizio"
-        sottotitolo={`Score ${analisi.credito.score}/100 · classe ${analisi.credito.classe}${
-          analisi.credito.altman === null
-            ? ''
-            : ` · Altman Z'' ${analisi.credito.altman.z.toFixed(2)} (${analisi.credito.altman.zona})`
-        }`}
+        /*
+          Il compilatore non protegge questa riga: un template literal accetta `null` e
+          scrive «Score null/100» senza che niente si accorga. Le uniche due occorrenze
+          rimaste di questo difetto — qui e nel fascicolo per il cliente — sono state
+          trovate rileggendo a mano ogni uso dei campi diventati annullabili, non dal
+          typecheck.
+        */
+        sottotitolo={
+          analisi.credito.score === null
+            ? 'Punteggio non determinabile sui dati disponibili'
+            : `Score ${analisi.credito.score}/100 · classe ${analisi.credito.classe}${
+                analisi.credito.altman === null
+                  ? ''
+                  : ` · Altman Z'' ${analisi.credito.altman.z.toFixed(2)} (${analisi.credito.altman.zona})`
+              }`
+        }
       >
         {analisi.credito.limitazione !== null && (
           <div className="mb-4">
@@ -1177,7 +1220,11 @@ export default async function PaginaAzienda({
 
         <Scheda>
           <p className="text-sm font-medium">Fido commerciale consigliato</p>
-          <p className="tabular mt-1 text-2xl font-semibold">{analisi.credito.fido.importo.formattato}</p>
+          {/* La spiegazione sotto dice già perché non c'è: qui basta non stampare una
+              cifra. «0 €» in questo punto verrebbe letto come «non concedere credito». */}
+          <p className="tabular mt-1 text-2xl font-semibold">
+            {analisi.credito.fido.importo?.formattato ?? 'Non determinabile'}
+          </p>
           <Spiegazione dati={analisi.credito.fido.spiegazione} aperta />
         </Scheda>
       </Sezione>

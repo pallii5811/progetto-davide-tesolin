@@ -37,7 +37,33 @@ import type { ContestoAltman } from './altman.js';
 import { atecoSection } from '../shared/identifiers.js';
 import { formattaGiorno } from '../shared/tempo.js';
 
-export type ClasseDiMerito = 'A' | 'B' | 'C' | 'D' | 'E';
+/**
+ * `ND` non è una sesta classe: è il rifiuto di attribuirne una.
+ *
+ * IL DIFETTO CHE L'HA RESA NECESSARIA. Su un profilo comprato al livello base — 0,10 €,
+ * un livello d'acquisto reale — il modello valuta UN fattore su sette, e il prodotto
+ * stampava «4/100 · classe E · rischio molto alto». Su un'impresa di cui non sapeva
+ * quasi nulla.
+ *
+ * Il caso limite era ancora più netto: a zero fattori valutabili la funzione scriveva una
+ * nota che diceva «dati insufficienti per esprimere un punteggio» e nella riga successiva
+ * ne esprimeva uno — 1 su 100, classe E, con tanto di probabilità di default calcolata su
+ * quell'uno. Chi legge guarda il numero, non la nota; e su quel numero il prodotto ordina
+ * le liste, filtra i portafogli e propone un fido.
+ *
+ * È il gemello del difetto corretto poco prima, che faceva salire il punteggio a «classe A
+ * rischio molto basso» quando i dati mancavano. Stessa causa — estrapolare un giudizio
+ * intero da mezzo modello — e verso opposto. Un tetto verso l'alto senza pavimento verso
+ * il basso corregge metà di un errore simmetrico.
+ *
+ * ATTENZIONE alla distinzione che regge tutto: un punteggio basso che nasce da un FATTO
+ * resta valido e va mostrato. Procedura concorsuale aperta, impresa cessata, patrimonio
+ * netto negativo sono notizie, non lacune: con quelle il giudizio è fondato anche su un
+ * modello scarso, e negarlo toglierebbe al venditore l'informazione che più gli serve.
+ * `ND` scatta solo quando il punteggio nasce dalla media di troppo pochi fattori e nessun
+ * fatto bloccante lo giustifica.
+ */
+export type ClasseDiMerito = 'A' | 'B' | 'C' | 'D' | 'E' | 'ND';
 
 export const CLASSE_LABEL: Readonly<Record<ClasseDiMerito, string>> = {
   A: 'Rischio molto basso',
@@ -45,6 +71,7 @@ export const CLASSE_LABEL: Readonly<Record<ClasseDiMerito, string>> = {
   C: 'Rischio medio',
   D: 'Rischio alto',
   E: 'Rischio molto alto',
+  ND: 'Non determinabile: dati insufficienti',
 };
 
 export interface ScoreFactor {
@@ -59,14 +86,32 @@ export interface ScoreFactor {
 }
 
 export interface CreditScore {
-  /** Punteggio finale 1–100. */
-  readonly value: number;
+  /**
+   * Punteggio finale 1–100, oppure `null` quando non è misurabile.
+   *
+   * `null` e non 1: è la regola 2d del progetto applicata al numero che decide più di
+   * tutti. Un punteggio a 1 su un'impresa che nessuno ha misurato viene sommato, ordinato,
+   * mediato in un portafoglio e mostrato a un venditore come «rischio molto alto». Un buco
+   * dichiarato si vede; un uno inventato no — e la nota accanto, che diceva «dati
+   * insufficienti per esprimere un punteggio», nessuno la legge quando c'è una cifra.
+   *
+   * Vale sempre insieme a `classe === 'ND'`: le due cose si muovono insieme, e il tipo
+   * costringe chi legge a gestire il caso invece di scoprirlo in produzione.
+   */
+  readonly value: number | null;
   readonly classe: ClasseDiMerito;
   readonly factors: readonly ScoreFactor[];
   /** Se il punteggio è stato forzato verso il basso da una condizione bloccante, il motivo. */
   readonly cap: string | null;
-  /** Probabilità di default a 12 mesi, stimata dalla curva di calibrazione. */
-  readonly probabilitaDefault: number;
+  /**
+   * Probabilità di default a 12 mesi, stimata dalla curva di calibrazione.
+   *
+   * `null` quando il punteggio non è misurabile: la curva trasforma un punteggio in una
+   * percentuale, e senza punteggio non c'è niente da trasformare. Stamparne una comunque
+   * significherebbe dare a un intermediario una probabilità di insolvenza con due decimali
+   * ricavata da un numero inventato.
+   */
+  readonly probabilitaDefault: number | null;
   /**
    * La stessa probabilità con la formula, il riferimento e la confidenza che merita.
    *
@@ -75,9 +120,10 @@ export interface CreditScore {
    * e in un prodotto che vende la trasparenza del calcolo era proprio il numero che
    * nessuno poteva ricalcolare né contestare.
    *
-   * `value` è identico a `probabilitaDefault`: cambia la forma, non la cifra.
+   * `value` è identico a `probabilitaDefault`: cambia la forma, non la cifra — e resta
+   * identico anche quando la cifra è `null`.
    */
-  readonly probabilitaDefaultSpiegata: Explained<number>;
+  readonly probabilitaDefaultSpiegata: Explained<number | null>;
 }
 
 /**
@@ -202,36 +248,64 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     .reference('Metodologia AEGIS · docs/DOMINIO.md §4');
 
   if (base === null) {
+    /*
+      La nota diceva «dati insufficienti per esprimere un punteggio» e la riga sotto ne
+      esprimeva uno: 1 su 100, classe E, «rischio molto alto», con una probabilità di
+      default calcolata su quell'uno. Due affermazioni opposte nello stesso oggetto, e
+      quella che arriva al venditore è la cifra — perché è la cifra che il prodotto ordina,
+      filtra e mostra grande in cima alla scheda.
+
+      Ora l'assenza resta assenza. Chi legge questo oggetto è costretto dal tipo a
+      distinguere «non misurato» da «misurato male», che è l'unica distinzione che conta.
+    */
     return builder
       .note('Nessun fattore valutabile: dati insufficienti per esprimere un punteggio.')
       .confidence('bassa')
       .value({
-        value: 1,
-        classe: 'E',
+        value: null,
+        classe: 'ND',
         factors,
         cap: 'Dati insufficienti',
-        probabilitaDefault: probabilitaDefault(1),
-        probabilitaDefaultSpiegata: probabilitaDefaultSpiegata(1, 'bassa'),
+        probabilitaDefault: null,
+        probabilitaDefaultSpiegata: probabilitaDefaultSpiegata(null, 'bassa'),
       });
   }
 
   let value = base;
   let cap: string | null = null;
 
+  /*
+    Un tetto che nasce da un FATTO non è una lacuna, ed è la distinzione che tiene in piedi
+    la classe `ND`.
+
+    Procedura concorsuale aperta, impresa cessata o in liquidazione, patrimonio netto
+    negativo: sono notizie verificate, e con una di queste il giudizio è fondato anche se
+    il modello ha valutato due fattori su sette. Negare la classe in quel caso toglierebbe
+    al venditore proprio l'informazione per cui ha pagato — «questa impresa è in
+    concordato» vale più di tutti gli indici messi insieme.
+
+    Il tetto per copertura insufficiente, invece, non è un fatto sull'impresa: è un fatto
+    su quanto ne sappiamo. Solo quello porta a `ND`.
+  */
+  let fattoBloccante = false;
+
   // ── Vincoli bloccanti ─────────────────────────────────────────────────────
   const proceduraAperta = eventi.procedure.find((p) => p.aperta);
   if (proceduraAperta !== undefined) {
     value = Math.min(value, 10);
     cap = `Procedura concorsuale aperta (${dicitura(proceduraAperta)}) dal ${formatDate(proceduraAperta.dataApertura)}`;
+    fattoBloccante = true;
   }
 
   const stato = profile.anagrafica.value.statoAttivita;
   if (stato === 'cessata' || stato === 'fallita') {
     value = Math.min(value, 5);
     cap = `Impresa ${stato}`;
+    fattoBloccante = true;
   } else if (stato === 'in-liquidazione') {
     value = Math.min(value, 20);
     cap ??= 'Impresa in liquidazione';
+    fattoBloccante = true;
   }
 
   /*
@@ -251,6 +325,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   if (patrimonioNetto !== null && !Money.isPositive(patrimonioNetto)) {
     value = Math.min(value, 35);
     cap ??= 'Patrimonio netto negativo (perdita di capitale sociale)';
+    fattoBloccante = true;
   }
 
   /*
@@ -339,8 +414,36 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     }
   }
 
-  const finale = Math.round(clamp(value, 1, 100));
-  const classe = classifica(finale);
+  /*
+    IL PAVIMENTO ANCHE VERSO IL BASSO.
+
+    Poco sopra il modello si rifiuta di dire «Rischio molto basso» quando ha visto meno di
+    metà dei fattori. Qui si rifiuta di dire qualunque cosa, per la stessa ragione e nel
+    verso opposto: misurato su una risposta reale al livello base, un fattore su sette
+    dava «4/100 · classe E · rischio molto alto» su un'impresa di cui il prodotto non
+    sapeva praticamente nulla. Quel numero finiva grande in cima alla scheda, e con lui una
+    probabilità di default a due decimali.
+
+    A meno che un FATTO non lo giustifichi. Con una procedura concorsuale aperta o
+    un'impresa cessata il giudizio regge anche su pochi indici, e nasconderlo sarebbe il
+    difetto opposto: tacere l'unica cosa che il venditore doveva sapere.
+  */
+  const copertoAbbastanza = misura.copertura >= PAVIMENTO_DI_COPERTURA;
+  const determinabile = copertoAbbastanza || fattoBloccante;
+
+  const finale = determinabile ? Math.round(clamp(value, 1, 100)) : null;
+  const classe: ClasseDiMerito = finale === null ? 'ND' : classifica(finale);
+
+  if (finale === null) {
+    cap ??=
+      `Copertura del modello ${formatPercent(misura.copertura, 1)} ` +
+      `(${misura.valutati} fattori su ${misura.totali}): punteggio non determinabile`;
+    builder.note(
+      `Il modello ha potuto valutare ${misura.valutati} fattori su ${misura.totali}. ` +
+        'Su questa base non si attribuisce né un punteggio né una classe: ' +
+        'acquistare il profilo completo, oppure rilevare i dati in sede di intervista.',
+    );
+  }
 
   /*
     Il peso stampato è quello che ha pesato.
@@ -400,14 +503,23 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   const pd = probabilitaDefaultSpiegata(finale, confidenza);
 
   return builder
-    .note(`Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`)
+    .note(
+      finale === null
+        ? `Punteggio non determinabile — ${CLASSE_LABEL[classe]}.`
+        : `Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`,
+    )
     .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
     .input('Data di valutazione', formatDate(asOf))
     .input(
       'Esercizio di riferimento',
       bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno),
     )
-    .input('Probabilità di default a 12 mesi', formatPercent(pd.value, 2))
+    // `formatPercent` su un'assenza scriverebbe «0,00%», che è una PD bassissima: la
+    // regola 2d del progetto vista dal lato della formattazione.
+    .input(
+      'Probabilità di default a 12 mesi',
+      pd.value === null ? 'non determinabile' : formatPercent(pd.value, 2),
+    )
     .note(pd.explanation.notes.join(' '))
     .confidence(confidenza)
     .value({
@@ -1042,7 +1154,31 @@ export function probabilitaDefault(score: number): number {
  * rischio, non una misura. Eredita inoltre la confidenza dello score da cui nasce — una
  * PD calcolata su un punteggio provvisorio non può essere più affidabile di lui.
  */
-export function probabilitaDefaultSpiegata(score: number, confidenzaScore: Confidence): Explained<number> {
+export function probabilitaDefaultSpiegata(
+  score: number | null,
+  confidenzaScore: Confidence,
+): Explained<number | null> {
+  /*
+    Senza punteggio non c'è niente da interpolare.
+
+    La curva trasforma uno score in una percentuale: chiamarla su un punteggio che non
+    esiste produrrebbe una probabilità di insolvenza con due decimali ricavata da un numero
+    inventato — e la scheda la stamperebbe accanto al nome di un'impresa vera.
+  */
+  if (score === null) {
+    return explain('Probabilità di default a 12 mesi')
+      .formula('Interpolazione lineare dello score sulla curva di calibrazione score → PD')
+      .input('Score di credito', 'non determinabile')
+      .note(
+        'Il punteggio di credito non è determinabile su questi dati, quindi non lo è nemmeno ' +
+          'la probabilità di default: la curva trasforma uno score in una percentuale, e qui ' +
+          'non c’è uno score da trasformare.',
+      )
+      .reference('Metodologia AEGIS · docs/DOMINIO.md §4 — curva di calibrazione score → PD')
+      .confidence('bassa')
+      .value(null);
+  }
+
   const pd = probabilitaDefault(score);
   return explain('Probabilità di default a 12 mesi')
     .formula('Interpolazione lineare dello score sulla curva di calibrazione score → PD')

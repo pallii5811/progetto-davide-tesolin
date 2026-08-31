@@ -88,7 +88,16 @@ export interface VoceportafoglioAzienda {
   readonly partitaIva: string | null;
   readonly provincia: string | null;
   readonly atecoDescrizione: string | null;
-  readonly scoreCredito: number;
+  /**
+   * `null` quando il merito non è determinabile su quell'impresa.
+   *
+   * La colonna del database lo diceva già — `score_credito` è annullabile — ed era questo
+   * strato a schiacciare l'assenza su zero con un `?? 0`. In un portafoglio zero non è un
+   * buco: è il punteggio peggiore possibile, ordina l'impresa in cima alla lista dei
+   * rischi e trascina all'ingiù ogni media. La distinzione esisteva in fondo e si perdeva
+   * a un passo dallo schermo.
+   */
+  readonly scoreCredito: number | null;
   readonly classeCredito: string;
   readonly statoCatNat: string;
   readonly catNatConforme: boolean;

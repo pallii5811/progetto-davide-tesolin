@@ -77,7 +77,7 @@ export interface VoceEsportabile {
   readonly partitaIva: string | null;
   readonly provincia: string | null;
   readonly atecoDescrizione: string | null;
-  readonly scoreCredito: number;
+  readonly scoreCredito: number | null;
   readonly classeCredito: string;
   readonly statoCatNat: string;
   readonly catNatConforme: boolean;
@@ -143,7 +143,14 @@ const COLONNE: readonly {
     valore: (v) => importo(v.esposizioneNonAssicurataCentesimi),
   },
   { intestazione: 'Rischi critici', valore: (v) => String(v.rischiCritici) },
-  { intestazione: 'Score di credito', valore: (v) => String(v.scoreCredito) },
+  {
+    intestazione: 'Score di credito',
+    // Cella VUOTA, non «0» e non «null». Questo file si apre in un foglio di calcolo, dove
+    // una cella vuota resta fuori dalle medie e dagli ordinamenti mentre uno zero ci entra
+    // e li falsa. E `String(null)` scriverebbe la parola «null» accanto al nome di
+    // un'impresa vera, in un documento che l'intermediario gira al cliente.
+    valore: (v) => (v.scoreCredito === null ? '' : String(v.scoreCredito)),
+  },
   { intestazione: 'Classe', valore: (v) => v.classeCredito },
   { intestazione: 'Completezza intervista', valore: (v) => percentuale(v.completezza) },
   { intestazione: 'Analizzata il', valore: (v) => data(v.analizzataIl) },

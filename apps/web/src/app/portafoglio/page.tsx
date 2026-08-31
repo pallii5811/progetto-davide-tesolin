@@ -402,7 +402,12 @@ function esposizione(azienda: VocePortafoglio): string {
 function PunteggioCredito({ azienda }: { azienda: VocePortafoglio }) {
   return (
     <>
-      <span className="tabular font-semibold">{azienda.scoreCredito}</span>
+      {/*
+        Un `null` in JSX non stampa niente: la cella sarebbe rimasta VUOTA accanto alla
+        classe «ND», e una cella vuota in una tabella si legge come un guasto, non come
+        un'informazione. Il trattino dice che il posto c'è e il numero no.
+      */}
+      <span className="tabular font-semibold">{azienda.scoreCredito ?? '—'}</span>
       <span className="ml-1 text-xs text-testo-debole">{azienda.classeCredito}</span>
     </>
   );

@@ -25,7 +25,21 @@ export const QUOTA_FATTURATO = 0.1;
 export const MULTIPLO_EBITDA = 3;
 
 export interface CreditLimit {
-  readonly importo: Euro;
+  /**
+   * Il fido consigliato, oppure `null` quando non se ne può consigliare uno.
+   *
+   * `null` e non zero, per la ragione che vale già per i tre vincoli qui sotto e per una
+   * in più: **zero euro di fido è una raccomandazione**, e la più severa che questo
+   * prodotto sappia dare — «pagamento anticipato o garanzia reale». Rivolgerla a
+   * un'impresa di cui non si è potuto misurare il merito non è prudenza: è un giudizio
+   * negativo emesso senza istruttoria, e a subirlo è il cliente dell'intermediario.
+   *
+   * Vale `null` quando il punteggio di credito è `ND`: il fido si dimensiona sul merito, e
+   * senza merito non c'è dimensionamento. Resta invece zero — che è un giudizio fondato —
+   * quando il punteggio c'è ed è bassissimo per un fatto accertato, come una procedura
+   * concorsuale aperta.
+   */
+  readonly importo: Euro | null;
   /** Quale dei tre vincoli si è rivelato il più stringente. */
   readonly vincoloAttivo: 'patrimoniale' | 'dimensionale' | 'flusso' | 'nessuno';
   /**
@@ -39,7 +53,8 @@ export interface CreditLimit {
   readonly limitePatrimoniale: Euro | null;
   readonly limiteDimensionale: Euro | null;
   readonly limiteFlusso: Euro | null;
-  readonly fattoreScore: number;
+  /** Il moltiplicatore ricavato dal merito, `null` quando il merito non è determinabile. */
+  readonly fattoreScore: number | null;
 }
 
 /**
@@ -98,6 +113,33 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
     )
     .reference('Metodologia AEGIS · docs/DOMINIO.md §4');
 
+  /*
+    I tre vincoli si calcolano PRIMA di guardare il merito, perché non dipendono da lui.
+    Stavano più in basso, dopo le uscite anticipate, e quindi le uscite anticipate non
+    potevano mostrarli: un fido non determinabile usciva senza dire nemmeno quanto
+    l'impresa potrebbe sostenere, che è l'unica cosa che in quel caso si sa.
+  */
+  const limitePatrimoniale =
+    basi.patrimonioNettoTangibile === null
+      ? null
+      : Money.max(ZERO, Money.multiply(basi.patrimonioNettoTangibile, QUOTA_PATRIMONIO_NETTO));
+  const limiteDimensionale =
+    basi.ricavi === null ? null : Money.max(ZERO, Money.multiply(basi.ricavi, QUOTA_FATTURATO));
+  const limiteFlusso =
+    basi.ebitda === null ? null : Money.max(ZERO, Money.multiply(basi.ebitda, MULTIPLO_EBITDA));
+
+  /**
+   * Il fido AZZERATO: l'unico caso in cui zero è una misura e non un buco.
+   *
+   * Si usa per il fido non concedibile a fronte di un fatto accertato — procedura
+   * concorsuale aperta, impresa cessata. Lì «0 €» è la risposta giusta e la
+   * raccomandazione, «pagamento anticipato o garanzia reale», è quella che l'intermediario
+   * deve leggere.
+   *
+   * Non si usa per un fido che non si è potuto calcolare: quello esce `null`, ramo per
+   * ramo. I due casi si scrivevano uguali, e la differenza è tutta la differenza fra
+   * «questa impresa non merita credito» e «non lo sappiamo».
+   */
   const azzerato: CreditLimit = {
     importo: ZERO,
     vincoloAttivo: 'nessuno',
@@ -106,6 +148,42 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
     limiteFlusso: ZERO,
     fattoreScore: 0,
   };
+
+  /*
+    Senza merito non c'è dimensionamento.
+
+    Il fido è il minimo fra tre vincoli MOLTIPLICATO per un fattore che nasce dal
+    punteggio. Quando il punteggio è `ND` quel fattore non esiste, e le due uscite
+    sbagliate sono entrambe a portata di mano: moltiplicare per zero — cioè raccomandare
+    il pagamento anticipato a un'impresa mai valutata — oppure moltiplicare per uno, cioè
+    concedere il fido pieno. La prima danneggia il cliente dell'intermediario, la seconda
+    l'intermediario.
+
+    Nessuna delle due è una misura. L'unica risposta vera è che la domanda non ha risposta
+    su questi dati, e i tre vincoli restano visibili perché sono calcolati e utili: dicono
+    quanto l'impresa potrebbe sostenere, in attesa del merito che dirà quanto le si può
+    concedere.
+  */
+  if (score.value === null) {
+    return builder
+      .note(
+        'Fido non determinabile: il punteggio di credito non è calcolabile su questi dati, ' +
+          'e il fido si dimensiona sul merito.',
+      )
+      .note(
+        'Non è un giudizio negativo sull’impresa: è l’assenza di un giudizio. ' +
+          'Acquistare il profilo completo, oppure rilevare i dati economici in intervista.',
+      )
+      .confidence('bassa')
+      .value({
+        importo: null,
+        vincoloAttivo: 'nessuno',
+        limitePatrimoniale,
+        limiteDimensionale,
+        limiteFlusso,
+        fattoreScore: null,
+      });
+  }
 
   if (score.cap !== null && score.value <= 20) {
     return builder
@@ -116,6 +194,20 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
   }
 
   if (basi.patrimonioNettoTangibile === null && basi.ricavi === null) {
+    /*
+      LA STESSA CONTRADDIZIONE DELLO SCORE, un piano più in basso, e trovata sui dati veri.
+
+      Questo ramo scriveva «il fido non è quantificabile con metodo» e restituiva `azzerato`,
+      cioè **0 €**. Le parole dicevano che non si può calcolare, il numero diceva zero — e
+      zero, in questa scheda, è la raccomandazione più severa che il prodotto sappia dare.
+      Misurato su una risposta reale: un'impresa con punteggio 59 e classe C usciva con
+      «Fido commerciale consigliato: 0 €».
+
+      `azzerato` metteva a zero anche i tre vincoli, contraddicendo la correzione già fatta
+      sul percorso principale, dove un vincolo non calcolabile esce `null` proprio perché
+      «vale zero» e «non lo so» sono due frasi opposte sotto lo stesso numero. Resta l'unico
+      caso in cui zero è vero: il fido non concedibile per un fatto accertato, qui sopra.
+    */
     return builder
       .note('Nessun aggregato di bilancio disponibile: il fido non è quantificabile con metodo.')
       .note(
@@ -123,17 +215,15 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
           'contenuto e di rivalutarlo sull’esperienza di pagamento.',
       )
       .confidence('bassa')
-      .value(azzerato);
+      .value({
+        importo: null,
+        vincoloAttivo: 'nessuno',
+        limitePatrimoniale,
+        limiteDimensionale,
+        limiteFlusso,
+        fattoreScore: null,
+      });
   }
-
-  const limitePatrimoniale =
-    basi.patrimonioNettoTangibile === null
-      ? null
-      : Money.max(ZERO, Money.multiply(basi.patrimonioNettoTangibile, QUOTA_PATRIMONIO_NETTO));
-  const limiteDimensionale =
-    basi.ricavi === null ? null : Money.max(ZERO, Money.multiply(basi.ricavi, QUOTA_FATTURATO));
-  const limiteFlusso =
-    basi.ebitda === null ? null : Money.max(ZERO, Money.multiply(basi.ebitda, MULTIPLO_EBITDA));
 
   // Si prende il più stringente **fra quelli calcolabili**. Un vincolo non calcolabile
   // non è un vincolo soddisfatto: viene dichiarato mancante nelle note e la confidenza scende.

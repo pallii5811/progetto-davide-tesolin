@@ -222,12 +222,19 @@ function arricchimentiPer(
   return arricchimenti;
 }
 
-/** I sette numeri che l'intermediario legge per primi. */
+/**
+ * I sette numeri che l'intermediario legge per primi.
+ *
+ * Proprio perché sono i primi, sono quelli in cui un'assenza travestita da valore fa più
+ * danno: qui non c'è la spiegazione accanto, c'è la cifra e basta. `scoreCredito` e
+ * `fidoConsigliato` valgono `null` quando il modello non ha potuto misurarli, e la classe
+ * in quel caso è `ND`.
+ */
 export interface SintesiAnalisi {
   readonly denominazione: string;
-  readonly scoreCredito: number;
+  readonly scoreCredito: number | null;
   readonly classeCredito: string;
-  readonly fidoConsigliato: Euro;
+  readonly fidoConsigliato: Euro | null;
   readonly rischiIdentificati: number;
   readonly rischiDaTrasferire: number;
   readonly rischiCritici: number;

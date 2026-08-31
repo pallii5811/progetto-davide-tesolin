@@ -304,10 +304,21 @@ export interface AnalisiDto {
     }[];
   };
   sintesi: {
-    scoreCredito: number;
+    /*
+      `| null` INSERITO A MANO, e qui nessun compilatore controlla che sia vero.
+
+      Questi tipi descrivono ciò che arriva per HTTP: sono una promessa scritta due volte,
+      una nel presentatore e una qui, e niente lega le due copie. Quando il motore ha
+      smesso di inventare un punteggio per le imprese che non sa misurare, il compilatore
+      ha corretto da solo dieci punti del server e zero di questo file — perché di questo
+      file non sa niente.
+
+      Il valore è `null` quando la classe vale `ND`: le due cose viaggiano insieme.
+    */
+    scoreCredito: number | null;
     classeCredito: string;
-    probabilitaDefault: number;
-    fidoConsigliato: MoneyDto;
+    probabilitaDefault: number | null;
+    fidoConsigliato: MoneyDto | null;
     rischiIdentificati: number;
     rischiDaTrasferire: number;
     rischiCritici: number;
@@ -323,9 +334,10 @@ export interface AnalisiDto {
     azioniPrioritarie: string[];
   };
   credito: {
-    score: number;
+    /** `null` con classe `ND`: il modello non ha visto abbastanza per esprimersi. */
+    score: number | null;
     classe: string;
-    probabilitaDefault: number;
+    probabilitaDefault: number | null;
     limitazione: string | null;
     confidenza: string;
     spiegazione: ExplanationDto;
@@ -339,7 +351,8 @@ export interface AnalisiDto {
     }[];
     altman: { z: number; zona: string; spiegazione: ExplanationDto } | null;
     fido: {
-      importo: MoneyDto;
+      /** `null` quando il merito non è determinabile: zero euro sarebbe una raccomandazione. */
+      importo: MoneyDto | null;
       vincoloAttivo: string;
       /**
        * I tre vincoli, e `null` dove il servizio non ha potuto calcolarli.
@@ -1005,7 +1018,8 @@ export interface VocePortafoglio {
   partitaIva: string | null;
   provincia: string | null;
   atecoDescrizione: string | null;
-  scoreCredito: number;
+  /** `null` per le imprese il cui merito non è determinabile: in un elenco, zero ordina in cima. */
+  scoreCredito: number | null;
   classeCredito: string;
   statoCatNat: string;
   catNatConforme: boolean;

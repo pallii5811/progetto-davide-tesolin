@@ -1097,14 +1097,29 @@ function TabellaSintesi({ analisi }: { analisi: AnalisiDto }) {
   const verificaEventiNegativi = analisi.eventiNegativi !== null;
 
   const righe: [string, string][] = [
+    /*
+      IL DOCUMENTO CHE L'INTERMEDIARIO CONSEGNA AL CLIENTE, cioè il posto dove una cifra
+      inventata costa più che altrove: su una schermata la si può ancora contestare, qui è
+      carta con un'intestazione sopra.
+
+      La riga dello score nascondeva una trappola che le altre non avevano: sta dentro un
+      template literal, e un template literal accetta `null` senza che il compilatore fiati.
+      Avrebbe stampato «null/100 — classe ND» accanto al nome di un'azienda vera, e fra le
+      sei segnalazioni del typecheck questa non c'era.
+    */
     [
       'Score di credito',
-      `${analisi.sintesi.scoreCredito}/100 — classe ${analisi.sintesi.classeCredito}` +
-        (verificaEventiNegativi ? '' : ' — provvisorio'),
+      analisi.sintesi.scoreCredito === null
+        ? 'Non determinabile — dati insufficienti per esprimere un punteggio'
+        : `${analisi.sintesi.scoreCredito}/100 — classe ${analisi.sintesi.classeCredito}` +
+          (verificaEventiNegativi ? '' : ' — provvisorio'),
     ],
     [
       'Fido commerciale consigliato',
-      analisi.sintesi.fidoConsigliato.formattato + (verificaEventiNegativi ? '' : ' — provvisorio'),
+      analisi.sintesi.fidoConsigliato === null
+        ? 'Non determinabile senza il merito creditizio'
+        : analisi.sintesi.fidoConsigliato.formattato +
+          (verificaEventiNegativi ? '' : ' — provvisorio'),
     ],
     ['Patrimonio esposto', analisi.sintesi.patrimonioEsposto?.formattato ?? 'da rilevare'],
     [
