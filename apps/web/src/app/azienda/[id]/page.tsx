@@ -11,6 +11,10 @@ import {
 import { ImmaginiUbicazione } from './ImmaginiUbicazione';
 import { TitolareEffettivo } from './TitolareEffettivo';
 import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
+// Le scale della matrice di rischio, prese da dove sono definite invece che ricopiate:
+// due elenchi di parole tenuti a mano in due posti divergono, e quello sbagliato finisce
+// sempre sullo schermo del cliente.
+import { IMPACT_LABEL, LIKELIHOOD_LABEL, riskLevel } from '@aegis/core';
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
 import { RitornoAllElenco } from '../../prospect/UltimoElenco';
@@ -891,7 +895,12 @@ export default async function PaginaAzienda({
             </div>
           )}
 
-        <MatriceRischi rischi={analisi.rischi} />
+        {/* L'identificativo serve al collaudo per fotografare la sola matrice: una schermata
+            dell'intera pagina è alta diciottomila pixel, e lì dentro un difetto di una
+            tabella non lo vede nessuno. */}
+        <div id="matrice">
+          <MatriceRischi rischi={analisi.rischi} />
+        </div>
         <div className="mt-5 space-y-2">
           {analisi.rischi.map((rischio) => (
             <VoceRischio key={rischio.id} rischio={rischio} />
@@ -2076,16 +2085,20 @@ function MatriceRischi({ rischi }: { rischi: RischioDto[] }) {
     celle.set(chiave, [...(celle.get(chiave) ?? []), rischio]);
   }
 
-  const livelloDi = (punteggio: number): RischioDto['livelloResiduo'] =>
-    punteggio <= 4
-      ? 'basso'
-      : punteggio <= 8
-        ? 'moderato'
-        : punteggio <= 12
-          ? 'rilevante'
-          : punteggio <= 16
-            ? 'alto'
-            : 'critico';
+  /*
+    Le soglie stavano scritte qui, una seconda volta.
+
+    Erano una copia esatta di `riskLevel` in `assessment.ts` — quattro confronti identici —
+    e finché restano identiche non succede niente. Il giorno che una delle due si muove, il
+    COLORE della casella smette di corrispondere al LIVELLO stampato accanto al rischio, e
+    la contraddizione compare sulla stessa schermata: la casella rossa che contiene un
+    rischio dichiarato «rilevante». Nessun controllo la vedrebbe, perché entrambe le regole
+    sono corrette prese da sole.
+
+    Il livello si chiede a chi lo definisce. Vale per la casella vuota quanto per quella
+    piena: la griglia colora una POSIZIONE, non il suo contenuto.
+  */
+  const livelloDi = (punteggio: number): RischioDto['livelloResiduo'] => riskLevel(punteggio);
 
   const sfondi: Record<string, string> = {
     basso: 'bg-basso-fondo',
@@ -2095,41 +2108,151 @@ function MatriceRischi({ rischi }: { rischi: RischioDto[] }) {
     critico: 'bg-critico-fondo',
   };
 
-  return (
-    <Scheda>
-      <p className="mb-3 text-sm font-medium">Matrice del rischio residuo</p>
-      <div className="flex gap-2">
-        <div className="flex flex-col-reverse justify-between pb-6 text-xs text-testo-debole">
-          <span className="rotate-180 [writing-mode:vertical-rl]">Probabilità →</span>
-        </div>
+  /*
+    LE PAROLE DEGLI ASSI ESISTONO GIÀ, e la matrice non le diceva.
 
-        <div className="flex-1">
-          <div className="grid grid-cols-5 gap-1">
-            {[5, 4, 3, 2, 1].map((probabilita) =>
-              [1, 2, 3, 4, 5].map((impatto) => {
-                const contenuto = celle.get(`${probabilita}-${impatto}`) ?? [];
-                const livello = livelloDi(probabilita * impatto);
-                return (
-                  <div
-                    key={`${probabilita}-${impatto}`}
-                    className={`min-h-14 rounded border border-bordo p-1.5 ${sfondi[livello]}`}
-                    title={contenuto.map((r) => r.etichetta).join('\n')}
-                  >
-                    {contenuto.length > 0 && (
-                      <>
-                        <p className="tabular text-sm font-bold">{contenuto.length}</p>
-                        <p className="truncate text-[10px] leading-tight text-testo-tenue">
-                          {contenuto[0]?.etichetta}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                );
-              }),
-            )}
-          </div>
-          <p className="mt-1.5 text-center text-xs text-testo-debole">Impatto →</p>
-        </div>
+    Qui c'erano due frecce — «Probabilità →» e «Impatto →» — su una griglia cinque per
+    cinque senza un solo riferimento di scala. Chi guardava vedeva dei quadrati colorati e
+    non poteva dire in che punto della scala stesse un rischio, né spiegarlo a un cliente.
+
+    Eppure il motore le scale le dichiara da sempre, in `assessment.ts`: da «Rara» a «Quasi
+    certa», da «Trascurabile» a «Catastrofico». E ogni rischio arriva a questa pagina con
+    la propria etichetta già dentro il DTO, calcolata e serializzata. Erano informazioni
+    presenti, pagate e buttate via a un passo dallo schermo — la stessa cosa che faceva il
+    campo `base` delle garanzie.
+
+    La griglia diventa anche una TABELLA vera, con intestazioni di riga e di colonna. Una
+    matrice di rischio fatta di riquadri affiancati è, per chi la legge con una tecnologia
+    assistiva o la trova stampata in un fascicolo, una sequenza di numeri senza posizione.
+  */
+  const scalaProbabilita = [5, 4, 3, 2, 1] as const;
+  const scalaImpatto = [1, 2, 3, 4, 5] as const;
+
+  return (
+    // `min-w-0` non è ornamentale: una cella di griglia o di flex ha larghezza minima
+    // `auto`, cioè si allarga fino a contenere il figlio più largo. Senza, il contenitore
+    // che scorre qui sotto non trattiene niente — allarga la scheda, che allarga la
+    // pagina, e il telefono si ritrova 116px di documento fuori schermo.
+    <Scheda className="min-w-0">
+      <p className="text-sm font-medium">Matrice del rischio residuo</p>
+      <p className="mb-3 mt-1 text-xs leading-snug text-testo-debole">
+        Probabilità sulle righe, impatto sulle colonne. Ogni casella riporta quanti rischi vi
+        ricadono.
+      </p>
+
+      {/*
+        COSA MOSTRA UNA MATRICE SU UN TELEFONO.
+
+        Il primo tentativo imponeva una larghezza minima di 34rem e lasciava scorrere il
+        contenitore. Misurato a 390px: 116px di documento fuori schermo — a scorrere finiva
+        la pagina intera, non la tabella. Puntellarlo con `min-w-0` e `max-w-full` non ha
+        spostato un pixel: la prova ha ripetuto lo stesso numero, ed è stata la prova a dire
+        che la strada era sbagliata, non un ragionamento.
+
+        La risposta non era un puntello ma una scelta. Su schermo stretto la matrice serve a
+        far vedere DOVE si addensa il rischio, e i nomi stanno già nell'elenco qui sotto:
+        restano i conteggi e i numeri degli assi, che a sei colonne ci stanno. Le parole
+        delle scale e i nomi nelle caselle ricompaiono da tablet in su, dove c'è spazio per
+        leggerli senza spezzarli.
+      */}
+      <div className="w-full max-w-full overflow-x-auto">
+        <table className="w-full table-fixed border-separate border-spacing-1 text-left">
+          <caption className="sr-only">
+            Matrice del rischio residuo: probabilità sulle righe, impatto sulle colonne.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" className="w-14 pb-1 text-xs font-normal text-testo-debole sm:w-28">
+                <span className="sm:hidden">P ↓ / I →</span>
+                <span className="hidden sm:inline">Probabilità ↓ / Impatto →</span>
+              </th>
+              {scalaImpatto.map((impatto) => (
+                <th key={impatto} scope="col" className="pb-1 align-bottom">
+                  <span className="tabular block text-xs font-semibold">{impatto}</span>
+                  <span className="hidden text-[10px] font-normal leading-tight text-testo-debole sm:block">
+                    {IMPACT_LABEL[impatto]}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {scalaProbabilita.map((probabilita) => (
+              <tr key={probabilita}>
+                <th scope="row" className="pr-2 align-middle">
+                  <span className="tabular text-xs font-semibold">{probabilita}</span>{' '}
+                  <span className="hidden text-[10px] font-normal leading-tight text-testo-debole sm:inline">
+                    {LIKELIHOOD_LABEL[probabilita]}
+                  </span>
+                </th>
+                {scalaImpatto.map((impatto) => {
+                  const contenuto = celle.get(`${probabilita}-${impatto}`) ?? [];
+                  const livello = livelloDi(probabilita * impatto);
+                  return (
+                    <td
+                      key={impatto}
+                      // L'altezza fissa tiene la griglia una griglia. Senza, le righe che
+                      // non contengono nessun rischio collassano a strisce di venti pixel
+                      // fra righe alte cento, e la scala della probabilità — che è
+                      // regolare — appare deformata.
+                      className={`h-16 rounded border border-bordo p-1.5 align-top ${sfondi[livello]}`}
+                    >
+                      {contenuto.length === 0 ? (
+                        // Una casella vuota è un'informazione, non un buco: dice che in quel
+                        // punto della scala non ricade nessun rischio. Detto a parole perché
+                        // chi la tabella la sente invece di vederla trovava una cella muta.
+                        <span className="sr-only">Nessun rischio</span>
+                      ) : (
+                        <>
+                          <p className="tabular text-sm font-bold">{contenuto.length}</p>
+                          {/* `slice` invece di `contenuto[0]`: sotto questo tetto
+                              `noUncheckedIndexedAccess` è spento — al contrario che in
+                              `packages/core` — e l'indice di un array si presenta come
+                              sempre valorizzato anche quando l'array è vuoto. Scorrere una
+                              fetta non chiede di credere a quella promessa. */}
+                          {contenuto.slice(0, 1).map((r) => (
+                            <p
+                              key={r.id}
+                              className="hidden text-[10px] leading-tight text-testo-tenue sm:block"
+                            >
+                              {r.etichetta}
+                            </p>
+                          ))}
+                          {/*
+                            QUANTI, NON QUALI — e questa riga è già stata sbagliata due volte
+                            in direzioni opposte.
+
+                            Prima la casella mostrava un nome solo mentre il conto diceva
+                            «8»: gli altri sette vivevano nel `title`, che su un telefono non
+                            si apre e a una tecnologia assistiva non arriva. Poi li ho
+                            elencati tutti, e la fotografia della sezione ha mostrato il
+                            risultato: una casella alta centoquaranta pixel piena di testo
+                            minuscolo, in uno strumento la cui unica ragione d'essere è
+                            farsi leggere in un colpo d'occhio.
+
+                            I nomi non spariscono: l'elenco completo dei rischi sta subito
+                            sotto questa matrice, ordinato per gravità. Qui resta il numero,
+                            che è ciò che la posizione nella griglia serve a qualificare.
+
+                            `text-testo-tenue` e non `text-testo-debole`: il secondo, su
+                            questi fondi colorati e in tema scuro, non regge il contrasto
+                            WCAG AA — quattro violazioni misurate da axe, tutte su questa
+                            riga.
+                          */}
+                          {contenuto.length > 1 && (
+                            <p className="mt-0.5 hidden text-[10px] leading-tight text-testo-tenue sm:block">
+                              e altri {contenuto.length - 1}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Scheda>
   );

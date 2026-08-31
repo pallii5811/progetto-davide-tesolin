@@ -61,7 +61,7 @@ test.describe('@visuale schermate', () => {
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
     await page.waitForLoadState('networkidle');
 
-    for (const id of ['danno-massimo', 'ritenzione', 'somme', 'credito']) {
+    for (const id of ['matrice', 'danno-massimo', 'ritenzione', 'somme', 'credito']) {
       const sezione = page.locator(`#${id}`);
       if ((await sezione.count()) === 0) continue;
       await sezione.scrollIntoViewIfNeeded();
