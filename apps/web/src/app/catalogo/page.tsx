@@ -18,10 +18,7 @@ export default async function PaginaCatalogo() {
 
   if (rischi === null || coperture === null) {
     return (
-      <ServizioNonRaggiungibile
-        titolo="Cataloghi non disponibili"
-        cosa="i cataloghi di riferimento"
-      />
+      <ServizioNonRaggiungibile titolo="Cataloghi non disponibili" cosa="i cataloghi di riferimento" />
     );
   }
 

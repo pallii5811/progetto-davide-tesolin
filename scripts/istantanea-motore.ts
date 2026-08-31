@@ -234,11 +234,7 @@ function profiloDaRisposta(grezzo: unknown, file: string): CompanyProfile {
       esiste, ed è più forte di ricordarsi i quattro campi.
     */
     bilanciSintetici: mappaBilanciSintetici(grezzo).map((b) =>
-      sourced(
-        b,
-        { kind: 'provider', provider: 'openapi', service: 'IT-advanced' },
-        QUANDO,
-      ),
+      sourced(b, { kind: 'provider', provider: 'openapi', service: 'IT-advanced' }, QUANDO),
     ),
     eventiNegativi: null,
     unitaLocali: null,

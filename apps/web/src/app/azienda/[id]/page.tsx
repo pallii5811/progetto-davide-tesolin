@@ -2183,8 +2183,7 @@ function MatriceRischi({ rischi }: { rischi: RischioDto[] }) {
     <Scheda className="min-w-0">
       <p className="text-sm font-medium">Matrice del rischio residuo</p>
       <p className="mb-3 mt-1 text-xs leading-snug text-testo-debole">
-        Probabilità sulle righe, impatto sulle colonne. Ogni casella riporta quanti rischi vi
-        ricadono.
+        Probabilità sulle righe, impatto sulle colonne. Ogni casella riporta quanti rischi vi ricadono.
       </p>
 
       {/*

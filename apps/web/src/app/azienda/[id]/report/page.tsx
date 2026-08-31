@@ -1118,8 +1118,7 @@ function TabellaSintesi({ analisi }: { analisi: AnalisiDto }) {
       'Fido commerciale consigliato',
       analisi.sintesi.fidoConsigliato === null
         ? 'Non determinabile senza il merito creditizio'
-        : analisi.sintesi.fidoConsigliato.formattato +
-          (verificaEventiNegativi ? '' : ' — provvisorio'),
+        : analisi.sintesi.fidoConsigliato.formattato + (verificaEventiNegativi ? '' : ' — provvisorio'),
     ],
     ['Patrimonio esposto', analisi.sintesi.patrimonioEsposto?.formattato ?? 'da rilevare'],
     [

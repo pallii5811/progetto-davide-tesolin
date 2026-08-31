@@ -14,12 +14,7 @@
  * l'informazione, che e il modo piu economico di sembrare di aver corretto qualcosa.
  */
 
-import {
-  DEMO_AS_OF,
-  analyzeCompany,
-  demoCompanyProfile,
-  demoPolizze,
-} from '../packages/core/src/index.js';
+import { DEMO_AS_OF, analyzeCompany, demoCompanyProfile, demoPolizze } from '../packages/core/src/index.js';
 
 const scenari = [
   { nome: 'dimostrativa, con polizze', polizze: demoPolizze() },

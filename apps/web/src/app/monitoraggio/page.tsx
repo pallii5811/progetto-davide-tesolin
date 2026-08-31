@@ -34,9 +34,7 @@ export default async function PaginaMonitoraggio({
   const monitoraggio = await leggiMonitoraggio(mostraTutti).catch(() => null);
 
   if (monitoraggio === null) {
-    return (
-      <ServizioNonRaggiungibile titolo="Monitoraggio non disponibile" cosa="la coda degli eventi" />
-    );
+    return <ServizioNonRaggiungibile titolo="Monitoraggio non disponibile" cosa="la coda degli eventi" />;
   }
 
   const { eventi, daGestire } = monitoraggio;

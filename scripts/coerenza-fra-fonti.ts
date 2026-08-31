@@ -76,9 +76,7 @@ for (const file of readdirSync(SONDA).sort()) {
   process.stdout.write(`    fatturato                 ${eur(ultimo.fatturato)}\n`);
   process.stdout.write(`    patrimonio netto          ${eur(ultimo.patrimonioNetto)}\n`);
   process.stdout.write(`    totale attivo             ${eur(ultimo.totaleAttivo)}\n`);
-  process.stdout.write(
-    `    grado di capitalizzazione ${grado === null ? 'assente' : grado.toFixed(4)}\n`,
-  );
+  process.stdout.write(`    grado di capitalizzazione ${grado === null ? 'assente' : grado.toFixed(4)}\n`);
 
   const pn = ultimo.patrimonioNetto;
   const attivo = ultimo.totaleAttivo;

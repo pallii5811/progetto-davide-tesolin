@@ -759,8 +759,7 @@ function calcolaPriorita(
  * questo blocco sostituisce, commessa con più parole.
  */
 const DATO_MANCANTE: Readonly<Record<BasiDiCalcolo, string | null>> = {
-  'valore-ricostruzione':
-    'il costo di ricostruzione a nuovo dei fabbricati, non il valore contabile netto',
+  'valore-ricostruzione': 'il costo di ricostruzione a nuovo dei fabbricati, non il valore contabile netto',
   'valore-rimpiazzo': 'il valore di rimpiazzo a nuovo di macchinari e attrezzature',
   'valore-scorte': 'il valore delle scorte al picco stagionale',
   'margine-contribuzione': 'il margine di contribuzione e il periodo di indennizzo da garantire',

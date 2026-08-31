@@ -23,10 +23,7 @@ export default async function PaginaUtenti() {
 
   if (elenco === null) {
     return (
-      <ServizioNonRaggiungibile
-        titolo="Servizio non raggiungibile"
-        cosa="l’elenco dei collaboratori"
-      />
+      <ServizioNonRaggiungibile titolo="Servizio non raggiungibile" cosa="l’elenco dei collaboratori" />
     );
   }
 

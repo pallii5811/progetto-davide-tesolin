@@ -555,34 +555,36 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   */
   const pd = probabilitaDefaultSpiegata(finale, confidenza);
 
-  return builder
-    .note(
-      finale === null
-        ? `Punteggio non determinabile — ${CLASSE_LABEL[classe]}.`
-        : `Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`,
-    )
-    .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
-    .input('Data di valutazione', formatDate(asOf))
-    .input(
-      'Esercizio di riferimento',
-      bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno),
-    )
-    // `formatPercent` su un'assenza scriverebbe «0,00%», che è una PD bassissima: la
-    // regola 2d del progetto vista dal lato della formattazione.
-    .input(
-      'Probabilità di default a 12 mesi',
-      pd.value === null ? 'non determinabile' : formatPercent(pd.value, 2),
-    )
-    .note(pd.explanation.notes.join(' '))
-    .confidence(confidenza)
-    .value({
-      value: finale,
-      classe,
-      factors,
-      cap,
-      probabilitaDefault: pd.value,
-      probabilitaDefaultSpiegata: pd,
-    });
+  return (
+    builder
+      .note(
+        finale === null
+          ? `Punteggio non determinabile — ${CLASSE_LABEL[classe]}.`
+          : `Punteggio ${finale}/100 — ${CLASSE_LABEL[classe]} (classe ${classe}).`,
+      )
+      .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
+      .input('Data di valutazione', formatDate(asOf))
+      .input(
+        'Esercizio di riferimento',
+        bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno),
+      )
+      // `formatPercent` su un'assenza scriverebbe «0,00%», che è una PD bassissima: la
+      // regola 2d del progetto vista dal lato della formattazione.
+      .input(
+        'Probabilità di default a 12 mesi',
+        pd.value === null ? 'non determinabile' : formatPercent(pd.value, 2),
+      )
+      .note(pd.explanation.notes.join(' '))
+      .confidence(confidenza)
+      .value({
+        value: finale,
+        classe,
+        factors,
+        cap,
+        probabilitaDefault: pd.value,
+        probabilitaDefaultSpiegata: pd,
+      })
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

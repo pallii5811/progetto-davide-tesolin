@@ -254,8 +254,8 @@ export function ServizioNonRaggiungibile({ cosa, titolo }: { cosa: string; titol
   if (process.env.NODE_ENV === 'production') {
     return (
       <Avviso tono="critico" titolo={titolo}>
-        Non è stato possibile leggere {cosa}. I dati già acquisiti restano consultabili dal
-        portafoglio. Se la situazione persiste, segnalarlo all’assistenza.
+        Non è stato possibile leggere {cosa}. I dati già acquisiti restano consultabili dal portafoglio. Se
+        la situazione persiste, segnalarlo all’assistenza.
       </Avviso>
     );
   }
@@ -263,8 +263,8 @@ export function ServizioNonRaggiungibile({ cosa, titolo }: { cosa: string; titol
   return (
     <Avviso tono="critico" titolo={titolo}>
       Non è stato possibile leggere {cosa}. Avviare il servizio con{' '}
-      <code className="font-mono">npm run dev:api</code>, oppure indicare l’indirizzo corretto
-      nella variabile <code className="font-mono">AEGIS_API_URL</code>.
+      <code className="font-mono">npm run dev:api</code>, oppure indicare l’indirizzo corretto nella
+      variabile <code className="font-mono">AEGIS_API_URL</code>.
     </Avviso>
   );
 }
