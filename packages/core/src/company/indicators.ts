@@ -8,6 +8,7 @@
 import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import type { BilancioRiclassificato, BilancioSintetico } from './financials.js';
+import type { IndicatoriFornitore } from './indicatori-fornitore.js';
 
 export type IndicatorUnit = 'percentuale' | 'volte' | 'giorni';
 
@@ -339,4 +340,121 @@ export function formatIndicator(key: keyof FinancialIndicators, value: number | 
     case 'giorni':
       return `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 }).format(value)} gg`;
   }
+}
+
+/**
+ * Gli indici che il Registro Imprese ha già calcolato, letti nella forma canonica.
+ *
+ * PERCHÉ ESISTE. L'anagrafica estesa porta con sé una ventina di indici elaborati dal
+ * registro sul bilancio depositato: current ratio, acid test, PFN su EBITDA, copertura
+ * degli oneri, le quattro durate del circolante. Sono pagati e vengono mostrati a
+ * schermo. Il motore del credito non li ha mai visti: senza lo schema CEE dettagliato —
+ * che nessuno compra, perché il servizio dedicato costa cinque euro ed è dichiarato non
+ * verificato — quattro fattori su sette uscivano «non valutabile».
+ *
+ * Il risultato, misurato su un'impresa reale: liquidità, sostenibilità del debito e
+ * Altman dichiarati non calcolabili, e venti centimetri più su, nella stessa pagina,
+ * «PFN su EBITDA 9,53» e «EBITDA su interessi lordi 2,5». Il dato era a schermo e il
+ * motore diceva di non averlo.
+ *
+ * COSA NON SI MAPPA, E PERCHÉ. Un indice non è lo stesso indice perché ha lo stesso
+ * nome — è la regola 2m del progetto, e qui costava caro in due punti:
+ *
+ *  - `ros` del registro vale 4,32 % sull'impresa provata, mentre EBIT / ricavi con i
+ *    valori stampati accanto dà 4,73 %: il denominatore è il valore della produzione,
+ *    non i ricavi. Sono due indici diversi.
+ *  - `roi` è calcolato sul capitale investito netto: su un'impresa con la posizione
+ *    finanziaria più negativa del patrimonio esce −323 % accanto a un ROA di +44 %.
+ *  - `indiceIndebitamento` avrebbe due candidati — `leva` e `debtRatio` — che sul
+ *    campione valgono 7,31 e 5,99. Nessuna documentazione dice quale sia
+ *    debiti / patrimonio netto, e sceglierne uno a caso è indovinare.
+ *
+ * Quelli restano `null`: un buco dichiarato si vede, un indice sbagliato no.
+ *
+ * COSA SI MAPPA, E CON QUALE PROVA. Le durate del circolante non si assumono, si
+ * verificano: sull'impresa provata crediti 144 gg + scorte 264 gg − fornitori 94,48 gg
+ * fa 313,52, e il ciclo finanziario dichiarato dal registro è 313. L'identità chiude, e
+ * questo prova che i quattro campi hanno la definizione standard.
+ *
+ * Attenzione a `coperturaOneriFinanziari`, che è la trappola meglio nascosta: la formula
+ * della piattaforma è **EBIT** su oneri finanziari, e il registro espone entrambe le
+ * varianti — 2,5 con l'EBITDA e 1,36 con l'EBIT. Prendere quella che somiglia di più al
+ * nome avrebbe gonfiato il fattore dell'ottantaquattro per cento, in silenzio.
+ */
+export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialIndicators | null {
+  const red = fornitore.redditivita;
+  const sol = fornitore.solidita;
+  const ind = fornitore.indebitamento;
+  const lev = fornitore.leveFinanziarie;
+  const cop = fornitore.coperturaOneri;
+  const cic = fornitore.cicloFinanziario;
+
+  const indicatori: FinancialIndicators = {
+    // Redditività: solo il ROE, che è utile netto su patrimonio netto ovunque.
+    roe: red?.roe ?? null,
+    roi: null,
+    ros: null,
+    ebitdaMargin: null,
+    valoreAggiuntoSuRicavi: null,
+
+    // Liquidità: acid test è il nome alternativo del quick ratio, stessa formula.
+    currentRatio: sol?.currentRatio ?? null,
+    quickRatio: sol?.acidTest ?? null,
+
+    // Struttura: il grado di capitalizzazione è patrimonio netto su totale attivo, ed è
+    // lo stesso numero che il prodotto stampa altrove come «patrimonio su totale attivo».
+    indiceIndebitamento: null,
+    equityRatio: ind?.gradoDiCapitalizzazione ?? null,
+    coperturaImmobilizzazioni: null,
+
+    // Sostenibilità del debito: EBIT sugli interessi, non EBITDA.
+    pfnSuEbitda: lev?.pfnSuEbitda ?? null,
+    coperturaOneriFinanziari: cop?.ebitSuInteressiLordi ?? null,
+    incidenzaOneriFinanziari: null,
+
+    // Ciclo del circolante: le quattro durate, verificate dall'identità del ciclo.
+    dso: cic?.durataCreditiVersoClienti ?? null,
+    dpo: cic?.durataDebitiVersoFornitori ?? null,
+    dio: cic?.durataScorte ?? null,
+    cicloCircolante: cic?.durataCicloFinanziario ?? null,
+
+    crescitaRicavi: null,
+    crescitaEbitda: null,
+    ricaviPerDipendente: null,
+    costoMedioDipendente: null,
+  };
+
+  /*
+    Se non è arrivato nemmeno un indice, si restituisce `null` e non un oggetto di soli
+    buchi: un oggetto pieno di null farebbe credere ai fattori di avere una fonte, e
+    ciascuno di loro produrrebbe «non calcolabile» attribuendolo al registro invece che
+    all'assenza del registro. Sono due frasi diverse per chi legge.
+  */
+  return Object.values(indicatori).some((v) => v !== null) ? indicatori : null;
+}
+
+/**
+ * Due fonti di indici, unite campo per campo: la prima vince dove ha un valore.
+ *
+ * Non è una scelta fra le due, è un riempimento dei buchi. Gli aggregati sintetici e gli
+ * indici del registro sono complementari e non alternativi: dai primi si ricava il
+ * patrimonio su totale attivo, dai secondi il current ratio, e nessuna delle due fonti da
+ * sola porta entrambi.
+ *
+ * La precedenza va alla prima perché è quella che il prodotto ha CALCOLATO, e di cui
+ * quindi conosce la formula. Gli indici del registro arrivano già fatti: dove il prodotto
+ * sa produrre il numero da sé preferisce il proprio, perché è l'unico di cui può stampare
+ * il procedimento.
+ */
+export function unisciIndicatori(
+  primaria: FinancialIndicators | null,
+  secondaria: FinancialIndicators | null,
+): FinancialIndicators | null {
+  if (primaria === null) return secondaria;
+  if (secondaria === null) return primaria;
+
+  const chiavi = Object.keys(primaria) as (keyof FinancialIndicators)[];
+  const unito = {} as Record<keyof FinancialIndicators, number | null>;
+  for (const chiave of chiavi) unito[chiave] = primaria[chiave] ?? secondaria[chiave];
+  return unito;
 }

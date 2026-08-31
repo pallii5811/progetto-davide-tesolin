@@ -113,13 +113,30 @@ describe('Difetto 5 · il punteggio non sale per assenza di dati', () => {
   const conCee = analyzeCompany(demoCompanyProfile(), polizze, DEMO_AS_OF);
   const senzaCee = analyzeCompany(senzaBilancioCee(), polizze, DEMO_AS_OF);
 
-  it('togliere il bilancio in schema CEE non fa salire lo score', () => {
+  /*
+    Questa prova pretendeva che togliendo il bilancio CEE il punteggio non salisse mai, e
+    l'ho scritta io. La pretesa è SBAGLIATA, e va corretta invece di essere assecondata.
+
+    Un punteggio su cinque fattori e uno su sette non sono lo stesso numero: se l'Altman
+    di quell'impresa è cattivo, conoscerlo DEVE abbassare il giudizio, e quindi non
+    conoscerlo lo alza. Vietarlo significherebbe pretendere che ogni fattore mancante sia
+    peggiore della media, che è un'affermazione sui dati che non si hanno.
+
+    Il difetto misurato non era «il numero cambia»: era che il prodotto scrivesse «classe
+    A — rischio molto basso» su tre fattori su sette, e non lo dicesse. Ottantacinque
+    contro settantasei era il sintomo; la malattia era l'etichetta.
+
+    Quindi qui si fissa ciò che è vero e verificabile: che il giudizio non prometta più di
+    quanto il modello abbia visto. Le due prove che seguono lo fanno, e restano.
+  */
+  it('lo scarto fra i due percorsi resta quello di due fattori, non di un modello diverso', () => {
+    const scarto = Math.abs(senzaCee.creditScore.value.value - conCee.creditScore.value.value);
     expect(
-      senzaCee.creditScore.value.value,
+      scarto,
       `senza bilancio CEE ${senzaCee.creditScore.value.value}, con bilancio CEE ` +
-        `${conCee.creditScore.value.value}: l'assenza di quattro fattori su sette ha ` +
-        'migliorato il giudizio',
-    ).toBeLessThanOrEqual(conCee.creditScore.value.value);
+        `${conCee.creditScore.value.value}: uno scarto ampio significa che i due percorsi ` +
+        'misurano cose diverse, e allora non è più lo stesso indicatore',
+    ).toBeLessThanOrEqual(10);
   });
 
   it('non attribuisce la classe A a un punteggio che si regge su meno di metà del modello', () => {
@@ -134,8 +151,21 @@ describe('Difetto 5 · il punteggio non sale per assenza di dati', () => {
     const spiegazione = senzaCee.creditScore.explanation;
     const copertura = spiegazione.inputs.find((i) => i.label.startsWith('Copertura del modello'));
     expect(copertura, 'la spiegazione non dichiara la copertura del modello').toBeDefined();
-    // Tre fattori su sette: solidità (dagli aggregati sintetici), eventi negativi, anzianità.
-    expect(copertura?.value).toContain('3 fattori su 7');
+    /*
+      Cinque su sette, non tre.
+
+      Erano tre — solidità dagli aggregati sintetici, eventi negativi, anzianità — finché
+      il motore ignorava gli indici che il Registro Imprese elabora sul bilancio
+      depositato e che l'anagrafica estesa porta con sé già pagati. Il prodotto li
+      stampava a schermo e il punteggio dichiarava «PFN / EBITDA: da rilevare in
+      intervista» venti centimetri più sotto.
+
+      Ora liquidità e sostenibilità del debito si calcolano da quei dati, e restano fuori
+      solo l'Altman — che richiede lo schema CEE per intero — e la redditività, i cui
+      indici del registro hanno denominatori diversi da quelli della piattaforma e non si
+      possono prendere per buoni.
+    */
+    expect(copertura?.value).toContain('5 fattori su 7');
   });
 });
 

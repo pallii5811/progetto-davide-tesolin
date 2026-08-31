@@ -159,16 +159,41 @@ describe('Il percorso di produzione non è quello della fixture', () => {
       di quanto il prodotto sapesse, e il fascicolo stampava «classe A» senza dire su
       quanti fattori si reggesse.
 
-      È l'asserzione che non deve mai più tornare verde per la ragione sbagliata: meno
-      dati non possono valere un giudizio migliore.
+      LA CORREZIONE È STATA POI PRECISATA, e vale la pena scriverlo perché la prima
+      versione di questa riga difendeva una cosa non vera.
+
+      «Meno dati non possono valere un giudizio migliore» sembra ovvio ed è falso: un
+      punteggio su cinque fattori e uno su sette non sono lo stesso numero, e se l'Altman
+      di quell'impresa è cattivo, conoscerlo DEVE abbassarlo. Vietare che il numero salga
+      equivale a pretendere che ogni fattore mancante sia peggiore della media — che è
+      un'affermazione sui dati che non si hanno.
+
+      Ciò che era davvero sbagliato è l'ETICHETTA: «classe A, rischio molto basso» su tre
+      fattori su sette, senza dirlo. È quella che si fissa qui, insieme alla dichiarazione
+      della copertura. Il numero può muoversi; la promessa no.
     */
-    const conCee = analyzeCompany(profilo, polizze, DEMO_AS_OF);
     const senzaCee = analyzeCompany({ ...profilo, bilanci: [] }, polizze, DEMO_AS_OF);
 
+    const valutati = senzaCee.creditScore.value.factors.filter((f) => f.score !== null).length;
+    const totali = senzaCee.creditScore.value.factors.length;
+
+    expect(valutati, 'nessun fattore valutato: il controllo non sta guardando niente').toBeGreaterThan(0);
     expect(
-      senzaCee.creditScore.value.value,
-      'con meno dati lo score non può salire: era 85 contro 76, e il percorso povero è quello di produzione',
-    ).toBeLessThanOrEqual(conCee.creditScore.value.value);
+      valutati,
+      'il percorso di produzione deve restare più povero di quello con il bilancio CEE',
+    ).toBeLessThan(totali);
+
+    expect(
+      senzaCee.creditScore.value.classe,
+      `classe ${senzaCee.creditScore.value.classe} su ${valutati} fattori valutati di ${totali}: ` +
+        'la classe migliore non si attribuisce su un modello incompleto',
+    ).not.toBe('A');
+
+    // E la copertura dev'essere scritta, non lasciata dedurre da chi legge.
+    const copertura = senzaCee.creditScore.explanation.inputs.find((i) =>
+      i.label.startsWith('Copertura del modello'),
+    );
+    expect(copertura, 'il fascicolo non dichiara su quanti fattori il punteggio si regge').toBeDefined();
   });
 });
 

@@ -21,7 +21,12 @@ import {
 } from '../company/profile.js';
 import { reclassify } from '../company/financials.js';
 import type { BilancioRiclassificato, ReclassifyOptions } from '../company/financials.js';
-import { computeIndicators, indicatorsFromSintetico } from '../company/indicators.js';
+import {
+  computeIndicators,
+  indicatoriDaArchivio,
+  indicatorsFromSintetico,
+  unisciIndicatori,
+} from '../company/indicators.js';
 import type { FinancialIndicators } from '../company/indicators.js';
 import { deriveFacts } from '../company/facts.js';
 import type { CompanyFacts } from '../company/facts.js';
@@ -264,12 +269,39 @@ export function analyzeCompany(
   const sinteticoCorrente = ultimoBilancioSintetico(profile)?.value ?? null;
   const sinteticoPrecedente = penultimoBilancioSintetico(profile)?.value ?? null;
 
+  /*
+    Tre fonti per gli indici, in ordine dichiarato — e la terza mancava.
+
+    Lo schema CEE dettagliato vince dove c'è: è il bilancio per intero, e da lì si ricava
+    tutto. Non c'è quasi mai, perché il servizio che lo porta costa cinque euro ed è
+    dichiarato non verificato.
+
+    Restavano gli aggregati sintetici, da cui si ricavano quattro grandezze: fatturato,
+    patrimonio netto, totale attivo, costo del personale. Bastano alla solidità e poco
+    altro: liquidità, sostenibilità del debito e ciclo del circolante restavano fuori, e
+    il motore le dichiarava «non calcolabili».
+
+    Ma la stessa anagrafica estesa porta con sé gli indici che il Registro Imprese ha già
+    elaborato sul bilancio depositato — current ratio, acid test, PFN su EBITDA, copertura
+    degli oneri, le quattro durate — e il prodotto li mostrava a schermo senza mai darli al
+    motore. Su un'impresa reale il punteggio dichiarava «PFN / EBITDA: da rilevare in
+    intervista» mentre venti centimetri più su stampava «PFN su EBITDA 9,53».
+
+    Si riempiono i buchi, non si sovrascrive: il sintetico ha la precedenza dove ha un
+    valore, l'archivio entra solo dove il sintetico tace. Le due fonti sono complementari,
+    non alternative — il sintetico sa il patrimonio su attivo, l'archivio sa il current
+    ratio — e nessuna delle due inventa ciò che non ha.
+  */
+  const daArchivio = indicatoriDaArchivio(profile.indicatoriFornitore);
   const indicatori =
     bilancio !== null
       ? computeIndicators(bilancio, bilancioPrecedente ?? undefined)
-      : sinteticoCorrente !== null
-        ? indicatorsFromSintetico(sinteticoCorrente, sinteticoPrecedente ?? undefined)
-        : null;
+      : unisciIndicatori(
+          sinteticoCorrente === null
+            ? null
+            : indicatorsFromSintetico(sinteticoCorrente, sinteticoPrecedente ?? undefined),
+          daArchivio,
+        );
 
   const facts = deriveFacts(profile, bilancio, asOf);
   const dimensione = classifySize({
