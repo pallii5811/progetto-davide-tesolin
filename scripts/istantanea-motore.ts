@@ -37,8 +37,20 @@
 
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEMO_AS_OF, analyzeCompany, demoCompanyProfile, demoPolizze } from '@aegis/core';
+import {
+  DATI_DICHIARATI_VUOTI,
+  DEMO_AS_OF,
+  analyzeCompany,
+  demoCompanyProfile,
+  demoPolizze,
+  sourced,
+} from '@aegis/core';
 import type { CompanyProfile } from '@aegis/core';
+import { mappaAnagrafica, mappaAssetti, mappaBilanciSintetici } from '@aegis/providers';
+// Percorso diretto: `indicatori.js` non è fra i moduli riesportati dall'indice del
+// pacchetto, pur essendo usato dal provider. Non si allarga la superficie pubblica di una
+// libreria per comodità di uno script di diagnosi.
+import { mappaIndicatoriFornitore } from '../packages/providers/src/openapi/indicatori.js';
 
 /**
  * L'istantanea gira sul COMPILATO, e il compilato può essere vecchio.
@@ -153,17 +165,87 @@ function scenariReali(): { nome: string; profilo: CompanyProfile | null }[] {
       const contenuto: unknown = JSON.parse(readFileSync(join(cartella, file), 'utf8'));
       const dati = (contenuto as { data?: unknown }).data;
       if (dati === undefined) continue;
-      // Le risposte registrate hanno forme diverse fra loro; qui interessa solo poterle
-      // dare in pasto al motore. Quelle che non si lasciano mappare si saltano dichiarando.
       const primo: unknown = Array.isArray(dati) ? dati[0] : dati;
       if (primo === null || typeof primo !== 'object') continue;
-      fuori.push({ nome: file, profilo: primo as unknown as CompanyProfile });
+      fuori.push({ nome: file, profilo: profiloDaRisposta(primo, file) });
     } catch {
       // Un file illeggibile non ferma l'istantanea: viene dichiarato nel riepilogo.
       fuori.push({ nome: file + ' ‹illeggibile›', profilo: null });
     }
   }
   return fuori;
+}
+
+/**
+ * Da risposta grezza a profilo di dominio, con i mappatori veri.
+ *
+ * QUI C'ERA UN CAST, e costava otto scenari su dieci. La riga diceva
+ * `primo as unknown as CompanyProfile`: prendeva il JSON del fornitore e lo dichiarava un
+ * profilo. TypeScript non può contraddire un doppio cast, quindi il typecheck restava
+ * verde; il motore invece andava a cercare `anagrafica.value.formaGiuridica` su un oggetto
+ * che ha `legalForm`, e sollevava un'eccezione. Tutte e otto le imprese reali finivano nel
+ * ramo «eccezione» dell'istantanea.
+ *
+ * L'effetto pratico è che il rilevatore di regressioni si reggeva su DUE scenari, entrambi
+ * dimostrativi, mentre il riepilogo annunciava «10 scenari (2 dimostrativi + 8 reali)». Un
+ * numero vero accanto a una copertura che non c'era.
+ *
+ * Ora il profilo si compone con gli stessi mappatori che usa `fetchProfile`. Due limiti
+ * dichiarati, perché un limite taciuto vale come un difetto:
+ *
+ *   1. È una RICOSTRUZIONE del livello `esteso`, non la chiamata di produzione: niente
+ *      bilanci in schema CEE, niente eventi negativi, niente unità locali — esattamente
+ *      come quando quei servizi non sono stati comprati.
+ *   2. Se un domani `fetchProfile` cambia il modo di comporre il profilo, questa funzione
+ *      non se ne accorge. Resta comunque il motore esercitato su dati veri, che è ciò per
+ *      cui l'istantanea esiste.
+ */
+function profiloDaRisposta(grezzo: unknown, file: string): CompanyProfile {
+  // `mappaAnagrafica` non restituisce mai `null`: su una risposta che non riconosce
+  // compila i campi che trova e lascia assenti gli altri. La guardia che stava qui non
+  // poteva scattare, e una guardia che non può scattare è una riga che rassicura.
+  const anagrafica = mappaAnagrafica(grezzo, 'IT-advanced', QUANDO);
+
+  const campo = (nome: string): string | null => {
+    const valore = (grezzo as Record<string, unknown>)[nome];
+    // Identificatori: restano STRINGHE. `Number('01528120981')` aggancia un'altra impresa,
+    // ed è la regola 2b del progetto — quella che costa di più a violare.
+    return typeof valore === 'string' && valore.trim() !== '' ? valore.trim() : null;
+  };
+
+  return {
+    identity: {
+      partitaIva: campo('vatCode') ?? campo('partitaIva'),
+      codiceFiscale: campo('taxCode') ?? campo('codiceFiscale') ?? campo('fiscalCode'),
+      denominazione: campo('companyName') ?? campo('denominazione') ?? file,
+    },
+    anagrafica,
+    assetti: mappaAssetti(grezzo, 'IT-advanced', QUANDO),
+    bilanci: [],
+    /*
+      `sourced()` e non un oggetto scritto a mano.
+
+      Il primo tentativo componeva `{ value, source }` e basta. Mancavano `observedAt` e
+      `confidence`, e il motore moriva con «Cannot read properties of undefined (reading
+      'getTime')» sui due scenari IT-advanced — cioè proprio quelli che portano i bilanci,
+      gli unici per cui valeva la pena aggiungerli.
+
+      Il costruttore del dominio non permette di dimenticarsene: è la ragione per cui
+      esiste, ed è più forte di ricordarsi i quattro campi.
+    */
+    bilanciSintetici: mappaBilanciSintetici(grezzo).map((b) =>
+      sourced(
+        b,
+        { kind: 'provider', provider: 'openapi', service: 'IT-advanced' },
+        QUANDO,
+      ),
+    ),
+    eventiNegativi: null,
+    unitaLocali: null,
+    gruppo: null,
+    indicatoriFornitore: mappaIndicatoriFornitore(grezzo),
+    datiDichiarati: DATI_DICHIARATI_VUOTI,
+  };
 }
 
 function analizzaOTrattieni(profilo: CompanyProfile): unknown {
