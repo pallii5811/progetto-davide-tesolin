@@ -55,7 +55,9 @@ export function ImmaginiUbicazione({
     */
     if (file.size > LIMITE_BYTE) {
       setErrore(
-        `L'immagine pesa ${(file.size / (1024 * 1024)).toFixed(1)} MB: il massimo è ${LIMITE_BYTE / (1024 * 1024)} MB.`,
+        // `toFixed` scriverebbe «1.5 MB» in un messaggio che il resto della pagina
+        // circonda di virgole: è la stessa classe di difetto di «PD 12 mesi 3.00%».
+        `L'immagine pesa ${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(file.size / (1024 * 1024))} MB: il massimo è ${LIMITE_BYTE / (1024 * 1024)} MB.`,
       );
       return;
     }

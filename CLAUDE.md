@@ -345,21 +345,36 @@ Due cose lo rendono credibile, e sono più importanti dei controlli:
 
 E un rilievo falso costa più di uno mancato: insegna a ignorare l'elenco.
 
+**Il DTO non è tutto ciò che il lettore vede.** Il report per il cliente ha prosa scritta
+nei componenti — «Restano da acquisire: …», le note di metodo, le avvertenze — che non
+passa dal presentatore, e per un giorno intero è rimasta l'unica superficie non misurata:
+quella con il lettore più esigente. `collaudo/testo-schermo.spec.ts` apre le cinque pagine
+che un lettore vede davvero, spalanca i blocchi ripiegabili e passa ogni riga resa agli
+**stessi** rilevatori dell'auditor, importati da `scripts/lib/rilevatori-testo.ts` e non
+copiati.
+
+> Il primo giorno ha trovato tre difetti che l'auditor del DTO non poteva vedere, tutti in
+> righe scritte a mano nel TSX: «PD 12 mesi **3.00**%», «Altman Z'' **2.09**» nella testata,
+> «e altri **1**» nella matrice. E un falso positivo utile: il codice ATECO in testata sta
+> senza la parola ATECO nella riga, e il rilevatore lo prendeva per un decimale. Ora lo
+> riconosce dalla forma — coppie di cifre seguite da una descrizione con la maiuscola.
+
 ---
 
 ## Comandi
 
 ```bash
 npm run verifica          # build + typecheck:web + lint + test
-npm run collaudo          # 108 prove su browser reale
+npm run collaudo          # 113 prove su browser reale, 5 delle quali leggono ogni riga resa
 npm run collaudo:schermate
 npx tsx scripts/istantanea-motore.ts prima.json    # e poi confronta-istantanee.ts
 npx tsx scripts/indicatori-mai-mostrati.ts         # dati comprati e non resi
 npx tsx scripts/quanto-del-comprato-si-vede.ts     # copertura dei campi del fornitore
 
 # PRIMA DI CONSEGNARE — ogni parola che la scheda stampa, controllata a macchina.
-npm run build && npx tsx scripts/audit-testo-schermo.ts
-npx tsx scripts/audit-testo-schermo.ts --da-database <piva>   # sul server, sulla scheda vera
+npm run build && npx tsx scripts/audit-testo-schermo.ts          # il DTO, sei controlli
+npx tsx scripts/audit-testo-schermo.ts --da-database <piva>       # sul server, sulla scheda vera
+npx playwright test --project=scrivania collaudo/testo-schermo.spec.ts   # il testo RESO, cinque pagine
 npx tsx scripts/quali-affermano-sullignoto.ts      # regole che parlano di ciò che non sanno
 ```
 

@@ -51,6 +51,7 @@ import { presentAnalysis } from '../apps/api/src/presenter.js';
 import { OpenApiProvider } from '../packages/providers/src/openapi/provider.js';
 import { OPENAPI_DEFAULT_CONFIG } from '../packages/providers/src/openapi/config.js';
 import type { Cache, CacheEntry } from '../packages/providers/src/http.js';
+import { accordiSbagliati, affermazioniRipetute, decimaliInglesi, parole } from './lib/rilevatori-testo.js';
 
 const DA_DATABASE = process.argv.includes('--da-database');
 /** Stampa la frase per intero invece del suo inizio: serve a decidere se il rilievo è vero. */
@@ -139,127 +140,19 @@ const CHIAVI_TECNICHE =
   /\.(id|ruleId|chiave|categoria|livello|livelloInerente|livelloResiduo|trattamento|forma|stato|urgenza|titolare|classe|confidenza|confidence|tono|piano\.urgenza|coperture\[\d+\]|codice|ateco|atecoSecondari\[\d+\]|partitaIva|codiceFiscale|versione\w*)$/;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1 · Separatore decimale inglese
+// 1 · 2 · 3 — i rilevatori di testo puro vivono in lib/rilevatori-testo.ts
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Un numero decimale scritto col punto, in un documento italiano.
- *
- * La difficoltà non è trovarlo, è non prendere per errore ciò che il punto ce l'ha per
- * ragioni sue. In italiano il punto separa le **migliaia** — `11.500.000` — e i gruppi
- * dopo il primo hanno sempre esattamente tre cifre. Un decimale inglese no: `0.30`, `2.60`,
- * `39.93`. La distinzione è meccanica e non richiede di indovinare.
- *
- * Restano fuori i codici che il punto lo usano come struttura — ATECO `25.72`, NACE, le
- * norme — riconosciuti dal contesto della frase.
- */
-const CONTESTI_CON_PUNTO = /ATECO|NACE|SIC|D\.Lgs|D\.P\.R|art\.|artt\.|c\.c\.|CCII|ISO|http|@|v\d/;
-
-function decimaliInglesi(testo: string): string[] {
-  if (CONTESTI_CON_PUNTO.test(testo)) return [];
-  const trovati: string[] = [];
-  for (const m of testo.matchAll(/\d+(?:\.\d+)+/g)) {
-    const gruppi = m[0].split('.');
-    const migliaiaItaliane = gruppi.slice(1).every((g) => g.length === 3);
-    if (!migliaiaItaliane) trovati.push(m[0]);
-  }
-  return trovati;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 2 · Accordo con il numero uno
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * «Sulle restanti 1 il contesto non è stato osservato.»
- *
- * Esce ogni volta che le ubicazioni sono due e una sola è stata guardata — cioè quasi
- * sempre, non in un caso limite. Il difetto nasce sempre allo stesso modo: un conteggio
- * interpolato dentro una frase scritta al plurale.
- *
- * Il vocabolario è quello dei nomi che questo prodotto conta davvero. Non si generalizza a
- * «ogni parola che finisce in -i»: prenderebbe «1 gennaio» e cento altre cose giuste.
- */
-const NOMI_CONTATI =
-  'ubicazioni|imprese|aziende|anni|esercizi|giorni|veicoli|soci|amministratori|bilanci|rischi|coperture|polizze|sedi|comuni|complessi|province|dipendenti|addetti|fabbricati|immobili|certificazioni|cariche|segnalazioni|fattori|indici|voci|schede|righe|campi';
+/*
+  Erano qui dentro. Sono usciti perché il report per il cliente ha prosa scritta nei
+  componenti, che non passa dal DTO e che nessun rilevatore aveva mai letto: il collaudo
+  su browser (`collaudo/testo-schermo.spec.ts`) ora importa le stesse funzioni e le applica
+  al testo reso. Una copia in due posti sarebbe divergente entro un mese.
+*/
 
 /** L'inizio della frase, o la frase intera con `--intero`: serve a giudicare il rilievo. */
 function estratto(testo: string): string {
   return INTERO ? testo : testo.slice(0, 110);
-}
-
-function accordiSbagliati(testo: string): string[] {
-  const trovati: string[] = [];
-  for (const m of testo.matchAll(new RegExp(`\\b1\\s+(${NOMI_CONTATI})\\b`, 'gi'))) {
-    trovati.push(m[0]);
-  }
-  // La forma opposta: l'aggettivo plurale prima del numero.
-  for (const m of testo.matchAll(/\b(restanti|rimanenti|altre|altri)\s+1\b/gi)) trovati.push(m[0]);
-  return trovati;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 3 · Affermazioni ripetute
-// ─────────────────────────────────────────────────────────────────────────────
-
-/*
-  Lo stesso riconoscitore della prova unitaria sulle motivazioni, portato qui sull'intera
-  scheda: parole di contenuto troncate alla radice, sequenze di tre. Là guardava una
-  copertura per volta; qui guarda ogni testo lungo che la pagina stampa, perché la
-  ripetizione più fastidiosa è quella fra due sezioni diverse.
-*/
-const PAROLE_DI_SERVIZIO = new Set(
-  (
-    'il lo la i gli le un uno una l di a ad da in con su per tra fra del dello della dei degli delle ' +
-    'dell al allo alla ai agli alle all dal dallo dalla dai dagli dalle dall nel nello nella nei negli ' +
-    'nelle nell sul sullo sulla sui sugli sulle sull e o ed od ma che chi cui non ne si se come anche ' +
-    'è sono ha hanno essere stato stata resta restano più meno quando dove ciò questo questa quello ' +
-    'quella entrambi casi caso sua suo sue suoi loro ogni tutti tutte solo soltanto stessa stesso'
-  ).split(' '),
-);
-
-function parole(testo: string): string[] {
-  return testo
-    .toLowerCase()
-    .replace(/[’']/g, ' ')
-    .replace(/[^a-zàèéìòù0-9]+/g, ' ')
-    .split(' ')
-    .filter((p) => p.length > 1 && !PAROLE_DI_SERVIZIO.has(p))
-    .map((p) => p.slice(0, 6));
-}
-
-/**
- * Toglie l'enumerazione finale dei rischi serviti, che è una lista di NOMI.
- *
- * La motivazione di adeguatezza chiude elencando i rischi che quella copertura serve, con
- * il loro livello. Su una copertura cyber quell'elenco contiene «violazione di dati
- * personali» — che è anche il soggetto della frase iniziale, perché è di quello che la
- * copertura parla.
- *
- * Il rilevatore lo segnalava come ripetizione, ed è un falso positivo: la prima è
- * un'affermazione, la seconda è il nome di un rischio dentro una lista, e porta con sé un
- * dato nuovo — il livello residuo. Cercare affermazioni ripetute dentro un elenco di nomi
- * è cercare la cosa sbagliata nel posto sbagliato.
- *
- * Le tre segnalazioni che restavano dopo la correzione delle ripetizioni vere erano tutte
- * di questa forma. Ma la parte in prosa continua a essere guardata: si toglie l'elenco, non
- * la frase.
- */
-function senzaElencoDeiRischi(testo: string): string {
-  const inizio = testo.indexOf('L’analisi ha rilevato i seguenti rischi residui');
-  const inizioApostrofoDritto = testo.indexOf("L'analisi ha rilevato i seguenti rischi residui");
-  const taglio = inizio >= 0 ? inizio : inizioApostrofoDritto;
-  return taglio >= 0 ? testo.slice(0, taglio) : testo;
-}
-
-function affermazioniRipetute(testo: string): string[] {
-  const p = parole(senzaElencoDeiRischi(testo));
-  const viste = new Map<string, number>();
-  for (let i = 0; i + 2 < p.length; i += 1) {
-    const tris = `${p[i]} ${p[i + 1]} ${p[i + 2]}`;
-    viste.set(tris, (viste.get(tris) ?? 0) + 1);
-  }
-  return [...viste.entries()].filter(([, n]) => n > 1).map(([tris]) => tris);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -717,6 +610,29 @@ function autoprovaRilevatori(): void {
   deve(
     decimaliInglesi('Patrimonio esposto 11.500.000 €').length === 0,
     'le migliaia italiane «11.500.000» vengono scambiate per un decimale inglese',
+  );
+  /*
+    I codici ATECO senza la parola ATECO nella riga: la testata della scheda li stampa
+    così, e il collaudo su browser li segnalava come decimali. La forma li distingue — a
+    coppie di cifre, seguiti da una descrizione con la maiuscola o da niente — e i tre casi
+    veri trovati nello stesso giro devono continuare a essere visti.
+  */
+  deve(
+    decimaliInglesi('52.10.10 Magazzini di custodia e deposito · Media impresa').length === 0,
+    'il codice ATECO «52.10.10» viene scambiato per un decimale inglese',
+  );
+  deve(decimaliInglesi('28.99.99').length === 0, 'il codice ATECO «28.99.99» da solo viene segnalato');
+  deve(
+    decimaliInglesi('Classe C · PD 12 mesi 3.00%').includes('3.00'),
+    'il decimale inglese «3.00%» non viene più visto',
+  );
+  deve(
+    decimaliInglesi("Score 59/100 · classe C · Altman Z'' 2.09 (incertezza)").includes('2.09'),
+    'il decimale inglese «2.09» non viene più visto',
+  );
+  deve(
+    decimaliInglesi('Durata debiti verso fornitori 94.48 gg').includes('94.48'),
+    'un decimale a due cifre seguito da una minuscola viene preso per un codice ATECO',
   );
 
   // 2 · accordo con il numero uno

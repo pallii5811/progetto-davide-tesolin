@@ -228,7 +228,7 @@ export default async function PaginaAzienda({
                   `Classe ${sintesi.classeCredito} · PD 12 mesi ${
                     sintesi.probabilitaDefault === null
                       ? 'non determinabile'
-                      : `${(sintesi.probabilitaDefault * 100).toFixed(2)}%`
+                      : `${numeroIt(sintesi.probabilitaDefault * 100, 2)}%`
                   }`
           }
           tono={
@@ -595,7 +595,7 @@ export default async function PaginaAzienda({
                     <span className="tabular shrink-0 text-sm font-medium">
                       {socio.quotaPercentuale === null
                         ? 'quota non indicata'
-                        : `${socio.quotaPercentuale.toFixed(socio.quotaPercentuale % 1 === 0 ? 0 : 2)}%`}
+                        : `${numeroIt(socio.quotaPercentuale, socio.quotaPercentuale % 1 === 0 ? 0 : 2)}%`}
                     </span>
                   </li>
                 ))}
@@ -1200,7 +1200,7 @@ export default async function PaginaAzienda({
             : `Score ${analisi.credito.score}/100 · classe ${analisi.credito.classe}${
                 analisi.credito.altman === null
                   ? ''
-                  : ` · Altman Z'' ${analisi.credito.altman.z.toFixed(2)} (${analisi.credito.altman.zona})`
+                  : ` · Altman Z'' ${numeroIt(analisi.credito.altman.z, 2)} (${analisi.credito.altman.zona})`
               }`
         }
       >
@@ -2378,7 +2378,11 @@ function MatriceRischi({ rischi }: { rischi: RischioDto[] }) {
                           */}
                           {contenuto.length > 1 && (
                             <p className="mt-0.5 hidden text-[10px] leading-tight text-testo-tenue sm:block">
-                              e altri {contenuto.length - 1}
+                              {/* «e altri 1» è il conteggio interpolato nel plurale: lo stesso
+                                  difetto di «Sulle restanti 1», trovato dal collaudo su browser. */}
+                              {contenuto.length - 1 === 1
+                                ? 'e un altro'
+                                : `e altri ${contenuto.length - 1}`}
                             </p>
                           )}
                         </>
@@ -2415,6 +2419,21 @@ function umanizza(chiave: string): string {
 
 function formatDelta(valore: number): string {
   return valore > 0 ? `+${valore}` : valore < 0 ? String(valore) : '±0';
+}
+
+/**
+ * Un numero scritto come lo scrive il resto della pagina: con la virgola.
+ *
+ * `toFixed` scrive il punto decimale inglese, e lo faceva in tre righe di questa pagina
+ * che nessuno strumento aveva letto perché non passano dal DTO: «PD 12 mesi 3.00%»,
+ * «Altman Z'' 2.09», la quota del socio quando non è intera. Le ha trovate il collaudo su
+ * browser, il primo giorno che ha letto il testo reso — a fianco di «1,37» e «13,7 %».
+ */
+function numeroIt(valore: number, decimali: number): string {
+  return new Intl.NumberFormat('it-IT', {
+    minimumFractionDigits: decimali,
+    maximumFractionDigits: decimali,
+  }).format(valore);
 }
 
 /**

@@ -493,6 +493,39 @@ Per il ciclo di vita delle sessioni contro un servizio già in esecuzione:
 npm run verifica:sessione -- admin@aegis.local <password>
 ```
 
+### Prima di consegnare: la scheda si misura, non si legge
+
+I cancelli sopra dicono che il software funziona. Non dicono che ciò che stampa sia
+giusto: una frase al presente indicativo su un fatto mai verificato, un decimale col punto
+inglese, un dato comprato e chiesto di nuovo all'impresa passano da `npm run verifica` e
+dal collaudo senza fermarsi. Per un giorno intero sono stati trovati **leggendo** la
+scheda, uno alla volta, a ogni ricaricamento. Da allora si misurano, e la misura è quella
+che si esegue prima di ogni consegna:
+
+```bash
+# 1 · il DTO che la pagina riceve — sei controlli, su imprese vere, dalle risposte già pagate
+npm run build && npx tsx scripts/audit-testo-schermo.ts
+
+# 2 · lo stesso, sul server, sulle schede che il cliente vede davvero (non spende)
+npx tsx scripts/audit-testo-schermo.ts --da-database <piva> [<piva> ...]
+
+# 3 · il testo RESO dal browser — analisi, intervista, report nei tre livelli
+npx playwright test --project=scrivania collaudo/testo-schermo.spec.ts
+
+# 4 · zero regressioni del motore, misurate: «campi SPARITI 0» e «valori NON testuali 0»
+npx tsx scripts/istantanea-motore.ts dopo.json && npx tsx scripts/confronta-istantanee.ts prima.json dopo.json
+```
+
+Il primo si rifiuta di girare sul compilato vecchio e, prima di misurare, fa fallire i
+propri rilevatori sui difetti storici: uno strumento cieco scrive «nessun rilievo»
+esattamente come uno pulito. Il quarto vuole `prima.json` preso dal commit in esercizio —
+un worktree separato con `.sonda/` copiata dentro — e stampa per primo il verdetto per
+tipo: le due righe che contano devono valere zero, le altre vanno nominate una per una.
+
+Esito al 02/09/2026, sulle tre imprese in archivio del cliente: **0 rilievi su 4.455
+stringhe**, cinque pagine rese pulite, 0 campi spariti e 0 valori non testuali cambiati su
+10 scenari.
+
 ---
 
 ## 10-bis. Da fare prima della produzione: Row Level Security
