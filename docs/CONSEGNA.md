@@ -154,16 +154,39 @@ OPENAPI_BUDGET_CENTESIMI=200
 rifiuta nuove chiamate a pagamento. È la difesa contro il ciclo che va in errore e riprova —
 senza, il credito si esaurisce prima che qualcuno se ne accorga.
 
-**Costo per azienda analizzata** (verificato su chiamate reali, agosto 2026):
+**Costo per azienda analizzata.** I prezzi sono quelli dichiarati dal servizio in
+`packages/providers/src/openapi/config.ts`, cioè gli stessi che compaiono sui pulsanti che
+spendono: non è una tabella scritta a mano che possa divergere dal prodotto.
 
-| Livello                | Costo   | Cosa aggiunge                                                       |
-| ---------------------- | ------- | ------------------------------------------------------------------- |
-| Base (`IT-advanced`)   | ~0,10 € | Anagrafica, ATECO, PEC, REA, 10 anni di bilanci sintetici, soci.    |
-| + eventi negativi      | ~0,45 € | Protesti e pregiudizievoli. Richiede l'apposito permesso sul token. |
-| + bilancio dettagliato | ~5,00 € | Voci CEE complete: alza la confidenza dello score.                  |
+| Acquisto                                  | Costo       | Validità in archivio | Cosa aggiunge                                                                                                                                                   |
+| ----------------------------------------- | ----------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Analisi** (`IT-advanced`)               | **0,10 €**  | 30 giorni            | Anagrafica, ATECO, PEC, REA, dieci anni di bilanci sintetici, soci.                                                                                             |
+| **Analisi approfondita** (`IT-full`)      | **+0,30 €** | 30 giorni            | Aggregati di bilancio autorevoli, quarantotto indici, cariche sociali, unità locali, qualifiche d'impresa, mercati di esportazione, gare pubbliche.             |
+| **Eventi negativi** (`IT-negativita`)     | **+0,45 €** | 7 giorni             | Protesti, pregiudizievoli e procedure concorsuali. Acquisto a parte, con il suo pulsante e il suo prezzo scritto sopra. Richiede l'apposito permesso sul token. |
+| Bilancio dettagliato (`IT-balance-sheet`) | 5,00 €      | —                    | Voci CEE complete. **Il codice non lo chiama**: vedi sotto.                                                                                                     |
 
-Un merito creditizio difendibile costa circa **55 centesimi**. Il registro costi in banca
-dati rende misurabile il margine per cliente.
+L'approfondimento **si somma** e non sostituisce: il profilo completo non porta i bilanci
+sintetici decennali, quindi affianca l'anagrafica estesa invece di rimpiazzarla.
+
+Un lead documentato per intero — anagrafica, profilo completo e verifica delle negatività —
+costa **85 centesimi**. È il numero su cui si costruisce il prezzo del servizio al cliente
+finale, e il registro costi in banca dati lo rende misurabile azienda per azienda.
+
+> Fino al 01/09/2026 questa sezione diceva «circa 55 centesimi», che era la somma di
+> anagrafica ed eventi negativi quando la verifica protesti veniva comprata **d'ufficio a
+> ogni analisi**. Quel comportamento è stato corretto — chi premeva «Analizza» spendeva
+> cinquantacinque centesimi credendo di spenderne dieci — ma il numero era rimasto qui, e
+> con esso mancava del tutto il livello che l'analisi la rende difendibile.
+
+Il **bilancio dettagliato non è acquistabile oggi**: il percorso non è confermato sul
+contratto, il servizio è marcato `verificato: false` e il provider lo salta invece di
+chiamarlo. Il prezzo è in tabella perché si sappia quanto costerebbe, non perché sia
+disponibile. Finché resta così, la confidenza dello score si regge sui bilanci sintetici e
+sugli aggregati del profilo completo — e la scheda lo dichiara.
+
+Le risposte già comprate restano in archivio per la validità indicata: entro quel periodo
+riaprire la stessa azienda **non addebita nulla**, e i pulsanti che spenderebbero lo dicono
+al posto del prezzo.
 
 Prima di collegare i dati veri, verificare cosa il token è autorizzato a fare — **non costa
 nulla**:
@@ -499,18 +522,15 @@ voce della lista di produzione.
 Onestà, perché il committente possa pianificare:
 
 - **parsing automatico dei testi di polizza**;
-- **cariche sociali** (amministratori, rappresentante legale): non sono comprese
-  nell'anagrafica acquistata da OpenAPI a questo livello. La piattaforma lo dichiara e
-  produce le domande da porre, invece di dedurle;
 - **collegamenti societari oltre il proprio portafoglio**: due aziende si collegano se
   condividono un socio ed entrambe sono state analizzate. Non è una visura nazionale
   delle partecipazioni;
 - **ingestione automatica dei dati SFCR**: oggi il censimento delle compagnie è manuale,
   un documento alla volta. Il motore e l'interfaccia sono completi; manca il caricamento
   massivo da una fonte, che nessuno pubblica in un formato interrogabile;
-- **bilancio dettagliato, protesti e pregiudizievoli** su OpenAPI: sono prodotti a
-  sottoscrizione separata, i percorsi non sono confermati e finché non lo saranno il codice
-  **non li chiama**, per non pagare chiamate a vuoto;
+- **bilancio dettagliato** (`IT-balance-sheet`, 5,00 €): prodotto a sottoscrizione
+  separata, il percorso non è confermato e finché non lo sarà il codice **non lo chiama**,
+  per non pagare una chiamata a vuoto. È l'unico servizio del listino in questa condizione;
 - **calibrazione su dati storici** della curva score → probabilità di default e dei
   benchmark di massimale: oggi sono tarati sull'esperienza di settore. Le funzioni sono
   isolate perché la ricalibrazione sia un intervento in un punto solo.

@@ -174,4 +174,41 @@ riga(
       : analisi.dannoMassimo.value.protezioniAccertate.join(', '),
 );
 
+/*
+  ── Il testo, per intero ─────────────────────────────────────────────────────
+
+  I sei difetti corretti il 01/09/2026 sono stati trovati tutti allo stesso modo: leggendo
+  la scheda dall'inizio alla fine. Nessuno di essi era visibile in un numero — la
+  motivazione che ripeteva sé stessa, la voce «Export: da rilevare» accanto ai mercati
+  stampati due sezioni sopra, «tenuto conto delle protezioni accertate» dove non ce n'era
+  nessuna. Erano visibili solo mettendo le frasi una sotto l'altra.
+
+  `--testo` fa quello, su un'impresa già comprata e senza aprire il browser. Non giudica:
+  serve a guardare, che è la sola cosa che ha funzionato.
+*/
+if (process.argv.includes('--testo')) {
+  process.stdout.write('\n  ══ Coperture proposte, e perché ═════════════════════\n');
+  for (const gap of analisi.gap.gaps) {
+    process.stdout.write(`\n  ▸ ${gap.definition.label} · ${gap.status}\n`);
+    process.stdout.write(`    ${gap.motivazioneAdeguatezza}\n`);
+    if (gap.motivazionePresupposti.length > 0) {
+      process.stdout.write(`    su: ${gap.motivazionePresupposti.join(' · ')}\n`);
+    }
+    process.stdout.write(`    confidenza ${gap.motivazioneConfidenza}\n`);
+  }
+
+  process.stdout.write('\n  ══ Rischi, e come sono stati valutati ═══════════════\n');
+  for (const r of analisi.rischi.risks) {
+    process.stdout.write(`\n  ▸ ${r.definition.label} · residuo ${r.residualScore} (${r.residualLevel})\n`);
+    for (const m of r.identificationRules) process.stdout.write(`    · ${m.rationale}\n`);
+    for (const m of r.modulationRules) {
+      const delta =
+        m.suDatoIgnoto || (m.likelihoodDelta === 0 && m.impactDelta === 0)
+          ? ''
+          : `[${m.likelihoodDelta >= 0 ? '+' : ''}${m.likelihoodDelta}P ${m.impactDelta >= 0 ? '+' : ''}${m.impactDelta}I] `;
+      process.stdout.write(`    ${delta}${m.rationale}\n`);
+    }
+  }
+}
+
 process.stdout.write('\n');
