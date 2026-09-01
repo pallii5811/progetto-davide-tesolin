@@ -150,7 +150,21 @@ export function IndicatoriArchivio({
         ['EBITDA su interessi netti', dati.coperturaOneri?.ebitdaSuInteressiNetti, ''],
         ['EBIT su interessi lordi', dati.coperturaOneri?.ebitSuInteressiLordi, ''],
         ['EBIT su interessi netti', dati.coperturaOneri?.ebitSuInteressiNetti, ''],
-        ['Indice di onerosità', dati.oneriFinanziari?.indiceDiOnerosita, ''],
+        /*
+          `burdenIndex` è in punti percentuali, ed è la stessa grandezza che il riquadro
+          «Marginalità» stampa come «Oneri finanziari su EBITDA» in rapporto.
+
+          Provato su due imprese, con i valori grezzi della risposta:
+
+            COMINOTTI   burdenIndex 39,93   financialCostsOnEbitda 0,3993
+            OPENAPI     burdenIndex  0,02   financialCostsOnEbitda 0,0002
+
+          Rapporto 100 esatto in entrambi i casi. Senza il segno di percentuale quel
+          «39,93» stava in colonna sotto «EBIT su interessi lordi 1,36», che è un
+          moltiplicatore: chi legge non aveva modo di sapere che era una percentuale, e
+          l'ordine di grandezza invitava a leggerlo per quello che non è.
+        */
+        ['Indice di onerosità — oneri finanziari su EBITDA', dati.oneriFinanziari?.indiceDiOnerosita, '%'],
         ['ROD — costo del debito', dati.oneriFinanziari?.rod, '%'],
         ['ROD finanziario', dati.oneriFinanziari?.rodFinanziario, '%'],
         // Gli altri due misurati e mai mostrati: la copertura e la generazione di cassa

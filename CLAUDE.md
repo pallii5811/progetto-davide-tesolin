@@ -191,6 +191,24 @@ segno di percentuale e `Grado di capitalizzazione 0,14` **senza**. La differenza
 visibile, basta guardarla. E la prova finale è l'aritmetica — 8.485 € di utile su 719.768 €
 di patrimonio fa l'1,18 **per cento**, che è il numero che l'archivio scrive come `1.18`.
 
+**E l'archivio pubblica la stessa grandezza due volte, in due unità.** Non è un caso limite:
+
+> | impresa   | `burdenIndex` | `financialCostsOnEbitda` | rapporto |
+> | --------- | ------------- | ------------------------ | -------- |
+> | COMINOTTI | 39,93         | 0,3993                   | 100      |
+> | OPENAPI   | 0,02          | 0,0002                   | 100      |
+>
+> Sono la stessa cosa. La scheda stampava «Indice di onerosità **39,93**» senza unità, in
+> colonna sotto «EBIT su interessi lordi 1,36» — che è un moltiplicatore. Chi legge non
+> aveva modo di sapere che era una percentuale, e l'ordine di grandezza invitava a leggerla
+> per quello che non era.
+
+Le coppie in rapporto 1:100 si cercano a macchina, su più imprese: una coincidenza su
+un'impresa sola è una coincidenza, su due è una definizione. Il controllo sta in
+`audit-testo-schermo.ts`, e la prima versione lo mancava perché divideva nel verso
+sbagliato — `indice di onerosità` viene prima in ordine alfabetico e portava il valore
+piccolo. L'ha preso l'autoprova, non io.
+
 ## 12 · Una frase detta due volte vale meno di una detta una volta
 
 > Costato, e detto dal proprietario del prodotto leggendo la propria scheda:

@@ -350,6 +350,81 @@ function chiedeCiòCheHaGià(frasi: readonly Frase[], indicatoriFornitore: unkno
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 5 · Lo stesso indice pubblicato due volte, in due unità
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Due campi dell'archivio che sono la stessa grandezza, uno in rapporto e uno in punti.
+ *
+ * Non è un'ipotesi teorica. Sulla scheda si leggeva, in due riquadri diversi:
+ *
+ *   Oneri finanziari su EBITDA   0,4        (Marginalità)
+ *   Indice di onerosità          39,93      (Liquidità e copertura degli oneri)
+ *
+ * `39,93 / 100 = 0,3993`, che stampato con un decimale fa esattamente `0,4`. È la stessa
+ * cosa detta due volte, e la seconda **senza unità di misura**: chi legge non ha modo di
+ * sapere che quel 39,93 è una percentuale, e la scheda che lo stampa accanto a «EBIT su
+ * interessi lordi 1,36» invita a leggerlo come un moltiplicatore.
+ *
+ * Il rapporto costante di 100 fra due campi si misura, non si suppone: qui si cercano su
+ * ogni impresa, e si segnalano solo le coppie che tengono **su tutte** quelle guardate. Una
+ * coincidenza su una impresa è una coincidenza; su tre è una definizione.
+ */
+interface CoppiaSospetta {
+  readonly a: string;
+  readonly b: string;
+  readonly imprese: number;
+}
+
+function coppieInDueUnita(archivi: readonly Map<string, unknown>[]): CoppiaSospetta[] {
+  /** Quante volte la coppia è comparsa con entrambi i valori, e quante ha tenuto il 1:100. */
+  const insieme = new Map<string, number>();
+  const conRapporto = new Map<string, number>();
+
+  for (const archivio of archivi) {
+    const numerici = [...archivio.entries()].filter(
+      (voce): voce is [string, number] => typeof voce[1] === 'number' && voce[1] !== 0,
+    );
+    for (const [nomeA, valoreA] of numerici) {
+      for (const [nomeB, valoreB] of numerici) {
+        if (nomeA >= nomeB) continue;
+        const chiave = `${nomeA}|${nomeB}`;
+        insieme.set(chiave, (insieme.get(chiave) ?? 0) + 1);
+
+        /*
+          Il rapporto si guarda grande su piccolo, non nell'ordine alfabetico dei nomi.
+
+          Con la divisione in una sola direzione la coppia vera usciva `0,01` invece di
+          `100` e passava liscia: `indice di onerosità` viene prima di `oneri finanziari su
+          ebitda`, e il grande stava al denominatore. Il difetto l'ho reintrodotto io in
+          questo controllo, ed è esattamente il motivo per cui l'autoprova esiste.
+        */
+        const grande = Math.max(Math.abs(valoreA), Math.abs(valoreB));
+        const piccolo = Math.min(Math.abs(valoreA), Math.abs(valoreB));
+        const rapporto = grande / piccolo;
+        // Tolleranza stretta: `39,93 / 0,3993` fa 100 esatto, e due grandezze diverse che
+        // ci passano vicino per caso sono rare quanto serve.
+        if (rapporto > 99.5 && rapporto < 100.5) {
+          conRapporto.set(chiave, (conRapporto.get(chiave) ?? 0) + 1);
+        }
+      }
+    }
+  }
+
+  /*
+    Si pretende che la coppia tenga su OGNI impresa in cui entrambi i campi ci sono, e su
+    almeno due. Pretendere che ci sia su tutte era troppo: un'impresa senza profilo
+    completo non ha quei campi, e la coppia vera veniva scartata per assenza.
+  */
+  return [...conRapporto.entries()]
+    .filter(([chiave, n]) => n >= 2 && n === insieme.get(chiave))
+    .map(([chiave, n]) => {
+      const [a = '', b = ''] = chiave.split('|');
+      return { a, b, imprese: n };
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // La cache che non spende
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -478,6 +553,31 @@ function autoprovaRilevatori(): void {
     'una grandezza diversa viene scambiata per la stessa',
   );
 
+  /*
+    5 · la coppia in due unità, con i valori veri delle due imprese su cui è stata provata.
+
+    Il nome che viene prima in ordine alfabetico porta il valore PICCOLO: è la disposizione
+    su cui la prima versione di questo controllo falliva in silenzio, dividendo nel verso
+    sbagliato e ottenendo 0,01 invece di 100.
+  */
+  const conCoppia = (onerosita: number, suEbitda: number): Map<string, unknown> =>
+    new Map<string, unknown>([
+      ['indice di onerosita', onerosita],
+      ['oneri finanziari su ebitda', suEbitda],
+    ]);
+  deve(
+    coppieInDueUnita([conCoppia(39.93, 0.3993), conCoppia(0.02, 0.0002)]).length === 1,
+    'la coppia «indice di onerosità» / «oneri finanziari su EBITDA» non viene più vista',
+  );
+  deve(
+    coppieInDueUnita([conCoppia(39.93, 0.3993), conCoppia(0.02, 0.5)]).length === 0,
+    'una coppia che NON tiene su tutte le imprese viene segnalata lo stesso',
+  );
+  deve(
+    coppieInDueUnita([conCoppia(39.93, 0.3993)]).length === 0,
+    'una sola impresa basta a dichiarare una coppia: e' + 'una coincidenza, non una definizione',
+  );
+
   if (guasti.length > 0) {
     process.stderr.write('\n  I RILEVATORI SONO CIECHI — la misura non vale:\n');
     for (const g of guasti) process.stderr.write(`    ✗ ${g}\n`);
@@ -497,6 +597,8 @@ if (bersagli.length === 0) {
 }
 
 let totale = 0;
+/* Gli indici dell'archivio impresa per impresa: le coppie si giudicano su tutte insieme. */
+const archiviVisti: Map<string, unknown>[] = [];
 
 for (const piva of bersagli) {
   const cache = await creaCache(piva);
@@ -562,6 +664,21 @@ for (const piva of bersagli) {
   }
   process.stdout.write(`  rilievi: ${rilievi.length}\n`);
   totale += rilievi.length;
+  archiviVisti.push(campiValorizzatiArchivio(indicatoriFornitore));
+}
+
+/*
+  Le coppie in due unità si giudicano alla fine: servono più imprese, perché su una sola un
+  rapporto di 100 fra due grandezze diverse è una coincidenza plausibile.
+*/
+const coppie = coppieInDueUnita(archiviVisti);
+if (coppie.length > 0) {
+  process.stdout.write(`\n  Indici dell’archivio in rapporto 1:100 su tutte le imprese guardate\n`);
+  process.stdout.write(`  ${'─'.repeat(70)}\n`);
+  for (const c of coppie) {
+    process.stdout.write(`  ✗ «${c.a}» e «${c.b}» — su ${c.imprese} imprese su ${archiviVisti.length}\n`);
+  }
+  totale += coppie.length;
 }
 
 process.stdout.write(`\n  TOTALE RILIEVI: ${totale}\n\n`);
