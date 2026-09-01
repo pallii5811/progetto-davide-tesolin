@@ -170,7 +170,10 @@ riga(
   `${analisi.ubicazioni.ubicazioni.length} · ${analisi.ubicazioni.comuni.length} comuni · ` +
     `${analisi.ubicazioni.complessiIncendio.length} complessi incendio`,
 );
-riga('Unità locali secondo l’archivio', String(analisi.facts.numeroUnitaLocali ?? '—'));
+// `numeroUnitaLocali` dei fatti conta le sedi mappate, e fra queste c'è anche quella
+// legale: non è il conteggio che l'archivio pubblica come «Unità locali», che comprende le
+// sole secondarie attive. Chiamarle con lo stesso nome le farebbe sembrare in disaccordo.
+riga('Sedi mappate (legale compresa)', String(analisi.facts.numeroUnitaLocali ?? '—'));
 for (const u of analisi.ubicazioni.ubicazioni) {
   process.stdout.write(`    · ${u.etichetta}\n`);
 }
