@@ -161,6 +161,36 @@ entra: l'intervista prevale sull'archivio, l'archivio non produce mai una negazi
 paesi» comprende gli Stati Uniti senza nominarli, e leggerlo come un «no» toglierebbe due
 gradini di massimale a chi là ci spedisce davvero.
 
+**È ricapitato il giorno dopo**, sulla stessa scheda e in due punti nuovi. Non è un difetto
+che si chiude correggendo un campo: si chiude solo rileggendo la pagina intera.
+
+> | la scheda stampava                | il motore diceva                                        |
+> | --------------------------------- | ------------------------------------------------------- |
+> | «Margine EBITDA 7,94 %»           | Redditività · peso 14 % · **non valutabile**            |
+> | «Copertura immobilizzazioni 3,05» | «Copertura immobilizzazioni: da rilevare in intervista» |
+>
+> Il primo costava un fattore intero su sette, su un punteggio che decide quanto credito
+> l'intermediario consiglia di concedere. La copertura del modello è passata da cinque
+> fattori su sette a sei.
+
+## 13 · Un indice comprato ha un'unità, e non è quella che ti aspetti
+
+Prima di far entrare un indice dell'archivio in un calcolo si guarda **come l'archivio
+scrive il valore**, non come si chiama il campo.
+
+> Stava per costare un fattore gonfiato in silenzio. `ebitdaMargin` dell'archivio vale
+> `7.94` — sono punti percentuali — mentre `FinancialIndicators` tiene rapporti, perché il
+> formattatore usa `style: 'percent'` e i punti di interpolazione dello score sono scritti
+> `0,05 · 0,10 · 0,18`. Passato senza dividere per cento avrebbe portato la redditività a
+> **100/100 su un'impresa che margina l'otto per cento**.
+>
+> E il `roe` era già così da prima: sarebbe uscito a schermo «118,0 %».
+
+Come si distingue, senza indovinare: la scheda stampa `Margine EBITDA 7,94 %` **con** il
+segno di percentuale e `Grado di capitalizzazione 0,14` **senza**. La differenza è già
+visibile, basta guardarla. E la prova finale è l'aritmetica — 8.485 € di utile su 719.768 €
+di patrimonio fa l'1,18 **per cento**, che è il numero che l'archivio scrive come `1.18`.
+
 ## 12 · Una frase detta due volte vale meno di una detta una volta
 
 > Costato, e detto dal proprietario del prodotto leggendo la propria scheda:

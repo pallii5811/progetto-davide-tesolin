@@ -381,6 +381,31 @@ export function formatIndicator(key: keyof FinancialIndicators, value: number | 
  * varianti — 2,5 con l'EBITDA e 1,36 con l'EBIT. Prendere quella che somiglia di più al
  * nome avrebbe gonfiato il fattore dell'ottantaquattro per cento, in silenzio.
  */
+/**
+ * Da punti percentuali dell'archivio a rapporto della piattaforma.
+ *
+ * L'archivio pubblica ROE e margine EBITDA in punti — `1.18` sta per l'1,18 %, e la scheda
+ * infatti li stampa con il segno di percentuale accanto. `FinancialIndicators` li tiene
+ * come rapporti: il formattatore usa `style: 'percent'`, che moltiplica per cento, e i
+ * punti di interpolazione dello score sono scritti in rapporto — 0,05 · 0,10 · 0,18.
+ *
+ * Passarli senza convertire non dà errore, e sono due danni diversi:
+ *
+ *   ROE           stampato «118,0 %» su un'impresa che rende l'1,18 %
+ *   margine EBITDA fattore redditività a 100/100 su un'impresa che margina l'8 %
+ *
+ * Il secondo è il peggiore: un fattore su sette gonfiato in silenzio, su un punteggio che
+ * decide quanto credito l'intermediario consiglia di concedere.
+ *
+ * Il grado di capitalizzazione e il tasso di copertura delle immobilizzazioni **non**
+ * passano di qui: l'archivio li pubblica già come rapporti — 0,14 e 3,05 — ed è la ragione
+ * per cui la scheda li stampa senza il segno di percentuale. La distinzione non si deduce
+ * dal nome del campo, si legge da come l'archivio scrive il valore.
+ */
+function daPercentuale(valore: number | null | undefined): number | null {
+  return valore === null || valore === undefined ? null : valore / 100;
+}
+
 export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialIndicators | null {
   const red = fornitore.redditivita;
   const sol = fornitore.solidita;
@@ -388,13 +413,32 @@ export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialI
   const lev = fornitore.leveFinanziarie;
   const cop = fornitore.coperturaOneri;
   const cic = fornitore.cicloFinanziario;
+  const kpi = fornitore.kpi;
 
   const indicatori: FinancialIndicators = {
-    // Redditività: solo il ROE, che è utile netto su patrimonio netto ovunque.
-    roe: red?.roe ?? null,
+    // Redditività: il ROE, che è utile netto su patrimonio netto ovunque, e il margine
+    // EBITDA, il cui denominatore si è provato essere lo stesso della piattaforma.
+    roe: daPercentuale(red?.roe),
     roi: null,
     ros: null,
-    ebitdaMargin: null,
+    /*
+      `marginePercentualeEbitda` è EBITDA su valore della produzione, come qui.
+
+      Non si assume dal nome — è la regola che questo file applica ovunque — si prova
+      dall'identità, sui numeri dell'impresa provata: il margine vale 7,94 % e l'EBITDA
+      343.989 €, quindi il denominatore è 4.332.355 €. I ricavi sono 3.959.368 €: non è
+      quello. E il ROS dichiarato dallo stesso archivio, 4,32 %, moltiplicato per quel
+      denominatore restituisce esattamente l'EBIT stampato accanto, 187.148 €.
+
+      Due indici indipendenti che chiudono sullo stesso valore della produzione: il
+      denominatore è quello, ed è `ce.valoreDellaProduzione` della piattaforma.
+
+      Costava un fattore intero. La scheda mostrava «Margine EBITDA 7,94 %» e, più in
+      basso, «Redditività · peso 14 % · non valutabile — EBITDA margin: da rilevare in
+      intervista». Il dato era comprato, era a schermo, e il quattordici per cento del
+      punteggio di merito veniva buttato.
+    */
+    ebitdaMargin: daPercentuale(kpi?.marginePercentualeEbitda),
     valoreAggiuntoSuRicavi: null,
 
     // Liquidità: acid test è il nome alternativo del quick ratio, stessa formula.
@@ -405,7 +449,22 @@ export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialI
     // lo stesso numero che il prodotto stampa altrove come «patrimonio su totale attivo».
     indiceIndebitamento: null,
     equityRatio: ind?.gradoDiCapitalizzazione ?? null,
-    coperturaImmobilizzazioni: null,
+    /*
+      Qui l'archivio offre DUE candidati, e prenderne uno a caso sarebbe il difetto che
+      questo file esiste per evitare:
+
+        indiceMargineDiStruttura        1,39   patrimonio netto / immobilizzazioni
+        tassoCoperturaImmobilizzazioni  3,05   (patrimonio netto + passivo consolidato)
+                                               / immobilizzazioni
+
+      La piattaforma calcola il secondo. E si prova, non si sceglie: dal margine di
+      struttura (200.484 €) e dal patrimonio netto (719.768 €) le immobilizzazioni sono
+      519.284 €; il margine di struttura secondario dichiarato, 1.065.706 €, porta le
+      fonti durevoli a 1.584.990 €, e il loro rapporto fa 3,052 — cioè il 3,05
+      dell'archivio. L'altro candidato, 719.768 / 519.284, fa 1,386: è l'indice primario,
+      e usarlo avrebbe dimezzato il fattore in silenzio.
+    */
+    coperturaImmobilizzazioni: sol?.tassoCoperturaImmobilizzazioni ?? null,
 
     // Sostenibilità del debito: EBIT sugli interessi, non EBITDA.
     pfnSuEbitda: lev?.pfnSuEbitda ?? null,

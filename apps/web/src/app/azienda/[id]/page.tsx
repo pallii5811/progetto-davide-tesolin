@@ -923,6 +923,7 @@ export default async function PaginaAzienda({
               voce={voce}
               compagnia={compagniaDi(voce, compagnie)}
               polizzeCensite={gap.polizzeDichiarate > 0}
+              asOf={analisi.asOf}
             />
           ))}
         </div>
@@ -1959,12 +1960,22 @@ function VoceGap({
   voce,
   compagnia,
   polizzeCensite,
+  asOf,
 }: {
   voce: GapDto;
   compagnia: SoliditaCompagnia | null;
   /** Falso quando nessuna polizza è stata dichiarata: allora «assente» non è un accertamento. */
   polizzeCensite: boolean;
+  /**
+   * La data dell'analisi, non quella di oggi.
+   *
+   * Un termine è scaduto o no rispetto al momento in cui il documento è stato prodotto: è
+   * lo stesso riferimento con cui il motore calcola i giorni al termine dell'obbligo
+   * catastrofale, e usarne un altro farebbe divergere due frasi della stessa pagina.
+   */
+  asOf: string;
 }) {
+  const scaduto = (termine: string): boolean => new Date(termine) < new Date(asOf);
   return (
     <Scheda className={voce.stato === 'adeguata' ? 'opacity-70' : ''}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -2009,9 +2020,17 @@ function VoceGap({
         <span className={voce.piano.urgenza === 'immediata' ? 'font-medium text-critico' : ''}>
           {ETICHETTE_URGENZA[voce.piano.urgenza]}
         </span>
+        {/*
+          «Entro il 01/01/2026» stampato il 1° settembre 2026, sull'obbligo catastrofale
+          il cui termine l'avviso in cima alla stessa pagina dichiarava «scaduto da 243
+          giorni». Un termine passato non si annuncia al futuro: la data resta — serve a
+          dire da quando si è inadempienti — ma la preposizione cambia, perché è quella
+          che dice all'intermediario se ha tempo o se è in ritardo.
+        */}
         {voce.piano.termine !== null && (
-          <span>
-            entro il <time dateTime={voce.piano.termine}>{formattaGiorno(voce.piano.termine)}</time>
+          <span className={scaduto(voce.piano.termine) ? 'font-medium text-critico' : ''}>
+            {scaduto(voce.piano.termine) ? 'termine scaduto il ' : 'entro il '}
+            <time dateTime={voce.piano.termine}>{formattaGiorno(voce.piano.termine)}</time>
           </span>
         )}
         <span>a cura {ETICHETTE_A_CURA[voce.piano.aCura]}</span>

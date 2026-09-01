@@ -190,13 +190,32 @@ export function IndicatoriArchivio({
         */
       ],
     },
+    /*
+      Marginalità e andamento erano un gruppo solo, sotto la nota «Variazioni rispetto
+      all'esercizio precedente». Quattro delle nove righe non erano variazioni ma livelli,
+      e la nota le trasformava in un'altra cosa: «Patrimonio su totale attivo 0,14» si
+      leggeva come una crescita dello 0,14 % invece che come un patrimonio pari al 14 %
+      dell'attivo — un ordine di grandezza e un significato diversi.
+
+      Un'intestazione che descrive metà delle righe è peggio di nessuna intestazione: il
+      lettore non ha modo di sapere quale metà sta guardando.
+    */
     {
-      titolo: 'Andamento e marginalità',
-      nota: 'Variazioni rispetto all’esercizio precedente.',
+      titolo: 'Marginalità',
+      nota: 'Livelli dell’ultimo esercizio, non variazioni.',
       voci: [
         ['Margine EBITDA', dati.kpi?.marginePercentualeEbitda, '%'],
         ['Oneri finanziari su EBITDA', dati.kpi?.oneriFinanziariSuEbitda, ''],
+        // Lo stesso numero che il riquadro «Indebitamento e leva» stampa come «Grado di
+        // capitalizzazione»: sono due nomi che l'archivio dà alla stessa grandezza, e si
+        // mostrano entrambi perché entrambi sono stati pagati e compaiono nei suoi elenchi.
         ['Patrimonio su totale attivo', dati.kpi?.patrimonioSuTotaleAttivo, ''],
+      ],
+    },
+    {
+      titolo: 'Andamento',
+      nota: 'Variazioni rispetto all’esercizio precedente.',
+      voci: [
         ['Valore aggiunto', dati.sviluppo?.valoreAggiunto, '%'],
         /*
           `ebitVariation` non è in punti percentuali: è il rapporto, e lo dimostra la

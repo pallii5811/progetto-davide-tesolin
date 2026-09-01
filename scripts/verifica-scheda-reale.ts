@@ -164,6 +164,25 @@ riga(
     ?.value ?? '—',
 );
 
+process.stdout.write('\n  ── Ubicazioni ───────────────────────────────────────\n');
+riga(
+  'Ubicazioni distinte',
+  `${analisi.ubicazioni.ubicazioni.length} · ${analisi.ubicazioni.comuni.length} comuni · ` +
+    `${analisi.ubicazioni.complessiIncendio.length} complessi incendio`,
+);
+riga('Unità locali secondo l’archivio', String(analisi.facts.numeroUnitaLocali ?? '—'));
+for (const u of analisi.ubicazioni.ubicazioni) {
+  process.stdout.write(`    · ${u.etichetta}\n`);
+}
+
+process.stdout.write('\n  ── Merito creditizio, fattore per fattore ───────────\n');
+for (const f of analisi.creditScore.value.factors) {
+  riga(
+    `${f.label} (peso ${Math.round(f.weight * 100)}%)`,
+    f.score === null ? 'non valutabile' : `${Math.round(f.score)}/100`,
+  );
+}
+
 process.stdout.write('\n  ── Danno massimo ────────────────────────────────────\n');
 riga(
   'Protezioni accertate',

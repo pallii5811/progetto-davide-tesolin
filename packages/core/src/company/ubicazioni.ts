@@ -86,7 +86,29 @@ export interface AnalisiUbicazioni {
   readonly confidenza: Confidence;
 }
 
-/** Chiave di deduplicazione: stesso indirizzo scritto in modi diversi resta un'ubicazione sola. */
+/**
+ * Chiave di deduplicazione: stesso indirizzo scritto in modi diversi resta un'ubicazione sola.
+ *
+ * VIA E CIVICO SI UNISCONO PRIMA DI NORMALIZZARE, e non \u00e8 un dettaglio di stile.
+ *
+ * Le due fonti scrivono lo stesso indirizzo in due modi: la sede legale arriva da
+ * `address`, che tiene il civico nel suo campo, e l'unit\u00e0 locale da `allOffices`, che a
+ * volte lo lascia dentro la via \u2014 con la virgola in coda. Con via e civico come segmenti
+ * distinti le due chiavi divergono:
+ *
+ *   agnosine | localitalocfondizonaindustriale | 102     \u2190 sede legale
+ *   agnosine | localitalocfondizonaindustriale102 |       \u2190 unit\u00e0 locale
+ *
+ * e lo stesso capannone diventa due ubicazioni. Sulla scheda di COMINOTTI S.R.L. si
+ * leggeva \u00ab3 ubicazioni \u00b7 2 comuni\u00bb mentre il registro, nella stessa pagina, dichiarava
+ * \u00abUnit\u00e0 locali: 1\u00bb \u2014 e l'analisi incendio le contava come **due complessi separati**,
+ * chiedendo all'intermediario di \u00abconfermare se sorgono nello stesso sito\u00bb due righe che
+ * riportavano lo stesso indirizzo carattere per carattere.
+ *
+ * Unendoli prima, la punteggiatura sparisce insieme al resto e le due chiavi coincidono.
+ * Non produce fusioni indebite: `via roma 1` e `via roma 10` restano `roma1` e `roma10`, e
+ * un indirizzo senza civico non aggancia quello con il civico \u2014 che \u00e8 il verso prudente.
+ */
 function chiaveDi(indirizzo: Indirizzo): string {
   const normalizza = (t: string): string =>
     t
@@ -96,7 +118,7 @@ function chiaveDi(indirizzo: Indirizzo): string {
       .replace(/\b(via|viale|piazza|corso|strada|largo|vicolo|v\.le|p\.zza)\b/g, '')
       .replace(/[^a-z0-9]/g, '');
 
-  return [normalizza(indirizzo.comune), normalizza(indirizzo.via), normalizza(indirizzo.civico ?? '')]
+  return [normalizza(indirizzo.comune), normalizza(`${indirizzo.via} ${indirizzo.civico ?? ''}`)]
     .filter((p) => p !== '')
     .join('|');
 }
@@ -371,10 +393,31 @@ function domande(ubicazioni: readonly Ubicazione[]): readonly string[] {
     return elenco;
   }
 
+  /*
+    La domanda resta, la motivazione no.
+
+    «Senza i metri quadri il capitale fabbricati resta da rilevare» era stampato sulla
+    stessa schermata che, tre riquadri più su, dichiarava «Somma assicuranda — Fabbricati
+    11.500.000 €». Il capitale c'era, calcolato dall'impronta a terra che la cartografia
+    rileva sulle ubicazioni con coordinate: la frase negava un numero che il prodotto
+    aveva appena stampato.
+
+    Chiedere la superficie resta giusto — un rilievo vero batte un'impronta, che ignora i
+    piani e sottostima ogni edificio a più livelli — ma il motivo per cui la si chiede
+    cambia, e il lettore deve sapere quale dei due sta guardando.
+  */
   const senzaSuperficie = ubicazioni.filter((u) => u.superficieMq === null);
   if (senzaSuperficie.length > 0) {
+    const quante =
+      senzaSuperficie.length === 1 ? 'questa ubicazione' : `queste ${senzaSuperficie.length} ubicazioni`;
+    const conImpronta = senzaSuperficie.filter(
+      (u) => (u.contesto?.fabbricati?.superficieCopertaMq ?? 0) > 0,
+    ).length;
+
     elenco.push(
-      `Qual è la superficie di ${senzaSuperficie.length === 1 ? 'questa ubicazione' : `queste ${senzaSuperficie.length} ubicazioni`}? Senza i metri quadri il capitale fabbricati resta da rilevare.`,
+      conImpronta === 0
+        ? `Qual è la superficie di ${quante}? Senza i metri quadri il capitale fabbricati resta da rilevare.`
+        : `Qual è la superficie di ${quante}? Su ${conImpronta === 1 ? 'una di esse' : `${conImpronta} di esse`} il capitale fabbricati è stato stimato dall’impronta a terra rilevata da cartografia, che ignora i piani: su un edificio a più livelli sottostima, ed è la sottostima su cui al sinistro opera la regola proporzionale.`,
     );
   }
 

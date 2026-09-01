@@ -152,20 +152,26 @@ describe('Difetto 5 · il punteggio non sale per assenza di dati', () => {
     const copertura = spiegazione.inputs.find((i) => i.label.startsWith('Copertura del modello'));
     expect(copertura, 'la spiegazione non dichiara la copertura del modello').toBeDefined();
     /*
-      Cinque su sette, non tre.
+      Sei su sette, e questo numero è il metro del recupero.
 
-      Erano tre — solidità dagli aggregati sintetici, eventi negativi, anzianità — finché
-      il motore ignorava gli indici che il Registro Imprese elabora sul bilancio
-      depositato e che l'anagrafica estesa porta con sé già pagati. Il prodotto li
-      stampava a schermo e il punteggio dichiarava «PFN / EBITDA: da rilevare in
-      intervista» venti centimetri più sotto.
+      TRE — solidità dagli aggregati sintetici, eventi negativi, anzianità — finché il
+      motore ignorava gli indici che il Registro Imprese elabora sul bilancio depositato e
+      che l'anagrafica estesa porta con sé già pagati. Il prodotto li stampava a schermo e
+      il punteggio dichiarava «PFN / EBITDA: da rilevare in intervista» venti centimetri
+      più sotto.
 
-      Ora liquidità e sostenibilità del debito si calcolano da quei dati, e restano fuori
-      solo l'Altman — che richiede lo schema CEE per intero — e la redditività, i cui
-      indici del registro hanno denominatori diversi da quelli della piattaforma e non si
-      possono prendere per buoni.
+      CINQUE quando liquidità e sostenibilità del debito hanno cominciato a leggerli.
+
+      SEI da oggi, con la redditività. Restava fuori perché ROI e ROS del registro hanno
+      denominatori che non coincidono con quelli della piattaforma — e quei due non si
+      mappano tuttora. Ma il **margine EBITDA** sì: il denominatore si è provato essere il
+      valore della produzione, con due indici indipendenti che chiudono sullo stesso
+      numero. Bastava quello, perché il fattore media i sotto-indici di cui dispone.
+
+      Resta fuori il solo Altman, che richiede lo schema CEE per intero — e quel bilancio
+      non si compra.
     */
-    expect(copertura?.value).toContain('5 fattori su 7');
+    expect(copertura?.value).toContain('6 fattori su 7');
   });
 });
 
