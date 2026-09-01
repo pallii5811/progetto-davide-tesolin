@@ -14,6 +14,10 @@
     "./tempo": {
       "types": "./dist/shared/tempo.d.ts",
       "default": "./dist/shared/tempo.js"
+    },
+    "./testo": {
+      "types": "./dist/shared/testo.d.ts",
+      "default": "./dist/shared/testo.js"
     }
   },
   "files": [

@@ -1,0 +1,568 @@
+/**
+ * Ogni parola che la scheda stampa, controllata a macchina.
+ *
+ *   npx tsx scripts/audit-testo-schermo.ts [partita-iva ...]
+ *   npx tsx scripts/audit-testo-schermo.ts --da-database <partita-iva ...>
+ *
+ * **Non spende niente**: le risposte arrivano dalla cache già pagata, come in
+ * `verifica-scheda-reale.ts`, e il token è volutamente non valido.
+ *
+ * ── PERCHÉ ESISTE ───────────────────────────────────────────────────────────────
+ *
+ * Il proprietario del prodotto, dopo l'ennesimo ricaricamento: «OGNI VOLTA CHE RICARICO
+ * LA PAGINA TROVIAMO ERRORI, COM'È POSSIBILE CHE NON RIESCI A RENDERE PERFETTO QUESTO
+ * SOFTWARE?»
+ *
+ * La risposta è nel metodo, non nel software. Ogni difetto di testo corretto fin qui era
+ * stato trovato da un paio d'occhi che leggevano la pagina — e gli occhi trovano
+ * un'istanza per volta. Le due volte in cui invece si è misurato, il conto è stato un
+ * altro:
+ *
+ *   frasi ripetute            trovate 3 leggendo → il controllo ne cerca su ogni copertura
+ *                             e ogni combinazione di fatti
+ *   affermazioni sull'ignoto  trovate 3 leggendo → misurate **32 su 68 regole**
+ *
+ * Le altre ventinove nessuno le aveva ancora incontrate: sarebbero uscite una alla volta,
+ * a un ricaricamento di distanza l'una dall'altra. È esattamente ciò che stava succedendo.
+ *
+ * Questo strumento chiude il metodo: monta la scheda vera di un'impresa vera, percorre
+ * **ogni stringa** che il presentatore consegna alla pagina, e applica i controlli
+ * meccanici tutti insieme. Quello che trova è un elenco, non un aneddoto.
+ *
+ * ── COSA CONTROLLA ──────────────────────────────────────────────────────────────
+ *
+ *   1  separatore decimale inglese         «0.30×» in una pagina che scrive «1,37»
+ *   2  accordo con il numero uno            «Sulle restanti 1 il contesto…»
+ *   3  affermazioni ripetute                la stessa cosa detta due volte, riformulata
+ *   4  «da rilevare» di ciò che si ha già   la voce chiesta e stampata nella stessa pagina
+ *
+ * Esce con codice 1 se trova qualcosa: è pensato per essere lanciato prima di consegnare.
+ */
+
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { analyzeCompany } from '@aegis/core';
+import { presentAnalysis } from '../apps/api/src/presenter.js';
+import { OpenApiProvider } from '../packages/providers/src/openapi/provider.js';
+import { OPENAPI_DEFAULT_CONFIG } from '../packages/providers/src/openapi/config.js';
+import type { Cache, CacheEntry } from '../packages/providers/src/http.js';
+
+const DA_DATABASE = process.argv.includes('--da-database');
+/** Stampa la frase per intero invece del suo inizio: serve a decidere se il rilievo è vero. */
+const INTERO = process.argv.includes('--intero');
+const PIVE = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const SONDA = join(process.cwd(), '.sonda');
+
+/**
+ * Si rifiuta di partire sul compilato vecchio.
+ *
+ * Non è una precauzione teorica: è successo mezz'ora fa. Corretta la frase che generava le
+ * ripetizioni, questo strumento ne segnalava ancora venti — perché `@aegis/core` risolve a
+ * `dist`, e il sorgente cambiato non era ancora stato compilato. Ricompilando, i venti sono
+ * diventati cinque.
+ *
+ * Un numero misurato sul codice sbagliato è peggio di nessun numero: convince, perché è
+ * vero — di un altro programma. Meglio fermarsi.
+ */
+function esigiCompilatoFresco(): void {
+  const sorgenti = join(process.cwd(), 'packages', 'core', 'src');
+  const compilato = join(process.cwd(), 'packages', 'core', 'dist');
+
+  if (!existsSync(compilato)) {
+    process.stderr.write('\n  packages/core/dist non esiste: eseguire `npm run build` prima.\n\n');
+    process.exit(2);
+  }
+
+  const piuRecente = (cartella: string): number => {
+    let massimo = 0;
+    for (const voce of readdirSync(cartella, { withFileTypes: true })) {
+      const percorso = join(cartella, voce.name);
+      massimo = Math.max(massimo, voce.isDirectory() ? piuRecente(percorso) : statSync(percorso).mtimeMs);
+    }
+    return massimo;
+  };
+
+  if (piuRecente(sorgenti) > piuRecente(compilato)) {
+    process.stderr.write(
+      '\n  I sorgenti sono più recenti del compilato: questa misura uscirebbe dal codice\n' +
+        '  VECCHIO. Eseguire `npm run build` e ripetere.\n\n',
+    );
+    process.exit(2);
+  }
+}
+
+esigiCompilatoFresco();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Il rilievo: ogni stringa che la pagina riceve, con il punto in cui sta
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Frase {
+  readonly dove: string;
+  readonly testo: string;
+}
+
+/**
+ * Percorre il DTO e raccoglie le stringhe destinate a un lettore.
+ *
+ * Si scartano quelle che non sono prosa: identificatori, codici, chiavi di enumerazione.
+ * Il criterio è che contengano almeno uno spazio **o** una cifra con separatore, perché
+ * `'rc-prodotti'` e `'alta'` non sono frasi e sporcherebbero ogni controllo.
+ */
+function raccogliFrasi(valore: unknown, dove: string, out: Frase[]): void {
+  if (typeof valore === 'string') {
+    if (valore.trim().length > 0) out.push({ dove, testo: valore });
+    return;
+  }
+  if (Array.isArray(valore)) {
+    valore.forEach((v, i) => raccogliFrasi(v, `${dove}[${i}]`, out));
+    return;
+  }
+  if (valore !== null && typeof valore === 'object') {
+    for (const [k, v] of Object.entries(valore)) raccogliFrasi(v, `${dove}.${k}`, out);
+  }
+}
+
+/**
+ * Le chiavi che non contengono prosa ma identificatori: si escludono per nome.
+ *
+ * `versioneCatalogo` sta qui per un motivo preciso: vale `2026.1`, e il controllo sul
+ * separatore decimale la segnalava. Una versione non è un numero da leggere, è un'etichetta
+ * — e un rilievo falso costa più di uno mancato, perché insegna a ignorare l'elenco.
+ */
+const CHIAVI_TECNICHE =
+  /\.(id|ruleId|chiave|categoria|livello|livelloInerente|livelloResiduo|trattamento|forma|stato|urgenza|titolare|classe|confidenza|confidence|tono|piano\.urgenza|coperture\[\d+\]|codice|ateco|atecoSecondari\[\d+\]|partitaIva|codiceFiscale|versione\w*)$/;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1 · Separatore decimale inglese
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Un numero decimale scritto col punto, in un documento italiano.
+ *
+ * La difficoltà non è trovarlo, è non prendere per errore ciò che il punto ce l'ha per
+ * ragioni sue. In italiano il punto separa le **migliaia** — `11.500.000` — e i gruppi
+ * dopo il primo hanno sempre esattamente tre cifre. Un decimale inglese no: `0.30`, `2.60`,
+ * `39.93`. La distinzione è meccanica e non richiede di indovinare.
+ *
+ * Restano fuori i codici che il punto lo usano come struttura — ATECO `25.72`, NACE, le
+ * norme — riconosciuti dal contesto della frase.
+ */
+const CONTESTI_CON_PUNTO = /ATECO|NACE|SIC|D\.Lgs|D\.P\.R|art\.|artt\.|c\.c\.|CCII|ISO|http|@|v\d/;
+
+function decimaliInglesi(testo: string): string[] {
+  if (CONTESTI_CON_PUNTO.test(testo)) return [];
+  const trovati: string[] = [];
+  for (const m of testo.matchAll(/\d+(?:\.\d+)+/g)) {
+    const gruppi = m[0].split('.');
+    const migliaiaItaliane = gruppi.slice(1).every((g) => g.length === 3);
+    if (!migliaiaItaliane) trovati.push(m[0]);
+  }
+  return trovati;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2 · Accordo con il numero uno
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * «Sulle restanti 1 il contesto non è stato osservato.»
+ *
+ * Esce ogni volta che le ubicazioni sono due e una sola è stata guardata — cioè quasi
+ * sempre, non in un caso limite. Il difetto nasce sempre allo stesso modo: un conteggio
+ * interpolato dentro una frase scritta al plurale.
+ *
+ * Il vocabolario è quello dei nomi che questo prodotto conta davvero. Non si generalizza a
+ * «ogni parola che finisce in -i»: prenderebbe «1 gennaio» e cento altre cose giuste.
+ */
+const NOMI_CONTATI =
+  'ubicazioni|imprese|aziende|anni|esercizi|giorni|veicoli|soci|amministratori|bilanci|rischi|coperture|polizze|sedi|comuni|complessi|province|dipendenti|addetti|fabbricati|immobili|certificazioni|cariche|segnalazioni|fattori|indici|voci|schede|righe|campi';
+
+/** L'inizio della frase, o la frase intera con `--intero`: serve a giudicare il rilievo. */
+function estratto(testo: string): string {
+  return INTERO ? testo : testo.slice(0, 110);
+}
+
+function accordiSbagliati(testo: string): string[] {
+  const trovati: string[] = [];
+  for (const m of testo.matchAll(new RegExp(`\\b1\\s+(${NOMI_CONTATI})\\b`, 'gi'))) {
+    trovati.push(m[0]);
+  }
+  // La forma opposta: l'aggettivo plurale prima del numero.
+  for (const m of testo.matchAll(/\b(restanti|rimanenti|altre|altri)\s+1\b/gi)) trovati.push(m[0]);
+  return trovati;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3 · Affermazioni ripetute
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+  Lo stesso riconoscitore della prova unitaria sulle motivazioni, portato qui sull'intera
+  scheda: parole di contenuto troncate alla radice, sequenze di tre. Là guardava una
+  copertura per volta; qui guarda ogni testo lungo che la pagina stampa, perché la
+  ripetizione più fastidiosa è quella fra due sezioni diverse.
+*/
+const PAROLE_DI_SERVIZIO = new Set(
+  (
+    'il lo la i gli le un uno una l di a ad da in con su per tra fra del dello della dei degli delle ' +
+    'dell al allo alla ai agli alle all dal dallo dalla dai dagli dalle dall nel nello nella nei negli ' +
+    'nelle nell sul sullo sulla sui sugli sulle sull e o ed od ma che chi cui non ne si se come anche ' +
+    'è sono ha hanno essere stato stata resta restano più meno quando dove ciò questo questa quello ' +
+    'quella entrambi casi caso sua suo sue suoi loro ogni tutti tutte solo soltanto stessa stesso'
+  ).split(' '),
+);
+
+function parole(testo: string): string[] {
+  return testo
+    .toLowerCase()
+    .replace(/[’']/g, ' ')
+    .replace(/[^a-zàèéìòù0-9]+/g, ' ')
+    .split(' ')
+    .filter((p) => p.length > 1 && !PAROLE_DI_SERVIZIO.has(p))
+    .map((p) => p.slice(0, 6));
+}
+
+/**
+ * Toglie l'enumerazione finale dei rischi serviti, che è una lista di NOMI.
+ *
+ * La motivazione di adeguatezza chiude elencando i rischi che quella copertura serve, con
+ * il loro livello. Su una copertura cyber quell'elenco contiene «violazione di dati
+ * personali» — che è anche il soggetto della frase iniziale, perché è di quello che la
+ * copertura parla.
+ *
+ * Il rilevatore lo segnalava come ripetizione, ed è un falso positivo: la prima è
+ * un'affermazione, la seconda è il nome di un rischio dentro una lista, e porta con sé un
+ * dato nuovo — il livello residuo. Cercare affermazioni ripetute dentro un elenco di nomi
+ * è cercare la cosa sbagliata nel posto sbagliato.
+ *
+ * Le tre segnalazioni che restavano dopo la correzione delle ripetizioni vere erano tutte
+ * di questa forma. Ma la parte in prosa continua a essere guardata: si toglie l'elenco, non
+ * la frase.
+ */
+function senzaElencoDeiRischi(testo: string): string {
+  const inizio = testo.indexOf('L’analisi ha rilevato i seguenti rischi residui');
+  const inizioApostrofoDritto = testo.indexOf("L'analisi ha rilevato i seguenti rischi residui");
+  const taglio = inizio >= 0 ? inizio : inizioApostrofoDritto;
+  return taglio >= 0 ? testo.slice(0, taglio) : testo;
+}
+
+function affermazioniRipetute(testo: string): string[] {
+  const p = parole(senzaElencoDeiRischi(testo));
+  const viste = new Map<string, number>();
+  for (let i = 0; i + 2 < p.length; i += 1) {
+    const tris = `${p[i]} ${p[i + 1]} ${p[i + 2]}`;
+    viste.set(tris, (viste.get(tris) ?? 0) + 1);
+  }
+  return [...viste.entries()].filter(([, n]) => n > 1).map(([tris]) => tris);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4 · «Da rilevare» di ciò che la pagina stampa già
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * La voce che chiede un dato che la stessa pagina mostra da un'altra parte.
+ *
+ * È il difetto che il proprietario del prodotto ha contestato più volte, e ha sempre la
+ * stessa forma: «Export: da rilevare in intervista» stampato a due sezioni di distanza da
+ * «Paesi di esportazione: Unione Europea, Altri Paesi». Il dato era comprato, era a
+ * schermo, e il motore dichiarava di non averlo.
+ *
+ * Il controllo confronta l'etichetta della voce vuota con le etichette valorizzate del
+ * resto della scheda, sulla radice delle parole: se una combacia, la richiesta è sospetta e
+ * va guardata a mano. Non è una condanna — «ROI» dell'archivio ha un denominatore che
+ * l'archivio non documenta, e restare fuori dal punteggio è corretto — ma è la lista di
+ * ciò che merita una spiegazione scritta.
+ */
+/** Le parole di contenuto di un'etichetta, come insieme di radici. */
+function radici(etichetta: string): Set<string> {
+  return new Set(parole(etichetta).filter((p) => !['sul', 'sui', 'suo', 'della'].includes(p)));
+}
+
+/** `pfnSuEbitda` → «pfn su ebitda»: il nome del campo diventa confrontabile con un'etichetta. */
+function daCamelCase(nome: string): string {
+  return nome.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+}
+
+/** Ogni campo valorizzato degli indicatori dell'archivio, col suo nome in chiaro. */
+function campiValorizzatiArchivio(indicatori: unknown, prefisso = ''): Map<string, unknown> {
+  const trovati = new Map<string, unknown>();
+  if (indicatori === null || typeof indicatori !== 'object') return trovati;
+  for (const [chiave, valore] of Object.entries(indicatori)) {
+    if (valore === null || valore === undefined) continue;
+    if (typeof valore === 'object' && !Array.isArray(valore)) {
+      for (const [k, v] of campiValorizzatiArchivio(valore, prefisso)) trovati.set(k, v);
+    } else {
+      trovati.set(daCamelCase(chiave), valore);
+    }
+  }
+  return trovati;
+}
+
+/**
+ * La voce che chiede un dato che l'archivio ha già dato — e che la pagina stampa.
+ *
+ * È il difetto contestato più volte, e ha sempre la stessa forma: «Export: da rilevare in
+ * intervista» a due sezioni di distanza da «Paesi di esportazione: Unione Europea, Altri
+ * Paesi»; «PFN / EBITDA: da rilevare in intervista» venti centimetri sotto «PFN su EBITDA
+ * 9,53». Il dato era comprato, era a schermo, e il motore dichiarava di non averlo.
+ *
+ * Il confronto NON è fra etichette della stessa pagina — sarebbe un controllo che non può
+ * accendersi, perché una voce vuota e una piena non portano quasi mai lo stesso nome. È fra
+ * l'etichetta vuota e i **campi valorizzati degli indicatori del fornitore**, che sono la
+ * roba pagata: due parole di contenuto in comune bastano per chiedere una spiegazione.
+ *
+ * Non ogni segnalazione è un difetto. Il ROI dell'archivio resta fuori dal punteggio perché
+ * il suo denominatore non è documentato, e la crescita dell'EBITDA perché è calcolata su due
+ * esercizi contro una soglia annua: sono decisioni scritte nel codice. Ma devono essere
+ * **scritte**, ed è questo elenco a pretenderlo.
+ */
+function chiedeCiòCheHaGià(frasi: readonly Frase[], indicatoriFornitore: unknown): string[] {
+  const perPercorso = new Map<string, Frase>();
+  for (const f of frasi) perPercorso.set(f.dove, f);
+
+  const archivio = campiValorizzatiArchivio(indicatoriFornitore);
+  const sospette: string[] = [];
+
+  for (const f of frasi) {
+    if (!f.dove.endsWith('.label')) continue;
+    const valore = perPercorso.get(f.dove.replace(/\.label$/, '.value'));
+    if (valore === undefined) continue;
+    if (!/da rilevare|non determinabil|non calcolabil|non disponibil/i.test(valore.testo)) continue;
+
+    const chieste = radici(f.testo);
+    if (chieste.size === 0) continue;
+
+    for (const [nome, valoreArchivio] of archivio) {
+      const offerte = radici(nome);
+      let comuni = 0;
+      for (const r of chieste) if (offerte.has(r)) comuni += 1;
+      // Due radici in comune: «pfn ebitda» contro «pfn su ebitda» combacia, «ciclo
+      // circolante» contro «ciclo finanziario» no — ed è giusto, sono grandezze diverse.
+      if (comuni >= 2) {
+        sospette.push(`«${f.testo}» chiesta, ma l’archivio dà «${nome}» = ${String(valoreArchivio)}`);
+        break;
+      }
+    }
+  }
+  return [...new Set(sospette)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La cache che non spende
+// ─────────────────────────────────────────────────────────────────────────────
+
+class CacheDaSonda implements Cache {
+  constructor(private readonly piva: string) {}
+  readonly mancanti: string[] = [];
+
+  get(key: string): CacheEntry | undefined {
+    const servizio = /\/([A-Za-z0-9-]+)\/\d+/.exec(key)?.[1] ?? null;
+    if (servizio === null) return undefined;
+    const file = join(SONDA, `prod-${servizio}-${this.piva}.json`);
+    if (!existsSync(file)) {
+      this.mancanti.push(servizio);
+      return undefined;
+    }
+    return {
+      value: JSON.parse(readFileSync(file, 'utf8')) as unknown,
+      expiresAt: Date.now() + 3_600_000,
+    };
+  }
+  set(): void {}
+  delete(): void {}
+}
+
+async function creaCache(piva: string): Promise<Cache> {
+  if (!DA_DATABASE) return new CacheDaSonda(piva);
+  const { creaPersistenza } = await import('../apps/api/src/persistenza.js');
+  const { CachePersistente } = await import('../apps/api/src/cache-persistente.js');
+  const persistenza = await creaPersistenza({ url: process.env['DATABASE_URL'] });
+  return new CachePersistente(persistenza.db);
+}
+
+/** Le imprese su cui misurare, quando non ne è stata indicata nessuna. */
+function piveDaSonda(): string[] {
+  if (!existsSync(SONDA)) return [];
+  const trovate = new Set<string>();
+  for (const f of readdirSync(SONDA)) {
+    const m = /^prod-IT-(?:advanced|full)-(\d+)\.json$/.exec(f);
+    if (m?.[1] !== undefined) trovate.add(m[1]);
+  }
+  return [...trovate];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// L'autoprova: i rilevatori si fanno fallire prima di essere creduti
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Ogni rilevatore, messo davanti al difetto vero e a un caso legittimo.
+ *
+ * Gira **sempre**, prima della misura, e non su richiesta: questo strumento ha già
+ * restituito «nessun rilievo» tre volte in mezz'ora per tre ragioni diverse — misurava il
+ * compilato vecchio, contava una versione come un decimale, cercava affermazioni ripetute
+ * dentro un elenco di nomi. Ogni volta lo zero sembrava identico a quello buono.
+ *
+ * Le stringhe sono quelle vere, prese dalle schede in cui i difetti sono stati trovati.
+ * Se un giorno un rilevatore smette di vederle, questo esce con codice 2 invece di
+ * dichiarare la scheda pulita.
+ */
+function autoprovaRilevatori(): void {
+  const guasti: string[] = [];
+
+  const deve = (condizione: boolean, cosa: string): void => {
+    if (!condizione) guasti.push(cosa);
+  };
+
+  // 1 · separatore decimale
+  deve(
+    decimaliInglesi('Fattore di score 0.30× (score 44/100)').includes('0.30'),
+    'il separatore inglese «0.30» non viene più visto',
+  );
+  deve(
+    decimaliInglesi('Patrimonio esposto 11.500.000 €').length === 0,
+    'le migliaia italiane «11.500.000» vengono scambiate per un decimale inglese',
+  );
+
+  // 2 · accordo con il numero uno
+  deve(
+    accordiSbagliati('Sulle restanti 1 il contesto non è stato osservato.').length > 0,
+    'l’accordo sbagliato «restanti 1» non viene più visto',
+  );
+  deve(
+    accordiSbagliati('Su 2 ubicazioni il contesto non è stato osservato.').length === 0,
+    'un plurale corretto viene segnalato come accordo sbagliato',
+  );
+
+  // 3 · affermazioni ripetute
+  const rcoComeUsciva =
+    'L’indennizzo INAIL non esaurisce il danno risarcibile: restano a carico del datore di ' +
+    'lavoro il danno differenziale e le voci che l’istituto non indennizza. Il datore di lavoro ' +
+    'è tenuto ad adottare le misure necessarie a tutelare l’integrità fisica dei prestatori di ' +
+    'lavoro, e ne risponde civilmente. L’indennizzo INAIL non esaurisce il danno risarcibile: ' +
+    'restano a carico il differenziale e le voci non indennizzate.';
+  deve(
+    affermazioniRipetute(rcoComeUsciva).includes('indenn inail esauri'),
+    'la ripetizione «indennizzo INAIL esaurisce» non viene più vista',
+  );
+  deve(
+    affermazioniRipetute(
+      'Protegge il capitale produttivo dell’impresa da eventi che possono comprometterne la ' +
+        'continuità aziendale e la capacità di produrre reddito nel tempo.',
+    ).length === 0,
+    'una frase senza ripetizioni viene segnalata',
+  );
+  // E l'elenco dei rischi serviti non deve rientrare dalla finestra: è una lista di nomi.
+  deve(
+    affermazioniRipetute(
+      'La violazione di dati personali espone a sanzioni GDPR e ad azioni risarcitorie degli ' +
+        'interessati. L’analisi ha rilevato i seguenti rischi residui a carico dell’impresa: ' +
+        'violazione di dati personali (rilevante); frode informatica (rilevante).',
+    ).length === 0,
+    'il nome di un rischio dentro l’elenco viene contato come affermazione ripetuta',
+  );
+
+  // 4 · «da rilevare» di ciò che l'archivio ha già dato
+  const frasiFinte: Frase[] = [
+    { dove: '.credito.fattori[3].dettagli[0].label', testo: 'PFN / EBITDA' },
+    { dove: '.credito.fattori[3].dettagli[0].value', testo: 'da rilevare in intervista' },
+  ];
+  deve(
+    chiedeCiòCheHaGià(frasiFinte, { leveFinanziarie: { pfnSuEbitda: 9.53 } }).length > 0,
+    'la voce chiesta mentre l’archivio la fornisce non viene più vista',
+  );
+  deve(
+    chiedeCiòCheHaGià(frasiFinte, { cicloFinanziario: { durataScorte: 264 } }).length === 0,
+    'una grandezza diversa viene scambiata per la stessa',
+  );
+
+  if (guasti.length > 0) {
+    process.stderr.write('\n  I RILEVATORI SONO CIECHI — la misura non vale:\n');
+    for (const g of guasti) process.stderr.write(`    ✗ ${g}\n`);
+    process.stderr.write('\n');
+    process.exit(2);
+  }
+}
+
+autoprovaRilevatori();
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const bersagli = PIVE.length > 0 ? PIVE : piveDaSonda();
+if (bersagli.length === 0) {
+  process.stdout.write('\n  Nessuna risposta registrata in .sonda/: niente da misurare.\n\n');
+  process.exit(1);
+}
+
+let totale = 0;
+
+for (const piva of bersagli) {
+  const cache = await creaCache(piva);
+  const provider = new OpenApiProvider({
+    token: 'nessun-token-audit-offline',
+    ambiente: 'produzione',
+    config: OPENAPI_DEFAULT_CONFIG,
+    cache,
+    ledger: { record: () => {} },
+  });
+
+  let dto: unknown;
+  let indicatoriFornitore: unknown = null;
+  let nome = piva;
+  try {
+    const profilo = await provider.fetchProfile(piva, 'profondito');
+    nome = `${profilo.identity.denominazione} · ${piva}`;
+    indicatoriFornitore = profilo.indicatoriFornitore;
+    dto = presentAnalysis(analyzeCompany(profilo, [], new Date()));
+  } catch (errore) {
+    // Il token è finto apposta: un 401 significa che la risposta non è fra quelle già
+    // pagate, non che il prodotto sia rotto. Si dice, e si passa alla successiva.
+    const messaggio = /HTTP 401/.test(String(errore))
+      ? 'risposta non registrata in .sonda/ — questo strumento non chiama e non spende'
+      : String(errore);
+    process.stdout.write(`\n  ${piva}: saltata (${messaggio})\n`);
+    continue;
+  }
+
+  const frasi: Frase[] = [];
+  raccogliFrasi(dto, '', frasi);
+  const prosa = frasi.filter((f) => !CHIAVI_TECNICHE.test(f.dove));
+
+  process.stdout.write(`\n  ${nome}\n  ${'─'.repeat(70)}\n`);
+  process.stdout.write(`  stringhe consegnate alla pagina: ${frasi.length}\n`);
+
+  const rilievi: string[] = [];
+
+  for (const f of prosa) {
+    for (const d of decimaliInglesi(f.testo)) {
+      rilievi.push(`separatore inglese «${d}» — ${f.dove}\n      ${estratto(f.testo)}`);
+    }
+    for (const a of accordiSbagliati(f.testo)) {
+      rilievi.push(`accordo «${a}» — ${f.dove}\n      ${estratto(f.testo)}`);
+    }
+    // La ripetizione si cerca solo nei testi lunghi: sotto le venti parole di contenuto
+    // una sequenza che torna è quasi sempre una coincidenza di lingua, non un difetto.
+    if (parole(f.testo).length >= 20) {
+      for (const r of affermazioniRipetute(f.testo)) {
+        rilievi.push(`ripetuto «${r}» — ${f.dove}\n      ${estratto(f.testo)}`);
+      }
+    }
+  }
+
+  for (const s of chiedeCiòCheHaGià(prosa, indicatoriFornitore)) {
+    rilievi.push(`già disponibile: ${s}`);
+  }
+
+  if (rilievi.length === 0) {
+    process.stdout.write('  nessun rilievo\n');
+  } else {
+    for (const r of rilievi) process.stdout.write(`  ✗ ${r}\n`);
+  }
+  process.stdout.write(`  rilievi: ${rilievi.length}\n`);
+  totale += rilievi.length;
+}
+
+process.stdout.write(`\n  TOTALE RILIEVI: ${totale}\n\n`);
+process.exit(totale === 0 ? 0 : 1);

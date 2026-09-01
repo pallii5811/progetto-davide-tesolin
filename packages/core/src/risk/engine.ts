@@ -28,6 +28,14 @@ export interface AppliedRule {
   readonly impactDelta: number;
   /** La regola si è attivata su un dato mancante: la conclusione va confermata dal cliente. */
   readonly suDatoIgnoto: boolean;
+  /**
+   * Il fatto è accertato e conta, ma la scala era già al suo limite: il delta esce zero
+   * per saturazione, non per irrilevanza.
+   *
+   * Senza questa distinzione i due zeri finivano sulla scheda scritti allo stesso modo, e
+   * il lettore non poteva sapere se un fatto fosse stato scartato o esaurito.
+   */
+  readonly saturata?: boolean | undefined;
 }
 
 export interface AssessedRisk {
@@ -159,8 +167,10 @@ export function assessRisks(
         rationale: accertato
           ? 'Il motore di conformità ha accertato che l’impresa è soggetta all’obbligo assicurativo ' +
             'contro i rischi catastrofali (L. 213/2023 art. 1 cc. 101-111).'
-          : 'Il perimetro dell’obbligo assicurativo catastrofale non è stato valutato per questa ' +
-            'impresa. (dato da confermare)',
+          : // La riserva è già il soggetto della frase: aggiungerla di nuovo fra parentesi
+            // la ripeteva, e in coda, che è il posto in cui non serve a nessuno.
+            'Il perimetro dell’obbligo assicurativo catastrofale non è stato valutato per questa ' +
+            'impresa.',
         likelihoodDelta: 0,
         impactDelta: 0,
         suDatoIgnoto: !accertato,
@@ -323,12 +333,12 @@ function toAppliedRule(rule: RiskRule, verdict: Verdict, facts: CompanyFacts): A
   const suDatoIgnoto = verdict === 'ignoto';
   // Il motivo può dipendere dai numeri di questa impresa: si risolve qui, dove i fatti ci
   // sono, invece di lasciare che una soglia si spacci per una misura.
-  const motivo = risolviRationale(rule.rationale, facts);
+  const motivo = motivoDellaRegola(rule, facts, suDatoIgnoto);
 
   if (rule.kind === 'identifica') {
     return {
       ruleId: rule.id,
-      rationale: suDatoIgnoto ? `${motivo} (dato da confermare)` : motivo,
+      rationale: motivo,
       likelihoodDelta: 0,
       impactDelta: 0,
       suDatoIgnoto,
@@ -337,11 +347,33 @@ function toAppliedRule(rule: RiskRule, verdict: Verdict, facts: CompanyFacts): A
   // Su dato ignoto la modulazione non si applica: si segnala soltanto la verifica da fare.
   return {
     ruleId: rule.id,
-    rationale: suDatoIgnoto ? `${motivo} (da verificare)` : motivo,
+    rationale: motivo,
     likelihoodDelta: suDatoIgnoto ? 0 : (rule.likelihood ?? 0),
     impactDelta: suDatoIgnoto ? 0 : (rule.impact ?? 0),
     suDatoIgnoto,
   };
+}
+
+/**
+ * Il motivo nella forma che corrisponde a ciò che si sa davvero.
+ *
+ * Sul fatto accertato vale il motivo della regola, all'indicativo. Sul fatto non rilevato
+ * vale la sua formulazione condizionale, che porta la riserva **dentro** la frase: la
+ * parentesi in coda arrivava dopo l'affermazione, e chi legge ad alta voce l'aveva già
+ * pronunciata — «Lavorazioni in cantiere» detto a un fabbricante di serrature.
+ *
+ * Il ripiego con la parentesi resta per le regole che non hanno ancora la loro forma
+ * condizionale: dichiarare la riserva tardi è meno peggio che non dichiararla. Ma è un
+ * ripiego, non un'alternativa, e `regole-non-affermano-lignoto.test.ts` lo tiene vuoto.
+ */
+function motivoDellaRegola(rule: RiskRule, facts: CompanyFacts, suDatoIgnoto: boolean): string {
+  const accertato = risolviRationale(rule.rationale, facts);
+  if (!suDatoIgnoto) return accertato;
+
+  const seIgnoto = 'rationaleSeIgnoto' in rule ? rule.rationaleSeIgnoto : undefined;
+  if (seIgnoto !== undefined) return risolviRationale(seIgnoto, facts);
+
+  return rule.kind === 'identifica' ? `${accertato} (dato da confermare)` : `${accertato} (da verificare)`;
 }
 
 /**
@@ -363,10 +395,24 @@ function applicaConTetto(
   return regole.map((regola) => {
     const nuovaProbabilita = clampLikelihood(probabilita + regola.likelihoodDelta);
     const nuovoImpatto = clampImpact(impatto + regola.impactDelta);
+    const applicataProbabilita = nuovaProbabilita - probabilita;
+    const applicatoImpatto = nuovoImpatto - impatto;
     const applicata: AppliedRule = {
       ...regola,
-      likelihoodDelta: nuovaProbabilita - probabilita,
-      impactDelta: nuovoImpatto - impatto,
+      likelihoodDelta: applicataProbabilita,
+      impactDelta: applicatoImpatto,
+      /*
+        Il fatto contava, ma la scala era già in fondo.
+
+        La scheda stampava «±0P ±0I» accanto a «Totale attivo superiore a 5 M€», su un
+        rischio già a impatto catastrofico: un numero al posto di una spiegazione, e per di
+        più uno zero che sembrava dire «questo fatto non conta». Contava, e non c'era più
+        spazio per contare di più. Sono due cose diverse e vanno stampate diverse.
+      */
+      saturata:
+        !regola.suDatoIgnoto &&
+        ((regola.likelihoodDelta !== 0 && applicataProbabilita === 0) ||
+          (regola.impactDelta !== 0 && applicatoImpatto === 0)),
     };
     probabilita = nuovaProbabilita;
     impatto = nuovoImpatto;

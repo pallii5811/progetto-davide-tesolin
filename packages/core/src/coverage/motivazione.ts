@@ -27,6 +27,7 @@ import type { CoverageDefinition, CoverageId } from './taxonomy.js';
 import { regimeDiResponsabilita } from '../governance/norme.js';
 import type { Confidence } from '../shared/provenance.js';
 import { formattaGiorno } from '../shared/tempo.js';
+import { inizialeMinuscola } from '../shared/testo.js';
 
 /**
  * Un pezzo di motivazione che si accende su un fatto.
@@ -436,10 +437,26 @@ export function componiMotivazioneCopertura(
   const parti = [...(assorbita ? [] : [definition.motivazioneTipo]), ...frammenti.map((f) => f.testo)];
 
   if (rischiServiti.length > 0) {
+    /*
+      «rischio residuo» stava scritto una volta nell'introduzione e poi di nuovo dentro
+      ogni voce: tre volte in una riga sola, su ogni copertura di ogni impresa.
+
+      Trovato misurando, non leggendo — `scripts/audit-testo-schermo.ts` lo segnala su
+      undici motivazioni su ventiquattro fra le due imprese di prova, ed è il singolo
+      difetto che produceva più ripetizioni in tutta la scheda. A occhio era invisibile:
+      la frase è corretta, e a leggerla da sola non stona.
+
+      L'introduzione dice già che si parla di rischi residui: alla voce resta il livello.
+    */
     const principali = [...rischiServiti]
       .sort((a, b) => b.residualScore - a.residualScore)
       .slice(0, 3)
-      .map((r) => `${r.definition.label.toLowerCase()} (rischio residuo ${r.residualLevel})`);
+      /*
+        `toLowerCase()` sull'etichetta intera scriveva «(d.lgs. 231/2001)» dentro un
+        documento che va al cliente e, davanti a una contestazione, in un fascicolo. E
+        «CAT NAT» diventava «cat nat». Quello che serve è solo l'iniziale.
+      */
+      .map((r) => `${inizialeMinuscola(r.definition.label)} (${r.residualLevel})`);
     parti.push(
       `L'analisi ha rilevato i seguenti rischi residui a carico dell'impresa: ${principali.join('; ')}.`,
     );

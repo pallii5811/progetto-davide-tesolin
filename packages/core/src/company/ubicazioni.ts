@@ -476,8 +476,13 @@ function note(
 
   const nonOsservate = ubicazioni.length - osservate.length;
   if (osservate.length > 0 && nonOsservate > 0) {
+    // «Sulle restanti 1» è la forma che esce ogni volta che le ubicazioni sono due e una
+    // sola è stata osservata — cioè il caso più frequente, non un caso limite. Su un
+    // documento che va al cliente un accordo sbagliato costa credito quanto un numero.
     elenco.push(
-      `Sulle restanti ${nonOsservate} il contesto non è stato osservato: l'assenza di segnalazioni non va letta come assenza di attività confinanti.`,
+      nonOsservate === 1
+        ? "Sulla restante il contesto non è stato osservato: l'assenza di segnalazioni non va letta come assenza di attività confinanti."
+        : `Sulle restanti ${nonOsservate} il contesto non è stato osservato: l'assenza di segnalazioni non va letta come assenza di attività confinanti.`,
     );
   }
 

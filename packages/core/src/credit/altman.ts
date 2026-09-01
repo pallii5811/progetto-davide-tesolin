@@ -123,11 +123,13 @@ export function computeAltmanZ(
       .input('X3 — EBIT / Totale attivo', formatRatio(x3))
       .input('X4 — Patrimonio netto / Totale debiti', formatRatio(x4))
       .input('Esercizio', String(b.anno))
-      .note(`Z'' = ${z.toFixed(2)} → ${ALTMAN_ZONE_LABEL[zone]}.`)
+      // `toFixed` scrive il punto decimale inglese, e questo file scrive già «4,00» a mano
+      // due note più giù: il documento sarebbe uscito con le due convenzioni mescolate.
+      .note(`Z'' = ${formatDue(z)} → ${ALTMAN_ZONE_LABEL[zone]}.`)
       .note(
-        `Soglie: > ${ALTMAN_SOGLIA_SICUREZZA.toFixed(2)} sicurezza · ` +
-          `${ALTMAN_SOGLIA_RISCHIO.toFixed(2)}–${ALTMAN_SOGLIA_SICUREZZA.toFixed(2)} incertezza · ` +
-          `< ${ALTMAN_SOGLIA_RISCHIO.toFixed(2)} rischio.`,
+        `Soglie: > ${formatDue(ALTMAN_SOGLIA_SICUREZZA)} sicurezza · ` +
+          `${formatDue(ALTMAN_SOGLIA_RISCHIO)}–${formatDue(ALTMAN_SOGLIA_SICUREZZA)} incertezza · ` +
+          `< ${formatDue(ALTMAN_SOGLIA_RISCHIO)} rischio.`,
       )
       .noteIf(
         !Money.isPositive(sp.totaleDebiti),
@@ -184,6 +186,13 @@ function normaCapitale(contesto: ContestoAltman | undefined): string {
 
 function formatRatio(value: number): string {
   return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(
+    value,
+  );
+}
+
+/** Lo Z'' e le sue soglie: due decimali, separatore italiano come tutto il resto. */
+function formatDue(value: number): string {
+  return new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
     value,
   );
 }

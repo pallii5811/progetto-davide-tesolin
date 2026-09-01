@@ -217,6 +217,107 @@ cantiere (da verificare)» mette un numero al posto di un motivo. Come «Analisi
 potenziale» detto a chi ha appena pagato il profilo completo: la misura era giusta, contava
 i campi dell'**intervista**, e il titolo la attribuiva all'analisi.
 
+## 14 · La riserva sta nella FORMA della frase, non in una parentesi in coda
+
+Una regola che si accende su un dato non rilevato non lo afferma. Non si scrive il fatto
+all'indicativo e poi si aggiunge «(da verificare)»: si scrive «Da accertare se…».
+
+> Costato, sulla scheda di un fabbricante di serrature:
+>
+> > «Lavorazioni in cantiere: settore a più elevata incidenza infortunistica. (da verificare)»
+> > «Canale e-commerce attivo: superficie di attacco esposta su internet. (da verificare)»
+> > «Gli immobili sono di proprietà: il danno colpisce il patrimonio aziendale. (da verificare)»
+>
+> Nessuno di quei fatti era stato rilevato, e il motore lo sapeva: marcava `suDatoIgnoto` e
+> azzerava i delta. Ma **32 regole su 68** si accendono così, e tutte e 32 lo affermavano.
+
+La parentesi arriva dopo l'affermazione, e l'intermediario che legge la riga al telefono
+l'ha già pronunciata: ha appena detto a un fabbricante di serrature che lavora in cantiere.
+Da lì in poi vale meno anche tutto il resto del documento, comprese le righe esatte — che
+sono la maggioranza.
+
+La forma condizionale dice tre cose: che il dato manca, cosa cambierebbe se ci fosse, e
+dove lo si va a prendere. La terza trasforma un avviso in un'istruzione: «voce C-I dello
+stato patrimoniale» è una cosa che si può chiedere al cliente, «da verificare» no.
+
+Il presidio è `packages/core/test/regole-non-affermano-lignoto.test.ts`; il conteggio si
+rifà con `scripts/quali-affermano-sullignoto.ts`.
+
+**Corollario sui due zeri.** «Il fatto non è stato rilevato» e «il fatto conta, ma la scala
+era già al massimo» producono entrambi delta zero e sono l'opposto l'uno dell'altro. La
+scheda li stampava con lo stesso «±0P ±0I».
+
+## 15 · L'orizzonte di una variazione si verifica, non si legge dal titolo
+
+Un numero in percentuale non dice rispetto a quando. Prima di scriverlo accanto a
+«rispetto all'esercizio precedente» si chiude l'identità sui valori che si hanno.
+
+> Costato: il riquadro «Andamento» dichiarava variazioni sull'anno precedente, e sono su
+> **due** esercizi. Provato a quattro decimali, su due indici indipendenti e con i numeri
+> che la stessa pagina stampa:
+>
+> | indice | conto                 | risultato  | a schermo |
+> | ------ | --------------------- | ---------- | --------- |
+> | EBIT   | 187.148 / 233.968 − 1 | −20,0113 % | −20,01 %  |
+> | EBITDA | 343.989 / 360.857 − 1 | −4,6744 %  | −4,67 %   |
+>
+> I denominatori sono `ebitL2Y` e `ebitdaL2Y` — _last two years_. Perché fosse un caso,
+> EBIT ed EBITDA dell'anno scorso dovrebbero coincidere **entrambi** con quelli di due anni
+> fa.
+
+«EBIT −20% sull'esercizio precedente» descrive un'impresa crollata in dodici mesi e apre
+una conversazione sul credito che i numeri non giustificano. Su due esercizi è una discesa.
+
+E lo stesso vale per farlo entrare in un calcolo: `sviluppo.mol` resta fuori dal fattore
+redditività proprio per questo — una discesa biennale confrontata con una soglia annua non
+è un'approssimazione, è un altro numero.
+
+## 16 · Il documento è italiano fino all'ultimo carattere
+
+`toFixed` scrive il punto decimale inglese. Su una pagina che stampa «1,37» e «13,7 %» il
+fattore di score usciva **«0.30×»**, e lo Z'' con le sue soglie faceva lo stesso.
+
+Vale anche per gli accordi: «Sulle restanti **1** il contesto non è stato osservato» esce
+ogni volta che le ubicazioni sono due e una sola è stata guardata — cioè quasi sempre, non
+in un caso limite.
+
+Nessuna delle due cambia un numero, e sono le due che un cliente nota per prime: fanno
+sembrare tradotto ciò che è stato scritto qui, e distratto ciò che è stato misurato.
+
+## 17 · La scheda si MISURA, non si legge
+
+È la regola 1 applicata al testo, e la sua assenza si pagava a ogni ricaricamento.
+
+> Costato, e detto così: «OGNI VOLTA CHE RICARICO LA PAGINA TROVIAMO ERRORI, COM'È POSSIBILE
+> CHE NON RIESCI A RENDERE PERFETTO QUESTO SOFTWARE?»
+>
+> La domanda era giusta e la risposta stava nel metodo. Ogni difetto di testo corretto fino
+> a quel punto era stato trovato da un paio d'occhi che leggevano la scheda, e gli occhi
+> trovano un'istanza per volta. Le due volte in cui invece si era misurato:
+>
+> | difetto                  | trovato leggendo | misurato             |
+> | ------------------------ | ---------------- | -------------------- |
+> | frasi ripetute           | 3                | 11 motivazioni su 24 |
+> | affermazioni sull'ignoto | 3                | **32 regole su 68**  |
+>
+> Le altre ventinove sarebbero uscite una alla volta, a un ricaricamento di distanza l'una
+> dall'altra. È esattamente ciò che stava succedendo.
+
+`scripts/audit-testo-schermo.ts` monta la scheda vera di un'impresa vera dalle risposte già
+pagate, percorre **ogni stringa** che il presentatore consegna alla pagina — sono circa
+millecinquecento per impresa — e applica i controlli tutti insieme.
+
+Due cose lo rendono credibile, e sono più importanti dei controlli:
+
+1. **Si rifiuta di girare sul compilato vecchio.** Ha già risposto «venti rilievi» misurando
+   `dist` prima della ricompilazione; i rilievi veri erano cinque.
+2. **Prima di misurare fa fallire i propri rilevatori** sui difetti storici. In mezz'ora ha
+   detto «nessun rilievo» tre volte per tre ragioni diverse — compilato vecchio, una
+   versione scambiata per un decimale, affermazioni cercate dentro un elenco di nomi — e
+   ogni volta quello zero era identico a quello buono.
+
+E un rilievo falso costa più di uno mancato: insegna a ignorare l'elenco.
+
 ---
 
 ## Comandi
@@ -228,7 +329,18 @@ npm run collaudo:schermate
 npx tsx scripts/istantanea-motore.ts prima.json    # e poi confronta-istantanee.ts
 npx tsx scripts/indicatori-mai-mostrati.ts         # dati comprati e non resi
 npx tsx scripts/quanto-del-comprato-si-vede.ts     # copertura dei campi del fornitore
+
+# PRIMA DI CONSEGNARE — ogni parola che la scheda stampa, controllata a macchina.
+npm run build && npx tsx scripts/audit-testo-schermo.ts
+npx tsx scripts/audit-testo-schermo.ts --da-database <piva>   # sul server, sulla scheda vera
+npx tsx scripts/quali-affermano-sullignoto.ts      # regole che parlano di ciò che non sanno
 ```
+
+`audit-testo-schermo.ts` vuole il compilato fresco e si ferma se non lo è, perché ci è già
+cascato: aveva risposto «venti rilievi» misurando `dist` prima della ricompilazione, e i
+rilievi veri erano cinque. E prima di misurare fa fallire i propri rilevatori sui difetti
+storici: uno strumento che dice «nessun rilievo» perché è cieco scrive sullo schermo la
+stessa cosa di uno che dice «nessun rilievo» perché è pulito.
 
 ⚠ `npm run format:check` **non può passare su Windows**: git scrive CRLF nella copia di
 lavoro e Prettier vuole LF. Segnala file mai toccati da nessuno. La CI, che estrae con LF,

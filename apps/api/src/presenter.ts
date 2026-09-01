@@ -712,12 +712,14 @@ function presentRisk(rischio: AssessedRisk) {
         deltaProbabilita: r.likelihoodDelta,
         deltaImpatto: r.impactDelta,
         suDatoIgnoto: r.suDatoIgnoto,
+        saturata: r.saturata === true,
       })),
       controlli: rischio.controlRules.map((r) => ({
         motivazione: r.rationale,
         deltaProbabilita: r.likelihoodDelta,
         deltaImpatto: r.impactDelta,
         suDatoIgnoto: r.suDatoIgnoto,
+        saturata: r.saturata === true,
       })),
     },
   };

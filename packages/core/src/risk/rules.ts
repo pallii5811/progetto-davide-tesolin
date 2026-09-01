@@ -42,7 +42,37 @@ export type Verdict = true | false | 'ignoto';
  */
 export type Rationale = string | ((facts: CompanyFacts) => string);
 
-export interface IdentifyRule {
+/**
+ * Il motivo quando il fatto **non è stato rilevato**.
+ *
+ * `rationale` descrive un fatto accertato, e va scritto all'indicativo. Ma la stessa regola
+ * si accende anche in forma ignota — `when` restituisce `'ignoto'`, i delta si azzerano — e
+ * lì la frase all'indicativo diventa un'affermazione sull'impresa che nessuno ha verificato.
+ *
+ * > Letto sulla scheda di un fabbricante di serrature, che in cantiere non ci mette piede:
+ * >
+ * >   «Lavorazioni in cantiere: settore a più elevata incidenza infortunistica. (da verificare)»
+ * >   «Canale e-commerce attivo: superficie di attacco esposta su internet.  (da verificare)»
+ * >   «Gli immobili sono di proprietà: il danno colpisce il patrimonio aziendale. (da verificare)»
+ * >
+ * > Trentadue regole su sessantotto si accendono così, e tutte e trentadue lo facevano al
+ * > presente indicativo. La parentesi in coda non salva la frase: arriva dopo
+ * > l'affermazione, e l'intermediario che legge quella riga al telefono l'ha già detta.
+ *
+ * La riserva quindi non si aggiunge in coda: si scrive nella **forma** della frase — «Da
+ * accertare se…», «Il dato non è stato rilevato: sopra la soglia…» — perché una condizione
+ * dichiarata all'inizio è l'unica che il lettore non può scavalcare.
+ *
+ * Non è facoltativo dove serve: `regole-non-affermano-lignoto.test.ts` valuta ogni regola
+ * su un'impresa di cui non si sa nulla e pretende questa formulazione per ognuna che si
+ * accenda. Le regole di controllo ne sono esenti, e per una ragione dimostrata: il motore
+ * le scarta prima di applicarle quando il verdetto è ignoto.
+ */
+type ConRiservaSuDatoIgnoto = {
+  readonly rationaleSeIgnoto?: Rationale | undefined;
+};
+
+export interface IdentifyRule extends ConRiservaSuDatoIgnoto {
   readonly kind: 'identifica';
   readonly id: string;
   readonly risk: RiskId;
@@ -50,7 +80,7 @@ export interface IdentifyRule {
   readonly rationale: Rationale;
 }
 
-export interface ModulateRule {
+export interface ModulateRule extends ConRiservaSuDatoIgnoto {
   readonly kind: 'modula';
   readonly id: string;
   readonly risk: RiskId;
@@ -242,6 +272,10 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'incendio/immobili-di-proprieta',
+    rationaleSeIgnoto:
+      'Il titolo di godimento degli immobili non è stato rilevato: se sono di proprietà il danno ' +
+      'colpisce direttamente il patrimonio aziendale, se sono in locazione resta la responsabilità ' +
+      'verso il proprietario e il contenuto.',
     risk: 'incendio-fabbricati',
     when: (f) => tri(f.possiedeImmobili),
     impact: 1,
@@ -259,6 +293,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'identifica',
     id: 'furto/scorte-o-commercio',
+    rationaleSeIgnoto:
+      'Da accertare se l’impresa detiene scorte o beni facilmente asportabili: è il presupposto ' +
+      'stesso della garanzia furto.',
     risk: 'furto-scorte',
     when: (f) => {
       const conScorte = importoOltre(f.rimanenze, 10_000);
@@ -272,6 +309,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'furto/scorte-rilevanti',
+    rationaleSeIgnoto:
+      'Il valore delle rimanenze non è stato rilevato: oltre i 500.000 € il rischio furto cambia di ' +
+      'grado. Si legge dalla voce C-I dello stato patrimoniale del bilancio depositato.',
     risk: 'furto-scorte',
     when: (f) => importoOltre(f.rimanenze, 500_000),
     impact: 1,
@@ -296,6 +336,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'sisma/zona-alta',
+    rationaleSeIgnoto:
+      'La zona sismica delle ubicazioni non è stata determinata: nelle zone 1 e 2 la probabilità ' +
+      'dell’evento è sensibilmente maggiore.',
     risk: 'catastrofale-sisma',
     when: sismicaAlta,
     likelihood: 1,
@@ -314,6 +357,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'alluvione/zona-idraulica-alta',
+    rationaleSeIgnoto:
+      'La pericolosità idraulica delle ubicazioni non è stata determinata: nelle aree classificate ' +
+      'a pericolosità elevata dal PAI la probabilità dell’evento cresce.',
     risk: 'catastrofale-alluvione',
     when: idraulicaAlta,
     likelihood: 1,
@@ -336,6 +382,10 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'guasto-macchinario/impianti-rilevanti',
+    rationaleSeIgnoto:
+      'Il valore degli impianti non è stato rilevato: oltre i 500.000 € al netto degli ammortamenti ' +
+      'il guasto di un macchinario critico pesa in modo diverso. Si legge dalle voci B-II-2 e ' +
+      'B-II-3 dello stato patrimoniale.',
     risk: 'guasto-macchinario',
     when: (f) => importoOltre(f.valoreImpiantiNetto, 500_000),
     impact: 1,
@@ -362,6 +412,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'fermo/margine-elevato',
+    rationaleSeIgnoto:
+      'Il margine di contribuzione non è stato rilevato: è la grandezza che misura quanto costa un ' +
+      'mese di fermo, e si ricava dalle voci B-6 e B-7 del conto economico depositato.',
     risk: 'fermo-attivita',
     when: (f) => importoOltre(f.margineDiContribuzione, 1_000_000),
     impact: 1,
@@ -407,6 +460,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'indisponibilita-sede/sede-unica',
+    rationaleSeIgnoto:
+      'Il numero di sedi operative non è stato rilevato: con un’unica sede non esiste alternativa ' +
+      'operativa immediata dopo un sinistro.',
     risk: 'indisponibilita-sede',
     when: (f) => (f.numeroUnitaLocali === null ? 'ignoto' : f.numeroUnitaLocali <= 1),
     impact: 1,
@@ -424,6 +480,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'rct/cantiere',
+    rationaleSeIgnoto:
+      'Da accertare se l’impresa opera presso cantieri o sedi di terzi: fuori dai propri locali ' +
+      'l’esposizione a danni verso terzi è molto più elevata.',
     risk: 'rc-verso-terzi',
     when: (f) => {
       const dichiarato = tri(f.lavoraInCantiere);
@@ -466,6 +525,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'rco/cantiere',
+    rationaleSeIgnoto:
+      'Da accertare se l’impresa svolge lavorazioni in cantiere: è il contesto a più elevata ' +
+      'incidenza infortunistica.',
     risk: 'rc-verso-dipendenti',
     when: (f) => {
       const dichiarato = tri(f.lavoraInCantiere);
@@ -519,28 +581,33 @@ export const RISK_RULES: readonly RiskRule[] = [
     when: (f) => tri(f.esportaUsaCanada),
     likelihood: 1,
     impact: 1,
+    rationale:
+      'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa ' +
+      'non comparabili a quelli europei.',
     /*
-      Nel ramo ignoto il motore aggiunge «(da verificare)», ed era tutto ciò che il lettore
-      riceveva: un'ipotesi sugli Stati Uniti accanto a un riquadro che dichiarava i mercati
-      d'esportazione dell'impresa, comprati e stampati due sezioni più su.
+      La forma condizionale, qui, ha una cosa in più da dire: i mercati d'esportazione sono
+      comprati e stampati due sezioni più su. Un dubbio che non ammette ciò che è già noto
+      sembra una frase di riempimento, e chi legge smette di distinguerla da quelle che
+      valgono.
 
-      L'ipotesi resta — «altri paesi» comprende gli Stati Uniti senza nominarli, e non si
-      chiude una domanda con un elenco che non l'ha chiusa — ma dice da dove parte. Un
-      «da verificare» che non ammette ciò che è già noto sembra una frase di riempimento,
-      e chi legge smette di distinguerla da quelle che valgono.
+      Il dubbio però resta, e non si chiude con quell'elenco: «altri paesi» comprende gli
+      Stati Uniti senza nominarli.
     */
-    rationale: (f) =>
-      f.esportaUsaCanada === true
-        ? 'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa non comparabili a quelli europei.'
-        : (f.paesiExportArchivio ?? null) !== null
-          ? `Mercati di esportazione dichiarati all’archivio: ${(f.paesiExportArchivio ?? '').toLowerCase()}. ` +
-            'La destinazione verso USA e Canada non vi risulta nominata, e va accertata in intervista: ' +
-            'là il regime risarcitorio prevede danni punitivi e costi di difesa non comparabili a quelli europei.'
-          : 'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa non comparabili a quelli europei.',
+    rationaleSeIgnoto: (f) =>
+      (f.paesiExportArchivio ?? null) !== null
+        ? `Mercati di esportazione dichiarati all’archivio: ${(f.paesiExportArchivio ?? '').toLowerCase()}. ` +
+          'Gli Stati Uniti e il Canada non vi risultano nominati, ma un elenco per aree non li ' +
+          'esclude: la destinazione va accertata in intervista, perché là il regime risarcitorio ' +
+          'prevede danni punitivi e costi di difesa non comparabili a quelli europei.'
+        : 'Da accertare se l’impresa esporta verso USA e Canada: là il regime risarcitorio prevede ' +
+          'danni punitivi e costi di difesa non comparabili a quelli europei.',
   },
   {
     kind: 'modula',
     id: 'rc-prodotto/export-rilevante',
+    rationaleSeIgnoto:
+      'La quota di export sul fatturato non è stata rilevata: oltre il 30% l’esposizione a più ' +
+      'ordinamenti e a un foro competente estero diventa rilevante.',
     risk: 'rc-prodotto',
     when: (f) => (f.quotaExport === null ? 'ignoto' : f.quotaExport > 0.3),
     impact: 1,
@@ -665,6 +732,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'data-breach/dati-particolari',
+    rationaleSeIgnoto:
+      'Da accertare se l’impresa tratta categorie particolari di dati (art. 9 GDPR): in quel caso ' +
+      'sanzioni e danno reputazionale sono superiori.',
     risk: 'data-breach',
     when: (f) => tri(f.trattaDatiParticolari),
     impact: 1,
@@ -674,6 +744,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'data-breach/ecommerce',
+    rationaleSeIgnoto:
+      'Da accertare se esiste un canale e-commerce: espone una superficie di attacco su internet e ' +
+      'comporta il trattamento di dati di pagamento.',
     risk: 'data-breach',
     when: (f) => tri(f.haEcommerce),
     likelihood: 1,
@@ -751,6 +824,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'd-and-o/patrimonio-rilevante',
+    rationaleSeIgnoto:
+      'Il totale attivo non è stato rilevato: oltre i 5 M€ l’entità delle azioni di responsabilità ' +
+      'cresce in proporzione al patrimonio aggredibile.',
     risk: 'responsabilita-amministratori',
     when: (f) => importoOltre(f.totaleAttivo, 5_000_000),
     impact: 1,
@@ -864,6 +940,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'identifica',
     id: 'insolvenza-clienti/crediti-commerciali',
+    rationaleSeIgnoto:
+      'L’entità dei crediti commerciali non è stata rilevata: è la voce dell’attivo esposta al ' +
+      'mancato incasso, e si legge dalla voce C-II-1 dello stato patrimoniale.',
     risk: 'insolvenza-clienti',
     when: (f) => importoOltre(f.creditiVersoClienti, 25_000),
     rationale: 'Presenza di crediti commerciali significativi esposti al rischio di mancato incasso.',
@@ -871,6 +950,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'insolvenza-clienti/esposizione-rilevante',
+    rationaleSeIgnoto:
+      'Crediti verso clienti e patrimonio netto non sono entrambi disponibili: quando i primi ' +
+      'superano il secondo, una sola insolvenza rilevante erode i mezzi propri.',
     risk: 'insolvenza-clienti',
     when: (f) => {
       if (f.creditiVersoClienti === null || f.patrimonioNetto === null) return 'ignoto';
@@ -884,6 +966,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'identifica',
     id: 'concentrazione/primo-cliente',
+    rationaleSeIgnoto:
+      'La concentrazione del fatturato sul primo cliente non è stata rilevata: è il dato che ' +
+      'determina se questo rischio riguardi l’impresa, e nessun archivio lo contiene.',
     risk: 'concentrazione-clienti',
     when: (f) => (f.concentrazionePrimoCliente === null ? 'ignoto' : f.concentrazionePrimoCliente > 0.2),
     rationale: 'Quota rilevante del fatturato concentrata su un singolo cliente.',
@@ -891,6 +976,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'concentrazione/molto-elevata',
+    rationaleSeIgnoto:
+      'La quota del primo cliente non è stata rilevata: oltre il 40% la sua perdita compromette ' +
+      'l’equilibrio economico dell’impresa.',
     risk: 'concentrazione-clienti',
     when: (f) => (f.concentrazionePrimoCliente === null ? 'ignoto' : f.concentrazionePrimoCliente > 0.4),
     impact: 1,
@@ -903,6 +991,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'identifica',
     id: 'merci/trasporto-proprio-o-settore',
+    rationaleSeIgnoto:
+      'Da accertare se l’impresa movimenta merci proprie o per conto terzi: i limiti di ' +
+      'responsabilità del vettore non risarciscono il valore reale della merce.',
     risk: 'danno-merci-trasporto',
     when: (f) => {
       const dichiarato = tri(f.trasportaMerciProprie);
@@ -917,6 +1008,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'identifica',
     id: 'flotta/veicoli-aziendali',
+    rationaleSeIgnoto:
+      'Il parco veicoli non è stato rilevato: ogni veicolo aziendale è soggetto a obbligo ' +
+      'assicurativo per la circolazione e a rischio di sinistro.',
     risk: 'sinistro-flotta',
     when: (f) => (f.numeroVeicoli === null ? 'ignoto' : f.numeroVeicoli > 0),
     rationale: 'Presenza di veicoli aziendali soggetti a obbligo assicurativo e a rischio di sinistro.',
@@ -924,6 +1018,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'flotta/parco-esteso',
+    rationaleSeIgnoto:
+      'Il numero di veicoli non è stato rilevato: oltre i dieci la gestione passa al libro ' +
+      'matricola e la sinistrosità attesa diventa significativa.',
     risk: 'sinistro-flotta',
     when: (f) => numeroOltre(f.numeroVeicoli, 10),
     likelihood: 1,
@@ -961,6 +1058,9 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'catnat/beni-rilevanti',
+    rationaleSeIgnoto:
+      'Il valore degli immobili strumentali non è stato rilevato: determina l’entità dei beni da ' +
+      'assicurare per obbligo di legge.',
     risk: 'inadempimento-catnat',
     when: (f) => importoOltre(f.valoreImmobiliNetto, 200_000),
     impact: 1,

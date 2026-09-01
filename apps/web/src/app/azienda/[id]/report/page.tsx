@@ -1,4 +1,5 @@
 import { richiediSessione } from '@/lib/sessione';
+import { inizialeMinuscola } from '@aegis/core/testo';
 import Link from 'next/link';
 import { analizzaAzienda, leggiImmaginiUbicazioni, leggiStudio } from '@/lib/api';
 import type { AnalisiDto, DatiStudio, GapDto } from '@/lib/api';
@@ -965,9 +966,14 @@ export default async function PaginaReport({
               <li>
                 La rilevazione dei dati di intervista è completa al{' '}
                 {Math.round(analisi.completezza.percentuale * 100)}%. Restano da acquisire:{' '}
+                {/*
+                  Abbassare l'etichetta intera scriveva «certificazioni di sistema (iso 9001,
+                  14001, 27001, 45001)»: le sigle dentro un'etichetta ci sono per un motivo,
+                  e qui serve solo che la parola non cominci in maiuscolo a metà frase.
+                */}
                 {analisi.completezza.mancanti
                   .slice(0, 5)
-                  .map((m) => m.etichetta.toLowerCase())
+                  .map((m) => inizialeMinuscola(m.etichetta))
                   .join('; ')}
                 . Il completamento può modificare capitali e priorità qui indicati.
               </li>

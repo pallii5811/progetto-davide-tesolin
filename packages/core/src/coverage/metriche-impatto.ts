@@ -28,6 +28,7 @@ import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import { explain } from '../shared/explain.js';
 import type { Explained } from '../shared/explain.js';
+import { formatNumber } from '../shared/math.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
 
 export type LivelloDiImpatto = 'trascurabile' | 'gestibile' | 'grave' | 'critico';
@@ -225,7 +226,9 @@ export function calcolaMetricheDiImpatto(
     .input('Margine di tesoreria', Money.format(margineDiTesoreria))
     .input(
       'Indice di disponibilità',
-      indiceDiDisponibilita === null ? 'da rilevare in intervista' : indiceDiDisponibilita.toFixed(2),
+      // Separatore italiano come ovunque: `toFixed` avrebbe scritto «1.37» accanto a un
+      // «1,37» prodotto due riquadri più in là dallo stesso documento.
+      indiceDiDisponibilita === null ? 'da rilevare in intervista' : formatNumber(indiceDiDisponibilita, 2),
     )
     .note(
       `I giorni di fermo si ricavano dividendo l’impatto per il margine di contribuzione ` +

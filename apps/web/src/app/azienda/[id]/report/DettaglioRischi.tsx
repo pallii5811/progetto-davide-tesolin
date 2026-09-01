@@ -130,11 +130,14 @@ function ElencoConDelta({ titolo, voci }: { titolo: string; voci: readonly VoceC
         {voci.map((v) => (
           <li key={v.motivazione} className="flex gap-2">
             {/*
-              Su un fatto non rilevato la modulazione non si applica, e stampare «0P 0I»
-              mette un numero al posto di un motivo: la riga lo dice già in fondo, con
-              «(da verificare)». Dove non c'è uno spostamento non si stampa uno zero.
+              Tre situazioni diverse producevano lo stesso «0P 0I»: il fatto non rilevato,
+              il fatto che conta ma trova la scala già satura, e — in teoria — il fatto che
+              non sposta. Le prime due sono l'opposto l'una dell'altra, e su un documento
+              che va al cliente non possono avere lo stesso segno.
             */}
-            {!v.suDatoIgnoto && (
+            {v.suDatoIgnoto ? null : v.saturata ? (
+              <span className="mt-0.5 shrink-0 text-xs text-testo-debole">già al massimo</span>
+            ) : (
               <span className="tabular mt-0.5 shrink-0 text-xs text-testo-debole">
                 {segno(v.deltaProbabilita)}P {segno(v.deltaImpatto)}I
               </span>

@@ -16,7 +16,7 @@ import { explain } from '../shared/explain.js';
 import type { Explained } from '../shared/explain.js';
 import { Money, ZERO } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
-import { interpolate } from '../shared/math.js';
+import { formatNumber, interpolate } from '../shared/math.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
 import type { CreditScore } from './score.js';
 
@@ -286,7 +286,10 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
       )
       .input(`Limite dimensionale (${(QUOTA_FATTURATO * 100).toFixed(0)}%)`, formatta(limiteDimensionale))
       .input(`Limite di flusso (${MULTIPLO_EBITDA}× EBITDA)`, formatta(limiteFlusso))
-      .input('Fattore di score', `${fattoreScore.toFixed(2)}× (score ${score.value}/100)`)
+      // `toFixed` scrive il punto decimale inglese: «0.30×» in una pagina che dieci righe
+      // più su stampa «1,37» e «13,7%». Un separatore fuori posto su un documento
+      // assicurativo italiano fa sembrare tradotto ciò che è stato scritto qui.
+      .input('Fattore di score', `${formatNumber(fattoreScore, 2)}× (score ${score.value}/100)`)
       .note(`Vincolo più stringente fra quelli calcolabili: ${vincoloAttivo}.`)
       .noteIf(
         limiteFlusso === null,

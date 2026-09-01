@@ -26,6 +26,7 @@ import type {
   GapDto,
   RischioDto,
   SoliditaCompagnia,
+  VoceConDelta,
 } from '@/lib/api';
 import {
   Avviso,
@@ -2182,22 +2183,14 @@ function VoceRischio({ rischio }: { rischio: RischioDto }) {
           */}
           {rischio.motivazioni.modulazione.map((m) => (
             <p key={m.motivazione} className="mt-1 border-l-2 border-alto/50 pl-2 text-testo-tenue">
-              {!m.suDatoIgnoto && (
-                <span className="tabular font-medium">
-                  {formatDelta(m.deltaProbabilita)}P {formatDelta(m.deltaImpatto)}I{' '}
-                </span>
-              )}
+              <EtichettaDelta voce={m} />
               {m.motivazione}
             </p>
           ))}
 
           {rischio.motivazioni.controlli.map((c) => (
             <p key={c.motivazione} className="mt-1 border-l-2 border-basso/50 pl-2 text-testo-tenue">
-              {!c.suDatoIgnoto && (
-                <span className="tabular font-medium">
-                  {formatDelta(c.deltaProbabilita)}P {formatDelta(c.deltaImpatto)}I{' '}
-                </span>
-              )}
+              <EtichettaDelta voce={c} />
               controllo in essere: {c.motivazione}
             </p>
           ))}
@@ -2422,6 +2415,32 @@ function umanizza(chiave: string): string {
 
 function formatDelta(valore: number): string {
   return valore > 0 ? `+${valore}` : valore < 0 ? String(valore) : '±0';
+}
+
+/**
+ * Di quanto quel fatto ha spostato la valutazione — e, quando non l'ha spostata, perché.
+ *
+ * La scheda stampava «±0P ±0I» in tre situazioni diverse e con lo stesso identico segno:
+ *
+ *   il fatto non è stato rilevato        la modulazione non si applica
+ *   il fatto conta ma la scala è satura  contava, e non c'era più spazio
+ *   il fatto ha spostato zero            (non accade: le regole dichiarano deltas non nulli)
+ *
+ * Le prime due sono l'opposto l'una dell'altra — «non lo sappiamo» contro «lo sappiamo e
+ * pesa» — e un lettore che vede lo stesso zero le legge come la stessa cosa. Nel primo
+ * caso non si stampa nulla: la frase è già scritta al condizionale e si spiega da sé. Nel
+ * secondo si dice cosa è successo, che è l'unica informazione che quel numero conteneva.
+ */
+function EtichettaDelta({ voce }: { voce: VoceConDelta }) {
+  if (voce.suDatoIgnoto) return null;
+  if (voce.saturata) {
+    return <span className="font-medium text-testo-debole">già al massimo </span>;
+  }
+  return (
+    <span className="tabular font-medium">
+      {formatDelta(voce.deltaProbabilita)}P {formatDelta(voce.deltaImpatto)}I{' '}
+    </span>
+  );
 }
 
 /** Urgenza e titolare, in forma leggibile. */

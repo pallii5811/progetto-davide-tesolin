@@ -212,9 +212,30 @@ export function IndicatoriArchivio({
         ['Patrimonio su totale attivo', dati.kpi?.patrimonioSuTotaleAttivo, ''],
       ],
     },
+    /*
+      L'orizzonte non si deduce dal nome del riquadro: si verifica sui numeri.
+
+      La nota diceva «rispetto all'esercizio precedente», e l'aritmetica dice due esercizi.
+      Sull'impresa provata, con i valori che l'archivio stampa in questa stessa pagina:
+
+        EBIT   187.148 / 233.968 − 1 = −20,0113 %   e a schermo esce −20,01 %
+        EBITDA 343.989 / 360.857 − 1 =  −4,6744 %   e a schermo esce  −4,67 %
+
+      I due denominatori sono `ebitL2Y` e `ebitdaL2Y` — last two years, i valori che il
+      riquadro «Risultati operativi» intitola «due esercizi fa». Due indici indipendenti che
+      chiudono alla quarta cifra sullo stesso orizzonte: perché fosse un caso, EBIT ed
+      EBITDA dell'anno scorso dovrebbero coincidere entrambi con quelli di due anni fa.
+
+      Costava la lettura opposta a quella vera: «EBIT −20% sull'esercizio precedente»
+      descrive un'impresa crollata in dodici mesi, e apre una conversazione sul credito che
+      i numeri non giustificano. Su due esercizi è una discesa, non un crollo.
+    */
     {
       titolo: 'Andamento',
-      nota: 'Variazioni rispetto all’esercizio precedente.',
+      // La nota dice esattamente quanto è stato provato, e su cosa: le altre quattro righe
+      // arrivano dalla stessa sezione della risposta, ma per loro l'identità non si chiude
+      // con i valori che abbiamo, e prometterlo sarebbe la stessa disinvoltura di prima.
+      nota: 'Variazioni su due esercizi, non sull’esercizio precedente: verificato su EBIT e MOL.',
       voci: [
         ['Valore aggiunto', dati.sviluppo?.valoreAggiunto, '%'],
         /*

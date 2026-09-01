@@ -153,6 +153,11 @@ export interface VoceConDelta {
   deltaProbabilita: number;
   deltaImpatto: number;
   suDatoIgnoto: boolean;
+  /**
+   * Il fatto conta, ma la scala era già al massimo: lo zero è saturazione, non
+   * irrilevanza. Sono due cose diverse e la scheda le stampava uguali.
+   */
+  saturata: boolean;
 }
 
 export interface RischioDto {

@@ -477,6 +477,20 @@ export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialI
     dio: cic?.durataScorte ?? null,
     cicloCircolante: cic?.durataCicloFinanziario ?? null,
 
+    /*
+      L'archivio una variazione dell'EBITDA ce l'ha — `sviluppo.mol` — e resta fuori di
+      proposito: è calcolata su DUE esercizi, e la soglia del fattore redditività è annua.
+
+      Non è una supposizione sul nome del campo. Sull'impresa provata, con i valori che lo
+      stesso archivio pubblica: 343.989 / 360.857 − 1 = −4,6744 %, cioè esattamente il
+      −4,67 % dichiarato, dove 360.857 € è `ebitdaL2Y` — due esercizi fa. La stessa identità
+      chiude sull'EBIT: 187.148 / 233.968 − 1 = −20,0113 %, contro il −20,01 % dichiarato.
+
+      Passarla al punteggio significherebbe confrontare una discesa biennale con una soglia
+      annua: il fattore uscirebbe più severo del vero su ogni impresa in calo lento, e più
+      indulgente su una che ha perso tutto in un anno e recuperato metà. Un numero giusto
+      messo nel posto sbagliato non è un'approssimazione, è un altro numero.
+    */
     crescitaRicavi: null,
     crescitaEbitda: null,
     ricaviPerDipendente: null,
