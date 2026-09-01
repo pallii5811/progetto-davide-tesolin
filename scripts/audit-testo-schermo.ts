@@ -376,6 +376,23 @@ interface CoppiaSospetta {
   readonly imprese: number;
 }
 
+/**
+ * Le coppie già esaminate, con la ragione per cui restano.
+ *
+ * L'archivio pubblica davvero la stessa grandezza due volte, e non smetterà: la coppia
+ * continuerebbe a comparire fra i rilievi anche dopo essere stata sistemata. Un rilievo che
+ * non si può chiudere è peggio di nessun rilievo, perché insegna a scorrere l'elenco.
+ *
+ * Non è un silenzio: le coppie qui dentro vengono comunque stampate, sotto «già esaminate»,
+ * e per entrare devono portare scritto **cosa è stato fatto**. Una riga senza motivo qui è
+ * una regressione, non una scorciatoia.
+ */
+const COPPIE_DICHIARATE: Readonly<Record<string, string>> = {
+  'indice di onerosita|oneri finanziari su ebitda':
+    'stessa grandezza in due unità; la scheda ora la nomina «Indice di onerosità — oneri ' +
+    'finanziari su EBITDA» e la stampa con il segno di percentuale',
+};
+
 function coppieInDueUnita(archivi: readonly Map<string, unknown>[]): CoppiaSospetta[] {
   /** Quante volte la coppia è comparsa con entrambi i valori, e quante ha tenuto il 1:100. */
   const insieme = new Map<string, number>();
@@ -575,7 +592,13 @@ function autoprovaRilevatori(): void {
   );
   deve(
     coppieInDueUnita([conCoppia(39.93, 0.3993)]).length === 0,
-    'una sola impresa basta a dichiarare una coppia: e' + 'una coincidenza, non una definizione',
+    'una sola impresa basta a dichiarare una coppia: è una coincidenza, non una definizione',
+  );
+  // E l'elenco delle coppie già esaminate non deve diventare il posto in cui le cose
+  // spariscono: ogni riga porta il motivo, e senza motivo non entra.
+  deve(
+    Object.values(COPPIE_DICHIARATE).every((motivo) => motivo.trim().length > 20),
+    'una coppia è stata dichiarata senza scrivere cosa è stato fatto',
   );
 
   if (guasti.length > 0) {
@@ -673,12 +696,18 @@ for (const piva of bersagli) {
 */
 const coppie = coppieInDueUnita(archiviVisti);
 if (coppie.length > 0) {
-  process.stdout.write(`\n  Indici dell’archivio in rapporto 1:100 su tutte le imprese guardate\n`);
+  process.stdout.write(`\n  Indici dell’archivio in rapporto 1:100\n`);
   process.stdout.write(`  ${'─'.repeat(70)}\n`);
   for (const c of coppie) {
-    process.stdout.write(`  ✗ «${c.a}» e «${c.b}» — su ${c.imprese} imprese su ${archiviVisti.length}\n`);
+    const dichiarata = COPPIE_DICHIARATE[`${c.a}|${c.b}`];
+    const dove = `su ${c.imprese} imprese su ${archiviVisti.length}`;
+    if (dichiarata === undefined) {
+      process.stdout.write(`  ✗ «${c.a}» e «${c.b}» — ${dove}\n`);
+      totale += 1;
+    } else {
+      process.stdout.write(`  · già esaminata: «${c.a}» e «${c.b}» — ${dichiarata}\n`);
+    }
   }
-  totale += coppie.length;
 }
 
 process.stdout.write(`\n  TOTALE RILIEVI: ${totale}\n\n`);
