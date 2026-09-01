@@ -75,6 +75,18 @@ export function IndicatoriArchivio({
       titolo: 'Solidità patrimoniale',
       nota: 'Misura se un sinistro non assicurato la manda fuori mercato.',
       voci: [
+        /*
+          IL PATRIMONIO NETTO DELL'ARCHIVIO, mostrato perché è il numero che decide tutto.
+
+          È il primo vincolo del fido commerciale e l'ingresso del fattore che pesa il 19%
+          del punteggio. L'archivio ne pubblica due — questo, e quello dell'anagrafica
+          estesa — e su un'impresa reale differivano di ottantaquattro volte: 719.768 €
+          contro 8.485 €, che era l'utile d'esercizio. Il motore ora usa questo, che si
+          verifica da sé contro il grado di capitalizzazione poco più in basso.
+
+          Mostrarlo serve proprio a quello: chi legge può rifare la divisione.
+        */
+        ['Patrimonio netto dichiarato dall’archivio', dati.aggregati?.patrimonioNetto, '€'],
         ['Current ratio', dati.solidita?.currentRatio, ''],
         ['Acid test', dati.solidita?.acidTest, ''],
         ['Copertura del capitale circolante', dati.solidita?.coperturaCapitaleCircolante, ''],

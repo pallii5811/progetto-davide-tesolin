@@ -54,6 +54,33 @@ export interface RisultatiOperativi {
   readonly ebitdaDueEserciziPrima: number | null;
 }
 
+/**
+ * Gli aggregati che l'archivio dichiara direttamente, in euro.
+ *
+ * IL PATRIMONIO NETTO STA QUI PERCHÉ LE DUE FONTI NON COINCIDONO, e la differenza non è un
+ * arrotondamento.
+ *
+ * L'anagrafica estesa porta `balanceSheets.last.netWorth`; il profilo completo porta
+ * `ecofin.netWorth`. Misurati sulla stessa impresa e sullo stesso esercizio:
+ *
+ *   COMINOTTI S.R.L.   estesa      8.485 €   completo   719.768 €
+ *   OPENAPI S.P.A.     estesa  1.037.925 €   completo 1.161.495 €
+ *
+ * Il secondo è quello autorevole, e lo si prova senza chiedere niente a nessuno: diviso
+ * per il totale attivo riproduce ESATTAMENTE il grado di capitalizzazione che l'archivio
+ * dichiara a parte — 0,1368 e 0,4838 sulle due imprese, fino alla quarta cifra. Il primo
+ * no, e di parecchi ordini di grandezza.
+ *
+ * Sulla prima impresa il valore dell'anagrafica estesa coincide con l'utile d'esercizio
+ * (ROE 1,18% × 719.768 = 8.493): spiega la natura dell'errore, non lo rende meno grave.
+ * Quel numero è il primo vincolo del fido commerciale e alimenta il fattore che pesa il
+ * 19% del punteggio di credito. Usato al posto del patrimonio netto dava un limite
+ * patrimoniale di 1.697 € invece di 143.954 €, ed equity ratio 0,2% invece di 13,7%.
+ */
+export interface AggregatiArchivio {
+  readonly patrimonioNetto: number | null;
+}
+
 /** Solidità patrimoniale: regge un colpo, o basta un sinistro a farla cadere? */
 export interface Solidita {
   readonly acidTest: number | null;
@@ -251,6 +278,8 @@ export interface QualificheImpresa {
 export interface IndicatoriFornitore {
   readonly redditivita: Redditivita | null;
   readonly risultatiOperativi: RisultatiOperativi | null;
+  /** Presente solo con il profilo completo: è la fonte autorevole del patrimonio netto. */
+  readonly aggregati: AggregatiArchivio | null;
   readonly solidita: Solidita | null;
   readonly indebitamento: Indebitamento | null;
   readonly liquidita: Liquidita | null;
@@ -271,6 +300,7 @@ export interface IndicatoriFornitore {
 export const INDICATORI_FORNITORE_VUOTI: IndicatoriFornitore = {
   redditivita: null,
   risultatiOperativi: null,
+  aggregati: null,
   solidita: null,
   indebitamento: null,
   liquidita: null,

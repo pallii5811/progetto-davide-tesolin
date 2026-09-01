@@ -15,7 +15,7 @@
  * inganna.
  */
 
-import type { AnalisiDto } from '@/lib/api';
+import type { AnalisiDto, VoceConDelta } from '@/lib/api';
 import type { Profondita } from './page';
 
 type Rischio = AnalisiDto['rischi'][number];
@@ -122,22 +122,23 @@ function Elenco({ titolo, voci }: { titolo: string; voci: readonly string[] }) {
  * chi legge di non essere d'accordo su una cifra precisa invece che sull'impressione
  * generale.
  */
-function ElencoConDelta({
-  titolo,
-  voci,
-}: {
-  titolo: string;
-  voci: readonly { motivazione: string; deltaProbabilita: number; deltaImpatto: number }[];
-}) {
+function ElencoConDelta({ titolo, voci }: { titolo: string; voci: readonly VoceConDelta[] }) {
   return (
     <div className="mt-2">
       <p className="text-xs font-medium text-testo-tenue">{titolo}</p>
       <ul className="mt-0.5 space-y-0.5 text-sm leading-relaxed">
         {voci.map((v) => (
           <li key={v.motivazione} className="flex gap-2">
-            <span className="tabular mt-0.5 shrink-0 text-xs text-testo-debole">
-              {segno(v.deltaProbabilita)}P {segno(v.deltaImpatto)}I
-            </span>
+            {/*
+              Su un fatto non rilevato la modulazione non si applica, e stampare «0P 0I»
+              mette un numero al posto di un motivo: la riga lo dice già in fondo, con
+              «(da verificare)». Dove non c'è uno spostamento non si stampa uno zero.
+            */}
+            {!v.suDatoIgnoto && (
+              <span className="tabular mt-0.5 shrink-0 text-xs text-testo-debole">
+                {segno(v.deltaProbabilita)}P {segno(v.deltaImpatto)}I
+              </span>
+            )}
             <span>{v.motivazione}</span>
           </li>
         ))}

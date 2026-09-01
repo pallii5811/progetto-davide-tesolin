@@ -429,6 +429,17 @@ function indicatoriDimostrativi(): IndicatoriFornitore {
       ebitDueEserciziPrima: 388_000,
       ebitdaDueEserciziPrima: 742_000,
     },
+    /*
+      `null` di proposito, e non un numero inventato.
+
+      Qui starebbe il patrimonio netto dichiarato dall'archivio, che sulle imprese vere è
+      la fonte autorevole. Metterne uno a caso lo renderebbe incoerente con il grado di
+      capitalizzazione già scritto più sotto — cioè riprodurrebbe nella fixture esattamente
+      la contraddizione che questo campo esiste per risolvere.
+      Lasciandolo assente, l'azienda dimostrativa esercita il percorso di ripiego, che è
+      quello di chi non ha comprato il profilo completo. Il percorso nuovo ha le sue prove.
+    */
+    aggregati: null,
     solidita: {
       acidTest: 0.94,
       currentRatio: 1.32,

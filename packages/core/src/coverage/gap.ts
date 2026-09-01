@@ -479,8 +479,10 @@ function capitalePerCopertura(coverageId: CoverageId, sums: SumsInsured): Explai
     case 'rc-inquinamento':
       return nonQuantificabile(
         'RC Inquinamento',
-        'Dimensionare il massimale sui costi di bonifica e di ripristino ambientale del sito, che ' +
-          'non seguono il benchmark della RCT e restano esclusi dalla RCT ordinaria.',
+        // L'esclusione dalla RCT ordinaria la dice già la motivazione, nella stessa scheda:
+        // qui serve dire cosa misurare, che è l'estensione del sito e non il fatturato.
+        'Dimensionare il massimale sull’estensione del sito e sulla natura del suolo: i costi di ' +
+          'bonifica e di ripristino non seguono il benchmark della RCT.',
       );
     case 'rco':
       return widen(sums.massimaleRcoPerPersona);

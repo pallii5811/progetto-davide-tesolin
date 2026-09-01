@@ -140,6 +140,21 @@ export interface SintesiRicerca {
 
 export type LivelloRischio = 'basso' | 'moderato' | 'rilevante' | 'alto' | 'critico';
 
+/**
+ * Una voce che ha spostato — o non ha spostato — la valutazione di un rischio.
+ *
+ * `suDatoIgnoto` distingue i due zeri: la regola che non muove nulla perché la scala è
+ * già satura, e quella che non muove nulla perché il fatto non è stato rilevato. Senza
+ * questa differenza la scheda stampava «±0P ±0I» a entrambe, cioè un numero al posto di
+ * un motivo su una riga che il motivo ce l'ha già in fondo, fra parentesi.
+ */
+export interface VoceConDelta {
+  motivazione: string;
+  deltaProbabilita: number;
+  deltaImpatto: number;
+  suDatoIgnoto: boolean;
+}
+
 export interface RischioDto {
   id: string;
   etichetta: string;
@@ -164,8 +179,8 @@ export interface RischioDto {
   daVerificare: boolean;
   motivazioni: {
     identificazione: string[];
-    modulazione: { motivazione: string; deltaProbabilita: number; deltaImpatto: number }[];
-    controlli: { motivazione: string; deltaProbabilita: number; deltaImpatto: number }[];
+    modulazione: VoceConDelta[];
+    controlli: VoceConDelta[];
   };
 }
 
@@ -471,6 +486,8 @@ export interface AnalisiDto {
         possibile: MoneyDto;
         probabile: MoneyDto;
         quota: number;
+        /** Le protezioni che hanno abbassato la quota. Vuoto: nessuna è stata accertata. */
+        protezioniAccertate: string[];
         forma: 'valore-intero' | 'primo-rischio-assoluto';
         motivazioneForma: string;
         domandeCheAbbassanoLaStima: string[];
@@ -1134,6 +1151,14 @@ export async function leggiPortafoglio(): Promise<{
  * comprare il record intero e mostrarne una parte.
  */
 export interface IndicatoriArchivioDto {
+  /**
+   * Il patrimonio netto dichiarato dal profilo completo: la fonte autorevole.
+   *
+   * L'archivio ne pubblica due e non coincidono. Questo si verifica da sé — diviso per il
+   * totale attivo riproduce il grado di capitalizzazione — e su un'impresa reale valeva
+   * 719.768 € contro gli 8.485 € dell'anagrafica estesa, che erano l'utile d'esercizio.
+   */
+  aggregati: { patrimonioNetto: number | null } | null;
   redditivita: {
     roe: number | null;
     roi: number | null;

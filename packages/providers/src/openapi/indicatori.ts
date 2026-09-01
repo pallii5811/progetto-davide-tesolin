@@ -27,6 +27,7 @@ import type {
   LeveFinanziarie,
   Liquidita,
   OneriFinanziari,
+  AggregatiArchivio,
   QualificheImpresa,
   Redditivita,
   RisultatiOperativi,
@@ -62,6 +63,7 @@ export function mappaIndicatoriFornitore(raw: unknown): IndicatoriFornitore {
   return {
     redditivita: leggiRedditivita(pick(dati, 'profitability')),
     risultatiOperativi: leggiRisultatiOperativi(pick(dati, 'operatingResults')),
+    aggregati: leggiAggregati(pick(dati, 'ecofin')),
     solidita: leggiSolidita(pick(dati, 'financialStability')),
     indebitamento: leggiIndebitamento(pick(dati, 'indebtedness')),
     liquidita: leggiLiquidita(pick(dati, 'liquidityRatios')),
@@ -103,6 +105,7 @@ export function fondiIndicatori(
   return {
     redditivita: fondiGruppo(base.redditivita, sopra.redditivita),
     risultatiOperativi: fondiGruppo(base.risultatiOperativi, sopra.risultatiOperativi),
+    aggregati: fondiGruppo(base.aggregati, sopra.aggregati),
     solidita: fondiGruppo(base.solidita, sopra.solidita),
     indebitamento: fondiGruppo(base.indebitamento, sopra.indebitamento),
     liquidita: fondiGruppo(base.liquidita, sopra.liquidita),
@@ -146,6 +149,19 @@ function leggiRedditivita(g: unknown): Redditivita | null {
     roaMonetario: num(g, 'roaMonetary'),
     incidenzaGestioneStraordinaria: num(g, 'incidenceOfExtraFeaturesManagement'),
   });
+}
+
+/**
+ * Il patrimonio netto del profilo completo, che è quello vero.
+ *
+ * L'anagrafica estesa ne porta un altro, sotto `balanceSheets.last.netWorth`, e i due non
+ * coincidono: su COMINOTTI S.R.L. 8.485 € contro 719.768 €, sullo stesso esercizio. Quello
+ * di qui è verificabile — diviso per il totale attivo riproduce il grado di
+ * capitalizzazione che l'archivio dichiara a parte, alla quarta cifra — e quello dell'
+ * anagrafica estesa no.
+ */
+function leggiAggregati(g: unknown): AggregatiArchivio | null {
+  return seValorizzato({ patrimonioNetto: num(g, 'netWorth') });
 }
 
 function leggiRisultatiOperativi(g: unknown): RisultatiOperativi | null {

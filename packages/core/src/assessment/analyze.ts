@@ -19,7 +19,7 @@ import {
   ultimoBilancio,
   ultimoBilancioSintetico,
 } from '../company/profile.js';
-import { reclassify } from '../company/financials.js';
+import { conPatrimonioNettoAutorevole, reclassify } from '../company/financials.js';
 import type { BilancioRiclassificato, ReclassifyOptions } from '../company/financials.js';
 import {
   computeIndicators,
@@ -273,8 +273,36 @@ export function analyzeCompany(
   // scoring rinormalizza i pesi sui soli fattori valutabili, quindi il punteggio resta
   // corretto — semplicemente meno informato, e la piattaforma lo dichiara.
   const livelloDati = livelloDatiEconomici(profile);
-  const sinteticoCorrente = ultimoBilancioSintetico(profile)?.value ?? null;
   const sinteticoPrecedente = penultimoBilancioSintetico(profile)?.value ?? null;
+
+  /*
+    DUE PATRIMONI NETTI DALLO STESSO FORNITORE, E QUELLO USATO ERA IL PIÙ SBAGLIATO.
+
+    L'anagrafica estesa porta `balanceSheets.last.netWorth`; il profilo completo porta
+    `ecofin.netWorth`. Sullo stesso esercizio della stessa impresa:
+
+      COMINOTTI S.R.L.   estesa      8.485 €   completo   719.768 €
+      OPENAPI S.P.A.     estesa  1.037.925 €   completo 1.161.495 €
+
+    Il secondo è quello autorevole, e si prova da sé: diviso per il totale attivo riproduce
+    alla quarta cifra il grado di capitalizzazione che l'archivio dichiara a parte — 0,1368
+    e 0,4838. Il primo no, e sulla prima impresa coincide con l'utile d'esercizio.
+
+    QUANTO COSTAVA. Quel numero è il primo vincolo del fido commerciale e l'ingresso del
+    fattore «solidità patrimoniale», che pesa il 19% del punteggio. Con 8.485 € al posto di
+    719.768 €: limite patrimoniale 1.697 € invece di 143.954 €, equity ratio 0,2% invece di
+    13,7%, indice di indebitamento 619× invece di 6,3×. Sulla scheda usciva «fido
+    consigliato 0 €», che è la raccomandazione più severa che questo prodotto sappia dare,
+    su un'impresa attiva da trentaquattro anni.
+
+    La correzione sta QUI e non più avanti perché lo stesso bilancio sintetico alimenta due
+    strade — gli indici e il fido — e correggerle separatamente significherebbe che un
+    giorno divergono.
+  */
+  const sinteticoCorrente = conPatrimonioNettoAutorevole(
+    ultimoBilancioSintetico(profile)?.value ?? null,
+    profile.indicatoriFornitore.aggregati?.patrimonioNetto ?? null,
+  );
 
   /*
     Tre fonti per gli indici, in ordine dichiarato — e la terza mancava.

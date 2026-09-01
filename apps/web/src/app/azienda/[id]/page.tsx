@@ -130,12 +130,26 @@ export default async function PaginaAzienda({
       {/* ── Completezza: l'invito ad agire, non un semplice avviso ────────── */}
       {analisi.completezza.percentuale < 0.65 && (
         <div className="mb-6">
+          {/*
+            Diceva «Analisi al 0% del suo potenziale» a chi aveva appena pagato il profilo
+            completo. La misura è giusta e il titolo la attribuiva alla cosa sbagliata:
+            quella percentuale conta i campi dell'INTERVISTA, non quanto vale l'analisi —
+            che intanto è stata prodotta per intero sui dati d'archivio acquistati.
+
+            A un cliente pagante «0% del suo potenziale» dice che ha comprato niente. Ora
+            il titolo nomina ciò che manca davvero, e il testo dice cosa c'è già.
+          */}
           <Avviso
             tono={analisi.completezza.percentuale < 0.3 ? 'attenzione' : 'informativo'}
-            titolo={`Analisi al ${Math.round(analisi.completezza.percentuale * 100)}% del suo potenziale`}
+            titolo={
+              analisi.completezza.percentuale === 0
+                ? 'Intervista non ancora compilata'
+                : `Intervista compilata al ${Math.round(analisi.completezza.percentuale * 100)}%`
+            }
           >
             <p>
-              Mancano dati che il bilancio non può fornire. Il primo per impatto:{' '}
+              L&apos;analisi qui sotto è costruita sui dati d&apos;archivio già acquistati. Restano fuori i
+              dati che nessun archivio contiene e che solo l&apos;impresa può dare. Il primo per impatto:{' '}
               <strong>{analisi.completezza.mancanti[0]?.etichetta}</strong> —{' '}
               {analisi.completezza.mancanti[0]?.beneficio}
             </p>
@@ -231,12 +245,35 @@ export default async function PaginaAzienda({
         <Metrica
           etichetta="Fido consigliato"
           valore={sintesi.fidoConsigliato?.formattato ?? 'Non determinabile'}
+          /*
+            LA NOTA DEVE SPIEGARE IL NUMERO CHE HA ACCANTO.
+
+            Su un'impresa reale usciva «0 €» con sotto «Provvisorio: una procedura
+            concorsuale aperta lo azzera, e non è stata verificata». Sono due cose diverse:
+            quello zero non veniva da una procedura — non ne risultava nessuna — ma dal
+            punteggio 24, che sulla curva del fido vale un fattore di cinque centesimi e
+            porta l'importo sotto la soglia di significatività.
+
+            La riserva sui protesti resta vera e va detta, ma DOPO la ragione: chi legge un
+            numero cerca la spiegazione di quel numero, e trovarne un'altra lo porta a
+            concludere una cosa che non è stata accertata — qui, che l'impresa sia in
+            procedura concorsuale.
+
+            La spiegazione dentro la scheda del fido lo diceva già bene. Era questo riquadro,
+            quello grande in cima, a raccontare un'altra storia.
+          */
           nota={
             sintesi.fidoConsigliato === null
               ? 'Il fido si dimensiona sul merito creditizio: senza punteggio non se ne consiglia uno, e zero euro sarebbe una raccomandazione'
-              : analisi.eventiNegativi === null
-                ? 'Provvisorio: una procedura concorsuale aperta lo azzera, e non è stata verificata'
-                : `Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`
+              : sintesi.fidoConsigliato.euro === 0
+                ? `Il merito creditizio è troppo basso perché un fido sia significativo: si consiglia pagamento anticipato${
+                    analisi.eventiNegativi === null
+                      ? ' — e protesti e procedure non sono stati verificati'
+                      : ''
+                  }`
+                : analisi.eventiNegativi === null
+                  ? `Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo} — provvisorio: una procedura concorsuale aperta lo azzererebbe, e non è stata verificata`
+                  : `Vincolo più stringente: ${analisi.credito.fido.vincoloAttivo}`
           }
           tono={
             sintesi.fidoConsigliato === null
@@ -995,9 +1032,18 @@ export default async function PaginaAzienda({
                   <dd className="tabular mt-1 text-xl font-semibold text-marchio">
                     {analisi.dannoMassimo.probabile.formattato}
                   </dd>
+                  {/*
+                    Diceva «tenuto conto delle protezioni accertate» anche quando non ne
+                    era stata accertata nessuna — e il riquadro sotto, nella stessa
+                    schermata, elencava le domande da fare proprio perché mancavano. La
+                    didascalia è l'unica cosa con cui si capisce quanto fidarsi del numero:
+                    ora dice quali protezioni hanno pesato, o che non ce n'è nessuna.
+                  */}
                   <dd className="mt-1 text-xs leading-snug text-testo-tenue">
-                    {Math.round(analisi.dannoMassimo.quota * 100)}% del valore, tenuto conto delle
-                    protezioni accertate
+                    {Math.round(analisi.dannoMassimo.quota * 100)}% del valore
+                    {analisi.dannoMassimo.protezioniAccertate.length > 0
+                      ? `, tenuto conto di: ${analisi.dannoMassimo.protezioniAccertate.join(', ')}`
+                      : ', per la sola classe di rischio del settore: nessuna protezione è stata accertata'}
                   </dd>
                 </dl>
                 <BadgeConfidenza livello={analisi.dannoMassimo.confidenza} />
@@ -2108,20 +2154,31 @@ function VoceRischio({ rischio }: { rischio: RischioDto }) {
             </p>
           ))}
 
+          {/*
+            «±0P ±0I» accanto a «Lavorazioni in cantiere (da verificare)», su un
+            fabbricante di serrature. Il numero era esatto — su un fatto non rilevato la
+            modulazione non si applica — e non diceva nulla che la riga non dicesse già
+            meglio in fondo. Dove non c'è uno spostamento non si stampa uno zero: si
+            lascia parlare il motivo.
+          */}
           {rischio.motivazioni.modulazione.map((m) => (
             <p key={m.motivazione} className="mt-1 border-l-2 border-alto/50 pl-2 text-testo-tenue">
-              <span className="tabular font-medium">
-                {formatDelta(m.deltaProbabilita)}P {formatDelta(m.deltaImpatto)}I
-              </span>{' '}
+              {!m.suDatoIgnoto && (
+                <span className="tabular font-medium">
+                  {formatDelta(m.deltaProbabilita)}P {formatDelta(m.deltaImpatto)}I{' '}
+                </span>
+              )}
               {m.motivazione}
             </p>
           ))}
 
           {rischio.motivazioni.controlli.map((c) => (
             <p key={c.motivazione} className="mt-1 border-l-2 border-basso/50 pl-2 text-testo-tenue">
-              <span className="tabular font-medium">
-                {formatDelta(c.deltaProbabilita)}P {formatDelta(c.deltaImpatto)}I
-              </span>{' '}
+              {!c.suDatoIgnoto && (
+                <span className="tabular font-medium">
+                  {formatDelta(c.deltaProbabilita)}P {formatDelta(c.deltaImpatto)}I{' '}
+                </span>
+              )}
               controllo in essere: {c.motivazione}
             </p>
           ))}

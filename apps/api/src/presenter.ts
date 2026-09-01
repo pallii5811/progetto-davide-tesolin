@@ -700,15 +700,24 @@ function presentRisk(rischio: AssessedRisk) {
     daVerificare: rischio.daVerificare,
     motivazioni: {
       identificazione: rischio.identificationRules.map((r) => r.rationale),
+      /*
+        `suDatoIgnoto` non era esposto, e la scheda non poteva distinguere due zeri
+        diversi: quello di una regola che non ha spostato nulla perché la scala era già
+        satura, e quello di una regola che non ha spostato nulla perché il fatto non è
+        stato rilevato. Stampava «±0P ±0I» per entrambi — un numero al posto di un
+        motivo, sulla riga che il motivo ce l'ha già scritto in fondo.
+      */
       modulazione: rischio.modulationRules.map((r) => ({
         motivazione: r.rationale,
         deltaProbabilita: r.likelihoodDelta,
         deltaImpatto: r.impactDelta,
+        suDatoIgnoto: r.suDatoIgnoto,
       })),
       controlli: rischio.controlRules.map((r) => ({
         motivazione: r.rationale,
         deltaProbabilita: r.likelihoodDelta,
         deltaImpatto: r.impactDelta,
+        suDatoIgnoto: r.suDatoIgnoto,
       })),
     },
   };
@@ -749,6 +758,8 @@ interface DannoMassimoDto {
   readonly possibile?: MoneyDto;
   readonly probabile?: MoneyDto;
   readonly quota?: number;
+  /** Vuoto quando la quota è la sola classe di settore: la scheda deve poterlo dire. */
+  readonly protezioniAccertate?: readonly string[];
   readonly forma?: FormaConsigliata;
   readonly motivazioneForma?: string;
   readonly domandeCheAbbassanoLaStima?: readonly string[];
@@ -771,6 +782,7 @@ function presentDannoMassimo(analisi: CompanyAnalysis): DannoMassimoDto {
     possibile: money(d.value.possibile),
     probabile: money(d.value.probabile),
     quota: d.value.quota,
+    protezioniAccertate: d.value.protezioniAccertate,
     forma: d.value.forma,
     motivazioneForma: d.value.motivazioneForma,
     domandeCheAbbassanoLaStima: d.value.domandeCheAbbassanoLaStima,

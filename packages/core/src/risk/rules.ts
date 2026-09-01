@@ -519,8 +519,24 @@ export const RISK_RULES: readonly RiskRule[] = [
     when: (f) => tri(f.esportaUsaCanada),
     likelihood: 1,
     impact: 1,
-    rationale:
-      'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa non comparabili a quelli europei.',
+    /*
+      Nel ramo ignoto il motore aggiunge «(da verificare)», ed era tutto ciò che il lettore
+      riceveva: un'ipotesi sugli Stati Uniti accanto a un riquadro che dichiarava i mercati
+      d'esportazione dell'impresa, comprati e stampati due sezioni più su.
+
+      L'ipotesi resta — «altri paesi» comprende gli Stati Uniti senza nominarli, e non si
+      chiude una domanda con un elenco che non l'ha chiusa — ma dice da dove parte. Un
+      «da verificare» che non ammette ciò che è già noto sembra una frase di riempimento,
+      e chi legge smette di distinguerla da quelle che valgono.
+    */
+    rationale: (f) =>
+      f.esportaUsaCanada === true
+        ? 'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa non comparabili a quelli europei.'
+        : (f.paesiExportArchivio ?? null) !== null
+          ? `Mercati di esportazione dichiarati all’archivio: ${(f.paesiExportArchivio ?? '').toLowerCase()}. ` +
+            'La destinazione verso USA e Canada non vi risulta nominata, e va accertata in intervista: ' +
+            'là il regime risarcitorio prevede danni punitivi e costi di difesa non comparabili a quelli europei.'
+          : 'Esportazione verso USA e Canada: regime risarcitorio con danni punitivi e costi di difesa non comparabili a quelli europei.',
   },
   {
     kind: 'modula',

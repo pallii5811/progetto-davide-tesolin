@@ -14,7 +14,7 @@ import { Money } from '../shared/money.js';
 import type { Money as Euro } from '../shared/money.js';
 import type { AtecoCode } from '../shared/identifiers.js';
 import { atecoDivision, atecoSection } from '../shared/identifiers.js';
-import { QUOTA_SERVIZI_VARIABILE_DEFAULT } from './financials.js';
+import { QUOTA_SERVIZI_VARIABILE_DEFAULT, conPatrimonioNettoAutorevole } from './financials.js';
 import type { BilancioRiclassificato } from './financials.js';
 import type { CompanyProfile, FormaGiuridica, Socio, StatoAttivita } from './profile.js';
 import { FORME_A_RESPONSABILITA_ILLIMITATA, anniDiAttivita, haProceduraAperta } from './profile.js';
@@ -67,6 +67,18 @@ export interface CompanyFacts {
   readonly haDipendenti: boolean | null;
   readonly quotaExport: number | null;
   readonly esportaUsaCanada: boolean | null;
+  /**
+   * Se l'impresa esporta, secondo l'intervista o — quando l'intervista tace — l'archivio.
+   *
+   * La quota sul fatturato e il fatto stesso di esportare sono due domande diverse, e il
+   * prodotto ne aveva una sola. Il risultato, su una scheda dove l'archivio dichiarava i
+   * mercati: la voce «Export» del dimensionamento diceva «da rilevare in intervista»
+   * accanto a un riquadro che stampava «Paesi di esportazione: Unione Europea, Altri
+   * Paesi». Il dato era pagato, era a schermo, e il motore non lo guardava.
+   */
+  readonly esportatore: boolean | null;
+  /** I mercati di destinazione come li dichiara l'archivio, testuali e non normalizzati. */
+  readonly paesiExportArchivio: string | null;
   readonly trattaDatiPersonali: boolean | null;
   readonly trattaDatiParticolari: boolean | null;
   readonly haEcommerce: boolean | null;
@@ -128,6 +140,26 @@ export interface CompanyFacts {
   readonly quotaSocioDiControllo: number | null;
 }
 
+/**
+ * Il Nord America dentro l'elenco dei mercati dell'archivio.
+ *
+ * Restituisce `true` o `null`, **mai** `false`. «UNIONE EUROPEA, ALTRI PAESI» — la
+ * risposta che l'archivio dà più spesso — non esclude gli Stati Uniti: «altri paesi» li
+ * comprende senza nominarli. Leggere quel silenzio come una negazione toglierebbe due
+ * gradini di massimale a un'impresa che là ci spedisce davvero, ed è il modo esatto in
+ * cui una polizza si scopre insufficiente il giorno del sinistro.
+ *
+ * I confini di parola servono: senza, «USA» aggancia «CAUSA» e «USATO».
+ */
+function usaCanadaDaiMercati(paesi: string | null): true | null {
+  if (paesi === null) return null;
+  const nominato =
+    /\b(STATI UNITI|U\.?S\.?A\.?|CANADA|AMERICA DEL NORD|NORD ?AMERICA|AMERICA SETTENTRIONALE)\b/.test(
+      paesi.toUpperCase(),
+    );
+  return nominato ? true : null;
+}
+
 export function deriveFacts(
   profile: CompanyProfile,
   bilancio: BilancioRiclassificato | null,
@@ -137,11 +169,30 @@ export function deriveFacts(
   const dichiarati = profile.datiDichiarati;
   const assetti = profile.assetti?.value ?? null;
   const unitaLocali = profile.unitaLocali?.value ?? null;
+  const qualifiche = profile.indicatoriFornitore.qualifiche;
+
+  const paesiExportArchivio = qualifiche?.paesiExport ?? null;
+  // «Esporta» e «quanto esporta» sono due domande: l'archivio risponde alla prima, e da
+  // un elenco di mercati l'esportazione si deduce anche quando la casella tace.
+  const esportatoreArchivio = qualifiche?.esportatore ?? (paesiExportArchivio === null ? null : true);
 
   // Gerarchia delle fonti: bilancio dettagliato → bilancio sintetico → anagrafica.
   // I dati di intervista prevalgono sempre sul numero di addetti, perché il broker
   // conosce la situazione odierna mentre il bilancio fotografa il 31 dicembre.
-  const sintetico = profile.bilanciSintetici[0]?.value ?? null;
+  /*
+    Il patrimonio netto passa dalla fonte che sa dimostrarsi anche QUI, e non solo dove si
+    calcolano gli indicatori.
+
+    Correggerlo nel solo `analyze` lasciava in piedi metà del difetto, nella metà che
+    nessuno guarda: da `facts.patrimonioNetto` passano la regola che confronta i crediti
+    verso clienti con il patrimonio — che con 8.485 € invece di 719.768 € si accende su
+    ogni impresa — l'incidenza stampata nel dimensionamento del fido clienti, e il valore
+    che il monitoraggio confronta di mese in mese.
+  */
+  const sintetico = conPatrimonioNettoAutorevole(
+    profile.bilanciSintetici[0]?.value ?? null,
+    profile.indicatoriFornitore.aggregati?.patrimonioNetto ?? null,
+  );
 
   const fatturato = bilancio?.ce.ricavi ?? sintetico?.fatturato ?? a.fatturatoDichiarato ?? null;
   const addetti =
@@ -269,7 +320,14 @@ export function deriveFacts(
     numeroVeicoli: dichiarati.numeroVeicoli ?? veicoliDaBilancio,
     haDipendenti: addetti === null ? null : addetti > 0,
     quotaExport: dichiarati.quotaExportPercentuale,
-    esportaUsaCanada: dichiarati.esportaVersoUsaCanada,
+    // L'intervista prevale, com'è giusto: chi ha parlato con l'imprenditore sa più
+    // dell'archivio. Ma quando non ha chiesto, l'archivio ha già risposto ed è pagato.
+    esportaUsaCanada: dichiarati.esportaVersoUsaCanada ?? usaCanadaDaiMercati(paesiExportArchivio),
+    esportatore:
+      dichiarati.quotaExportPercentuale === null
+        ? esportatoreArchivio
+        : dichiarati.quotaExportPercentuale > 0,
+    paesiExportArchivio,
     trattaDatiPersonali: dichiarati.trattaDatiPersonali,
     trattaDatiParticolari: dichiarati.trattaDatiParticolari,
     haEcommerce: dichiarati.haSitoEcommerce,

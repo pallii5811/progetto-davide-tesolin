@@ -88,6 +88,38 @@ describe('Le protezioni abbassano la stima secondo quanto reggono davvero', () =
     expect(soloCompartimenti.value!.quota).toBeLessThan(soloSprinkler.value!.quota);
   });
 
+  /*
+    La didascalia della scheda diceva «tenuto conto delle protezioni accertate» sempre —
+    anche sull'impresa dove non ne era stata accertata nessuna, e dove il riquadro sotto
+    elencava le domande da fare proprio per quello. Il numero era giusto e la frase lo
+    raccontava male: è il modo in cui una stima prudenziale viene letta come informata.
+
+    L'elenco qui sotto è ciò da cui la didascalia si compone: le protezioni che hanno
+    spostato la quota, e nient'altro.
+  */
+  it('dichiara quali protezioni hanno spostato la quota, e non ne millanta nessuna', () => {
+    expect(stimaDannoMassimo(VALORE, fatti(), [immobile()]).value?.protezioniAccertate).toEqual([]);
+
+    expect(
+      stimaDannoMassimo(VALORE, fatti(), [
+        immobile({ compartimentazioneRei: false, impiantoSprinkler: false }),
+      ]).value?.protezioniAccertate,
+      'protezioni dichiarate assenti non sono protezioni accertate',
+    ).toEqual([]);
+
+    expect(
+      stimaDannoMassimo(VALORE, fatti(), [
+        immobile({ compartimentazioneRei: true, impiantoSprinkler: false }),
+      ]).value?.protezioniAccertate,
+    ).toEqual(['compartimentazione antincendio REI']);
+
+    expect(
+      stimaDannoMassimo(VALORE, fatti(), [
+        immobile({ compartimentazioneRei: true, impiantoSprinkler: true }),
+      ]).value?.protezioniAccertate,
+    ).toEqual(['compartimentazione antincendio REI', 'impianto di estinzione automatica']);
+  });
+
   it('con tutte le protezioni accertate la confidenza è alta', () => {
     const esito = stimaDannoMassimo(VALORE, fatti(), [
       immobile({ compartimentazioneRei: true, impiantoSprinkler: true }),

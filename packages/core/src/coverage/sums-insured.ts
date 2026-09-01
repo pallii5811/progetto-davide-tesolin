@@ -758,6 +758,21 @@ function calcolaMassimaleRco(facts: CompanyFacts): Explained<Euro> {
     .value(massimale);
 }
 
+/** La voce «Export» del dimensionamento: quota se c'è, mercati se ci sono, e cosa manca. */
+function descriviExport(facts: CompanyFacts): string {
+  if (facts.quotaExport !== null) return `${formatNumber(facts.quotaExport * 100, 0)}%`;
+
+  // `?? null` e non un confronto secco: le impalcature di prova costruiscono i fatti con
+  // i soli campi che servono al calcolo in esame, e un campo assente arriva `undefined`.
+  const paesi = facts.paesiExportArchivio ?? null;
+  if (paesi !== null)
+    return `mercati dichiarati all’archivio: ${paesi.toLowerCase()} — quota sul fatturato da rilevare in intervista`;
+  if (facts.esportatore === true)
+    return 'esportatore secondo l’archivio — quota sul fatturato da rilevare in intervista';
+  if (facts.esportatore === false) return 'nessuna esportazione risulta all’archivio';
+  return 'da rilevare in intervista';
+}
+
 function calcolaMassimaleRcProdotti(facts: CompanyFacts): Explained<Euro | null> {
   const builder = explain('Massimale consigliato — RC Prodotti');
 
@@ -782,18 +797,21 @@ function calcolaMassimaleRcProdotti(facts: CompanyFacts): Explained<Euro | null>
     builder.note('Export superiore al 30%: esposizione a ordinamenti e fori esteri.');
   }
 
+  /*
+    La voce «Export» diceva «da rilevare in intervista» accanto al riquadro dell'archivio
+    che stampa «Paesi di esportazione: Unione Europea, Altri Paesi». Il dato era comprato,
+    era a schermo, e il dimensionamento dichiarava di non averlo.
+
+    Quello che manca è la QUOTA sul fatturato, non il fatto di esportare: `descriviExport`
+    distingue le due cose e chiede solo ciò che davvero nessuno ha chiesto.
+  */
   return builder
     .formula('Benchmark per classe di fatturato, elevato in funzione dei mercati di destinazione')
     .input(
       'Fatturato',
       facts.fatturato === null ? 'da rilevare in intervista' : Money.formatCompact(facts.fatturato),
     )
-    .input(
-      'Export',
-      facts.quotaExport === null
-        ? 'da rilevare in intervista'
-        : `${formatNumber(facts.quotaExport * 100, 0)}%`,
-    )
+    .input('Export', descriviExport(facts))
     .note('Valutare l’estensione alle spese di ritiro prodotti (recall), esclusa dalla garanzia base.')
     .confidence(facts.fatturato === null ? 'bassa' : 'media')
     .value(scala(indice));

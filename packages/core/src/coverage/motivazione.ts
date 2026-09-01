@@ -44,6 +44,25 @@ export interface FrammentoMotivazione {
   /** La norma di **questo** frammento, non della copertura in generale. */
   readonly riferimento: string | null;
   readonly suDatoIgnoto: boolean;
+  /**
+   * Il frammento dice, sui fatti di **questa** impresa, ciò che la frase di catalogo dice
+   * in generale. Quando è acceso, la frase di catalogo non si stampa.
+   *
+   * Le due frasi sono nate in momenti diversi: la `motivazioneTipo` quando i frammenti non
+   * esistevano, il frammento dopo, per dire la stessa cosa con più precisione e con il
+   * fatto che la regge. Affiancarle produceva una motivazione che ripete sé stessa —
+   * «L'indennizzo INAIL non esaurisce il danno risarcibile» due volte in tre righe, i costi
+   * di bonifica esclusi dalla RCT ordinaria tre volte nella stessa scheda.
+   *
+   * Non è un problema di eleganza. Un documento di adeguatezza che ripete la stessa
+   * affermazione con parole appena diverse **sembra generato**, e chi lo legge smette di
+   * distinguere ciò che è stato accertato su questa impresa da ciò che vale per tutte: è
+   * esattamente la distinzione che il fascicolo esiste per fare.
+   *
+   * Chi lo accende si assume un obbligo: il frammento deve dire **tutto** ciò che diceva la
+   * frase di catalogo, non una parte.
+   */
+  readonly assorbeLaFraseDiCatalogo?: boolean;
 }
 
 export interface MotivazioneComposta {
@@ -103,11 +122,19 @@ const fattoDeiCommessi: Regola = (f) => {
   if (f.haDipendenti === false) return null;
   const ignoto = f.haDipendenti === null;
   return {
+    /*
+      «Danni cagionati a terzi nell'esercizio…» è la formula con cui la frase di catalogo
+      apre il paragrafo, tre righe più su. Ripeterla qui faceva sembrare la stessa cosa
+      detta due volte, mentre l'art. 2049 aggiunge una regola diversa: non l'oggetto della
+      copertura, ma **chi** risponde del fatto altrui. La formulazione qui sotto è quella
+      del codice — fatto illecito, incombenze a cui sono adibiti — e dice ciò che la prima
+      non dice, senza riecheggiarla.
+    */
     testo: ignoto
-      ? 'Se l’impresa impiega personale dipendente o collaboratori, risponde anche dei danni che questi ' +
-        'cagionano a terzi nell’esercizio delle incombenze affidate.'
-      : 'L’impresa risponde dei danni che i propri dipendenti e collaboratori cagionano a terzi ' +
-        'nell’esercizio delle incombenze affidate.',
+      ? 'Se l’impresa impiega personale dipendente o collaboratori, risponde anche del loro fatto ' +
+        'illecito, per le incombenze a cui sono adibiti.'
+      : 'L’impresa risponde anche del fatto illecito dei propri dipendenti e collaboratori, per le ' +
+        'incombenze a cui sono adibiti.',
     fondamento: ignoto
       ? 'Presenza di personale dipendente non rilevata in intervista.'
       : 'Personale dipendente rilevato.',
@@ -190,25 +217,34 @@ const regimeDaProdotto: Regola = (f) => {
       riferimento:
         'Art. 114 D.Lgs. 206/2005 — esimenti: art. 118 · onere della prova a carico del danneggiato: art. 120',
       suDatoIgnoto: false,
+      assorbeLaFraseDiCatalogo: true,
     };
   }
   if (f.produceBeniFinali === false) {
     return {
       testo:
         'L’impresa non risulta produttrice: come fornitore risponde in via sussidiaria, quando il ' +
-        'produttore non è individuato e non ne comunica l’identità entro tre mesi dalla richiesta.',
+        'produttore non è individuato e non ne comunica l’identità entro tre mesi dalla richiesta. ' +
+        // Art. 116, c. 1: il fornitore «è sottoposto alla stessa responsabilità» del
+        // produttore. Ometterlo faceva sembrare la posizione del fornitore più mite di
+        // quello che è — sussidiaria nel presupposto, identica nella misura.
+        'In quel caso risponde alle stesse condizioni del produttore, a prescindere dalla colpa e ' +
+        'salve le esimenti di legge.',
       fondamento: 'Produzione di beni finali esclusa in intervista.',
       riferimento: 'Art. 116 D.Lgs. 206/2005',
       suDatoIgnoto: false,
+      assorbeLaFraseDiCatalogo: true,
     };
   }
   return {
     testo:
-      'Il regime di responsabilità dipende dal ruolo nella catena: è oggettivo per il produttore, ' +
-      'sussidiario per il solo fornitore. Va accertato prima di dimensionare il massimale.',
+      'Il regime di responsabilità dipende dal ruolo nella catena: è oggettivo per il produttore — ' +
+      'salve le esimenti di legge — e sussidiario per il solo fornitore. Va accertato prima di ' +
+      'dimensionare il massimale.',
     fondamento: 'Ruolo nella catena di fornitura non rilevato in intervista.',
     riferimento: 'Artt. 114 e 116 D.Lgs. 206/2005',
     suDatoIgnoto: true,
+    assorbeLaFraseDiCatalogo: true,
   };
 };
 
@@ -222,11 +258,12 @@ const regimeAmbientale: Regola = () => ({
   testo:
     'La responsabilità per danno ambientale è oggettiva per gli operatori delle attività elencate ' +
     'nell’Allegato 5 alla Parte VI del Codice dell’ambiente; per le altre attività risponde chi ha ' +
-    'agito con dolo o colpa. In entrambi i casi i costi di bonifica e ripristino restano esclusi ' +
-    'dalla RCT ordinaria.',
+    'agito con dolo o colpa. In entrambi i casi i costi di bonifica e di ripristino restano esclusi ' +
+    'dalla RCT ordinaria e possono eccedere di molto il danno cagionato a terzi.',
   fondamento: 'Appartenenza all’Allegato 5 non accertata: la formulazione resta valida in entrambi i casi.',
   riferimento: 'Artt. 298-bis e 311, c. 2, D.Lgs. 152/2006',
   suDatoIgnoto: true,
+  assorbeLaFraseDiCatalogo: true,
 });
 
 /** L'obbligo assicurativo del professionista vale per chi è iscritto a un albo. */
@@ -311,6 +348,10 @@ const obbligoDiSicurezza: Regola = (f) => {
       : 'Personale dipendente rilevato.',
     riferimento: 'Art. 2087 c.c. · art. 10 D.P.R. 1124/1965 · art. 13 D.Lgs. 38/2000',
     suDatoIgnoto: ignoto,
+    // Con il personale accertato il frammento dice già tutto ciò che dice la frase di
+    // catalogo, e in più su quale obbligo poggia. Nella forma ipotetica no — lì l'INAIL
+    // non è nominato — e la frase di catalogo resta a dirlo.
+    assorbeLaFraseDiCatalogo: !ignoto,
   };
 };
 
@@ -389,7 +430,10 @@ export function componiMotivazioneCopertura(
     .map((regola) => regola(facts, catNat))
     .filter((frammento): frammento is FrammentoMotivazione => frammento !== null);
 
-  const parti = [definition.motivazioneTipo, ...frammenti.map((f) => f.testo)];
+  // La frase di catalogo cede il posto al frammento che dice la stessa cosa sui fatti
+  // accertati: due formulazioni della medesima affermazione non rafforzano niente.
+  const assorbita = frammenti.some((f) => f.assorbeLaFraseDiCatalogo === true);
+  const parti = [...(assorbita ? [] : [definition.motivazioneTipo]), ...frammenti.map((f) => f.testo)];
 
   if (rischiServiti.length > 0) {
     const principali = [...rischiServiti]

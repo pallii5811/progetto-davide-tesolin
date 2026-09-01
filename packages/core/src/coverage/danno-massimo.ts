@@ -40,6 +40,20 @@ export interface DannoMassimo {
   readonly probabile: Euro;
   /** Quota del valore, da 0 a 1. */
   readonly quota: number;
+  /**
+   * Le protezioni che hanno **davvero** abbassato la quota, per nome. Vuoto quando
+   * nessuna è stata accertata.
+   *
+   * La scheda stampava «60% del valore, tenuto conto delle protezioni accertate» mentre,
+   * dieci righe più giù, elencava le domande da fare perché nessuna protezione risultava
+   * confermata. Quel 60% era la sola quota di settore: di protezioni non ne era stata
+   * tenuta in conto nessuna, e la didascalia attribuiva al numero una prudenza che non
+   * conteneva.
+   *
+   * Il difetto non era la stima — corretta, e per eccesso — ma la didascalia, che è
+   * l'unica cosa con cui il lettore decide quanto fidarsi del numero.
+   */
+  readonly protezioniAccertate: readonly string[];
   readonly forma: FormaConsigliata;
   readonly motivazioneForma: string;
   /** Cosa chiedere al cliente per stimare meglio, in ordine di impatto. */
@@ -154,11 +168,14 @@ export function stimaDannoMassimo(
     .note(base.motivo);
 
   const domande: string[] = [];
+  /* Solo ciò che ha spostato la quota: la didascalia della scheda si compone da qui. */
+  const protezioniAccertate: string[] = [];
 
   // ── Protezione passiva: è struttura, non dispositivo, e regge ────────────────
   const compartimentata = anyDichiarato(immobili.map((i) => i.compartimentazioneRei));
   if (compartimentata === true) {
     quota *= 0.55;
+    protezioniAccertate.push('compartimentazione antincendio REI');
     costruttore.note(
       'Compartimentazione REI dichiarata: l’incendio resta confinato nel compartimento di origine. È la protezione che incide di più, perché è struttura e non dipende da un dispositivo che deve attivarsi.',
     );
@@ -177,6 +194,7 @@ export function stimaDannoMassimo(
   const sprinkler = anyDichiarato(immobili.map((i) => i.impiantoSprinkler));
   if (sprinkler === true) {
     quota *= 0.7;
+    protezioniAccertate.push('impianto di estinzione automatica');
     costruttore.note(
       'Impianto di estinzione automatica: agisce senza che nessuno sia presente. Il credito è prudente perché un impianto può non entrare in funzione.',
     );
@@ -273,6 +291,7 @@ export function stimaDannoMassimo(
     possibile: valoreBeni,
     probabile,
     quota: quotaFinale,
+    protezioniAccertate,
     forma,
     motivazioneForma: motivazioneForma(forma, valoreBeni, probabile, quotaFinale),
     domandeCheAbbassanoLaStima: domande,

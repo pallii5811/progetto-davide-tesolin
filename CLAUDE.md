@@ -123,6 +123,70 @@ Un'attesa raccontata come indisponibilità fa chiudere la scheda e rifare tutto 
 Partita IVA, codice fiscale, CAP, telefono: mai `Number()`. Si converte ciò su cui si fanno
 **conti**, non ciò con cui si fanno **confronti di identità**.
 
+## 10 · Due valori per lo stesso fatto: vince quello che sa dimostrarsi
+
+Lo stesso fornitore, la stessa impresa, lo stesso esercizio, e due patrimoni netti diversi.
+Non è un caso limite: è la forma normale con cui un archivio risponde da due servizi.
+
+> Costato, su COMINOTTI S.R.L. e verificato uguale su una seconda impresa:
+>
+> | fonte             | campo                         | valore    |
+> | ----------------- | ----------------------------- | --------- |
+> | anagrafica estesa | `balanceSheets.last.netWorth` | 8.485 €   |
+> | profilo completo  | `ecofin.netWorth`             | 719.768 € |
+>
+> Il secondo si prova da sé: diviso per il totale attivo riproduce `capitalizationDegree`,
+> che l'archivio pubblica a parte, alla quarta cifra. Il primo no, e coincide con l'utile
+> d'esercizio. Il prodotto usava il primo: limite patrimoniale 1.697 € invece di 143.954 €,
+> equity ratio 0,2% invece di 13,7%, indebitamento 619× invece di 6,3×, e in fondo alla
+> scheda **«Fido consigliato: 0 €»** su un'impresa attiva da trentaquattro anni.
+
+Quando due campi dicono la stessa cosa, si sceglie quello che **una terza grandezza
+conferma**, e la scelta si scrive nel codice con il conto che la regge. Nessuno dei numeri
+era sbagliato preso da solo: il difetto si vedeva solo mettendo la pagina intera davanti.
+
+## 11 · Visibile non è letto
+
+La regola 4 chiede che il dato pagato arrivi allo schermo. Non basta: deve arrivare al
+**motore**.
+
+> Costato: «Paesi di esportazione: Unione Europea, Altri Paesi» stampato dall'archivio, e
+> due sezioni sotto il dimensionamento della RC Prodotti che dichiarava «Export: da rilevare
+> in intervista». Il dato era comprato, era a schermo, e nessuna regola poteva leggerlo:
+> `CompanyFacts` non aveva un campo in cui atterrare. Non era una svista di scrittura, era
+> un dato senza porta d'ingresso.
+
+La domanda da fare su ogni campo nuovo non è «si vede?» ma «**chi lo legge?**». E quando
+entra: l'intervista prevale sull'archivio, l'archivio non produce mai una negazione — «altri
+paesi» comprende gli Stati Uniti senza nominarli, e leggerlo come un «no» toglierebbe due
+gradini di massimale a chi là ci spedisce davvero.
+
+## 12 · Una frase detta due volte vale meno di una detta una volta
+
+> Costato, e detto dal proprietario del prodotto leggendo la propria scheda:
+> «A ME SEMBRANO FRASI GENERICHE TUTTE UGUALI».
+>
+> Aveva ragione. Ogni frase, presa da sola, era esatta e con la sua norma — ma la
+> motivazione stampava la frase di catalogo **e poi** il frammento nato dopo per dirla
+> meglio: «L'indennizzo INAIL non esaurisce il danno risarcibile» due volte in tre righe, i
+> costi di bonifica esclusi dalla RCT ordinaria tre volte nella stessa scheda.
+
+Un documento di adeguatezza vale per la distinzione fra ciò che è stato **accertato su
+questa impresa** e ciò che vale per tutte. Ripetere la stessa affermazione riformulata
+cancella quella distinzione, e il lettore conclude che il testo sia stato generato a
+macchina. Il presidio è `packages/core/test/motivazione-non-si-ripete.test.ts`, che cerca
+affermazioni ripetute su ogni copertura e ogni combinazione di fatti.
+
+**E la didascalia è parte del numero.** «60% del valore, tenuto conto delle protezioni
+accertate» era stampato dove nessuna protezione lo era, dieci righe sopra l'elenco delle
+domande da fare proprio per quello. La stima era giusta e prudenziale; la didascalia la
+faceva leggere come informata. È l'unica cosa con cui chi legge decide quanto fidarsi.
+
+E dove non c'è uno spostamento non si stampa uno zero: «±0P ±0I» accanto a «Lavorazioni in
+cantiere (da verificare)» mette un numero al posto di un motivo. Come «Analisi al 0% del suo
+potenziale» detto a chi ha appena pagato il profilo completo: la misura era giusta, contava
+i campi dell'**intervista**, e il titolo la attribuiva all'analisi.
+
 ---
 
 ## Comandi

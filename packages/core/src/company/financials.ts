@@ -170,6 +170,35 @@ export function isBilancioSinteticoUtile(b: BilancioSintetico): boolean {
   return b.fatturato !== null || b.totaleAttivo !== null || b.patrimonioNetto !== null;
 }
 
+/**
+ * Il patrimonio netto dell'archivio, quando l'archivio ne dichiara due.
+ *
+ * Lo stesso fornitore, la stessa impresa, lo stesso esercizio, e due numeri diversi:
+ *
+ *   anagrafica estesa   `balanceSheets.last.netWorth`        8.485 €
+ *   profilo completo    `ecofin.netWorth`                  719.768 €
+ *
+ * Il secondo si prova da sé: diviso per il totale attivo riproduce `capitalizationDegree`,
+ * che lo stesso archivio pubblica a parte, alla quarta cifra. Il primo no, e su un'impresa
+ * vera coincideva con l'utile d'esercizio.
+ *
+ * Sta qui, e non dentro chi lo usa, perché i consumatori sono due e devono vedere lo stesso
+ * numero: gli indicatori di bilancio — che ne ricavano il fido e l'equity ratio — e
+ * `deriveFacts`, da cui passano le regole di rischio e i massimali. Correggerne uno solo
+ * lascia in piedi metà del difetto, nella metà che nessuno guarda.
+ *
+ * Senza il profilo completo non c'è niente da preferire e si tiene ciò che si ha: è il caso
+ * di chi paga la sola anagrafica estesa, e lo dichiara il livello dei dati economici che la
+ * scheda stampa.
+ */
+export function conPatrimonioNettoAutorevole(
+  sintetico: BilancioSintetico | null,
+  patrimonioNettoArchivioEuro: number | null,
+): BilancioSintetico | null {
+  if (sintetico === null || patrimonioNettoArchivioEuro === null) return sintetico;
+  return { ...sintetico, patrimonioNetto: Money.euro(patrimonioNettoArchivioEuro) };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Schemi riclassificati (output)
 // ─────────────────────────────────────────────────────────────────────────────

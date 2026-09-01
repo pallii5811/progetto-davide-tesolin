@@ -789,7 +789,15 @@ function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
     details: [
       `Current ratio: ${ind.currentRatio === null ? 'da rilevare in intervista' : `${formatNumber(ind.currentRatio)}×`}`,
       `Quick ratio: ${ind.quickRatio === null ? 'da rilevare in intervista' : `${formatNumber(ind.quickRatio)}×`}`,
-      `Ciclo del circolante: ${ind.cicloCircolante === null ? 'da rilevare in intervista' : `${ind.cicloCircolante} gg`}`,
+      /*
+        L'unica riga di questo file che stampava il numero grezzo.
+
+        Le sedici accanto passano da `formatNumber`, questa no: usciva «Ciclo del
+        circolante: 313.3014 gg», con il punto come separatore decimale e quattro cifre. Un
+        lettore italiano legge trecentotredicimila giorni — e due riquadri più su, nella
+        tabella degli indici dell'archivio, lo stesso dato compare come «313 gg».
+      */
+      `Ciclo del circolante: ${ind.cicloCircolante === null ? 'da rilevare in intervista' : `${formatNumber(ind.cicloCircolante, 0)} gg`}`,
     ],
   };
 }
