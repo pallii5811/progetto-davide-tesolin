@@ -23,6 +23,7 @@ import {
 import { ageInMonths, weakestConfidence } from '../shared/provenance.js';
 import type { Confidence, Sourced } from '../shared/provenance.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
+import { assenzaDi } from '../company/indicators.js';
 import type { FinancialIndicators } from '../company/indicators.js';
 import type { CompanyProfile, EventiNegativi, ProceduraConcorsuale } from '../company/profile.js';
 import {
@@ -652,9 +653,9 @@ function fattoreSolidita(ind: FinancialIndicators | null): ScoreFactor {
             ? 'Patrimonializzazione nella norma, con dipendenza significativa da fonti di terzi.'
             : 'Patrimonializzazione debole: la struttura finanziaria è esposta a shock di reddito.',
     details: [
-      `Equity ratio: ${ind.equityRatio === null ? 'da rilevare in intervista' : formatPercent(ind.equityRatio)}`,
-      `Indice di indebitamento: ${ind.indiceIndebitamento === null ? 'da rilevare in intervista' : `${formatNumber(ind.indiceIndebitamento)}×`}`,
-      `Copertura immobilizzazioni: ${ind.coperturaImmobilizzazioni === null ? 'da rilevare in intervista' : `${formatNumber(ind.coperturaImmobilizzazioni)}×`}`,
+      `Equity ratio: ${ind.equityRatio === null ? assenzaDi('equityRatio') : formatPercent(ind.equityRatio)}`,
+      `Indice di indebitamento: ${ind.indiceIndebitamento === null ? assenzaDi('indiceIndebitamento') : `${formatNumber(ind.indiceIndebitamento)}×`}`,
+      `Copertura immobilizzazioni: ${ind.coperturaImmobilizzazioni === null ? assenzaDi('coperturaImmobilizzazioni') : `${formatNumber(ind.coperturaImmobilizzazioni)}×`}`,
     ],
   };
 }
@@ -720,9 +721,9 @@ function fattoreRedditivita(ind: FinancialIndicators | null): ScoreFactor {
             ? 'Redditività modesta: margini sufficienti ma poco spazio di assorbimento degli shock.'
             : 'Redditività insufficiente: la gestione operativa non remunera il capitale investito.',
     details: [
-      `ROI: ${ind.roi === null ? 'da rilevare in intervista' : formatPercent(ind.roi)}`,
-      `EBITDA margin: ${ind.ebitdaMargin === null ? 'da rilevare in intervista' : formatPercent(ind.ebitdaMargin)}`,
-      `Crescita EBITDA: ${ind.crescitaEbitda === null ? 'da rilevare in intervista' : formatPercent(ind.crescitaEbitda)}`,
+      `ROI: ${ind.roi === null ? assenzaDi('roi') : formatPercent(ind.roi)}`,
+      `EBITDA margin: ${ind.ebitdaMargin === null ? assenzaDi('ebitdaMargin') : formatPercent(ind.ebitdaMargin)}`,
+      `Crescita EBITDA: ${ind.crescitaEbitda === null ? assenzaDi('crescitaEbitda') : formatPercent(ind.crescitaEbitda)}`,
     ],
   };
 }
@@ -787,8 +788,8 @@ function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
             ? 'Liquidità appena sufficiente: il circolante assorbe cassa in misura rilevante.'
             : 'Tensione di liquidità: gli impegni a breve non sono coperti dalle attività correnti.',
     details: [
-      `Current ratio: ${ind.currentRatio === null ? 'da rilevare in intervista' : `${formatNumber(ind.currentRatio)}×`}`,
-      `Quick ratio: ${ind.quickRatio === null ? 'da rilevare in intervista' : `${formatNumber(ind.quickRatio)}×`}`,
+      `Current ratio: ${ind.currentRatio === null ? assenzaDi('currentRatio') : `${formatNumber(ind.currentRatio)}×`}`,
+      `Quick ratio: ${ind.quickRatio === null ? assenzaDi('quickRatio') : `${formatNumber(ind.quickRatio)}×`}`,
       /*
         L'unica riga di questo file che stampava il numero grezzo.
 
@@ -797,7 +798,7 @@ function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
         lettore italiano legge trecentotredicimila giorni — e due riquadri più su, nella
         tabella degli indici dell'archivio, lo stesso dato compare come «313 gg».
       */
-      `Ciclo del circolante: ${ind.cicloCircolante === null ? 'da rilevare in intervista' : `${formatNumber(ind.cicloCircolante, 0)} gg`}`,
+      `Ciclo del circolante: ${ind.cicloCircolante === null ? assenzaDi('cicloCircolante') : `${formatNumber(ind.cicloCircolante, 0)} gg`}`,
     ],
   };
 }
@@ -868,9 +869,9 @@ function fattoreSostenibilitaDebito(ind: FinancialIndicators | null): ScoreFacto
             ? 'Debito sostenibile ma con margini ridotti: sensibile a un calo della marginalità.'
             : 'Debito non sostenibile con la marginalità attuale: rischio di tensione finanziaria.',
     details: [
-      `PFN / EBITDA: ${ind.pfnSuEbitda === null ? 'da rilevare in intervista' : `${formatNumber(ind.pfnSuEbitda)}×`}`,
-      `Copertura oneri finanziari: ${ind.coperturaOneriFinanziari === null ? 'da rilevare in intervista' : `${formatNumber(ind.coperturaOneriFinanziari)}×`}`,
-      `Incidenza oneri finanziari sui ricavi: ${ind.incidenzaOneriFinanziari === null ? 'da rilevare in intervista' : formatPercent(ind.incidenzaOneriFinanziari)}`,
+      `PFN / EBITDA: ${ind.pfnSuEbitda === null ? assenzaDi('pfnSuEbitda') : `${formatNumber(ind.pfnSuEbitda)}×`}`,
+      `Copertura oneri finanziari: ${ind.coperturaOneriFinanziari === null ? assenzaDi('coperturaOneriFinanziari') : `${formatNumber(ind.coperturaOneriFinanziari)}×`}`,
+      `Incidenza oneri finanziari sui ricavi: ${ind.incidenzaOneriFinanziari === null ? assenzaDi('incidenzaOneriFinanziari') : formatPercent(ind.incidenzaOneriFinanziari)}`,
     ],
   };
 }

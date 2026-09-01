@@ -52,6 +52,59 @@ export interface FinancialIndicators {
   readonly costoMedioDipendente: number | null;
 }
 
+/**
+ * Perché quell'indice non c'è — che non è sempre «chiedilo al cliente».
+ *
+ * Il punteggio di merito scriveva «da rilevare in intervista» accanto a **ogni** indice
+ * mancante, quattordici volte, e per tre di quelli la frase è falsa:
+ *
+ * | indice                     | cosa diceva               | cosa succede davvero                          |
+ * | -------------------------- | ------------------------- | --------------------------------------------- |
+ * | ROI                        | da rilevare in intervista | l'archivio LO DÀ — 4,68 % stampato sopra      |
+ * | Crescita EBITDA            | da rilevare in intervista | l'archivio dà la variazione, su due esercizi  |
+ * | Incidenza oneri sui ricavi | da rilevare in intervista | l'archivio dà gli oneri, ma sull'EBITDA       |
+ *
+ * Su tutti e tre il dato **è stato pagato ed è a schermo**: dire «da rilevare» manda
+ * l'intermediario a chiedere all'impresa una cosa che ha già, e nasconde la ragione vera,
+ * che è una scelta di metodo — un denominatore non documentato, un orizzonte diverso.
+ *
+ * È la stessa forma del difetto già corretto sull'export, e sarebbe uscita al prossimo
+ * ricaricamento come è uscita quella. Qui la ragione si scrive una volta, accanto
+ * all'indice, e vale ovunque l'indice manchi.
+ *
+ * Gli indici non elencati conservano «da rilevare in intervista», ed è vero: richiedono lo
+ * schema CEE dettagliato, che il cliente ha già in mano nel bilancio depositato e che si
+ * inserisce in intervista senza comprare niente.
+ */
+export const MOTIVO_ASSENZA: Readonly<Partial<Record<keyof FinancialIndicators, string>>> = {
+  /*
+    L'archivio pubblica un ROI, ed è stampato fra i suoi indicatori. Non entra nel
+    punteggio perché il denominatore non è documentato: su un'impresa con la posizione
+    finanziaria più negativa del patrimonio esce −323 % accanto a un ROA di +44 %.
+  */
+  roi: 'l’archivio lo pubblica ma non ne documenta il denominatore: resta fra i suoi indicatori, fuori dal punteggio',
+  /*
+    `variazioneMol` è EBITDA corrente su EBITDA di DUE esercizi fa — provato a quattro
+    decimali: 343.989 / 360.857 − 1 = −4,6744 %, e l'archivio scrive −4,67 %. La soglia del
+    punteggio è annua, e confrontare due orizzonti diversi è il difetto della regola 2m.
+  */
+  crescitaEbitda:
+    'l’archivio la dà su due esercizi, non sull’anno precedente: non confrontabile con la soglia annua',
+  /*
+    L'archivio dà gli oneri finanziari solo in rapporto all'EBITDA (`burdenIndex`), e
+    l'EBITDA in rapporto al valore della produzione. Da lì si ricava oneri su valore della
+    produzione, non oneri su ricavi: i due denominatori differiscono di 373.000 € su questa
+    impresa, e scambiarli sarebbe indovinare.
+  */
+  incidenzaOneriFinanziari:
+    'l’archivio dà gli oneri solo in rapporto all’EBITDA: il rapporto sui ricavi richiede il bilancio in schema CEE',
+};
+
+/** La ragione dell'assenza, o il ripiego vero per gli indici che l'intervista porta davvero. */
+export function assenzaDi(chiave: keyof FinancialIndicators): string {
+  return MOTIVO_ASSENZA[chiave] ?? 'da rilevare in intervista';
+}
+
 export const INDICATOR_META: Readonly<Record<keyof FinancialIndicators, IndicatorMeta>> = {
   roe: {
     label: 'ROE',

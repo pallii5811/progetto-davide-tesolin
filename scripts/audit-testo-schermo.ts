@@ -275,9 +275,29 @@ function affermazioniRipetute(testo: string): string[] {
  * l'archivio non documenta, e restare fuori dal punteggio è corretto — ma è la lista di
  * ciò che merita una spiegazione scritta.
  */
+/**
+ * I sinonimi di mestiere, perché un controllo che confronta i nomi è cieco ai sinonimi.
+ *
+ * L'archivio chiama `variazioneMol` ciò che il punteggio chiama «Crescita EBITDA»: MOL ed
+ * EBITDA sono la stessa grandezza in due lingue di mestiere, e fra le due etichette non c'è
+ * **nessuna** parola in comune. Il rilievo non nasceva, e la scheda continuava a mandare
+ * l'intermediario a chiedere all'impresa un dato che era stato comprato e stampato.
+ *
+ * Le radici sono già troncate a sei lettere quando arrivano qui.
+ */
+const SINONIMI: Readonly<Record<string, string>> = {
+  mol: 'ebitda',
+  variaz: 'cresci',
+  onerif: 'oneri',
+};
+
 /** Le parole di contenuto di un'etichetta, come insieme di radici. */
 function radici(etichetta: string): Set<string> {
-  return new Set(parole(etichetta).filter((p) => !['sul', 'sui', 'suo', 'della'].includes(p)));
+  return new Set(
+    parole(etichetta)
+      .filter((p) => !['sul', 'sui', 'suo', 'della'].includes(p))
+      .map((p) => SINONIMI[p] ?? p),
+  );
 }
 
 /** `pfnSuEbitda` → «pfn su ebitda»: il nome del campo diventa confrontabile con un'etichetta. */
@@ -338,9 +358,15 @@ function chiedeCiòCheHaGià(frasi: readonly Frase[], indicatoriFornitore: unkno
       const offerte = radici(nome);
       let comuni = 0;
       for (const r of chieste) if (offerte.has(r)) comuni += 1;
-      // Due radici in comune: «pfn ebitda» contro «pfn su ebitda» combacia, «ciclo
-      // circolante» contro «ciclo finanziario» no — ed è giusto, sono grandezze diverse.
-      if (comuni >= 2) {
+      /*
+        Due radici in comune: «pfn ebitda» contro «pfn su ebitda» combacia, «ciclo
+        circolante» contro «ciclo finanziario» no — ed è giusto, sono grandezze diverse.
+
+        Ma un'etichetta di una parola sola non può averne due, e con la sola soglia a due
+        «ROI» non scattava mai: era chiesta in intervista mentre l'archivio la stampava
+        dodici righe più su. Quando la parola è una, dev'essere quella.
+      */
+      if (comuni >= 2 || (chieste.size === 1 && comuni === 1)) {
         sospette.push(`«${f.testo}» chiesta, ma l’archivio dà «${nome}» = ${String(valoreArchivio)}`);
         break;
       }
@@ -568,6 +594,31 @@ function autoprovaRilevatori(): void {
   deve(
     chiedeCiòCheHaGià(frasiFinte, { cicloFinanziario: { durataScorte: 264 } }).length === 0,
     'una grandezza diversa viene scambiata per la stessa',
+  );
+
+  /*
+    Le due che questo controllo aveva mancato, con le etichette e i campi veri.
+
+    «Crescita EBITDA» contro `variazioneMol`: nessuna parola in comune, e senza la tabella
+    dei sinonimi il rilievo non nasceva. «ROI» contro `roi`: una parola sola, e con la sola
+    soglia a due radici non scattava. Erano entrambe sulla scheda, con l'archivio che il
+    dato ce l'aveva stampato dodici righe piu su.
+  */
+  const chiesta = (etichetta: string): Frase[] => [
+    { dove: '.credito.fattori[1].dettagli[0].label', testo: etichetta },
+    { dove: '.credito.fattori[1].dettagli[0].value', testo: 'da rilevare in intervista' },
+  ];
+  deve(
+    chiedeCiòCheHaGià(chiesta('Crescita EBITDA'), { kpi: { variazioneMol: -4.67 } }).length > 0,
+    'il sinonimo MOL/EBITDA non viene riconosciuto',
+  );
+  deve(
+    chiedeCiòCheHaGià(chiesta('ROI'), { redditivita: { roi: 4.68 } }).length > 0,
+    'un’etichetta di una parola sola non viene mai agganciata',
+  );
+  deve(
+    chiedeCiòCheHaGià(chiesta('ROI'), { cicloFinanziario: { durataScorte: 264 } }).length === 0,
+    'un’etichetta di una parola sola aggancia qualunque campo',
   );
 
   /*
