@@ -14,7 +14,16 @@ modifica, e le tre regole che ne discendono sono operative.
    può contare, si conta: sui dati veri, con uno script che resti nel repository.
 2. **Zero regressioni.** Ogni modifica passa da `npm test`, `npm run collaudo`,
    `npm run typecheck`, `npm run lint` — e dal confronto delle istantanee del motore quando
-   tocca `packages/core`.
+   tocca `packages/core`. «Zero» è una misura, non un'opinione: il confronto stampa per
+   primo il **verdetto per tipo**, e le due righe che contano sono `campi SPARITI 0` e
+   `valori NON testuali 0`. Le altre — testo cambiato, campi comparsi — vanno nominate
+   una per una, ma non muovono un capitale. L'istantanea «prima» si prende dal commit in
+   esercizio, in un worktree separato (`git worktree add --detach <cartella> <commit>`,
+   `npm ci`, `npm run build`, poi `istantanea-motore.ts`), copiandovi `.sonda/` perché
+   gli otto scenari reali esistano da entrambe le parti. Il 02/09/2026, su 10 scenari e
+   599 differenze, questo ha dato 0 e 0: senza il verdetto per tipo, l'elenco troncato a
+   sessanta righe per scenario avrebbe potuto nascondere un numero cambiato alla
+   sessantunesima.
 3. **Ciò che non si può correggere si DICHIARA.** Un limite scritto nero su bianco è
    professionalità; lo stesso limite taciuto è una bugia che il cliente scopre da solo.
 

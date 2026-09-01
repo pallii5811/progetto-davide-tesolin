@@ -110,6 +110,73 @@ function confronta(a: unknown, b: unknown, percorso: string): void {
 
 confronta(prima, dopo, '');
 
+// ── Il verdetto per TIPO, prima dell'elenco ──────────────────────────────────
+
+/*
+  L'elenco per scenario si ferma a sessanta righe, e sessanta righe di testo cambiato
+  nascondono benissimo il numero cambiato alla sessantunesima. È successo: il confronto
+  fra ieri e oggi contava 599 differenze, e la domanda «qualche NUMERO è cambiato?» non
+  aveva risposta leggendo — l'ha avuta solo riclassificando le differenze per tipo di
+  valore, con uno script scritto sul momento.
+
+  Quella classificazione sta qui, prima di tutto il resto, e non si tronca mai:
+
+    testo cambiato        una frase riscritta — va nominata, ma non muove un capitale
+    campo comparso        additivo — nessuno lo leggeva prima
+    campo SPARITO         qualcuno lo leggeva: regressione finché non è spiegato
+    valore NON testuale   un numero, un booleano, un livello — è la riga da guardare
+
+  Le ultime due si stampano per intero, sempre. Zero in entrambe è la sola forma in cui
+  «nessuna regressione» è una misura invece di un'opinione.
+*/
+const comparsi = new Map<string, number>();
+const testoPerPercorso = new Map<string, number>();
+const spariti: Differenza[] = [];
+const nonTestuali: Differenza[] = [];
+let testoCambiato = 0;
+
+const nomeCampo = (p: string): string => (p.split('.').pop() ?? p).replace(/\[\d+\]/g, '');
+// Il nome di uno scenario reale contiene un punto — «reale:prod-IT-full-….json» — e
+// tagliare al primo punto lasciava «json.gap…» in testa a ogni percorso.
+const senzaIndici = (p: string): string =>
+  p.replace(/^scenari\.(?:[^.]+\.json|[^.]+)\./, '').replace(/\[\d+\]/g, '[]');
+
+for (const d of differenze) {
+  if (d.genere === 'comparso') {
+    comparsi.set(nomeCampo(d.percorso), (comparsi.get(nomeCampo(d.percorso)) ?? 0) + 1);
+  } else if (d.genere === 'sparito') {
+    spariti.push(d);
+  } else if (typeof d.prima === 'string' && typeof d.dopo === 'string') {
+    testoCambiato += 1;
+    const chiave = senzaIndici(d.percorso);
+    testoPerPercorso.set(chiave, (testoPerPercorso.get(chiave) ?? 0) + 1);
+  } else {
+    nonTestuali.push(d);
+  }
+}
+
+if (differenze.length > 0) {
+  const totaleComparsi = [...comparsi.values()].reduce((s, n) => s + n, 0);
+  process.stdout.write(`\n  VERDETTO PER TIPO\n  ${'─'.repeat(76)}\n`);
+  process.stdout.write(`  testo cambiato          ${testoCambiato}\n`);
+  for (const [p, n] of [...testoPerPercorso.entries()].sort((x, y) => y[1] - x[1]).slice(0, 12)) {
+    process.stdout.write(`      ~ ${p}  ×${n}\n`);
+  }
+  process.stdout.write(`  campi comparsi          ${totaleComparsi}\n`);
+  for (const [nome, n] of [...comparsi.entries()].sort((x, y) => y[1] - x[1])) {
+    process.stdout.write(`      + ${nome}  ×${n}\n`);
+  }
+  const avvisoSpariti = spariti.length > 0 ? '   ← regressione finché non è spiegato' : '';
+  process.stdout.write(`  campi SPARITI           ${spariti.length}${avvisoSpariti}\n`);
+  for (const d of spariti) process.stdout.write(`      − ${d.percorso}\n`);
+  const avvisoValori = nonTestuali.length > 0 ? '   ← QUI si guarda' : '';
+  process.stdout.write(`  valori NON testuali     ${nonTestuali.length}${avvisoValori}\n`);
+  for (const d of nonTestuali) {
+    process.stdout.write(`      ! ${d.percorso}\n`);
+    process.stdout.write(`          prima: ${breve(d.prima)}\n          dopo : ${breve(d.dopo)}\n`);
+  }
+}
+
 // ── Il rapporto ──────────────────────────────────────────────────────────────
 
 const perScenario = new Map<string, Differenza[]>();

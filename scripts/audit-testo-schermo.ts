@@ -34,7 +34,12 @@
  *   1  separatore decimale inglese         «0.30×» in una pagina che scrive «1,37»
  *   2  accordo con il numero uno            «Sulle restanti 1 il contesto…»
  *   3  affermazioni ripetute                la stessa cosa detta due volte, riformulata
- *   4  «da rilevare» di ciò che si ha già   la voce chiesta e stampata nella stessa pagina
+ *   4  «da rilevare» di ciò che si ha già   la voce chiesta mentre l'archivio l'ha data
+ *   5  un indice pubblicato in due unità    «39,93» senza unità sotto un moltiplicatore
+ *   6  numeri che devono tornare fra loro   conteggi, prodotti, somme, il 20 % del netto
+ *
+ * Prima di misurare fa fallire i propri rilevatori sui difetti storici: uno strumento cieco
+ * scrive «nessun rilievo» esattamente come uno pulito, e la differenza va provata ogni volta.
  *
  * Esce con codice 1 se trova qualcosa: è pensato per essere lanciato prima di consegnare.
  */
@@ -468,6 +473,176 @@ function coppieInDueUnita(archivi: readonly Map<string, unknown>[]): CoppiaSospe
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6 · I numeri della scheda devono tornare fra loro
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Le identità interne della scheda, ricalcolate e confrontate.
+ *
+ * È l'unico controllo che il lettore può fare da solo: «29 rischi identificati · 22 da
+ * trasferire» si verifica contando le righe, «60% di 11.500.000» si verifica con una
+ * moltiplicazione, «limite patrimoniale 143.954 €» con il 20 % del patrimonio netto
+ * stampato tre righe sopra. Se una di queste non torna, il difetto è nella scheda, non nel
+ * lettore — e il lettore lo trova, perché è la prima cosa che un intermediario prova a
+ * fare davanti a un numero.
+ *
+ * Nel progetto è già costato: «escluse per età: 10» mentre le schede passavano da 23 a 21.
+ * Erano due, e il conteggio contava le righe di un join. Qui si conta sul DTO che la
+ * pagina riceve, cioè su ciò che il lettore vede — non su ciò che il motore pensa di
+ * aver detto.
+ *
+ * Le tolleranze sono di un euro dove c'è un arrotondamento commerciale, e zero altrove.
+ */
+interface SchedaDaRiconciliare {
+  readonly rischi?: readonly {
+    readonly probabilita: number;
+    readonly impatto: number;
+    readonly punteggioResiduo: number;
+    readonly trattamento: string;
+    readonly daVerificare: boolean;
+  }[];
+  readonly rischiMeta?: {
+    readonly totale: number;
+    readonly daTrasferire: number;
+    readonly daVerificare: number;
+  };
+  readonly sintesi?: {
+    readonly rischiIdentificati: number;
+    readonly rischiDaTrasferire: number;
+    readonly patrimonioEsposto: { readonly euro: number } | null;
+    readonly esposizioneNonAssicurata: { readonly euro: number };
+  };
+  readonly dannoMassimo?: {
+    readonly disponibile: boolean;
+    readonly possibile?: { readonly euro: number };
+    readonly probabile?: { readonly euro: number };
+    readonly quota?: number;
+  };
+  readonly credito?: {
+    readonly fido: {
+      readonly importo: { readonly euro: number } | null;
+      readonly limitePatrimoniale: { readonly euro: number } | null;
+      readonly limiteDimensionale: { readonly euro: number } | null;
+      readonly limiteFlusso: { readonly euro: number } | null;
+    };
+  };
+  readonly sommeAssicurande?: Record<string, { readonly valore: { readonly euro: number } | null }>;
+  readonly indicatoriArchivio?: {
+    readonly aggregati?: { readonly patrimonioNetto: number | null } | null;
+  } | null;
+}
+
+function numeriCheNonTornano(dtoGrezzo: unknown): string[] {
+  const dto = dtoGrezzo as SchedaDaRiconciliare;
+  const rilievi: string[] = [];
+  const nonTorna = (cosa: string, atteso: number, trovato: number): void => {
+    rilievi.push(`${cosa}: atteso ${atteso}, stampato ${trovato}`);
+  };
+
+  const rischi = dto.rischi ?? [];
+  if (dto.rischiMeta !== undefined) {
+    const trasferire = rischi.filter((r) => r.trattamento === 'trasferire').length;
+    const verificare = rischi.filter((r) => r.daVerificare).length;
+    if (dto.rischiMeta.totale !== rischi.length)
+      nonTorna('rischi identificati', rischi.length, dto.rischiMeta.totale);
+    if (dto.rischiMeta.daTrasferire !== trasferire)
+      nonTorna('rischi da trasferire', trasferire, dto.rischiMeta.daTrasferire);
+    if (dto.rischiMeta.daVerificare !== verificare)
+      nonTorna('rischi da confermare', verificare, dto.rischiMeta.daVerificare);
+  }
+  if (dto.sintesi !== undefined) {
+    if (dto.sintesi.rischiIdentificati !== rischi.length)
+      nonTorna('sintesi · rischi identificati', rischi.length, dto.sintesi.rischiIdentificati);
+    const trasferire = rischi.filter((r) => r.trattamento === 'trasferire').length;
+    if (dto.sintesi.rischiDaTrasferire !== trasferire)
+      nonTorna('sintesi · rischi da trasferire', trasferire, dto.sintesi.rischiDaTrasferire);
+  }
+  for (const r of rischi) {
+    if (r.punteggioResiduo !== r.probabilita * r.impatto) {
+      nonTorna(
+        `punteggio residuo = probabilità × impatto (${r.probabilita}×${r.impatto})`,
+        r.probabilita * r.impatto,
+        r.punteggioResiduo,
+      );
+    }
+  }
+
+  const dm = dto.dannoMassimo;
+  if (
+    dm?.disponibile === true &&
+    dm.possibile !== undefined &&
+    dm.probabile !== undefined &&
+    dm.quota !== undefined
+  ) {
+    // Il probabile è possibile × quota arrotondato PER ECCESSO a cifra commerciale: mai
+    // sotto il prodotto, mai sopra il valore intero.
+    const atteso = dm.possibile.euro * dm.quota;
+    if (dm.probabile.euro < atteso - 1)
+      nonTorna('danno probabile ≥ possibile × quota', Math.round(atteso), dm.probabile.euro);
+    if (dm.probabile.euro > dm.possibile.euro + 1)
+      nonTorna('danno probabile ≤ danno possibile', dm.possibile.euro, dm.probabile.euro);
+    if (dm.quota < 0.35 || dm.quota > 1)
+      rilievi.push(`quota di danno probabile fuori da [0,35; 1]: ${dm.quota}`);
+  }
+
+  const fido = dto.credito?.fido;
+  if (fido !== undefined && fido.importo !== null) {
+    const limiti = [fido.limitePatrimoniale, fido.limiteDimensionale, fido.limiteFlusso]
+      .filter((l): l is { euro: number } => l !== null)
+      .map((l) => l.euro);
+    if (limiti.length > 0 && fido.importo.euro > Math.min(...limiti) + 1) {
+      nonTorna('fido ≤ vincolo più stringente', Math.min(...limiti), fido.importo.euro);
+    }
+    // Il limite patrimoniale è il 20 % del patrimonio netto che il motore usa: in
+    // produzione è quello dell'archivio, ed è stampato sulla stessa scheda.
+    const pn = dto.indicatoriArchivio?.aggregati?.patrimonioNetto ?? null;
+    if (
+      pn !== null &&
+      fido.limitePatrimoniale !== null &&
+      Math.abs(fido.limitePatrimoniale.euro - pn * 0.2) > 1
+    ) {
+      nonTorna(
+        'limite patrimoniale = 20 % del patrimonio netto',
+        Math.round(pn * 0.2),
+        fido.limitePatrimoniale.euro,
+      );
+    }
+  }
+
+  const somme = dto.sommeAssicurande;
+  if (somme !== undefined) {
+    const componenti = ['fabbricati', 'contenuto', 'scorte']
+      .map((k) => somme[k]?.valore?.euro ?? null)
+      .filter((v): v is number => v !== null);
+    const esposto = somme['patrimonioEsposto']?.valore?.euro ?? null;
+    if (componenti.length > 0 && esposto !== null) {
+      const attesa = componenti.reduce((s, v) => s + v, 0);
+      if (Math.abs(attesa - esposto) > 1)
+        nonTorna('patrimonio esposto = fabbricati + contenuto + scorte', attesa, esposto);
+    }
+    if (
+      dto.sintesi?.patrimonioEsposto != null &&
+      esposto !== null &&
+      dto.sintesi.patrimonioEsposto.euro !== esposto
+    ) {
+      nonTorna('sintesi · patrimonio esposto', esposto, dto.sintesi.patrimonioEsposto.euro);
+    }
+    if (
+      dto.sintesi?.patrimonioEsposto != null &&
+      dto.sintesi.esposizioneNonAssicurata.euro > dto.sintesi.patrimonioEsposto.euro + 1
+    ) {
+      nonTorna(
+        'esposizione non assicurata ≤ patrimonio esposto',
+        dto.sintesi.patrimonioEsposto.euro,
+        dto.sintesi.esposizioneNonAssicurata.euro,
+      );
+    }
+  }
+
+  return rilievi;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // La cache che non spende
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -652,6 +827,70 @@ function autoprovaRilevatori(): void {
     'una coppia è stata dichiarata senza scrivere cosa è stato fatto',
   );
 
+  /*
+    6 · i numeri che devono tornare, su una scheda finta coerente e su tre guaste.
+
+    La coerente deve restare muta: una riconciliazione che grida su una scheda giusta
+    insegna a ignorarla esattamente come una che tace su una sbagliata.
+  */
+  const rischio = (p: number, i: number, trattamento = 'trasferire') => ({
+    probabilita: p,
+    impatto: i,
+    punteggioResiduo: p * i,
+    trattamento,
+    daVerificare: false,
+  });
+  const coerente = {
+    rischi: [rischio(3, 5), rischio(2, 4, 'ridurre')],
+    rischiMeta: { totale: 2, daTrasferire: 1, daVerificare: 0 },
+    sintesi: {
+      rischiIdentificati: 2,
+      rischiDaTrasferire: 1,
+      patrimonioEsposto: { euro: 11_500_000 },
+      esposizioneNonAssicurata: { euro: 11_500_000 },
+    },
+    dannoMassimo: {
+      disponibile: true,
+      possibile: { euro: 11_500_000 },
+      probabile: { euro: 6_900_000 },
+      quota: 0.6,
+    },
+    credito: {
+      fido: {
+        importo: { euro: 43_000 },
+        limitePatrimoniale: { euro: 143_954 },
+        limiteDimensionale: { euro: 395_937 },
+        limiteFlusso: null,
+      },
+    },
+    sommeAssicurande: {
+      fabbricati: { valore: { euro: 11_500_000 } },
+      contenuto: { valore: null },
+      scorte: { valore: null },
+      patrimonioEsposto: { valore: { euro: 11_500_000 } },
+    },
+    indicatoriArchivio: { aggregati: { patrimonioNetto: 719_768 } },
+  };
+  deve(numeriCheNonTornano(coerente).length === 0, 'una scheda coerente viene segnalata');
+  deve(
+    numeriCheNonTornano({ ...coerente, rischiMeta: { ...coerente.rischiMeta, totale: 3 } }).length === 1,
+    'un conteggio dei rischi che non torna non viene visto',
+  );
+  deve(
+    numeriCheNonTornano({
+      ...coerente,
+      rischi: [rischio(3, 5), { ...rischio(2, 4, 'ridurre'), punteggioResiduo: 9 }],
+    }).length === 1,
+    'un punteggio residuo diverso da probabilità × impatto non viene visto',
+  );
+  deve(
+    numeriCheNonTornano({
+      ...coerente,
+      credito: { fido: { ...coerente.credito.fido, limitePatrimoniale: { euro: 1_697 } } },
+    }).length === 2,
+    'il limite patrimoniale che non è il 20 % del patrimonio netto non viene visto',
+  );
+
   if (guasti.length > 0) {
     process.stderr.write('\n  I RILEVATORI SONO CIECHI — la misura non vale:\n');
     for (const g of guasti) process.stderr.write(`    ✗ ${g}\n`);
@@ -730,6 +969,7 @@ for (const piva of bersagli) {
   for (const s of chiedeCiòCheHaGià(prosa, indicatoriFornitore)) {
     rilievi.push(`già disponibile: ${s}`);
   }
+  for (const s of numeriCheNonTornano(dto)) rilievi.push(`non torna: ${s}`);
 
   if (rilievi.length === 0) {
     process.stdout.write('  nessun rilievo\n');
