@@ -21,7 +21,31 @@
 
 import { sql } from 'drizzle-orm';
 import type { Database } from './client.js';
-import { sqlImpostaTenant } from './rls.js';
+import { sqlImpostaAmbitoPiattaforma, sqlImpostaTenant } from './rls.js';
+
+/**
+ * Esegue `azione` dentro una transazione che dichiara di operare **per la piattaforma**,
+ * cioè attraverso tutti gli studi.
+ *
+ * Sono poche operazioni, e tutte per disegno: cercare un utente per indirizzo email
+ * prima di sapere a quale studio appartiene — l'accesso, e il controllo che un indirizzo
+ * non sia già registrato — l'elenco degli studi con il numero dei loro collaboratori, la
+ * spesa complessiva della piattaforma, la creazione del primo amministratore di uno
+ * studio nuovo. Con le policy attive nessuna di queste può passare da `conTenant`, perché
+ * non c'è un tenant da dichiarare o ce n'è più d'uno.
+ *
+ * Non è un privilegio sparso: la policy ammette questo ambito solo se lo dichiara la
+ * transazione, e il collaudo `isolamento-rls.test.ts` tiene l'elenco esplicito delle
+ * funzioni che possono chiamarlo. Una chiamata nuova che non sta in quell'elenco fa
+ * fallire la suite — perché un ambito «piattaforma» che cresce in silenzio è la stessa
+ * cosa di un `where` dimenticato.
+ */
+export async function conPiattaforma<T>(db: Database, azione: (tx: Database) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql.raw(sqlImpostaAmbitoPiattaforma()));
+    return azione(tx);
+  });
+}
 
 /**
  * Esegue `azione` dentro una transazione che dichiara il tenant.

@@ -9,7 +9,7 @@
  * in rete un sistema con le credenziali che tutti conoscono.
  */
 
-import { contaUtenti, creaUtente } from '@aegis/db';
+import { conPiattaforma, conTenant, contaUtenti, creaUtente } from '@aegis/db';
 import { derivaPassword, generaPasswordIniziale } from './auth.js';
 import type { Persistenza } from './persistenza.js';
 
@@ -23,19 +23,28 @@ export async function predisponiPrimoAccesso(
   persistenza: Persistenza,
   emailAmministratore: string,
 ): Promise<EsitoPredisposizione> {
-  const utentiEsistenti = await contaUtenti(persistenza.db);
+  /*
+    «Esiste già un utente qualunque?» è una domanda su tutti gli studi, e con le policy
+    attive una lettura senza ambito risponderebbe zero — creando un secondo «primo
+    amministratore» a ogni riavvio. Si dichiara la piattaforma, che è ciò che si sta
+    guardando.
+  */
+  const utentiEsistenti = await conPiattaforma(persistenza.db, (tx) => contaUtenti(tx));
   if (utentiEsistenti > 0) {
     return { creato: false, email: null, password: null };
   }
 
   const password = generaPasswordIniziale();
-  await creaUtente(persistenza.db, {
-    tenantId: persistenza.tenantPredefinito,
-    email: emailAmministratore,
-    nome: 'Amministratore',
-    passwordHash: await derivaPassword(password),
-    ruolo: 'amministratore',
-  });
+  const passwordHash = await derivaPassword(password);
+  await conTenant(persistenza.db, persistenza.tenantPredefinito, (tx) =>
+    creaUtente(tx, {
+      tenantId: persistenza.tenantPredefinito,
+      email: emailAmministratore,
+      nome: 'Amministratore',
+      passwordHash,
+      ruolo: 'amministratore',
+    }),
+  );
 
   return { creato: true, email: emailAmministratore, password };
 }

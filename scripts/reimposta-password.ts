@@ -18,7 +18,15 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { connetti, revocaSessioniUtente, impostaPassword, schema, trovaUtentePerEmail } from '@aegis/db';
+import {
+  conPiattaforma,
+  conTenant,
+  connetti,
+  impostaPassword,
+  revocaSessioniUtente,
+  schema,
+  trovaUtentePerEmail,
+} from '@aegis/db';
 import { derivaPassword, generaPasswordIniziale, verificaRequisitiPassword } from '../apps/api/src/auth.js';
 
 /** La stessa cartella del servizio, ancorata alla radice del repository come in `main.ts`. */
@@ -58,16 +66,23 @@ async function main(): Promise<void> {
   console.log(`  Database: ${connessione.descrizione}`);
 
   try {
-    const utente = await trovaUtentePerEmail(db, email);
+    /*
+      L'indirizzo è tutto ciò che si sa: lo studio lo dice la riga trovata. Con le policy
+      attive una lettura senza ambito risponderebbe «nessun utente» a chiunque — e lo
+      strumento che serve a rientrare sarebbe il primo a chiudere fuori.
+    */
+    const utente = await conPiattaforma(db, (tx) => trovaUtentePerEmail(tx, email));
     if (utente === null) {
       console.error(`\n  Nessun utente registrato con l'indirizzo ${email}.`);
 
       // Chi arriva a questo strumento è già in difficoltà: costringerlo a indovinare
       // l'indirizzo esatto, o a interrogare il database a mano, è gratuitamente ostile.
-      const registrati = await db
-        .select({ email: schema.utenti.email, nome: schema.utenti.nome, ruolo: schema.utenti.ruolo })
-        .from(schema.utenti)
-        .orderBy(schema.utenti.creatoIl);
+      const registrati = await conPiattaforma(db, (tx) =>
+        tx
+          .select({ email: schema.utenti.email, nome: schema.utenti.nome, ruolo: schema.utenti.ruolo })
+          .from(schema.utenti)
+          .orderBy(schema.utenti.creatoIl),
+      );
 
       if (registrati.length > 0) {
         console.error('\n  Indirizzi registrati:');
@@ -77,8 +92,11 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    await impostaPassword(db, utente.id, await derivaPassword(password));
-    await revocaSessioniUtente(db, utente.id);
+    const passwordHash = await derivaPassword(password);
+    await conTenant(db, utente.tenantId, async (tx) => {
+      await impostaPassword(tx, utente.id, passwordHash);
+      await revocaSessioniUtente(tx, utente.id);
+    });
 
     console.log(`\n  Password reimpostata per ${utente.nome} <${utente.email}>.`);
     console.log(`  Ruolo: ${utente.ruolo}${utente.attivo ? '' : '  ⚠ utenza sospesa: non potrà accedere'}`);

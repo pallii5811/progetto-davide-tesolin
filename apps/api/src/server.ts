@@ -83,6 +83,8 @@ import {
   assicuraAzienda,
   cercaAziendeInArchivio,
   chiaveAzienda,
+  conPiattaforma,
+  conTenant,
   creaInvito,
   elencoSolidita,
   invitoAttivo,
@@ -349,14 +351,18 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (sessione === undefined) return null;
 
     if (tettoComplessivo > 0) {
-      const totale = await spesaOdiernaComplessiva(persistenza.db);
+      // La spesa di TUTTI gli studi: è l'unica lettura del tetto che attraversa gli studi
+      // per disegno, e lo dichiara.
+      const totale = await conPiattaforma(persistenza.db, (tx) => spesaOdiernaComplessiva(tx));
       if (totale >= tettoComplessivo) {
         return { speso: totale, limite: tettoComplessivo, ambito: 'piattaforma' };
       }
     }
 
     if (tettoGiornaliero <= 0) return null;
-    const speso = await spesaOdierna(persistenza.db, sessione.tenantId);
+    const speso = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      spesaOdierna(tx, sessione.tenantId),
+    );
     return speso >= tettoGiornaliero ? { speso, limite: tettoGiornaliero, ambito: 'studio' } : null;
   };
 
@@ -373,9 +379,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (persistenza === undefined) return false;
     const sessione = request.sessione;
     if (sessione === undefined) return false;
-    return (
-      (await trovaAziendaPerChiave(persistenza.db, sessione.tenantId, normalizza(identificativo))) !== null
+    const aziendaId = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      trovaAziendaPerChiave(tx, sessione.tenantId, normalizza(identificativo)),
     );
+    return aziendaId !== null;
   };
 
   /**
@@ -553,7 +560,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const { statoStudio, trovaUtentePerEmail, registraTentativoAccesso, creaSessione } =
       await import('@aegis/db');
-    const utente = await trovaUtentePerEmail(persistenza.db, parsed.data.email);
+    // L'indirizzo è tutto ciò che si sa: lo studio lo dice la riga. È l'unica lettura di
+    // `utenti` che attraversa gli studi per disegno, e lo dichiara.
+    const utente = await conPiattaforma(persistenza.db, (tx) => trovaUtentePerEmail(tx, parsed.data.email));
 
     // Messaggio identico per utente inesistente e password errata: distinguerli
     // consentirebbe di enumerare gli indirizzi registrati.
@@ -581,12 +590,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const corretta = await verificaPassword(parsed.data.password, utente.passwordHash);
-    await registraTentativoAccesso(
-      persistenza.db,
-      utente.id,
-      corretta,
-      SOGLIA_BLOCCO_TENTATIVI,
-      DURATA_BLOCCO_MS,
+    await conTenant(persistenza.db, utente.tenantId, (tx) =>
+      registraTentativoAccesso(tx, utente.id, corretta, SOGLIA_BLOCCO_TENTATIVI, DURATA_BLOCCO_MS),
     );
 
     if (!corretta) return reply.status(401).send(rifiuto);
@@ -670,7 +675,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const { trovaUtentePerId, impostaPassword, revocaSessioniUtente, creaSessione } =
       await import('@aegis/db');
 
-    const utente = await trovaUtentePerId(persistenza.db, sessione.utenteId);
+    const utente = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      trovaUtentePerId(tx, sessione.utenteId),
+    );
     if (utente?.passwordHash == null) {
       return reply.status(401).send({ errore: 'Utente non valido' });
     }
@@ -679,7 +686,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(401).send({ errore: 'La password attuale non è corretta' });
     }
 
-    await impostaPassword(persistenza.db, utente.id, await derivaPassword(parsed.data.nuova));
+    const nuovoHash = await derivaPassword(parsed.data.nuova);
+    await conTenant(persistenza.db, sessione.tenantId, (tx) => impostaPassword(tx, utente.id, nuovoHash));
 
     // Cambiare password deve buttare fuori chiunque altro fosse collegato con la vecchia:
     // è la ragione principale per cui si cambia una password.
@@ -815,7 +823,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (persistenza === undefined) return { studi: [] };
 
     const { elencoStudi } = await import('@aegis/db');
-    const studi = await elencoStudi(persistenza.db);
+    // Conta i collaboratori di ogni studio: attraversa `utenti` di tutti, per disegno.
+    const studi = await conPiattaforma(persistenza.db, (tx) => elencoStudi(tx));
     return {
       studi: studi.map((s) => ({
         id: s.id,
@@ -854,19 +863,23 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     // Gli indirizzi sono unici su tutta la piattaforma: verificarlo qui dà un errore
     // comprensibile invece della violazione di vincolo che arriverebbe dal database.
-    if ((await trovaUtentePerEmail(persistenza.db, email)) !== null) {
+    if ((await conPiattaforma(persistenza.db, (tx) => trovaUtentePerEmail(tx, email))) !== null) {
       return reply.status(409).send({ errore: 'Questo indirizzo è già registrato' });
     }
 
     const password = generaPasswordIniziale();
+    const passwordHash = await derivaPassword(password);
     const tenantId = await creaStudio(persistenza.db, parsed.data.denominazione.trim());
-    await creaUtente(persistenza.db, {
-      tenantId,
-      email,
-      nome: parsed.data.nome.trim(),
-      passwordHash: await derivaPassword(password),
-      ruolo: 'amministratore',
-    });
+    // Il primo amministratore appartiene allo studio appena aperto: si dichiara quello.
+    await conTenant(persistenza.db, tenantId, (tx) =>
+      creaUtente(tx, {
+        tenantId,
+        email,
+        nome: parsed.data.nome.trim(),
+        passwordHash,
+        ruolo: 'amministratore',
+      }),
+    );
 
     return reply.status(201).send({ id: tenantId, email, passwordIniziale: password });
   });
@@ -914,10 +927,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return { persistenza: false, creditoCaricatoCentesimi: 0 };
     }
 
-    const [consumatoTotale, consumatoOggi] = await Promise.all([
-      spesaComplessiva(persistenza.db),
-      spesaOdiernaComplessiva(persistenza.db),
-    ]);
+    // La spesa di tutti gli studi verso il fornitore: attraversa gli studi per disegno.
+    const [consumatoTotale, consumatoOggi] = await conPiattaforma(persistenza.db, (tx) =>
+      Promise.all([spesaComplessiva(tx), spesaOdiernaComplessiva(tx)]),
+    );
 
     return {
       persistenza: true,
@@ -990,7 +1003,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (sessione === null || persistenza === undefined) return reply;
 
     const { elencoUtenti } = await import('@aegis/db');
-    const utenti = await elencoUtenti(persistenza.db, sessione.tenantId);
+    const utenti = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      elencoUtenti(tx, sessione.tenantId),
+    );
 
     return {
       utenti: utenti.map((u) => ({
@@ -1012,20 +1027,28 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const { trovaUtentePerEmail, creaUtente } = await import('@aegis/db');
-    if ((await trovaUtentePerEmail(persistenza.db, parsed.data.email)) !== null) {
+    // Gli indirizzi sono unici su tutta la piattaforma: il controllo attraversa gli studi
+    // per disegno, e lo dichiara.
+    const giaRegistrato = await conPiattaforma(persistenza.db, (tx) =>
+      trovaUtentePerEmail(tx, parsed.data.email),
+    );
+    if (giaRegistrato !== null) {
       return reply.status(409).send({ errore: 'Esiste già un utente con questo indirizzo' });
     }
 
     // La password iniziale la genera il sistema e viene mostrata una volta sola
     // all'amministratore, che la consegna a voce. Non viene inviata per posta né salvata.
     const password = generaPasswordIniziale();
-    const utenteId = await creaUtente(persistenza.db, {
-      tenantId: sessione.tenantId,
-      email: parsed.data.email,
-      nome: parsed.data.nome,
-      passwordHash: await derivaPassword(password),
-      ruolo: parsed.data.ruolo,
-    });
+    const passwordHash = await derivaPassword(password);
+    const utenteId = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      creaUtente(tx, {
+        tenantId: sessione.tenantId,
+        email: parsed.data.email,
+        nome: parsed.data.nome,
+        passwordHash,
+        ruolo: parsed.data.ruolo,
+      }),
+    );
 
     const { registraAudit } = await import('@aegis/db');
     await registraAudit(persistenza.db, {
@@ -1065,9 +1088,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const { contaAmministratoriAttivi, elencoUtenti, aggiornaUtente, revocaSessioniUtente, registraAudit } =
       await import('@aegis/db');
 
-    const destinatario = (await elencoUtenti(persistenza.db, sessione.tenantId)).find(
-      (u) => u.id === request.params.id,
-    );
+    const destinatario = (
+      await conTenant(persistenza.db, sessione.tenantId, (tx) => elencoUtenti(tx, sessione.tenantId))
+    ).find((u) => u.id === request.params.id);
     if (destinatario === undefined) {
       return reply.status(404).send({ errore: 'Utente non trovato' });
     }
@@ -1080,21 +1103,17 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       parsed.data.attivo === false ||
       (parsed.data.ruolo !== undefined && parsed.data.ruolo !== 'amministratore');
 
-    if (
-      eraAmministratoreAttivo &&
-      perdeIPoteri &&
-      (await contaAmministratoriAttivi(persistenza.db, sessione.tenantId)) <= 1
-    ) {
+    const amministratoriAttivi = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      contaAmministratoriAttivi(tx, sessione.tenantId),
+    );
+    if (eraAmministratoreAttivo && perdeIPoteri && amministratoriAttivi <= 1) {
       return reply.status(400).send({
         errore: 'Deve restare almeno un amministratore attivo.',
       });
     }
 
-    const aggiornato = await aggiornaUtente(
-      persistenza.db,
-      sessione.tenantId,
-      request.params.id,
-      parsed.data,
+    const aggiornato = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      aggiornaUtente(tx, sessione.tenantId, request.params.id, parsed.data),
     );
     if (!aggiornato) return reply.status(404).send({ errore: 'Utente non trovato' });
 
@@ -1123,7 +1142,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const { elencoUtenti, revocaSessioniUtente, registraAudit } = await import('@aegis/db');
 
     // Si verifica che l'utente appartenga allo stesso studio prima di toccarlo.
-    const utenti = await elencoUtenti(persistenza.db, sessione.tenantId);
+    const utenti = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      elencoUtenti(tx, sessione.tenantId),
+    );
     if (!utenti.some((u) => u.id === request.params.id)) {
       return reply.status(404).send({ errore: 'Utente non trovato' });
     }
@@ -1168,14 +1189,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     // Solo dentro il proprio studio: l'elenco è già filtrato per intermediario, e un
     // identificativo indovinato non deve poter toccare l'utenza di un altro.
-    const utenti = await elencoUtenti(persistenza.db, sessione.tenantId);
+    const utenti = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      elencoUtenti(tx, sessione.tenantId),
+    );
     const destinatario = utenti.find((u) => u.id === request.params.id);
     if (destinatario === undefined) {
       return reply.status(404).send({ errore: 'Utente non trovato' });
     }
 
     const password = generaPasswordIniziale();
-    await impostaPassword(persistenza.db, destinatario.id, await derivaPassword(password));
+    const nuovoHash = await derivaPassword(password);
+    await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      impostaPassword(tx, destinatario.id, nuovoHash),
+    );
     await revocaSessioniUtente(persistenza.db, destinatario.id);
 
     await registraAudit(persistenza.db, {
@@ -1236,13 +1262,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       significa sapere chi sono i suoi clienti.
     */
     const sessioneRicerca = request.sessione;
+    const tenantRicerca = sessioneRicerca?.tenantId ?? persistenza?.tenantPredefinito ?? null;
     const inArchivio =
-      persistenza === undefined
+      persistenza === undefined || tenantRicerca === null
         ? []
-        : await cercaAziendeInArchivio(
-            persistenza.db,
-            sessioneRicerca?.tenantId ?? persistenza.tenantPredefinito,
-            parsed.data,
+        : await conTenant(persistenza.db, tenantRicerca, (tx) =>
+            cercaAziendeInArchivio(tx, tenantRicerca, parsed.data),
           );
 
     if (inArchivio.length > 0) {
@@ -1886,10 +1911,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const { elencoEventi, contaEventiDaGestire } = await import('@aegis/db');
 
     const soloDaGestire = request.query.tutti !== '1';
-    const [eventi, daGestire] = await Promise.all([
-      elencoEventi(persistenza.db, tenantId, { soloDaGestire }),
-      contaEventiDaGestire(persistenza.db, tenantId),
-    ]);
+    const [eventi, daGestire] = await conTenant(persistenza.db, tenantId, (tx) =>
+      Promise.all([elencoEventi(tx, tenantId, { soloDaGestire }), contaEventiDaGestire(tx, tenantId)]),
+    );
 
     return {
       eventi: eventi.map((e) => ({
@@ -1916,7 +1940,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const tenantId = sessione?.tenantId ?? persistenza.tenantPredefinito;
     const { eseguiMonitoraggio } = await import('./monitoraggio.js');
-    return eseguiMonitoraggio(persistenza.db, tenantId);
+    return conTenant(persistenza.db, tenantId, (tx) => eseguiMonitoraggio(tx, tenantId));
   });
 
   app.post<{ Params: { id: string } }>('/api/monitoraggio/:id/gestito', async (request, reply) => {
@@ -1928,11 +1952,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const tenantId = sessione?.tenantId ?? persistenza.tenantPredefinito;
     const { segnaGestito, registraAudit } = await import('@aegis/db');
 
-    const fatto = await segnaGestito(
-      persistenza.db,
-      tenantId,
-      request.params.id,
-      sessione?.utenteId ?? null,
+    const fatto = await conTenant(persistenza.db, tenantId, (tx) =>
+      segnaGestito(tx, tenantId, request.params.id, sessione?.utenteId ?? null),
     );
     if (!fatto) return reply.status(404).send({ errore: 'Evento non trovato' });
 
@@ -1983,14 +2004,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const sessione = request.sessione;
     const tenantId = sessione?.tenantId ?? persistenza.tenantPredefinito;
 
-    const aziendaId = await assicuraAzienda(persistenza.db, tenantId, {
-      partitaIva: request.params.id,
-      codiceFiscale: null,
-      denominazione: request.params.id,
-      providerId: request.params.id,
-      provincia: null,
-      atecoPrimario: null,
-    });
+    const aziendaId = await conTenant(persistenza.db, tenantId, (tx) =>
+      assicuraAzienda(tx, tenantId, {
+        partitaIva: request.params.id,
+        codiceFiscale: null,
+        denominazione: request.params.id,
+        providerId: request.params.id,
+        provincia: null,
+        atecoPrimario: null,
+      }),
+    );
 
     const token = generaTokenSessione();
     const invito = await creaInvito(persistenza.db, {
@@ -2018,7 +2041,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (persistenza === undefined) return { invito: null };
 
     const tenantId = request.sessione?.tenantId ?? persistenza.tenantPredefinito;
-    const aziendaId = await trovaAziendaPerChiave(persistenza.db, tenantId, request.params.id);
+    const aziendaId = await conTenant(persistenza.db, tenantId, (tx) =>
+      trovaAziendaPerChiave(tx, tenantId, request.params.id),
+    );
     if (aziendaId === null) return { invito: null };
 
     const invito = await invitoAttivo(persistenza.db, aziendaId);
@@ -2038,7 +2063,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (persistenza === undefined) return reply.status(404).send({ errore: 'Nessun invito' });
 
     const tenantId = request.sessione?.tenantId ?? persistenza.tenantPredefinito;
-    const aziendaId = await trovaAziendaPerChiave(persistenza.db, tenantId, request.params.id);
+    const aziendaId = await conTenant(persistenza.db, tenantId, (tx) =>
+      trovaAziendaPerChiave(tx, tenantId, request.params.id),
+    );
     if (aziendaId === null) return reply.status(404).send({ errore: 'Nessun invito' });
 
     const revocati = await revocaInviti(persistenza.db, tenantId, aziendaId);
@@ -2072,7 +2099,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const invito = await risolviInvito(persistenza.db, improntaToken(token));
     if (invito === null) return null;
 
-    const azienda = await chiaveAzienda(persistenza.db, invito.aziendaId);
+    // Lo studio lo dice l'invito, che non è protetto proprio perché si risolve prima di
+    // sapere per conto di chi. Da qui in poi il tenant è noto, e si dichiara.
+    const azienda = await conTenant(persistenza.db, invito.tenantId, (tx) =>
+      chiaveAzienda(tx, invito.aziendaId),
+    );
     if (azienda === null) return null;
 
     /*
@@ -2553,13 +2584,17 @@ const modificaUtenteSchema = z
 
 /** Traduce il cookie in una sessione applicativa, o `null` se non più valida. */
 async function risolviSessione(db: unknown, token: string): Promise<Sessione | null> {
-  const { statoStudio, trovaSessioneValida, trovaUtentePerId } = await import('@aegis/db');
+  const { conTenant, statoStudio, trovaSessioneValida, trovaUtentePerId } = await import('@aegis/db');
   const database = db as Parameters<typeof trovaSessioneValida>[0];
 
+  // La sessione non è protetta dalle policy — è il token stesso a dire lo studio — e da
+  // qui in poi lo studio è noto: la lettura dell'utente lo dichiara.
   const sessione = await trovaSessioneValida(database, improntaToken(token), new Date());
   if (sessione === null) return null;
 
-  const utente = await trovaUtentePerId(database, sessione.utenteId);
+  const utente = await conTenant(database, sessione.tenantId, (tx) =>
+    trovaUtentePerId(tx, sessione.utenteId),
+  );
   if (utente === null || !utente.attivo) return null;
 
   // La sospensione dello studio si verifica **a ogni richiesta**, non solo all'accesso:

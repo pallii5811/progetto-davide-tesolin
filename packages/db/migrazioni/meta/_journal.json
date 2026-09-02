@@ -71,6 +71,13 @@
       "when": 1787237615778,
       "tag": "0009_cache_risposte",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788652800000,
+      "tag": "0010_isolamento_rls",
+      "breakpoints": true
     }
   ]
 }
