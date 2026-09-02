@@ -156,9 +156,10 @@ previsione non è «sopravvissuta»: è censurata, perché nessuno ha guardato.
 il suo intervallo di confidenza, la mette accanto alla PD promessa, e **si rifiuta di
 proporre una curva sotto trenta esiti osservabili per classe** — sotto quella soglia
 l'intervallo è più largo del numero. Non scrive nulla: la curva si corregge a mano, in
-`credit/score.ts`, con un commit che citi il rapporto. Al 02/09/2026 le previsioni in
-archivio sono 31 su 3 imprese, tutte in classe D o E, la prima del 25/08/2026: il primo
-orizzonte si chiude il 25/08/2027, e fino ad allora gli esiti osservabili sono zero.
+`credit/score.ts`, con un commit che citi il rapporto. Al 02/09/2026 le analisi con score in
+archivio sono 31, su 3 imprese, tutte in classe D o E — cioè 3 previsioni indipendenti, una
+per impresa per trimestre — la prima del 25/08/2026: il primo orizzonte si chiude il
+25/08/2027, e fino ad allora gli esiti osservabili sono zero.
 
 ---
 
