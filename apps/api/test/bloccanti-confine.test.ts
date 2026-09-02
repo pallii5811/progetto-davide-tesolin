@@ -293,7 +293,15 @@ describe('Indicatori del fornitore · il DTO non taglia ciò che è già pagato'
  */
 describe('Reperto 20 · i vincoli non calcolabili del fido [FUORI CORSIA — resta rosso]', () => {
   it('un vincolo non calcolabile non esce come 0 €', () => {
-    const senzaBilancio: CompanyProfile = { ...demoCompanyProfile(), bilanci: [] };
+    // Senza bilancio E senza l'EBITDA dell'archivio camerale: dal 02/09/2026 il vincolo di
+    // flusso si calcola anche sui soli dati sintetici, se l'archivio dà l'EBITDA — e la
+    // dimostrazione ce l'ha. Qui si vuole il vincolo davvero non calcolabile.
+    const demo = demoCompanyProfile();
+    const senzaBilancio: CompanyProfile = {
+      ...demo,
+      bilanci: [],
+      indicatoriFornitore: { ...demo.indicatoriFornitore, risultatiOperativi: null },
+    };
     const dto = presentAnalysis(analyzeCompany(senzaBilancio, demoPolizze(), DEMO_AS_OF));
     const fido = dto.credito.fido;
 

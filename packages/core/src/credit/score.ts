@@ -173,6 +173,15 @@ const PESI = {
 } as const;
 
 /**
+ * I pesi normalizzati, per chi li cita fuori da qui.
+ *
+ * L'elenco degli arricchimenti diceva «il fattore che pesa il 20%» — i punti — mentre la
+ * scheda, tre riquadri sotto, stampava «peso 19%» — i punti su 105. Chi scrive un peso
+ * lo legge da qui, e i due numeri restano uno.
+ */
+export const PESI_SCORE: Readonly<typeof PESI> = PESI;
+
+/**
  * Quanto modello deve aver pesato perché il punteggio possa dirsi un punteggio.
  *
  * Sotto questa quota la media pesata non redistribuisce ai fattori superstiti il peso di
@@ -728,6 +737,30 @@ function fattoreRedditivita(ind: FinancialIndicators | null): ScoreFactor {
   };
 }
 
+/**
+ * La frase della tensione si compone dai valori, non dal punteggio.
+ *
+ * Diceva «gli impegni a breve non sono coperti dalle attività correnti» a un'impresa con
+ * current ratio 1,37 — che li copre, e la riga sotto lo stampava. Il punteggio era basso
+ * per il quick ratio (0,53) e per un ciclo di 313 giorni, non per il current ratio: la
+ * frase, scelta dalla sola soglia del punteggio, affermava ciò che i numeri accanto
+ * smentivano. Regola 5 del progetto: le frasi si compongono dai valori.
+ */
+function motivoDellaTensione(ind: FinancialIndicators): string {
+  const corrente = ind.currentRatio;
+  const rapido = ind.quickRatio;
+  if (corrente !== null && corrente >= 1 && rapido !== null && rapido < 1) {
+    return (
+      `Tensione di liquidità: le attività correnti coprono gli impegni a breve (${formatNumber(corrente)}×) ` +
+      `solo contando le scorte; senza, la copertura scende a ${formatNumber(rapido)}×.`
+    );
+  }
+  if (corrente !== null && corrente < 1) {
+    return 'Tensione di liquidità: gli impegni a breve non sono coperti dalle attività correnti.';
+  }
+  return 'Tensione di liquidità: il circolante assorbe cassa e le risorse a breve sono scarse.';
+}
+
 function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
   if (ind === null) {
     return notEvaluable('liquidita', 'Liquidità', PESI.liquidita, 'Bilancio non disponibile');
@@ -786,7 +819,7 @@ function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
           ? 'Buon equilibrio fra impegni a breve e risorse disponibili.'
           : score >= 45
             ? 'Liquidità appena sufficiente: il circolante assorbe cassa in misura rilevante.'
-            : 'Tensione di liquidità: gli impegni a breve non sono coperti dalle attività correnti.',
+            : motivoDellaTensione(ind),
     details: [
       `Current ratio: ${ind.currentRatio === null ? assenzaDi('currentRatio') : `${formatNumber(ind.currentRatio)}×`}`,
       `Quick ratio: ${ind.quickRatio === null ? assenzaDi('quickRatio') : `${formatNumber(ind.quickRatio)}×`}`,

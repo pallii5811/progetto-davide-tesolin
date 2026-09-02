@@ -333,15 +333,39 @@ describe('Onestà dello score con dati incompleti', () => {
     expect(soloSintetici.creditScore.confidence).not.toBe('alta');
   });
 
-  it('con i soli dati sintetici il fido si calcola comunque, senza il vincolo di flusso', () => {
+  it('con i soli dati sintetici il fido si calcola comunque, e l’EBITDA lo dà l’archivio', () => {
     const soloSintetici = analyzeCompany({ ...profilo, bilanci: [] }, polizze, DEMO_AS_OF);
     const fido = soloSintetici.creditLimit.value;
 
     // Patrimonio e fatturato ci sono: rinunciare al fido sarebbe rinunciare a rispondere
     // a una domanda a cui si può rispondere in parte.
     expect(Money.toEuro(fido.importo)).toBeGreaterThan(0);
-    expect(fido.vincoloAttivo).not.toBe('flusso');
-    expect(soloSintetici.creditLimit.explanation.notes.join(' ')).toContain('EBITDA non disponibile');
+
+    // L'archivio camerale calcola l'EBITDA sul bilancio depositato — lo stesso da cui il
+    // punteggio prende margine e leva. Il vincolo di flusso c'è, e dice da dove viene:
+    // usciva «EBITDA non calcolabile» sotto una scheda che stampava «EBITDA 343.989 €».
+    expect(fido.limiteFlusso).not.toBeNull();
+    expect(Money.toEuro(fido.limiteFlusso!)).toBe(3 * 850_000);
+    expect(soloSintetici.creditLimit.explanation.notes.join(' ')).toContain('archivio camerale');
+    expect(soloSintetici.creditLimit.explanation.notes.join(' ')).not.toContain('EBITDA non disponibile');
+    expect(soloSintetici.creditLimit.confidence).not.toBe('alta');
+
+    // Senza nemmeno l'archivio, il vincolo di flusso manca e la nota lo dichiara.
+    const senzaArchivio = analyzeCompany(
+      {
+        ...profilo,
+        bilanci: [],
+        indicatoriFornitore: {
+          ...profilo.indicatoriFornitore,
+          risultatiOperativi: { ...profilo.indicatoriFornitore.risultatiOperativi, ebitda: null },
+        },
+      },
+      polizze,
+      DEMO_AS_OF,
+    );
+    expect(senzaArchivio.creditLimit.value.limiteFlusso).toBeNull();
+    expect(senzaArchivio.creditLimit.value.vincoloAttivo).not.toBe('flusso');
+    expect(senzaArchivio.creditLimit.explanation.notes.join(' ')).toContain('EBITDA non disponibile');
   });
 
   it('dichiara quali acquisizioni migliorerebbero l’analisi', () => {

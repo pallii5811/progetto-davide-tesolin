@@ -13,6 +13,7 @@ export * from './shared/provenance.js';
 export * from './shared/explain.js';
 export * from './shared/math.js';
 export * from './shared/testo.js';
+export * from './shared/traduzioni-archivio.js';
 
 // ── Azienda ──────────────────────────────────────────────────────────────────
 export * from './company/profile.js';

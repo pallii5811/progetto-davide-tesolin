@@ -130,7 +130,9 @@ function etichettaDi(indirizzo: Indirizzo, origini: readonly OrigineUbicazione[]
       ? 'Unità locale'
       : 'Immobile rilevato';
   const civico = indirizzo.civico === null ? '' : ` ${indirizzo.civico}`;
-  return `${prefisso} — ${indirizzo.via}${civico}, ${indirizzo.comune} (${indirizzo.provincia})`;
+  // Una via arrivata con la virgola in coda non deve raddoppiarla qui: «102,, AGNOSINE».
+  const via = indirizzo.via.replace(/[\s,;]+$/u, '');
+  return `${prefisso} — ${via}${civico}, ${indirizzo.comune} (${indirizzo.provincia})`;
 }
 
 /**

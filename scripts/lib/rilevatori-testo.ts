@@ -160,10 +160,38 @@ export function affermazioniRipetute(testo: string): string[] {
  * ripetizione si cerca solo nei blocchi lunghi: sotto le venti parole di contenuto una
  * sequenza che torna è quasi sempre una coincidenza di lingua, non un difetto.
  */
+/**
+ * Inglese residuo dell'archivio.
+ *
+ * Il fornitore descrive cariche, sedi e classi dimensionali in inglese; la tabella di
+ * traduzione le copre, ma solo dove viene chiamata. «ha la rappresentanza legale (chairman
+ * of board of directors)» è uscito sulla scheda perché il motore stampava il ruolo grezzo.
+ * Si cercano le parole che il fornitore usa davvero — non l'inglese in generale, che in una
+ * scheda assicurativa compare a ragione: business interruption, cyber, key man.
+ */
+export const INGLESE_DELL_ARCHIVIO =
+  /\b(?:chairman of board of (?:directors|auditors)|board of (?:directors|auditors)|chairman|managing director|permanent auditor|temporary auditor|auditing company|special representative|registered office|local units?|administrative headquarter|operational headquarter|(?:micro|small|medium|large) enterprise)\b/gi;
+
+export function ingleseResiduo(testo: string): string[] {
+  return [...testo.matchAll(INGLESE_DELL_ARCHIVIO)].map((m) => m[0]);
+}
+
+/**
+ * Separatori doppi: «102,, AGNOSINE», «( )», «..».
+ *
+ * Nascono dove un pezzo dell'indirizzo manca, o arriva già con la sua virgola e chi compone
+ * aggiunge la propria. Nessuno li scrive apposta: ogni occorrenza è un difetto di composizione.
+ */
+export function separatoriDoppi(testo: string): string[] {
+  return [...testo.matchAll(/,,|, ,| ,(?=\s)|\(\s*\)|(?<!\.)\.\.(?!\.)|—\s*—/g)].map((m) => m[0]);
+}
+
 export function rilieviSulTesto(testo: string): string[] {
   const rilievi: string[] = [];
   for (const d of decimaliInglesi(testo)) rilievi.push(`separatore inglese «${d}»`);
   for (const a of accordiSbagliati(testo)) rilievi.push(`accordo «${a}»`);
+  for (const i of ingleseResiduo(testo)) rilievi.push(`inglese dell’archivio «${i}»`);
+  for (const s of separatoriDoppi(testo)) rilievi.push(`separatore doppio «${s}»`);
   if (parole(testo).length >= 20) {
     for (const r of affermazioniRipetute(testo)) rilievi.push(`ripetuto «${r}»`);
   }

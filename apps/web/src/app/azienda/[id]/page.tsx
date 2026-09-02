@@ -1748,7 +1748,10 @@ function RecordCamerale({
       sottotitolo={
         fonte === null
           ? 'Tutto quello che il registro riporta su questa impresa.'
-          : `${fonte.descrizione} · aggiornato al ${dataBreve(fonte.osservatoIl)}`
+          : // È la data in cui la piattaforma ha letto il registro. Quella in cui il registro
+            // ha aggiornato il record è un'altra, e sta in fondo agli indicatori: le due
+            // dicevano entrambe «aggiornato al», con due giorni diversi.
+            `${fonte.descrizione} · letto il ${dataBreve(fonte.osservatoIl)}`
       }
     >
       <Scheda>

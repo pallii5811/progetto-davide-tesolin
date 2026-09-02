@@ -36,7 +36,8 @@ import { classifySize } from '../company/size.js';
 import type { CompanySize } from '../company/size.js';
 import { computeAltmanZ } from '../credit/altman.js';
 import type { AltmanResult } from '../credit/altman.js';
-import { computeCreditScore } from '../credit/score.js';
+import { PESI_SCORE, computeCreditScore } from '../credit/score.js';
+import type { IndicatoriFornitore } from '../company/indicatori-fornitore.js';
 import type { CreditScore } from '../credit/score.js';
 import { basiDaBilancio, computeCreditLimit } from '../credit/credit-limit.js';
 import type { CreditLimit } from '../credit/credit-limit.js';
@@ -194,20 +195,39 @@ export interface ArricchimentoPossibile {
   readonly sbloccherebbe: readonly string[];
 }
 
-const ARRICCHIMENTO_BILANCIO_DETTAGLIATO: ArricchimentoPossibile = {
-  dato: 'Bilancio in schema CEE dettagliato',
-  sbloccherebbe: [
+/**
+ * Cosa sbloccherebbe il bilancio dettagliato — solo ciò che manca DAVVERO.
+ *
+ * L'elenco era fisso, e prometteva «indici di liquidità» e «sostenibilità del debito» a
+ * un'impresa la cui scheda, quaranta righe più giù, stampava «Current ratio: 1,37×» e
+ * «PFN / EBITDA: 9,53×»: l'archivio camerale li aveva già dati e il punteggio li usava.
+ * Un elenco che chiede ciò che ha è la stessa cosa di una frase che nega un numero
+ * stampato accanto: si costruisce dai valori, riga per riga.
+ */
+function arricchimentoBilancioDettagliato(ind: FinancialIndicators | null): ArricchimentoPossibile {
+  const manca = (valore: number | null | undefined): boolean => valore === null || valore === undefined;
+  const sbloccherebbe: string[] = [
     'Margine di contribuzione, e quindi la somma assicuranda per i danni indiretti',
-    'Indici di liquidità (current ratio, quick ratio) e ciclo del circolante',
-    "Altman Z''-score e la sostenibilità del debito (PFN/EBITDA, copertura oneri finanziari)",
-    'Valore di rimanenze e immobilizzazioni, base per furto, guasti macchine e CAT NAT',
-  ],
-};
+  ];
+  if (manca(ind?.currentRatio) || manca(ind?.quickRatio) || manca(ind?.cicloCircolante)) {
+    sbloccherebbe.push('Indici di liquidità (current ratio, quick ratio) e ciclo del circolante');
+  }
+  sbloccherebbe.push("Altman Z''-score");
+  if (manca(ind?.pfnSuEbitda) || manca(ind?.coperturaOneriFinanziari)) {
+    sbloccherebbe.push('Sostenibilità del debito (PFN/EBITDA, copertura oneri finanziari)');
+  }
+  sbloccherebbe.push('Valore di rimanenze e immobilizzazioni, base per furto, guasti macchine e CAT NAT');
+  return { dato: 'Bilancio in schema CEE dettagliato', sbloccherebbe };
+}
 
+/*
+  Il peso si legge dal modello, non si ricopia: diceva «20%» mentre la scheda, con gli
+  stessi punti normalizzati su 105, stampava «peso 19%» tre riquadri più in basso.
+*/
 const ARRICCHIMENTO_EVENTI_NEGATIVI: ArricchimentoPossibile = {
   dato: 'Protesti e pregiudizievoli',
   sbloccherebbe: [
-    'Il fattore che pesa il 20% dello score di credito',
+    `Il fattore che pesa il ${(PESI_SCORE.eventiNegativi * 100).toFixed(0)}% dello score di credito`,
     'Rilevazione di procedure concorsuali aperte, che azzerano il fido concedibile',
   ],
 };
@@ -215,11 +235,26 @@ const ARRICCHIMENTO_EVENTI_NEGATIVI: ArricchimentoPossibile = {
 function arricchimentiPer(
   livello: 'assente' | 'sintetico' | 'completo',
   eventiNegativiDisponibili: boolean,
+  indicatori: FinancialIndicators | null,
 ): readonly ArricchimentoPossibile[] {
   const arricchimenti: ArricchimentoPossibile[] = [];
-  if (livello !== 'completo') arricchimenti.push(ARRICCHIMENTO_BILANCIO_DETTAGLIATO);
+  if (livello !== 'completo') arricchimenti.push(arricchimentoBilancioDettagliato(indicatori));
   if (!eventiNegativiDisponibili) arricchimenti.push(ARRICCHIMENTO_EVENTI_NEGATIVI);
   return arricchimenti;
+}
+
+/**
+ * L'EBITDA per il vincolo di flusso, quando il bilancio dettagliato non c'è.
+ *
+ * Il fido usciva con «EBITDA non calcolabile» e la nota «con il bilancio dettagliato il
+ * fido potrebbe risultare inferiore», sulla stessa scheda che stampava «EBITDA 343.989 €»
+ * fra gli indicatori dell'archivio — lo stesso EBITDA da cui il punteggio prende già il
+ * margine e la leva. Si usa, e si dichiara da dove viene.
+ */
+function ebitdaDaArchivio(fornitore: IndicatoriFornitore | null): Euro | null {
+  const valore = fornitore?.risultatiOperativi?.ebitda;
+  if (valore === null || valore === undefined || !Number.isFinite(valore)) return null;
+  return Money.euro(valore);
 }
 
 /**
@@ -359,14 +394,16 @@ export function analyzeCompany(
   const creditScore = computeCreditScore({ profile, bilancio, indicatori, livelloDati, asOf });
 
   // Il fido si calcola sugli aggregati disponibili: dal bilancio dettagliato se c'è,
-  // altrimenti da quello sintetico, rinunciando al solo vincolo di flusso.
+  // altrimenti da quello sintetico, con l'EBITDA che l'archivio camerale calcola sul
+  // bilancio depositato — e, se manca anche quello, rinunciando al solo vincolo di flusso.
   const creditLimit = computeCreditLimit(
     bilancio !== null
       ? basiDaBilancio(bilancio)
       : {
           patrimonioNettoTangibile: sinteticoCorrente?.patrimonioNetto ?? null,
           ricavi: sinteticoCorrente?.fatturato ?? null,
-          ebitda: null,
+          ebitda: ebitdaDaArchivio(profile.indicatoriFornitore),
+          origineEbitda: 'archivio',
         },
     creditScore.value,
   );
@@ -508,7 +545,7 @@ export function analyzeCompany(
     ubicazioni,
     completezza: valutaCompletezza(profile.datiDichiarati, facts),
     livelloDatiEconomici: livelloDati,
-    arricchimentiPossibili: arricchimentiPer(livelloDati, profile.eventiNegativi !== null),
+    arricchimentiPossibili: arricchimentiPer(livelloDati, profile.eventiNegativi !== null, indicatori),
     sintesi: componiSintesi(profile, creditScore, creditLimit, rischi, sommeAssicurande, catNat, gap),
   };
 }

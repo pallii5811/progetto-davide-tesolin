@@ -219,7 +219,7 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
   const coordinate = coordinateDi(source);
 
   return {
-    via: via ?? '',
+    via: senzaSeparatoriInCoda(via ?? ''),
     civico: str(source, 'streetNumber', 'civico', 'numero') ?? separata?.civico ?? null,
     cap: str(source, 'zipCode', 'cap', 'postalCode') ?? '',
     frazione: str(source, 'hamlet', 'frazione', 'localita'),
@@ -240,9 +240,19 @@ function mappaIndirizzo(source: unknown): Indirizzo | null {
  * taglia niente: «VIA DEI MILLE, FRAZIONE SANTA MARIA» resta intera.
  */
 function separaCivico(composta: string): { via: string; civico: string | null } {
-  const corrispondenza = /^(.*?),\s*(\d+[a-zA-Z/-]*)\s*$/.exec(composta.trim());
-  if (corrispondenza === null) return { via: composta.trim(), civico: null };
+  /*
+    La virgola in coda si toglie prima di tutto. «LOCALITA' LOC. FONDI ZONA INDUSTRIALE
+    102,» arriva così da allOffices, e l'etichetta dell'ubicazione — che aggiunge la sua
+    virgola prima del comune — usciva «102,, AGNOSINE (BS)» sulla scheda e nel report.
+  */
+  const pulita = senzaSeparatoriInCoda(composta);
+  const corrispondenza = /^(.*?),\s*(\d+[a-zA-Z/-]*)\s*$/.exec(pulita);
+  if (corrispondenza === null) return { via: pulita, civico: null };
   return { via: corrispondenza[1]!.trim(), civico: corrispondenza[2]!.trim() };
+}
+
+function senzaSeparatoriInCoda(testo: string): string {
+  return testo.trim().replace(/[\s,;]+$/u, '');
 }
 
 function componiVia(toponimo: string | null, nome: string | null): string | null {

@@ -104,15 +104,21 @@ uno score contestabile è uno score difendibile. → `credit/altman.ts`
 Modello additivo a fattori pesati. 100 = rischio minimo. Ogni fattore restituisce punteggio,
 peso e motivazione testuale.
 
-| Fattore                  | Peso           | Cosa misura                                      |
-| ------------------------ | -------------- | ------------------------------------------------ |
-| Solidità patrimoniale    | 20%            | PN/Attivo, indice di indebitamento               |
-| Redditività              | 15%            | ROI, EBITDA margin, trend                        |
-| Liquidità                | 15%            | current ratio, quick ratio                       |
-| Sostenibilità del debito | 15%            | PFN/EBITDA, copertura oneri finanziari           |
-| Altman Z''               | 15%            | probabilità sintetica di default                 |
-| Eventi negativi          | 20% (penalità) | protesti, pregiudizievoli, procedure concorsuali |
-| Anzianità e continuità   | 5%             | anni di attività, continuità dei depositi        |
+| Fattore                  | Punti (peso in scheda) | Cosa misura                                      |
+| ------------------------ | ---------------------- | ------------------------------------------------ |
+| Solidità patrimoniale    | 20 (19 %)              | PN/Attivo, indice di indebitamento               |
+| Redditività              | 15 (14 %)              | ROI, EBITDA margin, trend                        |
+| Liquidità                | 15 (14 %)              | current ratio, quick ratio                       |
+| Sostenibilità del debito | 15 (14 %)              | PFN/EBITDA, copertura oneri finanziari           |
+| Altman Z''               | 15 (14 %)              | probabilità sintetica di default                 |
+| Eventi negativi          | 20 (19 %), penalità    | protesti, pregiudizievoli, procedure concorsuali |
+| Anzianità e continuità   | 5 (5 %)                | anni di attività, continuità dei depositi        |
+
+I punti sommano a 105; la scheda stampa il peso normalizzato e arrotondato, ed è il «19 %»
+che compare accanto a «Eventi negativi». Un fattore non valutabile esce dalla media, che si
+rifà sui punti dei soli fattori misurati. Le frasi di ogni fattore si compongono dai valori
+che stampano: la liquidità dice «coprono gli impegni a breve (1,37×) solo contando le scorte»
+quando il current ratio supera 1 e il quick ratio no, non «non sono coperti».
 
 **Tetti bloccanti**, applicati dopo la somma pesata. Non riducono il punteggio: lo tagliano.
 
@@ -127,9 +133,12 @@ Bilancio più vecchio di 24 mesi → confidenza ridotta e penalità.
 → `credit/score.ts`
 
 **Fido consigliato**: `min(20% del PN tangibile, 10% del fatturato, 3× EBITDA)` modulato dal fattore
-di score e arrotondato per difetto a taglio commerciale. Il fattore va **da 0 a 1,25**: sotto uno
+di score e arrotondato per difetto a taglio commerciale. Il fattore va **da 0 a 1,00**: sotto uno
 score di 25 vale 0,05 e a score 1 è zero — cioè il prodotto arriva a dire «nessun fido», che è una
-risposta e non un difetto di calcolo.
+risposta e non un difetto di calcolo — e da 80 in su vale 1,00, mai di più: il merito consente il
+fido pieno, non lo supera. Senza il bilancio in schema CEE, l'EBITDA del vincolo di flusso è quello
+che l'archivio camerale calcola sul bilancio depositato, dichiarato come tale in scheda; solo se
+manca anche quello il vincolo di flusso non si applica, e la scheda lo scrive.
 → `credit/credit-limit.ts`
 
 **Curva score → probabilità di default.** Otto punti, interpolati linearmente, costanti fuori

@@ -51,7 +51,14 @@ import { presentAnalysis } from '../apps/api/src/presenter.js';
 import { OpenApiProvider } from '../packages/providers/src/openapi/provider.js';
 import { OPENAPI_DEFAULT_CONFIG } from '../packages/providers/src/openapi/config.js';
 import type { Cache, CacheEntry } from '../packages/providers/src/http.js';
-import { accordiSbagliati, affermazioniRipetute, decimaliInglesi, parole } from './lib/rilevatori-testo.js';
+import {
+  accordiSbagliati,
+  affermazioniRipetute,
+  decimaliInglesi,
+  ingleseResiduo,
+  parole,
+  separatoriDoppi,
+} from './lib/rilevatori-testo.js';
 
 const DA_DATABASE = process.argv.includes('--da-database');
 /** Stampa la frase per intero invece del suo inizio: serve a decidere se il rilievo è vero. */
@@ -137,7 +144,7 @@ function raccogliFrasi(valore: unknown, dove: string, out: Frase[]): void {
  * — e un rilievo falso costa più di uno mancato, perché insegna a ignorare l'elenco.
  */
 const CHIAVI_TECNICHE =
-  /\.(id|ruleId|chiave|categoria|livello|livelloInerente|livelloResiduo|trattamento|forma|stato|urgenza|titolare|classe|confidenza|confidence|tono|piano\.urgenza|coperture\[\d+\]|codice|ateco|atecoSecondari\[\d+\]|partitaIva|codiceFiscale|versione\w*)$/;
+  /\.(id|ruleId|chiave|categoria|livello|livelloInerente|livelloResiduo|trattamento|forma|stato|urgenza|titolare|classe|confidenza|confidence|tono|piano\.urgenza|coperture\[\d+\]|codice|ruolo|dimensioneImpresa|ateco|atecoSecondari\[\d+\]|partitaIva|codiceFiscale|versione\w*)$/;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · 2 · 3 — i rilevatori di testo puro vivono in lib/rilevatori-testo.ts
@@ -560,6 +567,74 @@ class CacheDaSonda implements Cache {
   delete(): void {}
 }
 
+/**
+ * 7 · le frasi che negano un numero stampato sulla stessa scheda.
+ *
+ *  - «gli impegni a breve non sono coperti dalle attività correnti» con un current ratio
+ *    maggiore o uguale a 1 quattro righe sotto;
+ *  - il vincolo di flusso «non calcolabile» nel fido, con l'EBITDA dell'archivio stampato
+ *    fra gli indicatori più su;
+ *  - «sbloccherebbe gli indici di liquidità» (o la sostenibilità del debito) quando il
+ *    fattore corrispondente li stampa già con un numero.
+ *
+ * Sono uscite tutte e tre insieme su COMINOTTI il 02/09/2026, con l'auditor verde: i sei
+ * controlli precedenti guardano una frase o un numero per volta, e una contraddizione sta
+ * fra due righe lontane.
+ */
+function contraddizioni(dtoGrezzo: unknown): string[] {
+  const dto = dtoGrezzo as {
+    credito?: {
+      fattori?: readonly { chiave?: string; motivazione?: string; dettagli?: readonly string[] }[];
+      fido?: { limiteFlusso?: unknown };
+    };
+    indicatoriArchivio?: { risultatiOperativi?: { ebitda?: unknown } | null } | null;
+    arricchimentiPossibili?: readonly { sbloccherebbe?: readonly string[] }[];
+  };
+  const trovate: string[] = [];
+  const fattori = dto.credito?.fattori ?? [];
+  const numeroIn = (chiave: string, etichetta: RegExp): number | null => {
+    const fattore = fattori.find((f) => f.chiave === chiave);
+    for (const d of fattore?.dettagli ?? []) {
+      if (!etichetta.test(d)) continue;
+      const m = /(-?\d+(?:[.,]\d+)?)\s*[×x]/.exec(d);
+      if (m !== null) return Number(m[1]!.replace(',', '.'));
+    }
+    return null;
+  };
+
+  const corrente = numeroIn('liquidita', /^current ratio/i);
+  const liquidita = fattori.find((f) => f.chiave === 'liquidita');
+  if (
+    corrente !== null &&
+    corrente >= 1 &&
+    /non sono coperti dalle attività correnti/.test(liquidita?.motivazione ?? '')
+  ) {
+    trovate.push(`liquidità: «non coperti dalle attività correnti» con current ratio ${corrente}`);
+  }
+
+  const ebitdaArchivio = dto.indicatoriArchivio?.risultatiOperativi?.ebitda;
+  if (
+    typeof ebitdaArchivio === 'number' &&
+    Number.isFinite(ebitdaArchivio) &&
+    dto.credito?.fido?.limiteFlusso === null
+  ) {
+    trovate.push(`fido: vincolo di flusso «non calcolabile» con EBITDA ${ebitdaArchivio} € in archivio`);
+  }
+
+  const pfn = numeroIn('sostenibilita-debito', /^PFN/i);
+  for (const a of dto.arricchimentiPossibili ?? []) {
+    for (const s of a.sbloccherebbe ?? []) {
+      if (/current ratio/i.test(s) && corrente !== null) {
+        trovate.push(`sbloccherebbe «${s}» ma il current ratio è già stampato: ${corrente}`);
+      }
+      if (/PFN\/EBITDA/i.test(s) && pfn !== null) {
+        trovate.push(`sbloccherebbe «${s}» ma PFN/EBITDA è già stampato: ${pfn}`);
+      }
+    }
+  }
+  return trovate;
+}
+
 async function creaCache(piva: string): Promise<Cache> {
   if (!DA_DATABASE) return new CacheDaSonda(piva);
   const { creaPersistenza } = await import('../apps/api/src/persistenza.js');
@@ -807,6 +882,82 @@ function autoprovaRilevatori(): void {
     'il limite patrimoniale che non è il 20 % del patrimonio netto non viene visto',
   );
 
+  /*
+    7 · le contraddizioni, su una scheda finta coerente e su tre guaste — più i due
+    rilevatori di testo nuovi, con la frase e l'etichetta esattamente come sono uscite.
+  */
+  deve(
+    ingleseResiduo('COMINOTTI SERENELLA ha la rappresentanza legale (chairman of board of directors).')
+      .length === 1,
+    'la carica in inglese dell’archivio non viene più vista',
+  );
+  deve(
+    ingleseResiduo('Danni indiretti / Business Interruption · copertura key man · cyber risk').length === 0,
+    'l’inglese legittimo del lessico assicurativo viene segnalato',
+  );
+  deve(
+    separatoriDoppi('Sede legale — LOCALITA’ LOC. FONDI ZONA INDUSTRIALE 102,, AGNOSINE (BS)').length === 1,
+    'la virgola doppia dell’etichetta non viene più vista',
+  );
+  deve(
+    separatoriDoppi('VIA DENTI 26, 25020 FIESSE (BS) · unità locale… (senza coordinate)').length === 0,
+    'un’etichetta corretta viene segnalata per separatori doppi',
+  );
+  const fattoreLiquidita = (motivazione: string, corrente: string) => ({
+    chiave: 'liquidita',
+    motivazione,
+    dettagli: [`Current ratio: ${corrente}×`, 'Quick ratio: 0,53×', 'Ciclo del circolante: 313 gg'],
+  });
+  const schedaSana = {
+    credito: {
+      fattori: [
+        fattoreLiquidita(
+          'Tensione di liquidità: le attività correnti coprono gli impegni a breve (1,37×)…',
+          '1,37',
+        ),
+        { chiave: 'sostenibilita-debito', motivazione: '', dettagli: ['PFN / EBITDA: 9,53×'] },
+      ],
+      fido: { limiteFlusso: { euro: 1_031_967 } },
+    },
+    indicatoriArchivio: { risultatiOperativi: { ebitda: 343_989 } },
+    arricchimentiPossibili: [{ sbloccherebbe: ['Margine di contribuzione', "Altman Z''-score"] }],
+  };
+  deve(contraddizioni(schedaSana).length === 0, 'una scheda senza contraddizioni viene segnalata');
+  deve(
+    contraddizioni({
+      ...schedaSana,
+      credito: {
+        ...schedaSana.credito,
+        fattori: [
+          fattoreLiquidita(
+            'Tensione di liquidità: gli impegni a breve non sono coperti dalle attività correnti.',
+            '1,37',
+          ),
+        ],
+      },
+    }).length === 1,
+    'la frase che nega il current ratio stampato accanto non viene vista',
+  );
+  deve(
+    contraddizioni({ ...schedaSana, credito: { ...schedaSana.credito, fido: { limiteFlusso: null } } })
+      .length === 1,
+    'il vincolo di flusso assente con l’EBITDA in archivio non viene visto',
+  );
+  deve(
+    contraddizioni({
+      ...schedaSana,
+      arricchimentiPossibili: [
+        {
+          sbloccherebbe: [
+            'Indici di liquidità (current ratio, quick ratio) e ciclo del circolante',
+            'Sostenibilità del debito (PFN/EBITDA, copertura oneri finanziari)',
+          ],
+        },
+      ],
+    }).length === 2,
+    'l’elenco che chiede il current ratio e il PFN/EBITDA già stampati non viene visto',
+  );
+
   if (guasti.length > 0) {
     process.stderr.write('\n  I RILEVATORI SONO CIECHI — la misura non vale:\n');
     for (const g of guasti) process.stderr.write(`    ✗ ${g}\n`);
@@ -873,6 +1024,12 @@ for (const piva of bersagli) {
     for (const a of accordiSbagliati(f.testo)) {
       rilievi.push(`accordo «${a}» — ${f.dove}\n      ${estratto(f.testo)}`);
     }
+    for (const i of ingleseResiduo(f.testo)) {
+      rilievi.push(`inglese dell’archivio «${i}» — ${f.dove}\n      ${estratto(f.testo)}`);
+    }
+    for (const s of separatoriDoppi(f.testo)) {
+      rilievi.push(`separatore doppio «${s}» — ${f.dove}\n      ${estratto(f.testo)}`);
+    }
     // La ripetizione si cerca solo nei testi lunghi: sotto le venti parole di contenuto
     // una sequenza che torna è quasi sempre una coincidenza di lingua, non un difetto.
     if (parole(f.testo).length >= 20) {
@@ -886,6 +1043,7 @@ for (const piva of bersagli) {
     rilievi.push(`già disponibile: ${s}`);
   }
   for (const s of numeriCheNonTornano(dto)) rilievi.push(`non torna: ${s}`);
+  for (const s of contraddizioni(dto)) rilievi.push(`contraddizione: ${s}`);
 
   if (rilievi.length === 0) {
     process.stdout.write('  nessun rilievo\n');

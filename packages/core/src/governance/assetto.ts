@@ -24,6 +24,7 @@ import type { Assetti, Carica, Socio } from '../company/profile.js';
 import type { CompanyFacts } from '../company/facts.js';
 import type { Confidence } from '../shared/provenance.js';
 import { normaResponsabilitaAmministratori } from './norme.js';
+import { traduciDescrizioneArchivio } from '../shared/traduzioni-archivio.js';
 
 /**
  * Soglia di controllo: **maggioranza** dei voti esercitabili in assemblea ordinaria
@@ -445,7 +446,9 @@ function implicazioni(
       p.motivo === 'quota'
         ? detiene
         : p.motivo === 'carica'
-          ? `ha la rappresentanza legale${p.ruolo === null ? '' : ` (${p.ruolo.toLowerCase()})`}`
+          ? // La carica arriva in inglese dall'archivio («chairman of board of directors»):
+            // si stampa tradotta, come nel riquadro delle cariche, non grezza.
+            `ha la rappresentanza legale${p.ruolo === null ? '' : ` (${(traduciDescrizioneArchivio(p.ruolo) ?? p.ruolo).toLowerCase()})`}`
           : `${detiene} e ne ha la rappresentanza legale`;
 
     esiti.push({

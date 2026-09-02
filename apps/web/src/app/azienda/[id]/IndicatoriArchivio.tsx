@@ -541,7 +541,7 @@ function Qualifiche({
 
       {q.aggiornatoIl !== null && (
         <p className="mt-3 text-xs text-testo-debole">
-          Record camerale aggiornato al {formattaGiorno(q.aggiornatoIl)}.
+          Ultimo aggiornamento del record nell’archivio camerale: {formattaGiorno(q.aggiornatoIl)}.
         </p>
       )}
     </Scheda>

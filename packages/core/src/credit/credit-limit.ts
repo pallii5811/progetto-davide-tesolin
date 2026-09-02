@@ -84,6 +84,12 @@ export interface BasiDelFido {
    * sa, invece di scegliere l'ipotesi comoda.
    */
   readonly alNettoDegliImmateriali?: boolean;
+  /**
+   * Da dove viene l'EBITDA: dal riclassificato della piattaforma o dagli indicatori che
+   * l'archivio camerale calcola sul bilancio depositato. La scheda lo scrive accanto al
+   * numero, perché il lettore possa pesarlo.
+   */
+  readonly origineEbitda?: 'bilancio' | 'archivio';
 }
 
 export function basiDaBilancio(bilancio: BilancioRiclassificato): BasiDelFido {
@@ -93,6 +99,7 @@ export function basiDaBilancio(bilancio: BilancioRiclassificato): BasiDelFido {
     ebitda: bilancio.ce.ebitda,
     // Il riclassificato sottrae le immobilizzazioni immateriali: qui l'aggettivo è vero.
     alNettoDegliImmateriali: true,
+    origineEbitda: 'bilancio',
   };
 }
 
@@ -279,7 +286,12 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
     builder
       .input(etichettaPatrimonioNetto(basi), formatta(basi.patrimonioNettoTangibile))
       .input('Ricavi', formatta(basi.ricavi))
-      .input('EBITDA', formatta(basi.ebitda))
+      .input(
+        basi.origineEbitda === 'archivio' && basi.ebitda !== null
+          ? 'EBITDA (dall’archivio camerale)'
+          : 'EBITDA',
+        formatta(basi.ebitda),
+      )
       .input(
         `Limite patrimoniale (${(QUOTA_PATRIMONIO_NETTO * 100).toFixed(0)}%)`,
         formatta(limitePatrimoniale),
@@ -295,6 +307,11 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
         limiteFlusso === null,
         'EBITDA non disponibile: il vincolo di flusso non è stato applicato. Con il bilancio ' +
           'dettagliato il fido potrebbe risultare inferiore a quello qui indicato.',
+      )
+      .noteIf(
+        limiteFlusso !== null && basi.origineEbitda === 'archivio',
+        'L’EBITDA è quello che l’archivio camerale calcola sul bilancio depositato, lo stesso da cui ' +
+          'il punteggio prende margine e leva: il vincolo di flusso è applicato su quel valore.',
       )
       .noteIf(
         limiteFlusso !== null && !Money.isPositive(basi.ebitda ?? ZERO),
@@ -316,7 +333,14 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
       )
       // Un fido calcolato senza il vincolo di flusso è per costruzione meno affidabile:
       // è il vincolo che dice se l'azienda genera la cassa per ripagare la dilazione.
-      .confidence(limiteFlusso === null ? 'media' : score.value >= 35 ? 'alta' : 'media')
+      // E un EBITDA letto dall'archivio, non ricostruito dal bilancio, non porta ad «alta».
+      .confidence(
+        limiteFlusso === null || basi.origineEbitda === 'archivio'
+          ? 'media'
+          : score.value >= 35
+            ? 'alta'
+            : 'media',
+      )
       /*
         I tre vincoli non calcolabili escono `null`, non 0 €.
 
