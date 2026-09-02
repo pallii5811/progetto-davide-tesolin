@@ -94,13 +94,19 @@ export const ESCLUSIONI_MOTIVATE: Readonly<Record<string, string>> = {
  * La condizione che ogni riga deve soddisfare, in lettura e in scrittura.
  *
  * Due modi di passare, e nessun terzo: la riga appartiene allo studio dichiarato dalla
- * transazione, oppure la transazione ha dichiarato di operare per la piattaforma. Il
- * secondo `current_setting` ha `true` come secondo argomento — «manca» vale come vuoto e
- * non come errore — altrimenti una transazione senza ambito non tornerebbe zero righe,
- * ma un errore SQL su ogni query.
+ * transazione, oppure la transazione ha dichiarato di operare per la piattaforma.
+ *
+ * `NULLIF(…, '')` non è pignoleria: è la riga che la prova su un PostgreSQL vero ha
+ * corretto. `current_setting(nome, true)` restituisce NULL se il parametro non è mai
+ * esistito, ma restituisce la STRINGA VUOTA se è esistito in una transazione precedente
+ * sulla stessa connessione del pool — e `''::uuid` non è «nessuno studio», è un errore
+ * SQL. Tre prove su sette fallivano con `invalid input syntax for type uuid: ""`: una
+ * lettura senza dichiarazione non avrebbe restituito zero righe, sarebbe andata in
+ * errore. In produzione, sul percorso dell'accesso. Con NULLIF il vuoto torna NULL, il
+ * confronto è falso, e le righe sono zero — che è la sola risposta giusta.
  */
 const CONDIZIONE_ACCESSO =
-  "tenant_id = current_setting('app.tenant_id', true)::uuid " +
+  "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid " +
   "OR current_setting('app.ambito', true) = 'piattaforma'";
 
 /**
