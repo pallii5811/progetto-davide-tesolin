@@ -390,6 +390,14 @@ lavoro e Prettier vuole LF. Segnala file mai toccati da nessuno. La CI, che estr
 
 ## Dove stanno i limiti dichiarati
 
-`docs/CONSEGNA.md` §11 dice cosa non è costruito; §6.4 perché la Row Level Security non è
-attiva e i diciannove punti che restano; `docs/CONFRONTO-CREDITSAFE-IADV.md` confronta
-funzione per funzione con i due concorrenti, comprese le righe dove perdiamo.
+`docs/CONSEGNA.md` §11 dice cosa non è costruito; §6.4 come la Row Level Security è stata
+accesa il 02/09/2026 — diciannove punti a zero, due ambiti, migrazione generata, prova su
+un PostgreSQL vero che ha trovato il difetto del `''::uuid` prima della produzione — e come
+ripetere la prova o spegnere le policy in emergenza; `docs/CONFRONTO-CREDITSAFE-IADV.md`
+confronta funzione per funzione con i due concorrenti, comprese le righe dove perdiamo.
+
+**Le policy si provano su un PostgreSQL vero, sempre.** PGlite gira come superuser e non
+passa dalla policy: una prova verde lì dice che le policy non fanno danni, non che
+funzionano. La prima esecuzione sul server ha dato tre rosse su sette per una riga che su
+PGlite era invisibile. `isolamento-due-studi.test.ts` con `DATABASE_URL_PROVA`, su un
+database separato, prima di ogni migrazione che tocchi `rls.ts`.

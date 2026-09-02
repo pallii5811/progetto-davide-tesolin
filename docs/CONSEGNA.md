@@ -323,59 +323,68 @@ npm run start --workspace @aegis/web  # frontend, porta 3000
 Il frontend parla con l'API tramite `AEGIS_API_URL`; l'unico processo che deve essere
 raggiungibile dai browser è il frontend.
 
-### 6.4 Row Level Security — non ancora, e conviene sapere perché
+### 6.4 Row Level Security — attiva dal 02/09/2026
 
-Le policy in `packages/db/src/rls.ts` sono scritte e **inerti**: nessuna migrazione le
-applica. **Non applicarle.** Questa sezione dice cosa manca, così la decisione non poggia
-su una data ma su un elenco che si può contare.
+L'isolamento fra studi ha due strati. Il primo è applicativo — ogni lettura filtra per
+`tenant_id` — ed è quello che c'era da sempre. Il secondo lo impone il database: una
+lettura che non dichiara per conto di quale studio avviene restituisce **zero righe**, non
+le righe di un altro. È la proprietà che il primo strato non può dare, perché il primo
+strato è esattamente ciò che si dimentica.
 
-Il collegamento applicativo che serve — `SET LOCAL app.tenant_id` all'apertura di ogni
-transazione — è stato fatto il 22/08/2026 **per il contesto di uno studio**: ogni metodo di
-`creaContesto` passa da `conTenant` (`apps/api/src/persistenza.ts`), che apre una
-transazione e vi dichiara l'identificativo. Non è però tutto il servizio.
+Fino al 02/09/2026 il secondo strato era scritto e inerte. Il motivo era contabile, non
+tecnico: **diciannove punti** del servizio interrogavano il database senza dichiarare lo
+studio, e con le policy attive il primo a cadere sarebbe stato l'accesso — `utenti` letta
+per indirizzo email prima di sapere di quale studio si tratti — per chiunque e senza un
+errore che lo spiegasse. L'elenco lo misurava `packages/db/test/isolamento-rls.test.ts`
+leggendo il codice; il 02/09/2026 è arrivato a zero, e lo stesso collaudo lo tiene a zero.
 
-Restano **diciannove punti** che raggiungono una tabella protetta senza dichiarare per
-conto di quale studio. L'elenco non è stimato: lo misura
-`packages/db/test/isolamento-rls.test.ts` leggendo il codice, e il collaudo fallisce sia se
-se ne aggiunge uno sia se se ne risolve uno senza toglierlo dall'elenco — così il conto
-resta vero. Il peggiore è `trovaUtentePerEmail`, la ricerca dell'utente per indirizzo, che
-avviene _prima_ di sapere di quale studio si tratti: con le policy attive
-`current_setting('app.tenant_id')` torna vuoto, quella query restituisce zero righe e **non
-entra più nessuno** — senza un errore che lo spieghi.
+Come è stato chiuso, in ordine:
 
-Alcuni di quei diciannove attraversano gli studi **per disegno** — l'elenco degli studi, la
-spesa complessiva della piattaforma, la creazione del primo amministratore di uno studio
-nuovo — e non vanno avvolti in `conTenant`: con `FORCE ROW LEVEL SECURITY` nemmeno il
-proprietario delle tabelle li vede. Serviranno un ruolo distinto e una decisione, non una
-deroga sparsa.
+1. **Ogni chiamata dichiara ciò che fa.** Ciò che appartiene a uno studio passa da
+   `conTenant` (`packages/db/src/tenant.ts`). Ciò che attraversa gli studi **per disegno**
+   passa da `conPiattaforma`, e sono cinque funzioni in tutto — l'utente per indirizzo
+   (l'accesso e l'unicità), l'elenco degli studi, la spesa complessiva, quella odierna
+   complessiva, il conteggio degli utenti all'avvio — ognuna con la ragione scritta nel
+   collaudo, che pretende che l'insieme sia esattamente quello. Non serviva un secondo ruolo
+   PostgreSQL: `SET LOCAL app.ambito = 'piattaforma'` nella transazione fa la stessa cosa
+   senza un secondo pool, senza `CREATEROLE` sul server e senza un passo di installazione.
+2. **La migrazione `0010_isolamento_rls` è generata**, non scritta a mano, da
+   `sqlAbilitaRls()` con `scripts/genera-migrazione-rls.ts`; un collaudo pretende che i due
+   coincidano istruzione per istruzione. `npm run migra` la applica come tutte le altre.
+   `FORCE` vale anche per il proprietario delle tabelle, che è il ruolo con cui il servizio
+   si collega.
+3. **Provata su un PostgreSQL vero prima di toccare l'archivio.** PGlite gira come superuser
+   e le policy non gli si applicano: una prova verde lì dice che non fanno danni, non che
+   funzionano. Perciò `packages/db/test/isolamento-due-studi.test.ts` è stata eseguita sul
+   server, sullo stesso PostgreSQL 18 dell'archivio, su un database di prova separato
+   (`aegis_rls_prova`, stesso ruolo proprietario) con le migrazioni 0000-0010 applicate. Ed
+   è servito: **tre asserzioni su sette fallivano** con `invalid input syntax for type uuid:
+""` — `current_setting(…, true)` restituisce la stringa vuota, non NULL, se il parametro
+   è esistito in una transazione precedente sulla stessa connessione del pool, e `''::uuid`
+   è un errore SQL, non «nessuno studio». Con `NULLIF` la seconda esecuzione ha dato 7/7:
+   zero righe senza dichiarazione, lo studio A vede solo A anche con un `where` dimenticato,
+   la piattaforma dichiarata vede entrambi, scrivere per conto di A una riga di B viene
+   rifiutato dal database, l'accesso trova gli utenti di entrambi.
 
-**L'isolamento oggi in vigore è quello applicativo**, ed è reale: ogni repository filtra
-per `tenant_id` e c'è un collaudo che verifica su due studi distinti che nessuno veda i
-dati dell'altro. Manca il _secondo_ strato, quello che regge se un giorno qualcuno
-dimentica un `where`. **Su un'installazione con un solo studio la differenza è teorica**;
-diventa concreta il giorno in cui il secondo studio entra sulla stessa macchina, e quel
-giorno il lavoro va fatto prima, non dopo.
+Per ripetere la prova su una macchina (non tocca l'archivio):
 
-Per accenderlo servono, in quest'ordine:
+```bash
+sudo -u postgres createdb -O aegis aegis_rls_prova
+cd /opt/aegis/app && sudo -u aegis bash -c 'DATABASE_URL=<url con /aegis_rls_prova> npm run migra'
+sudo -u aegis bash -c 'DATABASE_URL_PROVA=<stessa url> npx vitest run packages/db/test/isolamento-due-studi.test.ts'
+sudo -u postgres dropdb aegis_rls_prova
+```
 
-1. **svuotare l'elenco dei diciannove aggiramenti**: avvolgere in `conTenant`
-   (`packages/db/src/tenant.ts`) ciò che appartiene a uno studio, e decidere separatamente
-   cosa fare di ciò che attraversa gli studi per disegno. Finché l'elenco non è vuoto, i
-   passi seguenti non vanno nemmeno tentati;
-2. un **PostgreSQL vero** su cui verificarlo. PGlite gira come superuser e i superuser
-   scavalcano la Row Level Security anche con `FORCE`: misurato il 20/08/2026 — due righe
-   di due intermediari diversi, entrambe visibili a policy attiva. In sviluppo non si può
-   provare, e una sicurezza non provata non è una sicurezza;
-3. un **ruolo applicativo non superuser** con cui il servizio si collega, altrimenti le
-   policy non mordono nemmeno in produzione;
-4. `sqlAbilitaRls()` eseguito come **proprietario** delle tabelle, sotto forma di
-   migrazione;
-5. **collaudarlo**: aprire due studi, analizzare un'azienda col primo, verificare che il
-   secondo non la veda — e che l'accesso funzioni ancora per entrambi.
+Se dopo un aggiornamento l'accesso smettesse di funzionare senza errori nel log, il
+sospetto è una lettura nuova che non dichiara lo studio: `isolamento-rls.test.ts` la
+ferma prima del deploy, ed è la ragione per cui esiste. Per disattivare le policy in
+emergenza, come proprietario delle tabelle: `ALTER TABLE <tabella> DISABLE ROW LEVEL
+SECURITY` sulle undici tabelle di `TABELLE_MULTI_TENANT` — i dati non vengono toccati.
 
-`cache_risposte` resta **fuori** dalle policy, deliberatamente: contiene dati pubblici del
-registro imprese comprati con un contratto unico, non dati di un cliente. Vedi il commento
-nello schema.
+`cache_risposte`, `sessioni`, `inviti_questionario` e `audit_log` restano **fuori** dalle
+policy, ciascuna con la ragione scritta in `ESCLUSIONI_MOTIVATE`: la cache contiene dati
+pubblici comprati con un contratto unico; sessione e invito si risolvono _prima_ di sapere
+lo studio, ed è la riga stessa a dirlo; l'audit ha righe di piattaforma senza studio.
 
 ---
 
@@ -514,6 +523,9 @@ npx playwright test --project=scrivania collaudo/testo-schermo.spec.ts
 
 # 4 · zero regressioni del motore, misurate: «campi SPARITI 0» e «valori NON testuali 0»
 npx tsx scripts/istantanea-motore.ts dopo.json && npx tsx scripts/confronta-istantanee.ts prima.json dopo.json
+
+# 5 · l'isolamento fra studi, su un PostgreSQL vero e su un database separato (§ 6.4)
+DATABASE_URL_PROVA=<url di prova> npx vitest run packages/db/test/isolamento-due-studi.test.ts
 ```
 
 Il primo si rifiuta di girare sul compilato vecchio e, prima di misurare, fa fallire i
@@ -528,25 +540,20 @@ stringhe**, cinque pagine rese pulite, 0 campi spariti e 0 valori non testuali c
 
 ---
 
-## 10-bis. Da fare prima della produzione: Row Level Security
+## 10-bis. Row Level Security: fatta, e provata prima della produzione
 
-L'isolamento fra intermediari è oggi **applicativo**: ogni lettura risolve l'azienda
-attraverso il proprio intermediario, e nessun percorso lo salta — verificato riga per riga.
-Ma è una garanzia che dipende dalla disciplina di chi scrive il codice, non dal database.
+Era la prima voce della lista di produzione: in un sistema che custodisce i portafogli
+clienti di broker concorrenti, l'isolamento non può dipendere dalla sola disciplina di chi
+scrive il codice. Dal 02/09/2026 lo impone il database, e la sezione 6.4 dice come — i
+diciannove punti chiusi, i due ambiti, la migrazione generata, la prova su un PostgreSQL
+vero che ha trovato un difetto prima che lo trovasse un cliente.
 
-`packages/db/src/rls.ts` contiene le policy PostgreSQL che imporrebbero l'isolamento a
-livello di motore: se il codice sbaglia, il database restituisce zero righe invece dei dati
-di un altro studio. **Sono scritte e non sono mai state applicate — e oggi non vanno
-applicate.**
-
-Il motivo, l'elenco esatto di ciò che manca e l'ordine dei passi stanno nella sezione 6.4.
-In breve: diciannove punti del servizio raggiungono ancora una tabella protetta senza
-dichiarare per conto di quale studio, e il primo a cadere sarebbe l'accesso. È un
-intervento sul livello di accesso ai dati, va fatto su un PostgreSQL vero e va collaudato:
-non è materiale da ultima serata prima della consegna.
-
-In un sistema che custodisce i portafogli clienti di broker concorrenti, questa è la prima
-voce della lista di produzione.
+Cosa resta vero anche adesso: una lettura nuova che non dichiara lo studio non produce un
+errore, produce **zero righe**. È la proprietà voluta, ed è anche il modo in cui un
+difetto di questo tipo si presenterebbe — una schermata vuota, non un messaggio. Il
+collaudo `isolamento-rls.test.ts` la intercetta prima del deploy leggendo il codice; la
+sezione 6.4 dice come ripetere la prova a due studi su una macchina e come disattivare le
+policy in emergenza.
 
 ---
 

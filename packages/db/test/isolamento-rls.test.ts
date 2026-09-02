@@ -290,4 +290,21 @@ describe('La migrazione delle policy coincide con il generatore', () => {
     };
     expect(diario.entries.map((e) => e.tag)).toContain('0010_isolamento_rls');
   });
+
+  /*
+    Trovato dalla prova su un PostgreSQL vero, non da un ragionamento.
+
+    `current_setting(nome, true)` restituisce NULL se il parametro non è mai esistito, ma
+    la STRINGA VUOTA se è esistito in una transazione precedente sulla stessa connessione
+    del pool — e `''::uuid` è un errore SQL, non «nessuno studio». Tre prove su sette
+    fallivano con «invalid input syntax for type uuid», e in produzione sarebbe caduto
+    l'accesso. Su PGlite non si vedeva: il superuser non passa dalla policy.
+
+    Il NULLIF è la riga che lo corregge, e questa prova impedisce che una riscrittura
+    «più pulita» della condizione lo tolga.
+  */
+  it('un ambito vuoto è zero righe, non un errore: la condizione passa da NULLIF', () => {
+    expect(sqlAbilitaRls()).toContain("NULLIF(current_setting('app.tenant_id', true), '')::uuid");
+    expect(sqlAbilitaRls()).not.toMatch(/current_setting\('app\.tenant_id', true\)::uuid/);
+  });
 });

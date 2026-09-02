@@ -184,34 +184,45 @@ aegis/
 1. **Immutabilità degli snapshot.** Un dato di provider non si aggiorna mai in place: si scrive una
    nuova riga in `snapshot_azienda`. Una valutazione fatta a marzo deve restare riproducibile a
    dicembre, con i dati di marzo. È un requisito legale, non un vezzo (contenzioso
-   sull'adeguatezza). Oggi è il **codice** a non riscrivere mai quelle righe: il divieto a livello
-   di database è scritto e non applicato — vedi il punto 3.
+   sull'adeguatezza). È il **codice** a non riscrivere mai quelle righe: il divieto a livello di
+   database non è applicato, deliberatamente — vedi il punto 3, ultimo capoverso.
 2. **Provenance ovunque.** `Sourced<T> = { value, source, observedAt, confidence }`. Se un campo non ha
    fonte, non entra nel modello.
-3. **Multi-tenant per intermediario.** Ogni riga di dati di studio porta `tenant_id`, e l'isolamento
-   oggi è **applicativo**: un `where tenant_id = …` in ogni query, tramite `conTenant`.
+3. **Multi-tenant per intermediario, su due strati.** Ogni riga di dati di studio porta
+   `tenant_id`. Il primo strato è applicativo — un `where tenant_id = …` in ogni query, tramite
+   `conTenant` — e il secondo lo impone PostgreSQL: dal 02/09/2026 la Row Level Security è
+   **accesa** (migrazione `0010_isolamento_rls`, generata da `sqlAbilitaRls()` in
+   `packages/db/src/rls.ts`) su undici tabelle, con `FORCE` perché il servizio si collega come
+   proprietario. Una query che non dichiara per conto di quale studio avviene restituisce zero
+   righe, non le righe di un altro: è la differenza fra «se il codice sbaglia PostgreSQL
+   restituisce zero righe» e «se il codice sbaglia i dati escono».
 
-   **La Row Level Security è scritta e non è accesa**, e va detto perché è la differenza fra «se il
-   codice sbaglia PostgreSQL restituisce zero righe» e «se il codice sbaglia i dati escono». Le
-   policy stanno in `sqlAbilitaRls()` (`packages/db/src/rls.ts`), coprono undici tabelle, e nessuna
-   migrazione le esegue. Accenderle adesso non metterebbe in sicurezza il prodotto: lo
-   spegnerebbe. Diciannove funzioni raggiungono ancora una tabella protetta senza impostare
-   `app.tenant_id` — fra queste la ricerca dell'utente per email, che avviene prima di sapere di
-   quale studio si tratti — e con le policy attive `current_setting` torna vuoto, ogni riga
-   sparisce e nessuno riesce più ad accedere.
+   Ogni transazione dichiara ciò che fa. `conTenant` imposta `SET LOCAL app.tenant_id`;
+   `conPiattaforma` imposta `SET LOCAL app.ambito = 'piattaforma'` per le cinque operazioni che
+   attraversano gli studi per disegno — l'utente per indirizzo email (l'accesso avviene prima di
+   sapere lo studio), l'elenco degli studi, la spesa complessiva, quella odierna complessiva, il
+   conteggio degli utenti all'avvio. Non c'è un secondo ruolo PostgreSQL: l'ambito dichiarato
+   nella transazione dà la stessa proprietà senza un secondo pool e senza `CREATEROLE`, ed è
+   un'informazione che solo l'applicazione può mettere, come `app.tenant_id`.
 
-   L'elenco di quei diciannove punti è **misurato leggendo il codice**, non scritto a mano, da
-   `packages/db/test/isolamento-rls.test.ts`, che fallisce se si allunga e verifica anche che
-   nessuna tabella con `tenant_id` resti fuori dalle policy senza una ragione scritta. Tre
-   esclusioni sono motivate e restano tali: `sessioni` e `inviti_questionario`, dove il tenant si
-   scopre _dalla_ riga, e `audit_log`, dove `tenant_id` è facoltativo. Quando l'elenco sarà vuoto,
-   `sqlAbilitaRls()` diventerà una migrazione — e con essa il `REVOKE UPDATE, DELETE` su
-   `audit_log`, `snapshot_azienda` e `analisi` che oggi, per la stessa ragione, non è applicato.
+   Il tutto è **misurato leggendo il codice**, da `packages/db/test/isolamento-rls.test.ts`:
+   zero chiamate raggiungono una tabella protetta senza dichiarare; l'insieme di ciò che gira per
+   la piattaforma è esattamente quello dichiarato, con la ragione; la migrazione coincide con il
+   generatore istruzione per istruzione; la condizione passa da `NULLIF`, perché
+   `current_setting(…, true)` restituisce la stringa vuota — non NULL — dopo una transazione
+   precedente sulla stessa connessione, e `''::uuid` sarebbe un errore invece di zero righe.
+   Quest'ultimo l'ha trovato la prova a due studi su un PostgreSQL vero
+   (`isolamento-due-studi.test.ts`, eseguita sul server su un database separato prima di
+   applicare la migrazione all'archivio): tre asserzioni su sette rosse alla prima esecuzione,
+   sette su sette alla seconda. Su PGlite non si sarebbe visto — il superuser non passa dalla
+   policy.
 
-   Prima di allora restano da decidere le operazioni che attraversano gli studi **per disegno** —
-   l'elenco degli studi, la spesa complessiva della piattaforma, la creazione del primo
-   amministratore di un nuovo studio: con `FORCE ROW LEVEL SECURITY` nemmeno il proprietario delle
-   tabelle le vede, e servirà un ruolo distinto, non una deroga sparsa.
+   Quattro esclusioni restano motivate: `sessioni` e `inviti_questionario`, dove il tenant si
+   scopre _dalla_ riga; `audit_log`, dove `tenant_id` è facoltativo; `cache_risposte`, dati
+   pubblici comprati con un contratto unico. Il `REVOKE UPDATE, DELETE` su `audit_log`,
+   `snapshot_azienda` e `analisi` **non** è applicato, deliberatamente: con un solo ruolo che è
+   anche proprietario, una REVOKE su sé stesso non regge, e fingere il contrario sarebbe una
+   sicurezza dichiarata e non vera.
 
 ---
 

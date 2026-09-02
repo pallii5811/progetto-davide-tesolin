@@ -34,22 +34,29 @@ dig +short aegis.esempio.it
 Deve rispondere con l'IP del server. Se non risponde, il passo 4 fallirà e il motivo sarà
 questo.
 
-### 2. Le policy di isolamento NON vanno applicate
+### 2. Le policy di isolamento sono attive, e non richiedono nulla
 
-Nel codice esiste `sqlAbilitaRls()`, che genera le policy di Row Level Security. **Non
-applicarlo.** Diciannove punti del servizio interrogano ancora il database senza
-dichiarare per conto di quale studio lo fanno; con le policy attive quelle query tornano
-vuote, e la prima a cadere è la ricerca dell'utente per indirizzo email — cioè l'accesso,
-per chiunque.
+Dal 02/09/2026 la Row Level Security fra studi è accesa: la migrazione
+`0010_isolamento_rls` la applica come tutte le altre, dentro `npm run migra`, che
+`03-applicazione.sh` e `aggiorna.sh` eseguono già. Non c'è un ruolo in più da creare né un
+passo da fare a mano.
 
-L'elenco esatto è misurato dal collaudo `packages/db/test/isolamento-rls.test.ts`, che
-fallisce se se ne aggiunge uno. Quando sarà vuoto, le policy potranno diventare una
-migrazione.
+Cosa cambia per chi amministra la macchina: **niente**, finché il servizio funziona. Se
+dopo un aggiornamento nessuno riesce più ad accedere e il log non mostra errori, il
+sospetto è una lettura del database che non dichiara lo studio — con le policy attive
+torna zero righe invece di fallire. Il collaudo `packages/db/test/isolamento-rls.test.ts`
+lo impedisce prima del deploy; se serve verificarlo sulla macchina, la prova a due studi
+gira su un database di prova separato senza toccare l'archivio:
 
-Fino ad allora l'isolamento fra intermediari poggia sui filtri applicativi, che oggi sono
-corretti. **Su un'installazione con un solo studio la differenza è teorica.** Diventa
-concreta il giorno in cui il secondo studio entra sulla stessa macchina: quel giorno il
-lavoro va fatto prima, non dopo.
+```
+sudo -u postgres createdb -O aegis aegis_rls_prova
+cd /opt/aegis/app && sudo -u aegis bash -c 'DATABASE_URL=<url con /aegis_rls_prova> npm run migra'
+sudo -u aegis bash -c 'DATABASE_URL_PROVA=<stessa url> npx vitest run packages/db/test/isolamento-due-studi.test.ts'
+sudo -u postgres dropdb aegis_rls_prova
+```
+
+Il 02/09/2026 questa prova è stata eseguita così, sullo stesso PostgreSQL 18 dell'archivio,
+**prima** di applicare la migrazione all'archivio vero.
 
 ---
 
@@ -180,7 +187,6 @@ Detto qui perché non venga scoperto dopo.
 
 - **Nessun backup.** I dati stanno su un solo disco. Un backup del database va aggiunto
   prima di caricarci il portafoglio di un cliente vero.
-- **Nessuna Row Level Security**, per la ragione spiegata sopra.
 - **Nessun monitoraggio esterno.** Se il servizio cade alle tre di notte, lo si scopre la
   mattina.
 - **Le fonti territoriali restano spente**, come da configurazione predefinita: Overpass

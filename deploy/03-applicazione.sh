@@ -83,8 +83,8 @@ sudo -u "$UTENTE" bash -c "cd '$APP' && npm run build --workspace @aegis/web"
 }
 
 echo "── Migrazioni ─────────────────────────────────────────────────────────"
-# Idempotenti: drizzle tiene traccia di quali sono già passate.
-# NB: NON si applicano le policy di Row Level Security. Vedi LEGGIMI.md.
+# Idempotenti: drizzle tiene traccia di quali sono già passate. Comprendono le policy di
+# Row Level Security (0010_isolamento_rls): nessun passo a parte. Vedi LEGGIMI.md § 2.
 sudo -u "$UTENTE" bash -c "cd '$APP' && set -a && . '$ENV' && set +a && npm run migra"
 
 echo "── Servizi ────────────────────────────────────────────────────────────"

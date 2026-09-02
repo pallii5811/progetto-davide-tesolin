@@ -537,21 +537,20 @@ compilato**, e chi si aspetta il modulo dell'IVASS non lo trova.
 **2. Il registro di audit non è né inalterabile né esibibile.** Sono due cose distinte, ed
 entrambe mancano.
 
-_L'inalterabilità non è attiva._ Il SQL che la impone esiste ed è corretto — `REVOKE UPDATE,
-DELETE` su `audit_log`, `snapshot_azienda` e `analisi` — ma vive dentro la funzione
-`sqlAbilitaRls()` di `packages/db/src/rls.ts`, che **nessuno chiama**: non è una migrazione,
-e nelle dieci migrazioni applicate non compare alcun `REVOKE` né alcuna policy. Verificabile
-in un comando: `grep -rn sqlAbilitaRls apps packages` restituisce la definizione e un
-collaudo, nessun chiamante. Oggi, quindi, il ruolo applicativo **può** aggiornare e
-cancellare quelle righe; ciò che le tiene ferme è che nessun percorso del codice lo fa.
+_L'inalterabilità non è attiva, e la ragione è cambiata._ Fino al 02/09/2026 il `REVOKE
+UPDATE, DELETE` su `audit_log`, `snapshot_azienda` e `analisi` viveva dentro
+`sqlAbilitaRls()`, insieme alle policy di isolamento che nessuno poteva accendere. Le policy
+ora sono accese — migrazione `0010_isolamento_rls`, vedi `docs/CONSEGNA.md` § 6.4 — e il
+`REVOKE` ne è stato **tolto**, deliberatamente: il servizio si collega con l'unico ruolo, che
+è anche proprietario delle tabelle, e una `REVOKE` che un ruolo fa a sé stesso non regge —
+il proprietario può ridarsi il privilegio con un comando. Scriverla avrebbe prodotto una
+sicurezza dichiarata e non vera, che è peggio di una mancante e detta.
 
-Non è una dimenticanza, ed è scritto nel file stesso: accendere quelle policy adesso
-spegnerebbe il prodotto. Diciannove funzioni raggiungono ancora una tabella protetta senza
-impostare `app.tenant_id` — fra queste la ricerca dell'utente per indirizzo email, che
-avviene **prima** di sapere di quale studio si tratti. Con le policy attive `current_setting`
-torna vuoto, ogni riga sparisce, e nessuno riesce più ad accedere senza un errore che lo
-spieghi. L'elenco è misurato, non stimato, da `packages/db/test/isolamento-rls.test.ts`, che
-fallisce se si allunga. Quando sarà vuoto, `sqlAbilitaRls()` diventerà una migrazione.
+Oggi, quindi, il ruolo applicativo **può** aggiornare e cancellare quelle righe; ciò che le
+tiene ferme è che nessun percorso del codice lo fa. Per renderle inalterabili davvero serve
+un secondo ruolo PostgreSQL, non proprietario, con cui il servizio si collega e su cui la
+`REVOKE` ha effetto: è un passo di installazione (`CREATEROLE` sul server, un secondo
+`DATABASE_URL`) e va deciso come tale.
 
 _La lettura non esiste._ **Nessuna schermata e nessuna rotta espongono il registro.** In
 ispezione non c'è modo di mostrarlo senza interrogare il database a mano — e un registro che

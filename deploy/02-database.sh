@@ -22,11 +22,11 @@ fi
 echo "── Ruolo e database ───────────────────────────────────────────────────"
 PASSWORD="$(openssl rand -base64 30 | tr -d '/+=' | head -c 32)"
 
-# Il ruolo è proprietario delle tabelle. Quando le policy di Row Level Security diventeranno
-# applicabili servirà un secondo ruolo, non proprietario e senza BYPASSRLS, per
-# l'applicazione: con `FORCE ROW LEVEL SECURITY` nemmeno il proprietario vede le righe
-# altrui, e le operazioni che attraversano gli studi per disegno smetterebbero di funzionare.
-# Vedi deploy/LEGGIMI.md § «Le policy di isolamento NON vanno applicate».
+# Il ruolo è proprietario delle tabelle ed è l'unico con cui il servizio si collega. Le
+# policy di Row Level Security (migrazione 0010) valgono anche per lui, perché sono create con
+# FORCE; le poche operazioni che attraversano gli studi per disegno lo dichiarano nella
+# transazione (SET LOCAL app.ambito = 'piattaforma') invece di passare da un secondo ruolo.
+# Non serve CREATEROLE, non serve un secondo DATABASE_URL. Vedi deploy/LEGGIMI.md § 2.
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 BEGIN
