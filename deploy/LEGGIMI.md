@@ -185,8 +185,11 @@ journalctl -u aegis-web -n 50 --no-pager
 
 Detto qui perché non venga scoperto dopo.
 
-- **Nessun backup.** I dati stanno su un solo disco. Un backup del database va aggiunto
-  prima di caricarci il portafoglio di un cliente vero.
+- **Nessun backup automatico.** I dati stanno su un solo disco. Esiste un solo dump
+  manuale, `pg_dump -Fc` in `/opt/aegis/backups/` (proprietario `aegis`, permessi 700),
+  fatto il 02/09/2026 prima della migrazione 0010; da allora nessuno lo rifà da solo. Un
+  backup periodico, copiato fuori dalla macchina, va aggiunto prima di caricarci il
+  portafoglio di un cliente vero.
 - **Nessun monitoraggio esterno.** Se il servizio cade alle tre di notte, lo si scopre la
   mattina.
 - **Le fonti territoriali restano spente**, come da configurazione predefinita: Overpass

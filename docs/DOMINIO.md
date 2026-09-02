@@ -132,6 +132,34 @@ score di 25 vale 0,05 e a score 1 è zero — cioè il prodotto arriva a dire «
 risposta e non un difetto di calcolo.
 → `credit/credit-limit.ts`
 
+**Curva score → probabilità di default.** Otto punti, interpolati linearmente, costanti fuori
+dagli estremi:
+
+| score | 1    | 20   | 35  | 50    | 65  | 80    | 90     | 100    |
+| ----- | ---- | ---- | --- | ----- | --- | ----- | ------ | ------ |
+| PD    | 35 % | 18 % | 9 % | 4,5 % | 2 % | 0,8 % | 0,35 % | 0,15 % |
+
+I confini di classe (80, 65, 50, 35) coincidono con punti della curva, così la scheda e questa
+tabella dicono la stessa cosa. `test/curva-pd-coerente.test.ts` lo verifica, insieme al fatto
+che la PD scenda sempre quando lo score sale e che le cinque classi occupino intervalli di PD
+disgiunti.
+
+La curva è **dichiarata, non calibrata**: viene dall'esperienza di settore, non dai default
+osservati dalla piattaforma, e la scheda lo scrive accanto a ogni PD. Calibrarla richiede
+esiti — imprese analizzate a una data e poi, dodici mesi dopo, con procedura concorsuale
+aperta o cessate, oppure no — e gli esiti si accumulano da soli, dall'archivio: ogni riga di
+`analisi` con uno score è una previsione; le analisi e gli eventi `procedura-aperta`
+successivi della stessa impresa sono l'osservazione. Un'impresa mai riguardata dopo la
+previsione non è «sopravvissuta»: è censurata, perché nessuno ha guardato.
+
+`scripts/calibra-curva-pd.ts` conta gli esiti, calcola la frequenza osservata per classe con
+il suo intervallo di confidenza, la mette accanto alla PD promessa, e **si rifiuta di
+proporre una curva sotto trenta esiti osservabili per classe** — sotto quella soglia
+l'intervallo è più largo del numero. Non scrive nulla: la curva si corregge a mano, in
+`credit/score.ts`, con un commit che citi il rapporto. Al 02/09/2026 le previsioni in
+archivio sono 31 su 3 imprese, tutte in classe D o E, la prima del 25/08/2026: il primo
+orizzonte si chiude il 25/08/2027, e fino ad allora gli esiti osservabili sono zero.
+
 ---
 
 ## 5. Analisi dei rischi ISO 31000:2018

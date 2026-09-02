@@ -572,5 +572,13 @@ Onestà, perché il committente possa pianificare:
   separata, il percorso non è confermato e finché non lo sarà il codice **non lo chiama**,
   per non pagare una chiamata a vuoto. È l'unico servizio del listino in questa condizione;
 - **calibrazione su dati storici** della curva score → probabilità di default e dei
-  benchmark di massimale: oggi sono tarati sull'esperienza di settore. Le funzioni sono
-  isolate perché la ricalibrazione sia un intervento in un punto solo.
+  benchmark di massimale: oggi sono tarati sull'esperienza di settore, e la scheda lo
+  dichiara accanto a ogni PD. Per la curva la raccolta degli esiti è costruita:
+  `scripts/calibra-curva-pd.ts` legge le previsioni dall'archivio, le confronta con le
+  procedure concorsuali e le cessazioni osservate nei dodici mesi successivi, e si rifiuta
+  di proporre una curva sotto trenta esiti osservabili per classe. Al 02/09/2026 gli esiti
+  osservabili sono zero — la prima previsione è del 25/08/2026 e il suo orizzonte si chiude
+  il 25/08/2027 — quindi la curva resta quella dichiarata, e `curva-pd-coerente.test.ts`
+  garantisce intanto che non contraddica sé stessa (`docs/DOMINIO.md` § 4). Non è stata
+  calibrata su numeri inventati: sarebbe il dato inaccurato che il prodotto non deve
+  produrre.
