@@ -200,6 +200,29 @@ export function dueDuePunti(testo: string): string[] {
   return m === null ? [] : [m[0].trim()];
 }
 
+/**
+ * Acronimi spenti: «certificazione soa», «gruppo iva», «pmi innovativa».
+ *
+ * Nascono da un toLowerCase applicato a un'etichetta intera per abbassarne l'iniziale.
+ * L'elenco è quello del lessico di questa scheda; gli indirizzi (apogeopec.it) non
+ * combaciano perché l'acronimo lì è preceduto da una lettera. Il punto DOPO è lecito:
+ * «gruppo iva.» chiude una frase, e va visto.
+ */
+export function acronimiMinuscoli(testo: string): string[] {
+  // E la forma «Ebitda», «Pfn»: l'acronimo trattato come una parola con l'iniziale maiuscola.
+  const titolati = [
+    ...testo.matchAll(
+      /(?<![\w@.])(Ebitda|Ebit|Pfn|Iva|Ateco|Pec|Rct|Rco|Soa|Pmi|Inail|Inps|Gdpr)(?![\w@])/g,
+    ),
+  ].map((m) => m[0]);
+  return [
+    ...titolati,
+    ...testo.matchAll(
+      /(?<![\w@.])(soa|pmi|iva|ateco|rea|pec|inail|inps|gdpr|ebitda|ebit|pfn|roi|roe|ros|rct|rco|cat nat|iso|lei|sdi|nace|sic)(?![\w@])/g,
+    ),
+  ].map((m) => m[0]);
+}
+
 export function rilieviSulTesto(testo: string): string[] {
   const rilievi: string[] = [];
   for (const d of decimaliInglesi(testo)) rilievi.push(`separatore inglese «${d}»`);
@@ -207,6 +230,7 @@ export function rilieviSulTesto(testo: string): string[] {
   for (const i of ingleseResiduo(testo)) rilievi.push(`inglese dell’archivio «${i}»`);
   for (const s of separatoriDoppi(testo)) rilievi.push(`separatore doppio «${s}»`);
   for (const d of dueDuePunti(testo)) rilievi.push(`due due-punti «${d}»`);
+  for (const a of acronimiMinuscoli(testo)) rilievi.push(`acronimo minuscolo «${a}»`);
   if (parole(testo).length >= 20) {
     for (const r of affermazioniRipetute(testo)) rilievi.push(`ripetuto «${r}»`);
   }

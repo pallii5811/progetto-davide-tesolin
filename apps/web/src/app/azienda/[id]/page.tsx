@@ -2415,8 +2415,26 @@ function RigheImporti({ dati }: { dati: Record<string, { formattato: string }> }
   );
 }
 
+/**
+ * Da «posizioneFinanziariaNetta» a «Posizione finanziaria netta». Gli acronimi restano
+ * acronimi: «ebitda» usciva «Ebitda» sul conto economico del cliente.
+ */
+const ACRONIMI_DEL_BILANCIO: Readonly<Record<string, string>> = {
+  ebitda: 'EBITDA',
+  ebit: 'EBIT',
+  pfn: 'PFN',
+  mol: 'MOL',
+  iva: 'IVA',
+  tfr: 'TFR',
+};
+
 function umanizza(chiave: string): string {
-  const parole = chiave.replace(/([A-Z])/g, ' $1').toLowerCase();
+  const parole = chiave
+    .replace(/([A-Z])/g, ' $1')
+    .toLowerCase()
+    .split(' ')
+    .map((p) => ACRONIMI_DEL_BILANCIO[p] ?? p)
+    .join(' ');
   return parole.charAt(0).toUpperCase() + parole.slice(1);
 }
 

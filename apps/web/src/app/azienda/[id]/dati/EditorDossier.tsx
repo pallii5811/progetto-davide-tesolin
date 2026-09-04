@@ -364,8 +364,8 @@ export function EditorDossier({
         <legend className="px-1.5 text-sm font-semibold">Immobili e sedi</legend>
         <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
           I metri quadri sono il dato che più incide sull&apos;intera analisi: senza, il capitale fabbricati
-          resta una stima — dall&apos;impronta a terra rilevata da cartografia o dal valore contabile, già
-          decurtato dagli ammortamenti — e la sottoassicurazione è quasi garantita.
+          resta una stima (dall&apos;impronta a terra rilevata da cartografia o dal valore contabile, già
+          decurtato dagli ammortamenti), e la sottoassicurazione è quasi garantita.
         </p>
 
         <div className="space-y-4">

@@ -659,7 +659,7 @@ function fattoreSolidita(ind: FinancialIndicators | null): ScoreFactor {
         : score >= 70
           ? 'Struttura patrimoniale robusta: i mezzi propri coprono adeguatamente attivo e immobilizzazioni.'
           : score >= 45
-            ? 'Patrimonializzazione nella norma, con dipendenza significativa da fonti di terzi.'
+            ? motivoDellaSolidita(ind)
             : 'Patrimonializzazione debole: la struttura finanziaria è esposta a shock di reddito.',
     details: [
       `Equity ratio: ${ind.equityRatio === null ? assenzaDi('equityRatio') : formatPercent(ind.equityRatio)}`,
@@ -759,6 +759,31 @@ function motivoDellaTensione(ind: FinancialIndicators): string {
     return 'Tensione di liquidità: gli impegni a breve non sono coperti dalle attività correnti.';
   }
   return 'Tensione di liquidità: il circolante assorbe cassa e le risorse a breve sono scarse.';
+}
+
+/**
+ * La fascia di mezzo della solidità, detta con i numeri.
+ *
+ * «Patrimonializzazione nella norma» usciva su un patrimonio netto pari al 13,7 %
+ * dell'attivo, con 6,31 € di debiti per euro di mezzi propri: il punteggio stava a 48 solo
+ * perché le immobilizzazioni erano coperte tre volte dalle fonti durevoli. La frase era
+ * scelta dalla soglia del punteggio, e un broker che legge «nella norma» sopra un 13,7 %
+ * smette di credere anche al resto. Sotto il 20 % di mezzi propri la fascia di mezzo dice
+ * cosa regge e cosa no.
+ */
+function motivoDellaSolidita(ind: FinancialIndicators): string {
+  const equity = ind.equityRatio;
+  if (equity === null || equity >= 0.2) {
+    return 'Patrimonializzazione nella norma, con dipendenza significativa da fonti di terzi.';
+  }
+  const debiti =
+    ind.indiceIndebitamento === null
+      ? ''
+      : `, ${formatNumber(ind.indiceIndebitamento)}× di debiti sui mezzi propri`;
+  const copertura = ind.coperturaImmobilizzazioni;
+  return copertura !== null && copertura >= 1
+    ? `Patrimonio sottile (${formatPercent(equity)} dell’attivo${debiti}), ma immobilizzazioni coperte ${formatNumber(copertura)}× dalle fonti durevoli.`
+    : `Patrimonio sottile (${formatPercent(equity)} dell’attivo${debiti}): la struttura dipende dalle fonti di terzi.`;
 }
 
 function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {

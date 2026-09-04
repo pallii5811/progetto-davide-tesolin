@@ -169,3 +169,28 @@ describe('L’etichetta dell’ubicazione non raddoppia la virgola', () => {
     expect(etichetta).not.toMatch(/,,/);
   });
 });
+
+describe('La frase della solidità dice cosa regge e cosa no', () => {
+  it('con il patrimonio al 13,7% dell’attivo non dice «nella norma»', () => {
+    // I numeri veri: equity ratio 13,7 %, 6,3× di debiti sui mezzi propri, immobilizzazioni
+    // coperte 3,05× dalle fonti durevoli. Il punteggio stava a 48 per la copertura, e la
+    // frase — scelta dalla soglia — diceva «Patrimonializzazione nella norma».
+    const profiloSottile: CompanyProfile = {
+      ...profilo,
+      bilanci: [],
+      bilanciSintetici: profilo.bilanciSintetici.map((s) => ({
+        ...s,
+        value: { ...s.value, patrimonioNetto: Money.euro(719_768), totaleAttivo: Money.euro(5_250_000) },
+      })),
+      indicatoriFornitore: {
+        ...profilo.indicatoriFornitore,
+        solidita: { ...profilo.indicatoriFornitore.solidita!, tassoCoperturaImmobilizzazioni: 3.05 },
+      },
+    };
+    const analisi = analyzeCompany(profiloSottile, polizze, DEMO_AS_OF);
+    const solidita = analisi.creditScore.value.factors.find((f) => f.key === 'solidita');
+    expect(solidita?.rationale).toContain('Patrimonio sottile (13,7%');
+    expect(solidita?.rationale).toContain('coperte 3,05×');
+    expect(solidita?.rationale).not.toContain('nella norma');
+  });
+});

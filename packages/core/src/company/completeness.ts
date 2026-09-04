@@ -98,8 +98,8 @@ const CAMPI: readonly CampoIntervista[] = [
     area: 'somme-assicurande',
     beneficio:
       'È il singolo dato che più riduce il rischio di sottoassicurazione, perché senza metri quadri il capitale ' +
-      'fabbricati resta una stima — dall’impronta a terra rilevata da cartografia, che ignora i piani, ' +
-      'o dal valore contabile, già decurtato dagli ammortamenti — ed è la stima su cui al sinistro ' +
+      'fabbricati resta una stima (dall’impronta a terra rilevata da cartografia, che ignora i piani, ' +
+      'o dal valore contabile, già decurtato dagli ammortamenti), ed è la stima su cui al sinistro ' +
       'opera la regola proporzionale.',
     compilato: (d) => d.immobili.length > 0 && d.immobili.some((i) => i.superficieMq !== null),
   },

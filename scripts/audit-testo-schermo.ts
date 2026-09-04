@@ -38,7 +38,8 @@
  *   5  un indice pubblicato in due unità    «39,93» senza unità sotto un moltiplicatore
  *   6  numeri che devono tornare fra loro   conteggi, prodotti, somme, il 20 % del netto
  *   7  inglese residuo dell'archivio         «(chairman of board of directors)» nella frase
- *   8  separatori doppi e due due-punti      «102,, AGNOSINE», «ROI: … denominatore: resta»
+ *   8  separatori doppi, due due-punti,      «102,, AGNOSINE», «ROI: … denominatore: resta»,
+ *      acronimi spenti                       «certificazione soa, gruppo iva»
  *   9  contraddizioni fra righe lontane      «non coperti» con current ratio 1,37; «EBITDA
  *                                            non calcolabile» sotto un EBITDA stampato;
  *                                            l'elenco che chiede ciò che è già a schermo
@@ -58,6 +59,7 @@ import { OPENAPI_DEFAULT_CONFIG } from '../packages/providers/src/openapi/config
 import type { Cache, CacheEntry } from '../packages/providers/src/http.js';
 import {
   accordiSbagliati,
+  acronimiMinuscoli,
   affermazioniRipetute,
   decimaliInglesi,
   dueDuePunti,
@@ -150,7 +152,7 @@ function raccogliFrasi(valore: unknown, dove: string, out: Frase[]): void {
  * — e un rilievo falso costa più di uno mancato, perché insegna a ignorare l'elenco.
  */
 const CHIAVI_TECNICHE =
-  /\.(id|ruleId|chiave|categoria|livello|livelloInerente|livelloResiduo|trattamento|forma|stato|urgenza|titolare|classe|confidenza|confidence|tono|piano\.urgenza|coperture\[\d+\]|codice|ruolo|dimensioneImpresa|ateco|atecoSecondari\[\d+\]|partitaIva|codiceFiscale|versione\w*)$/;
+  /\.(id|ruleId|chiave|categoria|livello|livelloInerente|livelloResiduo|trattamento|forma|stato|urgenza|titolare|classe|confidenza|confidence|tono|piano\.urgenza|coperture\[\d+\]|copertura|codice|ruolo|dimensioneImpresa|ateco|atecoSecondari\[\d+\]|partitaIva|codiceFiscale|versione\w*)$/;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · 2 · 3 — i rilevatori di testo puro vivono in lib/rilevatori-testo.ts
@@ -910,6 +912,20 @@ function autoprovaRilevatori(): void {
     'un’etichetta corretta viene segnalata per separatori doppi',
   );
   deve(
+    acronimiMinuscoli(
+      'Dichiarate assenti dal registro: certificazione soa, importatore, pmi innovativa, gruppo iva.',
+    ).length === 3,
+    'gli acronimi spenti non vengono più visti',
+  );
+  deve(
+    acronimiMinuscoli('PEC cominotti@apogeopec.it · sito cominotti.com · Certificazione SOA').length === 0,
+    'un indirizzo o un acronimo maiuscolo viene segnalato come acronimo spento',
+  );
+  deve(
+    acronimiMinuscoli('Ebitda 343.989 € · Posizione finanziaria netta · Pfn su Ebitda').length === 3,
+    'l’acronimo scritto come parola con l’iniziale maiuscola («Ebitda») non viene visto',
+  );
+  deve(
     dueDuePunti(
       'ROI: l’archivio lo pubblica ma non ne documenta il denominatore: resta fra i suoi indicatori',
     ).length === 1,
@@ -1049,6 +1065,9 @@ for (const piva of bersagli) {
     }
     for (const d of dueDuePunti(f.testo)) {
       rilievi.push(`due due-punti «${d}» — ${f.dove}\n      ${estratto(f.testo)}`);
+    }
+    for (const a of acronimiMinuscoli(f.testo)) {
+      rilievi.push(`acronimo minuscolo «${a}» — ${f.dove}\n      ${estratto(f.testo)}`);
     }
     // La ripetizione si cerca solo nei testi lunghi: sotto le venti parole di contenuto
     // una sequenza che torna è quasi sempre una coincidenza di lingua, non un difetto.

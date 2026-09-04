@@ -1,5 +1,6 @@
 import type { IndicatoriArchivioDto } from '@/lib/api';
 import { Scheda } from '@/components/ui';
+import { inizialeMinuscola } from '@aegis/core';
 import { formattaGiorno } from '@aegis/core/tempo';
 import { notaCampiMancanti } from '@/lib/nota-campi-mancanti';
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
@@ -504,7 +505,8 @@ function Qualifiche({
 
       {note.length > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-testo-debole">
-          Dichiarate assenti dal registro: {note.map(([nome]) => nome.toLowerCase()).join(', ')}.
+          {/* Solo l'iniziale: «certificazione soa» e «gruppo iva» erano acronimi spenti. */}
+          Dichiarate assenti dal registro: {note.map(([nome]) => inizialeMinuscola(nome)).join(', ')}.
         </p>
       )}
 
