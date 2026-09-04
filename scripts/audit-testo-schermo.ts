@@ -37,6 +37,11 @@
  *   4  «da rilevare» di ciò che si ha già   la voce chiesta mentre l'archivio l'ha data
  *   5  un indice pubblicato in due unità    «39,93» senza unità sotto un moltiplicatore
  *   6  numeri che devono tornare fra loro   conteggi, prodotti, somme, il 20 % del netto
+ *   7  inglese residuo dell'archivio         «(chairman of board of directors)» nella frase
+ *   8  separatori doppi e due due-punti      «102,, AGNOSINE», «ROI: … denominatore: resta»
+ *   9  contraddizioni fra righe lontane      «non coperti» con current ratio 1,37; «EBITDA
+ *                                            non calcolabile» sotto un EBITDA stampato;
+ *                                            l'elenco che chiede ciò che è già a schermo
  *
  * Prima di misurare fa fallire i propri rilevatori sui difetti storici: uno strumento cieco
  * scrive «nessun rilievo» esattamente come uno pulito, e la differenza va provata ogni volta.
@@ -55,6 +60,7 @@ import {
   accordiSbagliati,
   affermazioniRipetute,
   decimaliInglesi,
+  dueDuePunti,
   ingleseResiduo,
   parole,
   separatoriDoppi,
@@ -903,6 +909,17 @@ function autoprovaRilevatori(): void {
     separatoriDoppi('VIA DENTI 26, 25020 FIESSE (BS) · unità locale… (senza coordinate)').length === 0,
     'un’etichetta corretta viene segnalata per separatori doppi',
   );
+  deve(
+    dueDuePunti(
+      'ROI: l’archivio lo pubblica ma non ne documenta il denominatore: resta fra i suoi indicatori',
+    ).length === 1,
+    'la riga con due due-punti non viene più vista',
+  );
+  deve(
+    dueDuePunti('Vincolo più stringente fra quelli calcolabili: patrimoniale. Apertura: 10:30').length ===
+      0,
+    'un orario o un solo due-punti per frase viene segnalato',
+  );
   const fattoreLiquidita = (motivazione: string, corrente: string) => ({
     chiave: 'liquidita',
     motivazione,
@@ -1029,6 +1046,9 @@ for (const piva of bersagli) {
     }
     for (const s of separatoriDoppi(f.testo)) {
       rilievi.push(`separatore doppio «${s}» — ${f.dove}\n      ${estratto(f.testo)}`);
+    }
+    for (const d of dueDuePunti(f.testo)) {
+      rilievi.push(`due due-punti «${d}» — ${f.dove}\n      ${estratto(f.testo)}`);
     }
     // La ripetizione si cerca solo nei testi lunghi: sotto le venti parole di contenuto
     // una sequenza che torna è quasi sempre una coincidenza di lingua, non un difetto.

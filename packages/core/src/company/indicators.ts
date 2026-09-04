@@ -82,14 +82,14 @@ export const MOTIVO_ASSENZA: Readonly<Partial<Record<keyof FinancialIndicators, 
     punteggio perché il denominatore non è documentato: su un'impresa con la posizione
     finanziaria più negativa del patrimonio esce −323 % accanto a un ROA di +44 %.
   */
-  roi: 'l’archivio lo pubblica ma non ne documenta il denominatore: resta fra i suoi indicatori, fuori dal punteggio',
+  roi: 'l’archivio lo pubblica senza documentarne il denominatore, quindi resta fra i suoi indicatori e fuori dal punteggio',
   /*
     `variazioneMol` è EBITDA corrente su EBITDA di DUE esercizi fa — provato a quattro
     decimali: 343.989 / 360.857 − 1 = −4,6744 %, e l'archivio scrive −4,67 %. La soglia del
     punteggio è annua, e confrontare due orizzonti diversi è il difetto della regola 2m.
   */
   crescitaEbitda:
-    'l’archivio la dà su due esercizi, non sull’anno precedente: non confrontabile con la soglia annua',
+    'l’archivio la dà su due esercizi, non sull’anno precedente, e non è confrontabile con la soglia annua',
   /*
     L'archivio dà gli oneri finanziari solo in rapporto all'EBITDA (`burdenIndex`), e
     l'EBITDA in rapporto al valore della produzione. Da lì si ricava oneri su valore della
@@ -97,7 +97,7 @@ export const MOTIVO_ASSENZA: Readonly<Partial<Record<keyof FinancialIndicators, 
     impresa, e scambiarli sarebbe indovinare.
   */
   incidenzaOneriFinanziari:
-    'l’archivio dà gli oneri solo in rapporto all’EBITDA: il rapporto sui ricavi richiede il bilancio in schema CEE',
+    'l’archivio dà gli oneri solo in rapporto all’EBITDA, e il rapporto sui ricavi richiede il bilancio in schema CEE',
 };
 
 /** La ragione dell'assenza, o il ripiego vero per gli indici che l'intervista porta davvero. */

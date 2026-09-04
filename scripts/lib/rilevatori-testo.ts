@@ -186,12 +186,27 @@ export function separatoriDoppi(testo: string): string[] {
   return [...testo.matchAll(/,,|, ,| ,(?=\s)|\(\s*\)|(?<!\.)\.\.(?!\.)|—\s*—/g)].map((m) => m[0]);
 }
 
+/**
+ * Due due-punti nella stessa frase: «ROI: l’archivio lo pubblica ma non ne documenta il
+ * denominatore: resta fra i suoi indicatori». Nasce quando un motivo scritto per stare da
+ * solo viene appeso a un'etichetta che porta già il suo. Si escludono gli orari (10:30) e
+ * i due-punti dentro le virgolette.
+ */
+export function dueDuePunti(testo: string): string[] {
+  const senzaCitazioni = testo.replace(/«[^»]*»/g, '«»');
+  // Fra i due due-punti non deve chiudersi una frase: «Formula: X. Riferimento: Y» è lecito.
+  // Il punto mediano separa coppie etichetta-valore («Probabilità: Possibile · Impatto: Grave»).
+  const m = /: [^:.;!?·]{6,}: /.exec(senzaCitazioni);
+  return m === null ? [] : [m[0].trim()];
+}
+
 export function rilieviSulTesto(testo: string): string[] {
   const rilievi: string[] = [];
   for (const d of decimaliInglesi(testo)) rilievi.push(`separatore inglese «${d}»`);
   for (const a of accordiSbagliati(testo)) rilievi.push(`accordo «${a}»`);
   for (const i of ingleseResiduo(testo)) rilievi.push(`inglese dell’archivio «${i}»`);
   for (const s of separatoriDoppi(testo)) rilievi.push(`separatore doppio «${s}»`);
+  for (const d of dueDuePunti(testo)) rilievi.push(`due due-punti «${d}»`);
   if (parole(testo).length >= 20) {
     for (const r of affermazioniRipetute(testo)) rilievi.push(`ripetuto «${r}»`);
   }

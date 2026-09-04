@@ -364,7 +364,20 @@ export async function cercaAziendeInArchivio(
   criteri: { readonly denominazione?: string | undefined; readonly partitaIva?: string | undefined },
   limite = 20,
 ): Promise<readonly AziendaInArchivio[]> {
-  const condizioni = [eq(schema.aziende.tenantId, tenantId)];
+  /*
+    Una riga che si chiama come la propria chiave non è un'impresa trovata: è un segnaposto.
+
+    La creano le operazioni che dell'azienda conoscono solo la partita IVA — un invito al
+    questionario, una fotografia — passando la chiave come denominazione, perché la colonna
+    non ammette il vuoto. La ricerca la restituiva come «Trovata nel suo archivio — nessun
+    costo», con la partita IVA al posto del nome, senza comune né stato. Chi la vedeva
+    concludeva che il prodotto non sapeva chi fosse l'impresa. Un segnaposto non si
+    restituisce: si passa al fornitore, che è ciò che l'utente ha chiesto.
+  */
+  const condizioni = [
+    eq(schema.aziende.tenantId, tenantId),
+    sql`${schema.aziende.denominazione} <> coalesce(${schema.aziende.partitaIva}, ${schema.aziende.providerId}, '')`,
+  ];
 
   if (criteri.partitaIva !== undefined && criteri.partitaIva !== '') {
     condizioni.push(eq(schema.aziende.partitaIva, criteri.partitaIva));

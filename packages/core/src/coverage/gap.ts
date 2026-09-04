@@ -793,14 +793,14 @@ function descriviAzione(
       `Polizza ${definition.label} scaduta il ${formattaGiorno(polizza.dataScadenza)} ` +
       `(${giorni} giorni fa): la garanzia non è in vigore.`;
     return raccomandato === null
-      ? `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla: capitale da definire in sede di intervista.`
+      ? `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla, con capitale da definire in sede di intervista.`
       : `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla con capitale di ${Money.formatCompact(raccomandato)}.`;
   }
 
   switch (status) {
     case 'assente':
       return raccomandato === null
-        ? `Attivare la copertura ${definition.label}: capitale da definire in sede di intervista.`
+        ? `Attivare la copertura ${definition.label}, con capitale da definire in sede di intervista.`
         : `Attivare la copertura ${definition.label} con capitale di ${Money.formatCompact(raccomandato)}.`;
     case 'sottoassicurata': {
       const delta =
@@ -822,11 +822,11 @@ function descriviAzione(
     case 'da-quantificare': {
       const dato = DATO_MANCANTE[definition.base];
       if (dato !== null) {
-        return `Per dimensionare ${definition.label} serve ${dato}: da rilevare in sede di intervista.`;
+        return `Per dimensionare ${definition.label} serve ${dato}, da rilevare in sede di intervista.`;
       }
       return definition.base === 'massimale-benchmark'
         ? `Fissare il massimale di ${definition.label} per confronto con il settore e la classe dimensionale, da concordare in sede di intervista.`
-        : `Dimensionare ${definition.label} in sede di intervista: il capitale si determina caso per caso.`;
+        : `Dimensionare ${definition.label} in sede di intervista, perché il capitale si determina caso per caso.`;
     }
     case 'adeguata':
       return 'Copertura congrua: nessun intervento richiesto in questa fase.';

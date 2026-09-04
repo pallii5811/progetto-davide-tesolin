@@ -592,10 +592,12 @@ function formatta(valore: number | null | undefined, unita: string): string {
   if (unita === 'frazione%') return percentuale(valore * 100);
   if (unita === '%') return percentuale(valore);
   if (unita === 'gg') return `${arrotonda(valore)} gg`;
-  return arrotonda(valore);
+  // I rapporti puri escono sempre con due decimali: «2,50» accanto a «2,57», non «2,5».
+  // In una colonna di indici un decimale in meno si legge come un numero diverso.
+  return arrotonda(valore, 2);
 }
 
-function arrotonda(valore: number): string {
+function arrotonda(valore: number, decimaliMinimi = 0): string {
   /*
     Un valore piccolo ma diverso da zero non si stampa «0».
 
@@ -609,6 +611,7 @@ function arrotonda(valore: number): string {
   // Due decimali sotto il centinaio, nessuno sopra: su un indice pari a 4766 i decimali
   // sono rumore, su uno pari a 1,79 sono l'informazione.
   return new Intl.NumberFormat('it-IT', {
+    minimumFractionDigits: Math.abs(valore) < 100 ? decimaliMinimi : 0,
     maximumFractionDigits: Math.abs(valore) < 100 ? 2 : 0,
   }).format(valore);
 }

@@ -97,7 +97,7 @@ const CAMPI: readonly CampoIntervista[] = [
     peso: 10,
     area: 'somme-assicurande',
     beneficio:
-      'È il singolo dato che più riduce il rischio di sottoassicurazione: senza metri quadri il capitale ' +
+      'È il singolo dato che più riduce il rischio di sottoassicurazione, perché senza metri quadri il capitale ' +
       'fabbricati resta una stima — dall’impronta a terra rilevata da cartografia, che ignora i piani, ' +
       'o dal valore contabile, già decurtato dagli ammortamenti — ed è la stima su cui al sinistro ' +
       'opera la regola proporzionale.',

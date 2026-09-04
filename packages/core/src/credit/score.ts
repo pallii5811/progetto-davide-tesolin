@@ -404,7 +404,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
     value = SOGLIA_CLASSE_A - 1;
     cap ??=
       `Copertura del modello ${formatPercent(misura.copertura, 1)} ` +
-      `(${misura.valutati} fattori su ${misura.totali}): classe A non attribuibile`;
+      `(${misura.valutati} fattori su ${misura.totali}) — classe A non attribuibile`;
   }
 
   // ── Obsolescenza del bilancio ─────────────────────────────────────────────
@@ -500,7 +500,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   if (finale === null) {
     cap ??=
       `Copertura del modello ${formatPercent(misura.copertura, 1)} ` +
-      `(${misura.valutati} fattori su ${misura.totali}): punteggio non determinabile`;
+      `(${misura.valutati} fattori su ${misura.totali}) — punteggio non determinabile`;
     builder.note(
       `Il modello ha potuto valutare ${misura.valutati} fattori su ${misura.totali}. ` +
         'Su questa base non si attribuisce né un punteggio né una classe: ' +

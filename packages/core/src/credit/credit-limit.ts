@@ -109,7 +109,7 @@ function etichettaPatrimonioNetto(basi: BasiDelFido): string {
   if (basi.alNettoDegliImmateriali === false) {
     return 'Patrimonio netto (comprensivo delle immobilizzazioni immateriali)';
   }
-  return 'Patrimonio netto (non dichiarato se al netto degli immateriali)';
+  return 'Patrimonio netto (l’archivio non dice se al netto degli immateriali)';
 }
 
 export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Explained<CreditLimit> {

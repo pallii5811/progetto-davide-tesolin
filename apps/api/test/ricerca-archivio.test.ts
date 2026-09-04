@@ -50,6 +50,32 @@ describe('Ricerca fra le aziende già in archivio', () => {
     await persistenza.chiudi();
   });
 
+  it('un segnaposto — la riga che si chiama come la propria partita IVA — non è una trovata', async () => {
+    // Lo crea chi dell'azienda conosce solo la partita IVA (invito al questionario, foto):
+    // la ricerca lo restituiva come «Trovata nel suo archivio», con la partita IVA al posto
+    // del nome. Si passa al fornitore finché un'analisi non porta il nome vero.
+    const { assicuraAzienda } = await import('@aegis/db');
+    const segnaposto = {
+      partitaIva: '03158460174',
+      codiceFiscale: null,
+      denominazione: '03158460174',
+      providerId: '03158460174',
+      provincia: null,
+      atecoPrimario: null,
+    };
+    await assicuraAzienda(persistenza.db, studioA, segnaposto);
+    expect(await cercaAziendeInArchivio(persistenza.db, studioA, { partitaIva: '03158460174' })).toEqual(
+      [],
+    );
+
+    await assicuraAzienda(persistenza.db, studioA, {
+      ...segnaposto,
+      denominazione: 'OFFICINE DI PROVA S.R.L.',
+    });
+    const trovate = await cercaAziendeInArchivio(persistenza.db, studioA, { partitaIva: '03158460174' });
+    expect(trovate.map((t) => t.denominazione)).toEqual(['OFFICINE DI PROVA S.R.L.']);
+  });
+
   it('trova per partita IVA senza toccare il fornitore', async () => {
     const trovate = await cercaAziendeInArchivio(persistenza.db, studioA, {
       partitaIva: '02413390390',
