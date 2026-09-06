@@ -185,11 +185,14 @@ journalctl -u aegis-web -n 50 --no-pager
 
 Detto qui perché non venga scoperto dopo.
 
-- **Nessun backup automatico.** I dati stanno su un solo disco. Esiste un solo dump
-  manuale, `pg_dump -Fc` in `/opt/aegis/backups/` (proprietario `aegis`, permessi 700),
-  fatto il 02/09/2026 prima della migrazione 0010; da allora nessuno lo rifà da solo. Un
-  backup periodico, copiato fuori dalla macchina, va aggiunto prima di caricarci il
-  portafoglio di un cliente vero.
+- **Il backup è notturno ma resta sulla macchina.** Ogni notte alle 03:15
+  `deploy/backup-notturno.sh` (installato in `/etc/cron.d/aegis-backup` da `aggiorna.sh`)
+  scrive `pg_dump -Fc` in `/opt/aegis/backups/`, ne verifica l'indice e tiene gli ultimi
+  14; esito in `/var/log/aegis-backup.log`. Si controlla così, e il numero deve crescere
+  con i dati: `sudo ls -la /opt/aegis/backups/`. Un disco che muore porta via anche i
+  backup: la copia fuori dalla macchina — secondo server, storage box, bucket — richiede
+  una destinazione e una credenziale che solo il proprietario può dare, e va aggiunta
+  prima di caricarci il portafoglio di un cliente vero.
 - **Nessun monitoraggio esterno.** Se il servizio cade alle tre di notte, lo si scopre la
   mattina.
 - **Le fonti territoriali restano spente**, come da configurazione predefinita: Overpass

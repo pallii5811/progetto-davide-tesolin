@@ -90,6 +90,8 @@ sudo -u "$UTENTE" bash -c "cd '$APP' && set -a && . '$ENV' && set +a && npm run 
 echo "── Servizi ────────────────────────────────────────────────────────────"
 install -m 644 "$APP/deploy/aegis-api.service" /etc/systemd/system/aegis-api.service
 install -m 644 "$APP/deploy/aegis-web.service" /etc/systemd/system/aegis-web.service
+# Il backup notturno: un file in cron.d, versionato qui, mai scritto a mano sul server.
+install -m 644 "$APP/deploy/aegis-backup.cron" /etc/cron.d/aegis-backup
 systemctl daemon-reload
 systemctl enable aegis-api aegis-web
 systemctl restart aegis-api

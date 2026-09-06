@@ -1,0 +1,5 @@
+# Backup notturno del database AEGIS. Installato da deploy/aggiorna.sh in /etc/cron.d/aegis-backup.
+# Alle 03:15, quando nessuno lavora. L'esito va in /var/log/aegis-backup.log e nel journal (tag aegis-backup).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 3 * * * root /usr/bin/bash /opt/aegis/app/deploy/backup-notturno.sh 2>&1 | /usr/bin/tee -a /var/log/aegis-backup.log | /usr/bin/logger -t aegis-backup
