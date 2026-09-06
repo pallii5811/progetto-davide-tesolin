@@ -15,6 +15,8 @@
 *.sh            text eol=lf
 *.service       text eol=lf
 deploy/Caddyfile text eol=lf
+# Il file di cron.d viene letto da cron su Linux: un CR in coda alla riga rompe il comando.
+*.cron          text eol=lf
 
 # Le migrazioni SQL vengono lette da PostgreSQL su Linux.
 *.sql           text eol=lf
