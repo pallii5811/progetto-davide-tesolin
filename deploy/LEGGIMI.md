@@ -187,9 +187,13 @@ Detto qui perché non venga scoperto dopo.
 
 - **Il backup è notturno ma resta sulla macchina.** Ogni notte alle 03:15
   `deploy/backup-notturno.sh` (installato in `/etc/cron.d/aegis-backup` da `aggiorna.sh`)
-  scrive `pg_dump -Fc` in `/opt/aegis/backups/`, ne verifica l'indice e tiene gli ultimi
-  14; esito in `/var/log/aegis-backup.log`. Si controlla così, e il numero deve crescere
-  con i dati: `sudo ls -la /opt/aegis/backups/`. Un disco che muore porta via anche i
+  scrive `pg_dump -Fc` in `/opt/aegis/backups/` come utente `postgres` — le policy di Row
+  Level Security valgono anche per il proprietario, e il dump come `aegis` si fermava su
+  `analisi` lasciando un file a metà — ne verifica l'indice (almeno 15 tabelle con dati),
+  gli dà il nome definitivo solo dopo, e tiene gli ultimi 14; esito in
+  `/var/log/aegis-backup.log`. Si controlla così, e il numero deve crescere con i dati:
+  `sudo ls -la /opt/aegis/backups/` (02/09: 113.318 byte; 07/09: 132.100). Un disco che
+  muore porta via anche i
   backup: la copia fuori dalla macchina — secondo server, storage box, bucket — richiede
   una destinazione e una credenziale che solo il proprietario può dare, e va aggiunta
   prima di caricarci il portafoglio di un cliente vero.
