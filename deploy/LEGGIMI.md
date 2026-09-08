@@ -209,3 +209,8 @@ Detto qui perché non venga scoperto dopo.
   uguale a «nessuna pericolosità». Si accende con `IDRAULICA_ISPRA=attivo` dopo aver
   misurato con `npx tsx scripts/prova-ispra-vera.ts`. Anche lo storico meteo (Open-Meteo)
   resta **spento**: gratuito solo per uso non commerciale. Tutto in `docs/CONSEGNA.md`.
+- **Il ripristino del backup richiede una copia leggibile.** Il file è 600 di `aegis`,
+  `pg_restore` gira come `postgres`, e il comando ovvio fallisce con «Permission denied»
+  proprio mentre si sta ripristinando. La procedura che funziona è in testa a
+  `deploy/backup-notturno.sh`, sezione RIPRISTINO, ed è stata eseguita davvero
+  l'08/09/2026 su un database separato: 46 righe di registro ripristinate, zero errori.

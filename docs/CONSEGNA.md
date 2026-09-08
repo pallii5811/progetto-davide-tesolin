@@ -550,6 +550,8 @@ npx tsx scripts/istantanea-motore.ts dopo.json && npx tsx scripts/confronta-ista
 
 # 5 · l'isolamento fra studi, su un PostgreSQL vero e su un database separato (§ 6.4)
 DATABASE_URL_PROVA=<url di prova> npx vitest run packages/db/test/isolamento-due-studi.test.ts
+# 6 · il registro delle operazioni è ancora una prova: zero rotture, o dice dove smette
+DATABASE_URL=<url> npx tsx scripts/verifica-registro.ts
 ```
 
 Il primo si rifiuta di girare sul compilato vecchio e, prima di misurare, fa fallire i

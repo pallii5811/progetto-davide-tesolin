@@ -21,6 +21,7 @@ import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join as joinPath } from 'node:path';
 import * as schema from './schema.js';
+import { sqlRegistroInalterabile } from './registro.js';
 
 /**
  * Tipo comune ai due driver.
@@ -185,6 +186,17 @@ export async function applicaSchema(connessione: Connessione): Promise<void> {
     );
   }
   for (const comando of DDL) {
+    await connessione.db.execute(sql.raw(comando));
+  }
+  /*
+    Il registro inalterabile si applica anche qui, non solo nella migrazione.
+
+    A differenza delle policy di isolamento — che su PGlite non mordono, perché gira come
+    superutente — i trigger valgono per tutti. Se stessero solo nella migrazione, la prova
+    esisterebbe in produzione e non nei collaudi, e la prima divergenza si scoprirebbe in
+    ispezione. Le istruzioni sono le stesse: una fonte sola, `registro.ts`.
+  */
+  for (const comando of sqlRegistroInalterabile()) {
     await connessione.db.execute(sql.raw(comando));
   }
 }
@@ -548,6 +560,11 @@ export async function applicaSchemaTollerante(connessione: Connessione): Promise
       const messaggio = errore instanceof Error ? errore.message : String(errore);
       if (!messaggio.includes('does not exist')) throw errore;
     }
+  }
+
+  // Il registro inalterabile: stesse istruzioni della migrazione, stessa fonte.
+  for (const comando of sqlRegistroInalterabile()) {
+    await connessione.db.execute(sql.raw(comando));
   }
 }
 

@@ -7,6 +7,7 @@
 
 export * as schema from './schema.js';
 export * from './rls.js';
+export * from './registro.js';
 export * from './tenant.js';
 export * from './client.js';
 export * from './repositories.js';

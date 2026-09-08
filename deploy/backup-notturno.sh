@@ -18,6 +18,22 @@
 # Il file si scrive con un nome provvisorio e prende quello definitivo SOLO dopo la
 # verifica: un backup a metà non deve mai restare con il nome di un backup.
 #
+# ── RIPRISTINO ──────────────────────────────────────────────────────────────
+#
+# Il file è 600 di aegis, perché contiene i dati dei clienti dello studio. `pg_restore`
+# gira come `postgres`, che quel file non lo apre: il comando ovvio fallisce con
+# «could not open input file: Permission denied», e lo si scopre nel momento in cui si sta
+# ripristinando, cioè il peggiore. Serve una copia leggibile, e va cancellata dopo:
+#
+#   D=$(sudo ls -1t /opt/aegis/backups/aegis-*.dump | head -1)
+#   sudo install -m 600 -o postgres -g postgres "$D" /var/tmp/ripristino.dump
+#   sudo -u postgres createdb aegis_ripristino
+#   sudo -u postgres pg_restore --dbname=aegis_ripristino --no-owner --no-privileges /var/tmp/ripristino.dump
+#   sudo rm -f /var/tmp/ripristino.dump
+#
+# Si ripristina SEMPRE su un database nuovo, mai sopra `aegis`: se il backup fosse
+# incompleto si perderebbe anche ciò che restava. Il confronto si fa dopo, a mente fredda.
+#
 # Cosa NON fa, e va detto: non copia il file fuori dalla macchina. Un disco che muore
 # porta via anche i backup. La copia altrove — un secondo server, uno storage box, un
 # bucket — richiede una destinazione e una credenziale che solo il proprietario può dare;

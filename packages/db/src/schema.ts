@@ -692,8 +692,20 @@ export const eventiMonitoraggio = pgTable(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Registro append-only. Nessun UPDATE, nessun DELETE: da imporre con permessi di
- * database, non solo per convenzione applicativa.
+ * Registro delle operazioni: si aggiunge soltanto, e lo impone il database.
+ *
+ * Fino alla migrazione 0011 questa intestazione diceva «da imporre con permessi di
+ * database, non solo per convenzione applicativa». Era un proposito: nessun permesso lo
+ * imponeva, e chiunque sapesse scrivere sul database poteva togliere la riga scomoda.
+ *
+ * Adesso due trigger lo rendono vero. Il primo rifiuta UPDATE e DELETE. Il secondo
+ * incatena ogni riga alla precedente con un'impronta SHA-256 del contenuto: togliere o
+ * riscrivere una riga qualsiasi spezza la catena da lì in avanti, e
+ * `verifica_catena_audit()` dice in quale punto e per quale dei tre guasti.
+ *
+ * Non impedisce a un amministratore di database di riscrivere tutto: nulla lo impedisce.
+ * Rende impossibile farlo **senza che si veda**, ed è la sola cosa che una prova possa
+ * dare. Per l'intermediario è la differenza fra avere un registro e poterlo esibire.
  */
 export const auditLog = pgTable(
   'audit_log',
@@ -707,6 +719,14 @@ export const auditLog = pgTable(
     dettagli: jsonb('dettagli'),
     indirizzoIp: text('indirizzo_ip'),
     avvenutoIl: timestamp('avvenuto_il', { withTimezone: true }).notNull().defaultNow(),
+    /*
+      Le tre colonne della catena. Le scrive il trigger, non l'applicazione: se le
+      scrivesse chi inserisce, chi inserisce potrebbe anche sceglierle, e la prova
+      varrebbe quanto la buona fede di chi la produce.
+    */
+    impronta: text('impronta'),
+    improntaPrecedente: text('impronta_precedente'),
+    numeroProgressivo: bigint('numero_progressivo', { mode: 'number' }),
   },
   (t) => [
     index('audit_per_entita').on(t.entita, t.entitaId),
