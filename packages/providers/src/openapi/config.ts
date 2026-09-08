@@ -42,6 +42,7 @@ export interface OpenApiConfig {
     readonly profiloCompleto: ServiceConfig;
     readonly bilancioDettagliato: ServiceConfig;
     readonly eventiNegativi: ServiceConfig;
+    readonly screeningPersona: ServiceConfig;
   };
   /** Percorso di lettura dello stato delle pratiche asincrone. */
   readonly percorsoStatoRichiesta: string;
@@ -182,6 +183,38 @@ export const OPENAPI_DEFAULT_CONFIG: OpenApiConfig = {
       descrizione: 'Protesti, pregiudizievoli e procedure concorsuali (asincrono)',
       verificato: true,
       scope: 'risk / IT-negativita',
+    },
+
+    /**
+     * Adeguata verifica: liste sanzioni, persone politicamente esposte, stampa avversa.
+     *
+     * È l'obbligo dell'intermediario (D.Lgs. 231/2007), non un miglioramento dell'analisi:
+     * prima di stringere un rapporto continuativo il distributore deve identificare il
+     * cliente e i suoi titolari effettivi e verificarli contro quelle liste.
+     *
+     * **Sei centesimi virgola due, non trentuno.** Il listino ha anche `WW-kyc-pep`,
+     * `WW-kyc-sanction_list` e `WW-kyc-adverse_media` a 0,31 € **ciascuno**; questo
+     * servizio li comprende tutti e tre — provato sul servizio vero, i tag della risposta
+     * portano `sanctions`, `pep` e `adverse_media` insieme — e costa cinque volte meno dei
+     * tre messi in fila. Chi sceglie i tre separati paga 0,93 € per la stessa risposta.
+     *
+     * Il TTL è breve: una lista di sanzioni cambia per decreto, e una verifica di sei mesi
+     * fa non è una verifica. Trenta giorni è il compromesso fra il costo e l'obbligo di
+     * controllo nel continuo.
+     *
+     * Il listino dice 0,062 €, cioè 6,2 centesimi. Qui è dichiarato **7**, arrotondato per
+     * eccesso: il registro dei costi conta in centesimi interi, e un costo dichiarato più
+     * basso del vero gonfierebbe di poco ogni chiamata e di molto il tetto giornaliero, che
+     * è la cosa che deve fermare un ciclo impazzito. Meglio dire di spendere l'undici per
+     * cento in più di quanto si spende che il contrario.
+     */
+    screeningPersona: {
+      path: '/WW-kyc-full',
+      ttlSeconds: 30 * GIORNO,
+      costoCentesimi: 7,
+      descrizione: 'Adeguata verifica: sanzioni, PEP e stampa avversa su una persona o un ente',
+      verificato: true,
+      scope: 'risk / WW-kyc-full',
     },
   },
 };

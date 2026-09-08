@@ -12,6 +12,7 @@ export * from './openapi/autorizzazioni.js';
 export * from './openapi/parse.js';
 export * from './openapi/mapper.js';
 export * from './openapi/negativita.js';
+export * from './openapi/kyc.js';
 export * from './openapi/provider.js';
 export * from './openapi/prezzi.js';
 export * from './openapi/campi-noti.js';

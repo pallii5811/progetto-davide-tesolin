@@ -24,6 +24,8 @@ import type {
   PartitaIva,
   Sourced,
 } from '@aegis/core';
+import type { CandidatoDiRiscontro } from '@aegis/core';
+import { corpoRichiesta, mappaCandidati } from './kyc.js';
 import { HttpProviderClient } from '../http.js';
 import type { Cache, CostLedger, RequestOptions } from '../http.js';
 import { ProviderError } from '../port.js';
@@ -692,6 +694,35 @@ export class OpenApiProvider implements CompanyDataProvider {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Adeguata verifica di una persona o di un ente contro liste sanzioni, PEP e stampa avversa.
+   *
+   * Restituisce **candidati**, non un verdetto: la fonte cerca per nome, e sul primo giro
+   * vero uno stesso nome ha prodotto due persone diverse — una sanzionata, una no. Chi
+   * chiama deve pesarli con `componiEsito` e mostrarli all'intermediario, che decide sul
+   * documento d'identità. Vedi `compliance/adeguata-verifica.ts`.
+   *
+   * Costa: è dichiarato nel listino e finisce nel registro dei costi come ogni altra
+   * chiamata. La cache lo tiene trenta giorni, perché una lista di sanzioni cambia per
+   * decreto e una verifica semestrale non è una verifica.
+   */
+  async screeningPersona(nome: string, annoDiNascita?: number): Promise<readonly CandidatoDiRiscontro[]> {
+    const servizio = this.#config.services.screeningPersona;
+    const nomePulito = nome.trim();
+    // Un nome vuoto non si manda: il servizio lo rifiuta, ma la chiamata resta partita.
+    if (nomePulito === '') return [];
+
+    const risposta = await this.#risk.request<unknown>({
+      service: servizio.path,
+      path: servizio.path,
+      method: 'POST',
+      body: corpoRichiesta(nomePulito, annoDiNascita),
+      cacheTtlSeconds: servizio.ttlSeconds,
+      costoCentesimi: servizio.costoCentesimi,
+    });
+    return mappaCandidati(risposta);
   }
 
   async #get(service: ServiceConfig, identifier: string): Promise<unknown> {

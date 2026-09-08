@@ -124,13 +124,58 @@ const NON_LETTI_DICHIARATI: Readonly<
       'data.cf_piva',
       'data.date_completion',
       'data.date_request',
-      'data.esito',
+      // `data.esito` è uscito da questo elenco quando il controllo ha imparato a vedere
+      // anche gli accessi per proprietà: il codice lo legge, e dichiararlo non letto era
+      // un debito che nessuno avrebbe più riletto.
       'data.logo_pdf',
       'data.owner',
       'data.soggetto',
       'data.text_pdf',
       'data.timestamp',
       'data.title_pdf',
+    ],
+  },
+  /*
+    L'adeguata verifica: liste sanzioni, PEP e stampa avversa su una persona.
+
+    Ciò che serve al fascicolo è letto: i nomi in tutte le loro translitterazioni, gli anni
+    di nascita con il flag che dice se la fonte li ha dedotti, le nazionalità, i paesi, i
+    tag delle liste, i codici delle autorità che elencano il soggetto e la data di
+    aggiornamento. Quello che resta si divide in tre gruppi, e nessuno dei tre è un dato
+    dell'impresa o della persona.
+  */
+  'prod-WW-kyc-full-prova-schema.json': {
+    perche:
+      'l’eco della domanda inviata, le opzioni del PDF che il fornitore genererebbe, e i dettagli anagrafici che non servono a distinguere un omonimo: il fascicolo li cita per nome, anno e nazionalità',
+    campi: [
+      // 1 · L'eco della nostra stessa domanda: il servizio la rimanda indietro.
+      'data.query.entityType',
+      'data.query.firstName',
+      'data.query.lastName',
+      'data.query.removeDeceased',
+      // 2 · Le opzioni del rapporto in PDF del fornitore, che non usiamo: il fascicolo
+      //     lo compone AEGIS, con le proprie parole e la propria intestazione.
+      'data.callback',
+      'data.logoPdf',
+      'data.textPdf',
+      'data.titlePdf',
+      /*
+        3 · Anagrafica che non distingue un omonimo. Il sesso non separa due «Mario Rossi»;
+        giorno e mese di nascita sarebbero utili, ma la fonte li dà solo su una parte dei
+        soggetti e su nessuno dei due del campione: usarli quando ci sono e ignorarli quando
+        mancano darebbe una corrispondenza «forte» a chi ha la data completa e «possibile» a
+        chi non ce l'ha, cioè una forza che misura la fonte invece della persona.
+        `primary`, `title` e `native` descrivono come la fonte ordina i nomi, e noi li
+        leggiamo tutti; le due date di `last_update` si prendono già come la più recente.
+      */
+      'data.entities.birth_dates.day',
+      'data.entities.birth_dates.month',
+      'data.entities.gender',
+      'data.entities.last_update.adverse_media',
+      'data.entities.last_update.entity',
+      'data.entities.names.native',
+      'data.entities.names.primary',
+      'data.entities.names.title',
     ],
   },
 };
@@ -156,9 +201,21 @@ function campiLetti(): ReadonlySet<string> {
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n');
 
-  // Le stringhe fra apici singoli: sono la forma con cui i lettori ricevono i nomi.
-  // Lo spazio finale è ammesso perché il fornitore ha davvero una chiave che lo contiene.
-  return new Set([...codice.matchAll(/'([A-Za-z][A-Za-z0-9_]{2,} ?)'/g)].map((m) => m[1]!));
+  /*
+    Due forme, perché il codice legge in due modi.
+
+    La prima è la stringa fra apici singoli, con cui i lettori generici ricevono il nome
+    del campo: `str(source, 'streetName')`. Lo spazio finale è ammesso perché il fornitore
+    ha davvero una chiave che lo contiene.
+
+    La seconda è l'accesso per proprietà — `e.tags`, `n.full_name` — che i mappatori
+    tipizzati usano al posto dei lettori generici. Senza, questo controllo dichiarava «mai
+    letti» ventitré campi che il codice legge riga per riga: un controllo che grida su ciò
+    che è a posto insegna a ignorarlo, esattamente come uno che tace su ciò che è rotto.
+  */
+  const daStringhe = [...codice.matchAll(/'([A-Za-z][A-Za-z0-9_]{2,} ?)'/g)].map((m) => m[1]!);
+  const daProprieta = [...codice.matchAll(/\.([A-Za-z][A-Za-z0-9_]{2,})\b/g)].map((m) => m[1]!);
+  return new Set([...daStringhe, ...daProprieta]);
 }
 
 /** Ogni percorso foglia della risposta, con il nome del campo terminale. */
@@ -263,14 +320,19 @@ describe.skipIf(!disponibile)('Copertura dei campi acquistati', () => {
     }
   });
 
-  it('il conto aperto è quello che l’audit ha misurato: 38 più 11', () => {
+  it('il conto aperto è quello dichiarato: 38, 10 e 16', () => {
     /*
-      I due numeri del rapporto, scritti qui perché il lettore possa fare la sottrazione.
-      Se un domani salgono, qualcuno ha comprato dati nuovi e non li ha letti; se scendono,
+      I numeri del rapporto, scritti qui perché il lettore possa fare la sottrazione. Se un
+      domani salgono, qualcuno ha comprato dati nuovi e non li ha letti; se scendono,
       qualcuno li ha letti e questo elenco va accorciato.
+
+      Erano 38 e 11, e sono cambiati due volte nello stesso giorno per due ragioni opposte.
+      Il secondo file è sceso a 10 perché il controllo ha imparato a vedere gli accessi per
+      proprietà e ha scoperto che un campo dichiarato «non letto» si leggeva già: un debito
+      che non esisteva. Il terzo è nuovo, ed è l'adeguata verifica.
     */
     const perFile = Object.values(NON_LETTI_DICHIARATI).map((v) => v.campi.length);
-    expect(perFile).toEqual([38, 11]);
+    expect(perFile).toEqual([38, 10, 16]);
   });
 
   it('il profilo completo resta il campione più ricco, e resta ricco', () => {

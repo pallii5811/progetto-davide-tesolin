@@ -42,6 +42,7 @@ export * from './risk/ritenzione.js';
 export * from './governance/assetto.js';
 export * from './governance/norme.js';
 export * from './governance/titolare-effettivo.js';
+export * from './compliance/adeguata-verifica.js';
 export * from './risk/prevenzione.js';
 
 // ── Coperture ────────────────────────────────────────────────────────────────
