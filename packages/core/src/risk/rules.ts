@@ -20,7 +20,7 @@ import type { Money as Euro } from '../shared/money.js';
 import type { CompanyFacts } from '../company/facts.js';
 import { atecoStartsWith } from '../shared/identifiers.js';
 import type { RiskId } from './taxonomy.js';
-import { territorialExposure, worstExposure } from './geo.js';
+import { territorialExposure } from './geo.js';
 import {
   categoriaSocietaria,
   normaResponsabilitaAmministratori,
@@ -188,17 +188,22 @@ function numeroOltre(value: number | null, soglia: number): Verdict {
   risposta che il prodotto possa dare.
 */
 function sismicaAlta(facts: CompanyFacts): Verdict {
-  if (facts.provinceOperative.length === 0) return 'ignoto';
-  const esposizioni = facts.provinceOperative.map(territorialExposure);
+  const risolte = facts.esposizioniTerritoriali;
+  const esposizioni = risolte.length > 0 ? risolte : facts.provinceOperative.map(territorialExposure);
+  if (esposizioni.length === 0) return 'ignoto';
   if (esposizioni.some((e) => e.sismica === 'alta')) return true;
   if (esposizioni.some((e) => e.sismica === null)) return 'ignoto';
   return false;
 }
 
 function idraulicaAlta(facts: CompanyFacts): Verdict {
-  const exposure = worstExposure(facts.provinceOperative);
-  if (exposure === null) return 'ignoto';
-  return exposure.idraulica === 'alta';
+  const risolte = facts.esposizioniTerritoriali;
+  const esposizioni = risolte.length > 0 ? risolte : facts.provinceOperative.map(territorialExposure);
+  if (esposizioni.length === 0) return 'ignoto';
+  if (esposizioni.some((e) => e.idraulica === 'alta')) return true;
+  // Con misure puntuali, «non alta» è una risposta; sul ripiego provinciale l'assenza
+  // di misura sulle non-alte restava false (non alta), e resta tale.
+  return false;
 }
 
 /** Vero se l'azienda dichiara una certificazione fra quelle indicate (confronto insensibile a maiuscole). */

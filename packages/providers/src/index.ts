@@ -18,6 +18,7 @@ export * from './openapi/campi-noti.js';
 export * from './openapi/sorveglianza-campi.js';
 export * from './territorio/contesto.js';
 export * from './territorio/meteo.js';
+export * from './territorio/idraulica.js';
 
 import { MockCompanyProvider } from './mock.js';
 import { OpenApiProvider } from './openapi/provider.js';

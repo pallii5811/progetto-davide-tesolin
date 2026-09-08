@@ -22,8 +22,13 @@
 import type { Indirizzo, ImmobileDichiarato, TipoUnitaLocale, UnitaLocale } from './profile.js';
 import { AVVERTENZA_CONTESTO } from './contesto-territoriale.js';
 import type { ContestoTerritoriale } from './contesto-territoriale.js';
-import { territorialExposure } from '../risk/geo.js';
-import type { TerritorialExposure } from '../risk/geo.js';
+import {
+  conIdraulicaPuntuale,
+  territorialExposureDi,
+  worstOfExposures,
+  FONTE_SISMICA_COMUNALE,
+} from '../risk/geo.js';
+import type { ExposureLevel, TerritorialExposure } from '../risk/geo.js';
 import type { Confidence } from '../shared/provenance.js';
 
 /**
@@ -48,7 +53,7 @@ export interface Ubicazione {
   readonly indirizzo: Indirizzo;
   readonly superficieMq: number | null;
   readonly addetti: number | null;
-  /** Esposizione territoriale. Oggi risolta a livello provinciale: vedi nota nel risultato. */
+  /** Esposizione territoriale: sismica comunale PC, idraulica ISPRA se misurata. */
   readonly esposizione: TerritorialExposure;
   readonly haCoordinate: boolean;
   /**
@@ -187,6 +192,13 @@ export function analizzaUbicazioni(input: {
    * riprovare, oppure andare a guardare.
    */
   readonly esitoContesto?: { readonly occupate: number; readonly nonRaggiunte: number } | undefined;
+  /**
+   * Pericolosità idraulica puntuale ISPRA, per chiave di ubicazione.
+   *
+   * `null` o chiave assente = non misurata: resta il ripiego provinciale. Non si inventa
+   * «bassa» dal silenzio della rete.
+   */
+  readonly idraulichePuntuali?: ReadonlyMap<string, ExposureLevel | null> | undefined;
 }): AnalisiUbicazioni {
   const sorgenti: Sorgente[] = [];
 
@@ -230,7 +242,13 @@ export function analizzaUbicazioni(input: {
       indirizzo: esistente !== undefined && esistente.haCoordinate ? esistente.indirizzo : s.indirizzo,
       superficieMq: s.superficieMq ?? esistente?.superficieMq ?? null,
       addetti: s.addetti ?? esistente?.addetti ?? null,
-      esposizione: territorialExposure(s.indirizzo.provincia),
+      esposizione: conIdraulicaPuntuale(
+        territorialExposureDi({
+          provincia: s.indirizzo.provincia,
+          comune: s.indirizzo.comune,
+        }),
+        input.idraulichePuntuali?.get(id) ?? null,
+      ),
       haCoordinate:
         (esistente?.haCoordinate ?? false) ||
         (s.indirizzo.latitudine !== null && s.indirizzo.longitudine !== null),
@@ -353,11 +371,9 @@ function peggiore(ubicazioni: readonly Ubicazione[]): {
   ubicazionePeggiore: Ubicazione | null;
 } {
   const rango = (u: Ubicazione): number => {
-    // `null` è l'esposizione idraulica non misurata, e vale zero: la tabella conosce solo
-    // le province alte, quindi ciò che non vi compare non è alto. L'ordinamento non
-    // cambia rispetto al ripiego «media» che c'era prima, perché era uniforme su tutte.
-    const punti = (l: 'alta' | 'media' | 'bassa' | null): number =>
-      l === 'alta' ? 2 : l === 'media' ? 1 : 0;
+    // `null` non misurato = 0; `bassa` misurata = 1 — distinguere «non so» da «so che è bassa».
+    const punti = (l: ExposureLevel | null): number =>
+      l === 'alta' ? 3 : l === 'media' ? 2 : l === 'bassa' ? 1 : 0;
     return punti(u.esposizione.sismica) + punti(u.esposizione.idraulica);
   };
 
@@ -367,7 +383,10 @@ function peggiore(ubicazioni: readonly Ubicazione[]): {
   }
 
   return {
-    esposizionePeggiore: scelta?.esposizione ?? null,
+    esposizionePeggiore:
+      ubicazioni.length === 0
+        ? null
+        : (worstOfExposures(ubicazioni.map((u) => u.esposizione)) ?? scelta?.esposizione ?? null),
     ubicazionePeggiore: scelta,
   };
 }
@@ -443,12 +462,39 @@ function note(
   ubicazioni: readonly Ubicazione[],
   esitoContesto?: { readonly occupate: number; readonly nonRaggiunte: number },
 ): readonly string[] {
-  const elenco: string[] = [
-    // Dichiarare il limite è parte del risultato: chi legge deve sapere quanto è fine la
-    // maglia con cui si è misurato, altrimenti attribuisce alla stima una precisione che
-    // non ha.
-    'La classificazione sismica e idraulica è risolta su base provinciale. La zonazione sismica di legge è comunale: per le imprese in province disomogenee la verifica sul singolo comune resta necessaria.',
-  ];
+  const elenco: string[] = [];
+
+  const tutteComunali =
+    ubicazioni.length > 0 && ubicazioni.every((u) => u.esposizione.sismicaComunale === true);
+  const alcunaComunale = ubicazioni.some((u) => u.esposizione.sismicaComunale === true);
+
+  if (tutteComunali) {
+    elenco.push(
+      `Classificazione sismica comunale (OPCM 3519/2003 e aggiornamenti regionali; zone 1 e 2 → alta, 3 → media, 4 → bassa). Fonte: ${FONTE_SISMICA_COMUNALE}.`,
+    );
+  } else if (alcunaComunale) {
+    elenco.push(
+      `Classificazione sismica comunale dove il comune è stato risolto; altrove ripiego provinciale (zone 1 e 2 → alta, 3 → media, 4 → bassa). Fonte comunale: ${FONTE_SISMICA_COMUNALE}.`,
+    );
+  } else {
+    elenco.push(
+      'La classificazione sismica è sul ripiego provinciale: i comuni delle ubicazioni non sono stati risolti nel dataset Protezione Civile.',
+    );
+  }
+
+  if (ubicazioni.some((u) => u.esposizione.idraulica !== null && u.esposizione.idraulica !== 'alta')) {
+    elenco.push(
+      'Pericolosità idraulica puntuale da mosaicatura ISPRA (P3/P2/P1) sulle coordinate dell’ubicazione.',
+    );
+  } else if (ubicazioni.some((u) => u.esposizione.idraulica === 'alta')) {
+    elenco.push(
+      'Esposizione idraulica: misura puntuale ISPRA oppure ripiego provinciale sulle province ad alta esposizione storica.',
+    );
+  } else {
+    elenco.push(
+      'Pericolosità idraulica non determinata sulle ubicazioni: manca la misura puntuale ISPRA e la provincia non è nell’elenco delle alte.',
+    );
+  }
 
   if (ubicazioni.some((u) => u.haCoordinate)) {
     elenco.push(

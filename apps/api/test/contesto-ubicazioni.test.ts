@@ -57,7 +57,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto();
 
-    const contesti = await raccogliContesti(profilo, { leggi: finto.leggi });
+    const contesti = await raccogliContesti(profilo, { leggi: finto.leggi, idraulicaAttiva: false });
 
     // La proprietà che conta: le chiavi devono combaciare con quelle prodotte dal motore,
     // altrimenti il contesto viene raccolto, pagato in tempo, e poi non trovato da nessuno.
@@ -76,7 +76,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto();
 
-    await raccogliContesti(profilo, { leggi: finto.leggi });
+    await raccogliContesti(profilo, { leggi: finto.leggi, idraulicaAttiva: false });
 
     const { ubicazioni } = analizzaUbicazioni({
       sedeLegale: profilo.anagrafica.value.sedeLegale,
@@ -94,7 +94,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto();
 
-    await raccogliContesti(profilo, { leggi: finto.leggi, maxUbicazioni: 1 });
+    await raccogliContesti(profilo, { leggi: finto.leggi, maxUbicazioni: 1, idraulicaAttiva: false });
 
     expect(finto.chiamate).toHaveLength(1);
   });
@@ -110,7 +110,7 @@ describe('Raccolta del contesto territoriale', () => {
       return scatti === 1 ? 0 : 1_000_000;
     };
 
-    await raccogliContesti(profilo, { leggi: finto.leggi, budgetMs: 10, adesso });
+    await raccogliContesti(profilo, { leggi: finto.leggi, budgetMs: 10, adesso, idraulicaAttiva: false });
 
     expect(finto.chiamate).toHaveLength(0);
   });
@@ -119,7 +119,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto({ esito: 'non-raggiunto' });
 
-    const contesti = await raccogliContesti(profilo, { leggi: finto.leggi });
+    const contesti = await raccogliContesti(profilo, { leggi: finto.leggi, idraulicaAttiva: false });
 
     // La distinzione che deve sopravvivere fino al report: nessun contesto ≠ nessun rischio.
     expect(contesti.size).toBe(0);
@@ -130,7 +130,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto({ esito: 'occupato' });
 
-    const esito = await raccogliConEsito(profilo, { leggi: finto.leggi });
+    const esito = await raccogliConEsito(profilo, { leggi: finto.leggi, idraulicaAttiva: false });
 
     /*
       Gli slot di Overpass sono per indirizzo IP: se la prima ubicazione trova la coda, la
@@ -147,7 +147,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto({ esito: 'occupato' });
 
-    const esito = await raccogliConEsito(profilo, { leggi: finto.leggi });
+    const esito = await raccogliConEsito(profilo, { leggi: finto.leggi, idraulicaAttiva: false });
     const { note } = analizzaUbicazioni({
       sedeLegale: profilo.anagrafica.value.sedeLegale,
       unitaLocali: profilo.unitaLocali?.value ?? [],
@@ -168,7 +168,7 @@ describe('Raccolta del contesto territoriale', () => {
     const profilo = demoCompanyProfile();
     const finto = lettoreFinto();
 
-    const contesti = await raccogliContesti(profilo, { leggi: finto.leggi });
+    const contesti = await raccogliContesti(profilo, { leggi: finto.leggi, idraulicaAttiva: false });
     const { ubicazioni, note } = analizzaUbicazioni({
       sedeLegale: profilo.anagrafica.value.sedeLegale,
       unitaLocali: profilo.unitaLocali?.value ?? [],
@@ -191,6 +191,7 @@ describe('Raccolta del contesto territoriale', () => {
 
     const contesti = await raccogliContesti(profilo, {
       leggi: finto.leggi,
+      idraulicaAttiva: false,
       leggiMeteo: async () => {
         chiamateMeteo += 1;
         return Promise.resolve(null);
@@ -212,6 +213,7 @@ describe('Raccolta del contesto territoriale', () => {
 
     const contesti = await raccogliContesti(profilo, {
       leggi: finto.leggi,
+      idraulicaAttiva: false,
       meteoAttivo: true,
       leggiMeteo: async () =>
         Promise.resolve({
@@ -243,6 +245,7 @@ describe('Raccolta del contesto territoriale', () => {
 
     const contesti = await raccogliContesti(profilo, {
       leggi: finto.leggi,
+      idraulicaAttiva: false,
       meteoAttivo: true,
       leggiMeteo: async () => Promise.resolve(null),
     });
@@ -251,5 +254,34 @@ describe('Raccolta del contesto territoriale', () => {
     const primo = [...contesti.values()][0];
     expect(primo?.meteo).toBeNull();
     expect(primo?.vigiliDelFuoco).toHaveLength(1);
+  });
+
+  it('ISPRA in timeout lascia idraulica null e non fa cadere il contesto', async () => {
+    const profilo = demoCompanyProfile();
+    const finto = lettoreFinto();
+
+    const esito = await raccogliConEsito(profilo, {
+      leggi: finto.leggi,
+      idraulicaAttiva: true,
+      leggiIdraulica: async () => Promise.resolve(null),
+    });
+
+    expect(esito.contesti.size).toBeGreaterThan(0);
+    for (const livello of esito.idraulichePuntuali.values()) {
+      expect(livello).toBeNull();
+    }
+  });
+
+  it('ISPRA che risponde alta la riporta per chiave ubicazione', async () => {
+    const profilo = demoCompanyProfile();
+    const finto = lettoreFinto();
+
+    const esito = await raccogliConEsito(profilo, {
+      leggi: finto.leggi,
+      idraulicaAttiva: true,
+      leggiIdraulica: async () => Promise.resolve('alta'),
+    });
+
+    expect([...esito.idraulichePuntuali.values()].every((l) => l === 'alta')).toBe(true);
   });
 });

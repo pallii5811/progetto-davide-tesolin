@@ -281,6 +281,7 @@ OVERPASS_URL=https://…/api/interpreter
 OVERPASS_USER_AGENT=NomeProdotto/1.0 (contatto: tecnico@studio.it)
 
 METEO_STORICO=spento            # spento (predefinito) · attivo
+IDRAULICA_ISPRA=attivo          # attivo (predefinito con il contesto) · spento
 METEO_URL=https://…/v1/archive
 ```
 
@@ -301,15 +302,38 @@ serve a guardare la resa del capitolo senza acquistare un'anagrafica, `mai` a sp
 tutto — utile dietro una rete chiusa, o quando la fonte è ferma e si preferisce un report
 senza quel capitolo a uno che attende invano.
 
-**Storico degli eventi atmosferici** (giorni oltre soglia di pioggia e raffica negli ultimi
-dieci anni). Fonte: Open-Meteo, archivio di rianalisi ERA5. **Spento di default**, e la
-ragione è la licenza: l'uso è gratuito per scopi non commerciali, mentre un prodotto
-venduto richiede un abbonamento. Accenderlo è una decisione con un costo, non
+**Storico degli eventi atmosferici** (giorni oltre soglia di pioggia, raffica e temporale
+WMO negli ultimi dieci anni). Fonte: Open-Meteo, archivio di rianalisi ERA5. **Spento di
+default**, e la ragione è la licenza: l'uso è gratuito per scopi non commerciali, mentre un
+prodotto venduto richiede un abbonamento. Accenderlo è una decisione con un costo, non
 un'impostazione tecnica — e il codice non la prende al posto di chi installa.
 
-⚠ La fonte **non copre grandine né fulmini**, e la grandine è il fenomeno che produce più
-sinistri sui capannoni. Il report lo dichiara accanto ai dati: quella riga non va tolta,
-perché senza chi legge conclude che su quel punto non ne siano mai caduti.
+⚠ La fonte **non copre grandine né fulmini** osservati (solo temporali via weather_code), e
+la grandine è il fenomeno che produce più sinistri sui capannoni. Il report lo dichiara
+accanto ai dati: quella riga non va tolta, perché senza chi legge conclude che su quel
+punto non ne siano mai caduti.
+
+**Pericolosità idraulica puntuale** (ISPRA, scenari P3/P2/P1 sulle coordinate).
+**Spenta di default**, e la ragione è misurata, non prudenziale: l'08/09/2026, sul servizio
+vero, un punto per strato ha richiesto fra 1,3 e 45 secondi, con casi oltre i 90. I poligoni
+sono enormi — quello che copre Ravenna ha 18.102 vertici e si estende su tutta la piana
+romagnola — e il tetto di attesa in produzione è di 8 secondi: quasi ogni punto che avrebbe
+una risposta la perde per strada. Un timeout arriva alla scheda **uguale** a «fuori da ogni
+classe», e questa è la ragione vera per cui non può stare accesa in una pagina che qualcuno
+guarda: «non ho potuto guardare» diventerebbe indistinguibile da «ho guardato e non c'era».
+
+I tre scenari si interrogano insieme e non in fila, così chi la accende paga l'attesa di uno
+solo. Si accende con `IDRAULICA_ISPRA=attivo` **dopo** aver misurato con
+`npx tsx scripts/prova-ispra-vera.ts`, che interroga il servizio vero su sei punti di
+riferimento noti e stampa livello e millisecondi.
+
+⚠ Il primo tentativo di questa integrazione scriveva il bbox nell'ordine `lat,lon` — quello
+che la norma WFS 2.0 prescrive per EPSG:4326 — e il servizio rispondeva `HTTP 200` con zero
+poligoni su **ogni** punto d'Italia. Nessun errore, nessuna eccezione, prove a risposte
+finte tutte verdi, e una funzione spenta che sembrava accesa. È stato trovato interrogando
+il servizio vero con una coordinata presa da dentro un poligono dello strato. Vale come
+regola, non come aneddoto: **un'integrazione provata solo con risposte finte non è provata**,
+e `packages/providers/test/idraulica.test.ts` ora fissa l'ordine degli assi senza rete.
 
 ### 6.3 Avvio
 

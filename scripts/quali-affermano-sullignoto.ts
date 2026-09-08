@@ -52,6 +52,7 @@ const IGNOTA = {
   possiedeImmobili: null,
   numeroUnitaLocali: null,
   provinceOperative: [],
+  esposizioniTerritoriali: [],
   haImpiantoAntincendio: null,
   haAllarme: null,
   certificazioni: [],

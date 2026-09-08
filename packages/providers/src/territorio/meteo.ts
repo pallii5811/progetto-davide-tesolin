@@ -11,11 +11,10 @@
  * **Open-Meteo**, archivio di rianalisi ERA5. Non richiede chiave, copre dal 1940, ha
  * risoluzione oraria e giornaliera.
  *
- * **Primo limite: non copre grandine né fulmini.** Sono due dei quattro fenomeni che un
- * assicuratore vorrebbe, e la grandine è quello che produce più sinistri sui capannoni. Il
- * dato che manca viene **dichiarato nel risultato** e stampato nel report: un capitolo
- * intitolato «storico degli eventi atmosferici» che tace di non contenerli farebbe
- * concludere che su quel punto non ne siano mai caduti.
+ * **Primo limite: non copre grandine né fulmini osservati.** Open-Meteo archive espone
+ * i codici WMO giornalieri (temporali ≥ 95): quelli entrano come soglia «temporale».
+ * Grandine e fulminazioni restano in `fenomeniNonCoperti` finché non c'è una fonte vera
+ * (LAMPINET / archivio a pagamento). Affermarle da un codice previsionale sarebbe un falso.
  *
  * **Secondo limite: la licenza.** L'uso è gratuito per scopi non commerciali; un prodotto
  * venduto richiede un abbonamento. Per questo la raccolta è **spenta di default** e si
@@ -53,6 +52,12 @@ const SOGLIE = [
   { campo: 'pioggia', valore: 100, descrizione: 'Pioggia oltre 100 mm in un giorno', unita: 'mm' },
   { campo: 'raffica', valore: 75, descrizione: 'Raffiche oltre 75 km/h', unita: 'km/h' },
   { campo: 'raffica', valore: 100, descrizione: 'Raffiche oltre 100 km/h', unita: 'km/h' },
+  {
+    campo: 'temporale',
+    valore: 95,
+    descrizione: 'Temporale (codice WMO ≥ 95)',
+    unita: 'codice',
+  },
 ] as const;
 
 const NON_COPERTI = [
@@ -76,6 +81,7 @@ interface RispostaOpenMeteo {
     readonly time?: readonly string[];
     readonly precipitation_sum?: readonly (number | null)[];
     readonly wind_gusts_10m_max?: readonly (number | null)[];
+    readonly weather_code?: readonly (number | null)[];
   };
 }
 
@@ -113,7 +119,7 @@ export async function leggiStoricoMeteo(
     `${options.baseUrl ?? OPEN_METEO_PREDEFINITO}` +
     `?latitude=${latitudine.toFixed(4)}&longitude=${longitudine.toFixed(4)}` +
     `&start_date=${dal}&end_date=${al}` +
-    `&daily=precipitation_sum,wind_gusts_10m_max&timezone=${encodeURIComponent(FUSO_ORARIO)}`;
+    `&daily=precipitation_sum,wind_gusts_10m_max,weather_code&timezone=${encodeURIComponent(FUSO_ORARIO)}`;
 
   try {
     const risposta = await richiesta(url, {
@@ -145,11 +151,12 @@ function riduci(dati: RispostaOpenMeteo, dal: string, al: string): StoricoMeteo 
 
   const pioggia = dati.daily?.precipitation_sum ?? [];
   const raffica = dati.daily?.wind_gusts_10m_max ?? [];
+  const temporale = dati.daily?.weather_code ?? [];
 
   const soglie: SogliaSuperata[] = [];
 
   for (const s of SOGLIE) {
-    const serie = s.campo === 'pioggia' ? pioggia : raffica;
+    const serie = s.campo === 'pioggia' ? pioggia : s.campo === 'raffica' ? raffica : temporale;
     const anniConEvento = new Set<string>();
     let conteggio = 0;
     let massimo = 0;
@@ -171,7 +178,10 @@ function riduci(dati: RispostaOpenMeteo, dal: string, al: string): StoricoMeteo 
       descrizione: s.descrizione,
       giorni: conteggio,
       anniConEvento: anniConEvento.size,
-      massimo: `${Math.round(massimo * 10) / 10} ${s.unita}`,
+      massimo:
+        s.campo === 'temporale'
+          ? `codice ${Math.round(massimo)}`
+          : `${Math.round(massimo * 10) / 10} ${s.unita}`,
     });
   }
 

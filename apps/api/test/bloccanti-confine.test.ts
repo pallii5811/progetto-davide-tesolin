@@ -161,15 +161,16 @@ function unioneDichiarata(campo: string): string[] {
 
 describe('Reperto 19 · il tipo dell’idraulica dice quello che il server manda', () => {
   /**
-   * I soli valori che `territorialExposure` può produrre per l'etichetta idraulica.
-   * La tabella conosce le sole province alte; per tutte le altre non ha misurato.
+   * Sul ripiego provinciale: sole province alte, altrimenti non determinata.
+   * Con ISPRA puntuale possono arrivare anche media e bassa misurate.
    */
-  const VALORI_POSSIBILI = ['alta', IDRAULICA_NON_DETERMINATA];
+  const VALORI_PROVINCIALI = ['alta', IDRAULICA_NON_DETERMINATA];
+  const VALORI_DTO = ['alta', 'media', 'bassa', IDRAULICA_NON_DETERMINATA];
 
-  it('il motore conferma di produrre esattamente questi due valori', () => {
+  it('il ripiego provinciale conferma di produrre esattamente alta o non determinata', () => {
     const province = ['MI', 'FE', 'BS', 'AL', 'TO', 'RA', 'PD', 'GE'];
     const prodotti = new Set(province.map((p) => territorialExposure(p).idraulicaEtichetta));
-    expect([...prodotti].sort()).toEqual([...VALORI_POSSIBILI].sort());
+    expect([...prodotti].sort()).toEqual([...VALORI_PROVINCIALI].sort());
   });
 
   it('l’API manda «non determinata» su una provincia che la tabella non ha misurato', () => {
@@ -178,19 +179,16 @@ describe('Reperto 19 · il tipo dell’idraulica dice quello che il server manda
     expect(etichette.has(IDRAULICA_NON_DETERMINATA)).toBe(true);
   });
 
-  it('il tipo del frontend ammette ogni valore che il server manda', () => {
+  it('il tipo del frontend ammette ogni valore che il server può mandare', () => {
     const dichiarati = unioneDichiarata('idraulica');
-    for (const valore of VALORI_POSSIBILI) {
+    for (const valore of VALORI_DTO) {
       expect(dichiarati).toContain(valore);
     }
   });
 
-  it('e non ne ammette nessuno che il server non manda', () => {
-    // Dichiarare «media» e «bassa» non è un'imprecisione innocua: è ciò che fa dipingere
-    // «non determinata» con la classe del rischio basso, cioè affermare una misura bassa
-    // dove non c'è stata misura.
+  it('e non ne inventa oltre a quelli misurabili (provincia o ISPRA)', () => {
     const dichiarati = unioneDichiarata('idraulica');
-    expect(dichiarati.sort()).toEqual([...VALORI_POSSIBILI].sort());
+    expect(dichiarati.sort()).toEqual([...VALORI_DTO].sort());
   });
 });
 

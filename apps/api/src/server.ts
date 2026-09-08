@@ -1492,6 +1492,20 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           meteoAttivo: process.env['METEO_STORICO'] === 'attivo',
           cacheMeteo: cacheContesto,
           baseUrlMeteo: process.env['METEO_URL'],
+          // ISPRA attivo di default con il contesto; spegnibile dietro rete chiusa.
+          /*
+            Spenta finché non risponde in tempi da pagina web.
+
+            Misurato sul servizio vero l'08/09/2026, un punto per strato: da 1,3 a 45
+            secondi, con timeout oltre i 90 su alcune coordinate. I poligoni sono enormi —
+            quello di Ravenna ha 18.102 vertici — e il tetto qui è di 8 secondi: quasi
+            ogni punto che avrebbe una risposta la perde per strada, e un timeout arriva
+            alla scheda uguale a «fuori da ogni classe». Si accende con
+            IDRAULICA_ISPRA=attivo, e `scripts/prova-ispra-vera.ts` dice se conviene.
+          */
+          idraulicaAttiva: process.env['IDRAULICA_ISPRA'] === 'attivo',
+          cacheIdraulica: cacheContesto,
+          baseUrlIdraulica: process.env['ISPRA_WFS_URL'],
         })
       : undefined;
 
@@ -1504,6 +1518,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         : {
             contestiTerritoriali: territorio.contesti,
             esitoContesto: { occupate: territorio.occupate, nonRaggiunte: territorio.nonRaggiunte },
+            idraulichePuntuali: territorio.idraulichePuntuali,
           },
     );
 

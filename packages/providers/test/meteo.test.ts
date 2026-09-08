@@ -36,6 +36,7 @@ const SERIE = {
     time: ['2020-09-01', '2020-09-02', '2021-10-15', '2022-03-04', '2023-07-19'],
     precipitation_sum: [72.4, 3.1, 118.9, null, 12.0],
     wind_gusts_10m_max: [40, 38, 61, 82.5, 44],
+    weather_code: [3, 61, 95, 0, 99],
   },
 };
 
@@ -87,6 +88,21 @@ describe('Storico degli eventi atmosferici', () => {
     const nonCoperti = storico?.fenomeniNonCoperti.join(' ') ?? '';
     expect(nonCoperti).toContain('grandine');
     expect(nonCoperti).toContain('fulmin');
+  });
+
+  it('conta i temporali dal weather_code senza spacciarli per grandine', async () => {
+    const storico = await leggiStoricoMeteo(45.5, 9.2, { fetchImpl: fetchFinto(SERIE), oggi: OGGI });
+    const temporale = storico?.soglie.find((s) => s.descrizione.includes('Temporale'));
+    expect(temporale?.giorni).toBe(2);
+    expect(temporale?.anniConEvento).toBe(2);
+    expect(storico?.fenomeniNonCoperti.join(' ')).toContain('grandine');
+  });
+
+  it('chiede weather_code insieme a pioggia e raffiche', async () => {
+    const chiamata = fetchFinto(SERIE);
+    await leggiStoricoMeteo(45.5, 9.2, { fetchImpl: chiamata, oggi: OGGI });
+    const url = String((chiamata as unknown as { mock: { calls: [string][] } }).mock.calls[0]?.[0] ?? '');
+    expect(url).toContain('weather_code');
   });
 
   it('chiede una finestra di dieci anni e si ferma prima di oggi', async () => {

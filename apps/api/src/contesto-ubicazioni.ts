@@ -7,10 +7,10 @@
  *
  * ## Perché ci sono dei limiti, e perché sono qui
  *
- * La fonte è **Overpass**, un servizio donato con una politica d'uso equo. Un'impresa con
- * quaranta unità locali produrrebbe quaranta interrogazioni per ogni analisi, e ripetute a
- * ogni riesecuzione: è il modo in cui un servizio gratuito viene chiuso a tutti. Da qui tre
- * vincoli deliberati:
+ * La fonte cartografica è **Overpass**, un servizio donato con una politica d'uso equo.
+ * Un'impresa con quaranta unità locali produrrebbe quaranta interrogazioni per ogni
+ * analisi, e ripetute a ogni riesecuzione: è il modo in cui un servizio gratuito viene
+ * chiuso a tutti. Da qui tre vincoli deliberati:
  *
  *  - **un tetto al numero di ubicazioni** interrogate per analisi;
  *  - **letture in sequenza**, mai in parallelo;
@@ -26,8 +26,8 @@
  */
 
 import { analizzaUbicazioni } from '@aegis/core';
-import type { CompanyProfile, ContestoTerritoriale } from '@aegis/core';
-import { leggiEsitoContesto, leggiStoricoMeteo } from '@aegis/providers';
+import type { CompanyProfile, ContestoTerritoriale, ExposureLevel } from '@aegis/core';
+import { leggiEsitoContesto, leggiPericolositaIdraulica, leggiStoricoMeteo } from '@aegis/providers';
 import type { Cache } from '@aegis/providers';
 
 /** Quante ubicazioni interrogare al massimo per una singola analisi. */
@@ -55,10 +55,26 @@ export interface OpzioniContesto {
   readonly cacheMeteo?: Cache | undefined;
   readonly baseUrlMeteo?: string | undefined;
   readonly leggiMeteo?: typeof leggiStoricoMeteo | undefined;
+  /**
+   * Pericolosità idraulica ISPRA sul punto. Default attivo quando c'è il contesto
+   * territoriale; spegnibile con `IDRAULICA_ISPRA=spento` o `idraulicaAttiva: false`.
+   */
+  readonly idraulicaAttiva?: boolean | undefined;
+  readonly cacheIdraulica?: Cache | undefined;
+  readonly baseUrlIdraulica?: string | undefined;
+  readonly leggiIdraulica?: typeof leggiPericolositaIdraulica | undefined;
   readonly maxUbicazioni?: number | undefined;
   readonly budgetMs?: number | undefined;
   /** Orologio iniettabile: i collaudi non devono attendere davvero. */
   readonly adesso?: (() => number) | undefined;
+}
+
+export interface EsitoRaccoltaContesto {
+  readonly contesti: ReadonlyMap<string, ContestoTerritoriale>;
+  /** Livello ISPRA per chiave ubicazione; assente = non interrogata / non misurata. */
+  readonly idraulichePuntuali: ReadonlyMap<string, ExposureLevel | null>;
+  readonly occupate: number;
+  readonly nonRaggiunte: number;
 }
 
 /**
@@ -77,32 +93,22 @@ export async function raccogliContesti(
 
 /**
  * Come {@link raccogliContesti}, ma dichiara anche **quante letture sono fallite e
- * perché**.
- *
- * La distinzione serve al report: «fonte occupata» è una coda che si risolve riprovando,
- * «fonte non raggiunta» è un guasto da indagare, e nessuna delle due è «intorno non c'è
- * niente». Senza questo, un limite d'uso di Overpass — che con analisi in sequenza è la
- * condizione **normale**, non l'eccezione — faceva sparire il capitolo dal documento
- * senza lasciare traccia.
+ * perché**, e le misure idrauliche puntuali ISPRA.
  */
 export async function raccogliConEsito(
   profilo: CompanyProfile,
   opzioni: OpzioniContesto = {},
-): Promise<{
-  readonly contesti: ReadonlyMap<string, ContestoTerritoriale>;
-  readonly occupate: number;
-  readonly nonRaggiunte: number;
-}> {
+): Promise<EsitoRaccoltaContesto> {
   const contesti = new Map<string, ContestoTerritoriale>();
+  const idraulichePuntuali = new Map<string, ExposureLevel | null>();
   let occupate = 0;
   let nonRaggiunte = 0;
   const leggi = opzioni.leggi ?? leggiEsitoContesto;
   const adesso = opzioni.adesso ?? Date.now;
   const budget = opzioni.budgetMs ?? BUDGET_TOTALE_MS;
   const tetto = opzioni.maxUbicazioni ?? MAX_UBICAZIONI;
+  const idraulicaAttiva = opzioni.idraulicaAttiva ?? true;
 
-  // Primo tempo: le ubicazioni, con le loro chiavi. È lo stesso calcolo che farà l'analisi,
-  // quindi le chiavi coincidono per costruzione — non c'è un accordo da mantenere a mano.
   const { ubicazioni } = analizzaUbicazioni({
     sedeLegale: profilo.anagrafica.value.sedeLegale,
     unitaLocali: profilo.unitaLocali?.value ?? [],
@@ -128,17 +134,6 @@ export async function raccogliConEsito(
     });
 
     if (esito.esito === 'osservato') {
-      /*
-        Lo storico meteo si innesta qui, e **solo se acceso**.
-
-        È una fonte diversa da quella cartografica e con una licenza diversa: gratuita per
-        uso non commerciale, a pagamento per un prodotto venduto. Spenta di default perché
-        accenderla è una decisione con un costo, non un'impostazione tecnica — e chi la
-        accende sa cosa sta accettando.
-
-        Se la lettura fallisce il contesto resta intero senza meteo: una fonte accessoria
-        che cade non deve portarsi via anche caserme e vicinanze.
-      */
       const meteo = opzioni.meteoAttivo
         ? await (opzioni.leggiMeteo ?? leggiStoricoMeteo)(latitudine, longitudine, {
             cache: opzioni.cacheMeteo,
@@ -152,17 +147,27 @@ export async function raccogliConEsito(
     else nonRaggiunte += 1;
 
     /*
-      Se la fonte è in coda, smettere di insistere.
-
-      Gli slot sono per indirizzo IP: una seconda ubicazione troverebbe la stessa coda, e
-      l'unico effetto sarebbe consumare il tempo concesso all'analisi per ottenere un
-      altro rifiuto. Le ubicazioni rimanenti restano non osservate, e il conteggio lo dice.
+      ISPRA è indipendente da Overpass: coordinate note bastano. Se la rete cade resta
+      `null` e a valle vince il ripiego provinciale — mai un livello inventato.
     */
+    if (idraulicaAttiva && adesso() < scadenza) {
+      const livello = await (opzioni.leggiIdraulica ?? leggiPericolositaIdraulica)(
+        latitudine,
+        longitudine,
+        {
+          cache: opzioni.cacheIdraulica,
+          baseUrl: opzioni.baseUrlIdraulica,
+          timeoutMs: TIMEOUT_SINGOLA_MS,
+        },
+      );
+      idraulichePuntuali.set(u.id, livello);
+    }
+
     if (esito.esito === 'occupato') {
       occupate += daInterrogare.length - daInterrogare.indexOf(u) - 1;
       break;
     }
   }
 
-  return { contesti, occupate, nonRaggiunte };
+  return { contesti, idraulichePuntuali, occupate, nonRaggiunte };
 }

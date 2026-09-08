@@ -254,12 +254,12 @@ describe('Territorio: cosa può cadere insieme', () => {
 });
 
 describe('Ciò che non si sa', () => {
-  it('dichiara la granularità provinciale della classificazione', () => {
+  it('dichiara la classificazione sismica comunale quando il comune è risolto', () => {
     const a = analizzaUbicazioni({ sedeLegale: MILANO, unitaLocali: [], immobili: [] });
-    // Attribuire alla stima una precisione comunale che non ha sarebbe il modo più
-    // elegante di sbagliare: la nota esiste perché la maglia sia dichiarata.
-    expect(a.note.some((n) => /provinciale/i.test(n))).toBe(true);
+    // Attribuire alla stima una precisione che non ha sarebbe il modo più elegante di
+    // sbagliare: la nota esiste perché la maglia sia dichiarata.
     expect(a.note.some((n) => /comunale/i.test(n))).toBe(true);
+    expect(a.ubicazioni[0]?.esposizione.sismicaComunale).toBe(true);
   });
 
   it('senza alcuna ubicazione lo dice e abbassa la confidenza', () => {

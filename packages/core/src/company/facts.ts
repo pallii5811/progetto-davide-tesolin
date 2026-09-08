@@ -16,11 +16,12 @@ import type { AtecoCode } from '../shared/identifiers.js';
 import { atecoDivision, atecoSection } from '../shared/identifiers.js';
 import { QUOTA_SERVIZI_VARIABILE_DEFAULT, conPatrimonioNettoAutorevole } from './financials.js';
 import type { BilancioRiclassificato } from './financials.js';
-import type { CompanyProfile, FormaGiuridica, Socio, StatoAttivita } from './profile.js';
+import type { CompanyProfile, FormaGiuridica, Indirizzo, Socio, StatoAttivita } from './profile.js';
 import { FORME_A_RESPONSABILITA_ILLIMITATA, anniDiAttivita, haProceduraAperta } from './profile.js';
 import type { CompanySize } from './size.js';
 import { classifySize } from './size.js';
-
+import type { TerritorialExposure } from '../risk/geo.js';
+import { territorialExposureDi } from '../risk/geo.js';
 export interface CompanyFacts {
   // Identità e stato
   readonly denominazione: string;
@@ -57,6 +58,11 @@ export interface CompanyFacts {
   readonly possiedeImmobili: boolean | null;
   readonly numeroUnitaLocali: number | null;
   readonly provinceOperative: readonly string[];
+  /**
+   * Esposizioni territoriali già risolte per ubicazione (sismica comunale, idraulica
+   * puntuale). Vuoto = il motore ripiega sulle sole sigle provinciali.
+   */
+  readonly esposizioniTerritoriali: readonly TerritorialExposure[];
   /** Misure di protezione dichiarate: `null` se il questionario non è stato compilato. */
   readonly haImpiantoAntincendio: boolean | null;
   readonly haAllarme: boolean | null;
@@ -209,11 +215,25 @@ export function deriveFacts(
   const possiedeImmobili = derivePossiedeImmobili(profile, bilancio);
 
   const province = new Set<string>();
-  if (a.sedeLegale !== null) province.add(a.sedeLegale.provincia);
-  for (const u of unitaLocali ?? []) province.add(u.indirizzo.provincia);
-  for (const i of dichiarati.immobili) {
-    if (i.indirizzo !== null) province.add(i.indirizzo.provincia);
+  const indirizzi: Indirizzo[] = [];
+  if (a.sedeLegale !== null) {
+    province.add(a.sedeLegale.provincia);
+    indirizzi.push(a.sedeLegale);
   }
+  for (const u of unitaLocali ?? []) {
+    province.add(u.indirizzo.provincia);
+    indirizzi.push(u.indirizzo);
+  }
+  for (const i of dichiarati.immobili) {
+    if (i.indirizzo !== null) {
+      province.add(i.indirizzo.provincia);
+      indirizzi.push(i.indirizzo);
+    }
+  }
+
+  const esposizioniTerritoriali = deduplicaEsposizioni(
+    indirizzi.map((ind) => territorialExposureDi({ provincia: ind.provincia, comune: ind.comune })),
+  );
 
   const veicoliDaBilancio = null; // il bilancio non isola i veicoli: resta un dato dichiarato
 
@@ -313,6 +333,7 @@ export function deriveFacts(
     possiedeImmobili,
     numeroUnitaLocali: unitaLocali === null ? null : unitaLocali.length,
     provinceOperative: [...province],
+    esposizioniTerritoriali,
     haImpiantoAntincendio: anyDeclared(dichiarati.immobili.map((i) => i.presenzaImpiantoAntincendio)),
     haAllarme: anyDeclared(dichiarati.immobili.map((i) => i.presenzaAllarme)),
     certificazioni: dichiarati.certificazioni,
@@ -446,4 +467,27 @@ function quotaInPercentuale(quota: number | null, soci: readonly Socio[]): numbe
   const somma = noti.reduce((t, q) => t + q, 0);
   const sonoFrazioni = somma > 0 && somma <= 1.01 && noti.every((q) => q <= 1);
   return sonoFrazioni ? quota * 100 : quota;
+}
+
+/**
+ * Rimpiazza le esposizioni territoriali (es. dopo la misura ISPRA sulle ubicazioni).
+ * Il resto dei fatti resta invariato: è l'unico campo che la rete può arricchire.
+ */
+export function conEsposizioniTerritoriali(
+  facts: CompanyFacts,
+  esposizioni: readonly TerritorialExposure[],
+): CompanyFacts {
+  return { ...facts, esposizioniTerritoriali: esposizioni };
+}
+
+function deduplicaEsposizioni(esposizioni: readonly TerritorialExposure[]): readonly TerritorialExposure[] {
+  const visti = new Set<string>();
+  const out: TerritorialExposure[] = [];
+  for (const e of esposizioni) {
+    const chiave = `${e.provincia}|${e.sismica ?? ''}|${e.idraulica ?? ''}|${e.sismicaComunale === true ? 'c' : 'p'}`;
+    if (visti.has(chiave)) continue;
+    visti.add(chiave);
+    out.push(e);
+  }
+  return out;
 }

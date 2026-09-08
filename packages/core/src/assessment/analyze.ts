@@ -28,7 +28,7 @@ import {
   unisciIndicatori,
 } from '../company/indicators.js';
 import type { FinancialIndicators } from '../company/indicators.js';
-import { deriveFacts } from '../company/facts.js';
+import { deriveFacts, conEsposizioniTerritoriali } from '../company/facts.js';
 import type { CompanyFacts } from '../company/facts.js';
 import { valutaCompletezza } from '../company/completeness.js';
 import type { Completezza } from '../company/completeness.js';
@@ -63,6 +63,7 @@ import type { PolizzaInEssere } from '../coverage/policy.js';
 import { analizzaUbicazioni } from '../company/ubicazioni.js';
 import type { AnalisiUbicazioni } from '../company/ubicazioni.js';
 import type { ContestoTerritoriale } from '../company/contesto-territoriale.js';
+import type { ExposureLevel } from '../risk/geo.js';
 import { analizzaAssetto } from '../governance/assetto.js';
 import { analizzaTitolareEffettivo } from '../governance/titolare-effettivo.js';
 import type { AnalisiTitolareEffettivo } from '../governance/titolare-effettivo.js';
@@ -82,6 +83,11 @@ export interface AnalyzeOptions {
   readonly contestiTerritoriali?: ReadonlyMap<string, ContestoTerritoriale> | undefined;
   /** Quante letture del contesto sono fallite, e perché. Vedi `analizzaUbicazioni`. */
   readonly esitoContesto?: { readonly occupate: number; readonly nonRaggiunte: number } | undefined;
+  /**
+   * Pericolosità idraulica puntuale ISPRA per chiave ubicazione.
+   * `null` = non misurata (non inventare bassa).
+   */
+  readonly idraulichePuntuali?: ReadonlyMap<string, ExposureLevel | null> | undefined;
 }
 
 export interface CompanyAnalysis {
@@ -433,8 +439,15 @@ export function analyzeCompany(
     immobili: profile.datiDichiarati.immobili,
     contesti: options.contestiTerritoriali,
     esitoContesto: options.esitoContesto,
+    idraulichePuntuali: options.idraulichePuntuali,
   });
 
+  // Le esposizioni per ubicazione (sismica comunale + eventuale ISPRA) battono quelle
+  // derivate a freddo dai soli indirizzi: è ciò su cui ragiona il registro rischi.
+  const factsPerRischi = conEsposizioniTerritoriali(
+    facts,
+    ubicazioni.ubicazioni.map((u) => u.esposizione),
+  );
   // ── 4. Somme assicurande ──────────────────────────────────────────────────
   const superficieCartograficaMq = superficieRilevata(ubicazioni);
 
@@ -487,7 +500,7 @@ export function analyzeCompany(
 
   // ── 5. CAT NAT ────────────────────────────────────────────────────────────
   const catNat = assessCatNat({
-    facts,
+    facts: factsPerRischi,
     baseAssicurabile: sommeAssicurande.baseCatNat.value,
     giaCoperta: polizze.some(
       (p) => p.coverage === 'catastrofali' && p.dataScadenza.getTime() > asOf.getTime(),
@@ -498,17 +511,17 @@ export function analyzeCompany(
   // ── 3. Rischi ─────────────────────────────────────────────────────────────
   // Il perimetro dell'obbligo catastrofale arriva dal motore che l'ha stabilito: il
   // registro lo riporta, non lo ricalcola.
-  const rischi = assessRisks(facts, asOf, {
+  const rischi = assessRisks(factsPerRischi, asOf, {
     includiRischiDaVerificare: options.includiRischiDaVerificare ?? true,
     catNat: catNat.value,
   });
 
-  const prevenzione = raccomandaPrevenzione(rischi.risks, facts);
+  const prevenzione = raccomandaPrevenzione(rischi.risks, factsPerRischi);
 
   // ── 6. Gap analysis ───────────────────────────────────────────────────────
   const gap = analyzeGaps({
     assessment: rischi,
-    facts,
+    facts: factsPerRischi,
     sums: sommeAssicurande,
     polizze,
     catNat: catNat.value,
@@ -516,7 +529,7 @@ export function analyzeCompany(
     asOf,
   });
 
-  const assetto = analizzaAssetto(profile.assetti?.value ?? null, facts);
+  const assetto = analizzaAssetto(profile.assetti?.value ?? null, factsPerRischi);
   const titolareEffettivo = analizzaTitolareEffettivo(assetto);
 
   return {
@@ -529,7 +542,7 @@ export function analyzeCompany(
     altman,
     creditScore,
     creditLimit,
-    facts,
+    facts: factsPerRischi,
     rischi,
     sommeAssicurande,
     dannoMassimo,
@@ -543,7 +556,7 @@ export function analyzeCompany(
     assetto,
     titolareEffettivo,
     ubicazioni,
-    completezza: valutaCompletezza(profile.datiDichiarati, facts),
+    completezza: valutaCompletezza(profile.datiDichiarati, factsPerRischi),
     livelloDatiEconomici: livelloDati,
     arricchimentiPossibili: arricchimentiPer(livelloDati, profile.eventiNegativi !== null, indicatori),
     sintesi: componiSintesi(profile, creditScore, creditLimit, rischi, sommeAssicurande, catNat, gap),

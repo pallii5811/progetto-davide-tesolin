@@ -548,17 +548,12 @@ export interface AnalisiDto {
       superficieMq: number | null;
       addetti: number | null;
       haCoordinate: boolean;
-      sismica: 'alta' | 'media' | 'bassa';
+      sismica: 'alta' | 'media' | 'bassa' | 'non determinata';
       /**
-       * Etichetta idraulica, non livello: la tabella conosce le **sole** province alte.
-       *
-       * Qui c'era `alta | media | bassa`, e il server manda anche `non determinata`. Il
-       * tipo non descriveva ciò che arrivava, e a valle il badge dipingeva la quarta
-       * stringa con la classe del rischio basso: una provincia mai misurata veniva
-       * mostrata come misurata bassa. Un livello mancante non è un livello intermedio,
-       * e nemmeno un livello minimo.
+       * Etichetta idraulica: ripiego provinciale (`alta` | `non determinata`) oppure
+       * misura ISPRA puntuale (`alta` | `media` | `bassa`).
        */
-      idraulica: 'alta' | 'non determinata';
+      idraulica: 'alta' | 'media' | 'bassa' | 'non determinata';
       piuEsposta: boolean;
       /**
        * Contesto fisico attorno all'ubicazione: caserme e attività confinanti.

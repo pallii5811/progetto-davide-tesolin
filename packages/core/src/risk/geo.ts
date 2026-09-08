@@ -1,15 +1,17 @@
 /**
  * Esposizione territoriale ai rischi naturali.
  *
- * ⚠ Approssimazione dichiarata: la classificazione sismica ufficiale (OPCM 3519/2003)
- * è **comunale**, non provinciale, e la pericolosità idraulica è definita dai PAI di
- * distretto su base cartografica. Questa tabella fornisce un primo livello indicativo,
- * sufficiente a modulare la valutazione del rischio e a far scattare le verifiche;
- * non sostituisce l'accertamento puntuale sul sito.
+ * **Sismica.** La classificazione ufficiale (OPCM 3519/2003 e aggiornamenti regionali) è
+ * **comunale**. `territorialExposureDi` la legge dal dataset Protezione Civile (maggio
+ * 2025). `territorialExposure(provincia)` resta la tabella provinciale indicativa — usata
+ * solo come ripiego quando il comune non è risolvibile — e non inventa la zona 4.
  *
- * Sostituzione prevista (F2): incrocio delle coordinate della sede con le mappe ISTAT
- * di classificazione sismica comunale e con le aree a pericolosità idraulica ISPRA.
+ * **Idraulica.** La pericolosità ufficiale è cartografica (ISPRA/PAI). La tabella
+ * provinciale segnala le sole province ad alta esposizione storica; il livello puntuale
+ * arriva da fuori (provider ISPRA) e si applica con `conIdraulicaPuntuale`.
  */
+
+import { sismicaComunale } from './data/sismica-comunale.js';
 
 export type ExposureLevel = 'bassa' | 'media' | 'alta';
 
@@ -146,119 +148,179 @@ export const IDRAULICA_NON_DETERMINATA = 'non determinata';
 /** Etichetta da mostrare dove la tabella sismica non ha classificato la provincia. */
 export const SISMICA_NON_DETERMINATA = 'non determinata';
 
+/** Fonte del dataset comunale, pronta da stampare in scheda. */
+export const FONTE_SISMICA_COMUNALE = sismicaComunale.fonte;
+
+const LIVELLI_COMUNALI = sismicaComunale.livelli as Readonly<Record<string, ExposureLevel>>;
+
 export interface TerritorialExposure {
   readonly provincia: string;
   /**
-   * Sismica: `null` dove la tabella non ha classificato.
+   * Sismica: `null` dove non è stata classificata.
    *
-   * Qui c'era «una misura vera a tre livelli: ciò che non compare nelle due tabelle è
-   * zona 4, cioè esposizione bassa **accertata**». Non era vero. Le due tabelle contano
-   * settantaquattro province su centosette: le trentatré che restano — tutto il Piemonte,
-   * la Liguria, Milano, Mantova, Venezia, Padova, Piacenza — non sono state classificate
-   * zona 4, sono state **omesse**. La prova che si tratta di omissione e non di misura è
-   * nel file stesso: dodici di esse compaiono in `IDRAULICA_ALTA`, quindi la tabella le
-   * conosce e non le ha classificate.
-   *
-   * Il danno non era il livello sbagliato, era il tipo: `false` invece di `'ignoto'`. In
-   * `engine.ts` una regola con verdetto falso non entra affatto nel registro, e la
-   * modulazione sismica spariva senza lasciare traccia per un terzo delle province
-   * italiane. Un buco dichiarato si vede; una zona 4 inventata no.
-   *
-   * Le trentatré non vengono classificate qui: la zonazione di legge è **comunale** e non
-   * si deduce. `null` finché non arriva la classificazione ISTAT per comune.
+   * Sul percorso provinciale (`territorialExposure`) le trentatré province fuori tabella
+   * restano `null`: non sono zona 4 accertata, sono omesse. Sul percorso comunale
+   * (`territorialExposureDi`) la zona 4 ufficiale diventa `bassa` misurata.
    */
   readonly sismica: ExposureLevel | null;
-  /**
-   * L'etichetta pronta da stampare: il livello misurato, oppure `non determinata`.
-   *
-   * Sta accanto al livello per la stessa ragione di `idraulicaEtichetta`: la frase
-   * mostrata all'utente si compone dove il dato ha ancora il suo significato, non a valle
-   * con un ripiego.
-   */
+  /** L'etichetta pronta da stampare: il livello misurato, oppure `non determinata`. */
   readonly sismicaEtichetta: string;
   /**
    * Idraulica: `null` dove non è stata misurata.
    *
-   * Di pericolosità idraulica esiste un insieme solo, quello delle province alte. Per le
-   * altre — circa due terzi — il codice restituiva «media», e il badge la mostrava
-   * accanto a una sismica misurata come se fosse dello stesso tipo. Non lo era: era il
-   * ripiego di un `else`, e chi legge non aveva modo di distinguerlo.
-   *
-   * Un livello mancante non è un livello intermedio. Ciò che si sa è che la provincia
-   * non è nell'elenco delle alte; ciò che non si sa — se sia media o bassa — resta `null`
-   * finché non arrivano le aree di pericolosità ISPRA.
+   * La tabella provinciale conosce solo le province alte. Media e bassa arrivano solo
+   * dalla misura puntuale ISPRA (`conIdraulicaPuntuale`).
    */
   readonly idraulica: ExposureLevel | null;
-  /**
-   * L'etichetta pronta da stampare: `alta` oppure `non determinata`.
-   *
-   * Sta qui e non nello strato di presentazione perché la frase mostrata all'utente non
-   * si ricicla e non si reinventa a valle: si compone dove il dato ha ancora il suo
-   * significato.
-   */
+  /** L'etichetta pronta da stampare. */
   readonly idraulicaEtichetta: string;
+  /** True se la sismica viene dal dataset comunale PC, non dalla tabella provinciale. */
+  readonly sismicaComunale?: boolean | undefined;
 }
 
+export interface LuogoPerEsposizione {
+  readonly provincia: string;
+  readonly comune?: string | undefined;
+}
+
+/**
+ * Normalizza il nome del comune per il lookup (accenti, apostrofi, maiuscole).
+ * Esportata perché lo script di generazione deve usare la stessa funzione.
+ */
+export function normalizzaComune(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[''`´]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function etichettaIdraulica(livello: ExposureLevel | null): string {
+  return livello ?? IDRAULICA_NON_DETERMINATA;
+}
+
+function etichettaSismica(livello: ExposureLevel | null): string {
+  return livello ?? SISMICA_NON_DETERMINATA;
+}
+
+function sismicaProvinciale(sigla: string): ExposureLevel | null {
+  if (SISMICA_ALTA.has(sigla)) return 'alta';
+  if (SISMICA_MEDIA.has(sigla)) return 'media';
+  return null;
+}
+
+function idraulicaProvinciale(sigla: string): ExposureLevel | null {
+  return IDRAULICA_ALTA.has(sigla) ? 'alta' : null;
+}
+
+/**
+ * Lookup sismico comunale. `null` se il comune non è nel dataset (nome illegibile,
+ * comune estero, frazione passata al posto del comune).
+ */
+export function sismicaDelComune(comune: string, provincia: string): ExposureLevel | null {
+  const sigla = provincia.trim().toUpperCase();
+  const chiave = `${sigla}|${normalizzaComune(comune)}`;
+  return LIVELLI_COMUNALI[chiave] ?? null;
+}
+
+/**
+ * Esposizione indicativa per sola sigla provinciale.
+ *
+ * Invariata rispetto al comportamento storico: non inventa zona 4, non inventa idraulica
+ * media/bassa. Usare `territorialExposureDi` quando si ha il comune.
+ */
 export function territorialExposure(provincia: string): TerritorialExposure {
   const sigla = provincia.trim().toUpperCase();
-  const idraulica: ExposureLevel | null = IDRAULICA_ALTA.has(sigla) ? 'alta' : null;
-  const sismica: ExposureLevel | null = SISMICA_ALTA.has(sigla)
-    ? 'alta'
-    : SISMICA_MEDIA.has(sigla)
-      ? 'media'
-      : null;
+  const idraulica = idraulicaProvinciale(sigla);
+  const sismica = sismicaProvinciale(sigla);
   return {
     provincia: sigla,
     sismica,
-    sismicaEtichetta: sismica ?? SISMICA_NON_DETERMINATA,
+    sismicaEtichetta: etichettaSismica(sismica),
     idraulica,
-    idraulicaEtichetta: idraulica ?? IDRAULICA_NON_DETERMINATA,
+    idraulicaEtichetta: etichettaIdraulica(idraulica),
   };
 }
 
 /**
- * Esposizione peggiore fra tutte le province in cui l'azienda opera.
- *
- * L'assenza di misura vale zero nella graduatoria, e non è una scelta prudenziale
- * mascherata: la tabella idraulica conosce **solo** le province alte, quindi una
- * provincia non misurata è per costruzione una provincia non alta. Trattarla come «media»
- * dava lo stesso ordinamento e in più affermava un livello.
- *
- * ⚠ Per la sismica il ragionamento **non** si trasferisce, e va dichiarato: lì le tabelle
- * conoscono le alte e le medie, quindi una provincia assente potrebbe essere di qualunque
- * livello. La graduatoria continua a restituire il livello più alto fra quelli noti, e su
- * un'impresa con una provincia classificata «media» e una non classificata la peggiore
- * esce «media» — che è un pavimento, non un tetto. Chi deve rispondere «è in zona alta?»
- * non usi questo aggregato: `sismicaAlta` in `rules.ts` guarda le province una per una,
- * perché deve poter dire «non lo so» quando una di esse non è classificata.
+ * Esposizione per ubicazione: sismica comunale se risolvibile, altrimenti ripiego
+ * provinciale; idraulica ancora provinciale finché non arriva la misura ISPRA.
  */
-export function worstExposure(province: readonly string[]): TerritorialExposure | null {
-  if (province.length === 0) return null;
-  const rank = (level: ExposureLevel | null): number => (level === 'alta' ? 2 : level === 'media' ? 1 : 0);
+export function territorialExposureDi(luogo: LuogoPerEsposizione): TerritorialExposure {
+  const base = territorialExposure(luogo.provincia);
+  const comune = luogo.comune?.trim() ?? '';
+  if (comune === '') return base;
 
-  let worst: TerritorialExposure | null = null;
-  for (const p of province) {
-    const current = territorialExposure(p);
-    if (worst === null) {
-      worst = current;
-      continue;
-    }
-    // Annotato per forza: `worst` si riassegna nel ciclo, e senza il tipo esplicito
-    // l'inferenza gira su sé stessa.
-    const idraulica: ExposureLevel | null =
-      rank(current.idraulica) > rank(worst.idraulica) ? current.idraulica : worst.idraulica;
-    const sismica: ExposureLevel | null =
-      rank(current.sismica) > rank(worst.sismica) ? current.sismica : worst.sismica;
+  const sismicaComune = sismicaDelComune(comune, base.provincia);
+  if (sismicaComune === null) return base;
+
+  return {
+    ...base,
+    sismica: sismicaComune,
+    sismicaEtichetta: etichettaSismica(sismicaComune),
+    sismicaComunale: true,
+  };
+}
+
+/**
+ * Sovrascrive l'idraulica con la misura puntuale ISPRA. `null` lascia intatto il ripiego
+ * provinciale (o l'assenza di misura): non inventa un livello dal silenzio della rete.
+ */
+export function conIdraulicaPuntuale(
+  esposizione: TerritorialExposure,
+  idraulica: ExposureLevel | null,
+): TerritorialExposure {
+  if (idraulica === null) return esposizione;
+  return {
+    ...esposizione,
+    idraulica,
+    idraulicaEtichetta: etichettaIdraulica(idraulica),
+  };
+}
+
+function rank(level: ExposureLevel | null): number {
+  return level === 'alta' ? 3 : level === 'media' ? 2 : level === 'bassa' ? 1 : 0;
+}
+
+/**
+ * Esposizione peggiore fra più esposizioni già risolte (per ubicazione).
+ */
+export function worstOfExposures(esposizioni: readonly TerritorialExposure[]): TerritorialExposure | null {
+  if (esposizioni.length === 0) return null;
+
+  let worst = esposizioni[0]!;
+  for (let i = 1; i < esposizioni.length; i++) {
+    const current = esposizioni[i]!;
+    const idraulica = rank(current.idraulica) > rank(worst.idraulica) ? current.idraulica : worst.idraulica;
+    const sismica = rank(current.sismica) > rank(worst.sismica) ? current.sismica : worst.sismica;
     worst = {
       provincia:
         rank(current.sismica) + rank(current.idraulica) > rank(worst.sismica) + rank(worst.idraulica)
           ? current.provincia
           : worst.provincia,
       sismica,
-      sismicaEtichetta: sismica ?? SISMICA_NON_DETERMINATA,
+      sismicaEtichetta: etichettaSismica(sismica),
       idraulica,
-      idraulicaEtichetta: idraulica ?? IDRAULICA_NON_DETERMINATA,
+      idraulicaEtichetta: etichettaIdraulica(idraulica),
+      ...(sismica !== null && esposizioni.some((e) => e.sismica === sismica && e.sismicaComunale)
+        ? { sismicaComunale: true }
+        : {}),
     };
   }
   return worst;
+}
+
+/**
+ * Esposizione peggiore fra tutte le province in cui l'azienda opera.
+ *
+ * L'assenza di misura vale zero nella graduatoria. ⚠ Per la sismica una provincia
+ * assente potrebbe essere di qualunque livello: chi deve rispondere «è in zona alta?»
+ * non usi questo aggregato sulle sole sigle — usi le esposizioni per ubicazione.
+ */
+export function worstExposure(province: readonly string[]): TerritorialExposure | null {
+  if (province.length === 0) return null;
+  return worstOfExposures(province.map((p) => territorialExposure(p)));
 }

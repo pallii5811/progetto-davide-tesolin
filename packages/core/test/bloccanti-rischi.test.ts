@@ -286,7 +286,7 @@ describe('19 · La provincia assente dalla tabella sismica è ignota, non bassa'
       entra affatto nel registro: la modulazione sismica spariva senza lasciare traccia
       per un terzo delle province italiane.
     */
-    const sisma = rischio({ provinceOperative: ['MI'] }, 'catastrofale-sisma');
+    const sisma = rischio({ provinceOperative: ['MI'], esposizioniTerritoriali: [] }, 'catastrofale-sisma');
     const zona = (sisma?.modulationRules ?? []).find((r) => r.ruleId === 'sisma/zona-alta');
     expect(zona, 'la modulazione sismica non compare affatto').toBeDefined();
     expect(zona?.suDatoIgnoto).toBe(true);

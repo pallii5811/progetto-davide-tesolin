@@ -68,6 +68,7 @@ const REGISTRO_SENZA_INTERVISTA = {
   possiedeImmobili: null,
   numeroUnitaLocali: null,
   provinceOperative: [],
+  esposizioniTerritoriali: [],
   haImpiantoAntincendio: null,
   haAllarme: null,
   certificazioni: [],
