@@ -199,7 +199,13 @@ Detto qui perché non venga scoperto dopo.
   prima di caricarci il portafoglio di un cliente vero.
 - **Nessun monitoraggio esterno.** Se il servizio cade alle tre di notte, lo si scopre la
   mattina.
-- **Le fonti territoriali restano spente**, come da configurazione predefinita: Overpass
-  gira su un'istanza volontaria e Open-Meteo è gratuito solo per uso non commerciale.
-  Accenderle su un prodotto venduto è una decisione con implicazioni di licenza, descritta
-  in `docs/CONSEGNA.md`.
+- **Le fonti territoriali, una per una.** La classificazione sismica è un dataset locale
+  (Protezione Civile, maggio 2025, ~7.900 comuni): nessuna chiamata di rete. Il contesto
+  fisico (OpenStreetMap via Overpass) è acceso sui dati veri (`CONTESTO_TERRITORIALE=auto`)
+  e gira su un'istanza volontaria: `OVERPASS_URL` verso un'istanza propria è la scelta da
+  fare per un prodotto venduto. La pericolosità idraulica puntuale (ISPRA) è **spenta**: il
+  servizio risponde fra 1,3 e 45 secondi per strato e il tetto di attesa è 8, quindi quasi
+  ogni punto che avrebbe una risposta la perde per strada — e un timeout arriva alla scheda
+  uguale a «nessuna pericolosità». Si accende con `IDRAULICA_ISPRA=attivo` dopo aver
+  misurato con `npx tsx scripts/prova-ispra-vera.ts`. Anche lo storico meteo (Open-Meteo)
+  resta **spento**: gratuito solo per uso non commerciale. Tutto in `docs/CONSEGNA.md`.
