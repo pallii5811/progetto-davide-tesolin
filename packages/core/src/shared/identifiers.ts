@@ -194,6 +194,44 @@ export function codiceFiscale(input: string): CodiceFiscale {
   return parsed;
 }
 
+/**
+ * L'anno di nascita scritto dentro il codice fiscale, quando è certo.
+ *
+ * ── A COSA SERVE ─────────────────────────────────────────────────────────────
+ *
+ * All'adeguata verifica, dove è la differenza fra accusare un cliente e riconoscere un
+ * omonimo. La ricerca sulle liste di sanzioni trova per nome, e sul primo giro vero uno
+ * stesso nome ha restituito due persone: una del 1952, sanzionata, e una nata verso il
+ * 1978, no. Senza l'anno il prodotto può solo dire «possibile» su entrambe; con l'anno
+ * dice «forte» su una e «debole» sull'altra, ed è l'intera utilità del controllo.
+ *
+ * ── PERCHÉ IL SECOLO NON È UN'IPOTESI ────────────────────────────────────────
+ *
+ * Il codice porta **due cifre**: 52 può essere 1952 o 2052. La scelta non è una
+ * convenzione comoda, è una deduzione: chi compare come socio, amministratore o titolare
+ * effettivo di un'impresa ha almeno diciotto anni, e nessuno vive oltre centodieci.
+ * Applicando quella finestra, uno solo dei due secoli resta possibile — e quando restano
+ * due, o nessuno, la funzione risponde `null` invece di sceglierne uno.
+ *
+ * Si passa l'anno di riferimento: una funzione che leggesse l'orologio darebbe risposte
+ * diverse a distanza di anni sullo stesso codice, e nessun collaudo se ne accorgerebbe.
+ */
+export function annoDiNascitaDaCodiceFiscale(input: string, annoDiRiferimento: number): number | null {
+  const cf = parseCodiceFiscale(input);
+  if (cf === null) return null;
+
+  const dueCifre = Number(cf.slice(6, 8));
+  if (!Number.isInteger(dueCifre)) return null;
+
+  const plausibile = (anno: number): boolean => {
+    const eta = annoDiRiferimento - anno;
+    return eta >= 18 && eta <= 110;
+  };
+
+  const candidati = [1900 + dueCifre, 2000 + dueCifre].filter(plausibile);
+  return candidati.length === 1 ? candidati[0]! : null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ATECO
 // ─────────────────────────────────────────────────────────────────────────────

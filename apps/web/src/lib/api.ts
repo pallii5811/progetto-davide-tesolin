@@ -767,6 +767,51 @@ export interface UtenteCorrente {
   gestorePiattaforma?: boolean;
 }
 
+export interface CandidatoVerificaDto {
+  readonly candidato: {
+    readonly identificativo: string;
+    readonly tipo: 'persona' | 'ente';
+    readonly nomi: string[];
+    readonly anniDiNascita: { anno: number; dedotto: boolean }[];
+    readonly nazionalita: string[];
+    readonly paesi: string[];
+    readonly liste: string[];
+    readonly riferimenti: { autorita: string; codice: string }[];
+    readonly aggiornatoIl: string | null;
+  };
+  readonly forza: 'forte' | 'possibile' | 'debole';
+  readonly perche: string[];
+  readonly gravita: 'bloccante' | 'rafforzata' | 'da-valutare';
+}
+
+export interface VerificaDto {
+  readonly id: string;
+  readonly nome: string;
+  readonly ruolo: string;
+  readonly annoNascita: number | null;
+  readonly stato: 'nessun-riscontro' | 'da-esaminare' | 'non-eseguita';
+  readonly conclusione: string;
+  readonly candidati: CandidatoVerificaDto[];
+  readonly decisioni: Record<string, 'confermato' | 'escluso'>;
+  readonly nota: string | null;
+  readonly verificataIl: string | null;
+  readonly decisaIl: string | null;
+}
+
+/**
+ * L'adeguata verifica gia' svolta su un'impresa, e il costo della prossima.
+ *
+ * Il costo arriva insieme all'elenco perche' va mostrato PRIMA che qualcuno prema il
+ * tasto: e' il numero su cui l'intermediario decide, non una nota a pie' di pagina.
+ */
+export async function leggiAdeguataVerifica(
+  identificativo: string,
+): Promise<{ verifiche: VerificaDto[]; costoCentesimi: number }> {
+  return chiama<{ verifiche: VerificaDto[]; costoCentesimi: number }>(
+    `/api/aziende/${encodeURIComponent(identificativo)}/adeguata-verifica`,
+  );
+}
+
 export async function utenteCorrente(): Promise<UtenteCorrente> {
   try {
     return await chiama<UtenteCorrente>('/api/auth/me');

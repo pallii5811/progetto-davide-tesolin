@@ -74,3 +74,107 @@ export async function rimuoviImmagineAzione(
     };
   }
 }
+
+/** Il valore testuale di un campo. Un file dove serve testo diventa vuoto, non «[object Object]». */
+function testo(modulo: FormData, nome: string): string {
+  const valore = modulo.get(nome);
+  return typeof valore === 'string' ? valore : '';
+}
+
+// ── Adeguata verifica della clientela ────────────────────────────────────────
+
+/**
+ * Esegue la verifica sulle persone indicate. E' un acquisto, e il costo e' gia' a schermo.
+ *
+ * Le persone arrivano dal modulo perche' e' la scheda a sapere chi sono: titolari
+ * effettivi e rappresentanti legali sono gia' calcolati e mostrati. L'anno di nascita,
+ * quando c'e', viaggia con la domanda: senza, due omonimi restano indistinguibili.
+ */
+export async function eseguiAdeguataVerificaAzione(
+  _precedente: EsitoVerifica | null,
+  modulo: FormData,
+): Promise<EsitoVerifica> {
+  const identificativo = testo(modulo, 'identificativo');
+  const grezzo = testo(modulo, 'persone') || '[]';
+
+  let persone: { nome: string; ruolo: string; annoNascita?: number }[];
+  try {
+    persone = JSON.parse(grezzo) as { nome: string; ruolo: string; annoNascita?: number }[];
+  } catch {
+    return { ok: false, messaggio: 'Elenco delle persone non leggibile.' };
+  }
+  if (persone.length === 0) {
+    return { ok: false, messaggio: 'Nessuna persona da verificare.' };
+  }
+
+  const risposta = await chiamaApiConSessione(
+    `/api/aziende/${encodeURIComponent(identificativo)}/adeguata-verifica`,
+    { metodo: 'POST', corpo: { persone } },
+  );
+  const corpo = (await risposta.json().catch(() => ({}))) as {
+    errore?: string;
+    verificate?: number;
+    costoCentesimi?: number;
+  };
+
+  if (!risposta.ok) {
+    return { ok: false, messaggio: corpo.errore ?? 'Verifica non riuscita.' };
+  }
+
+  revalidatePath(`/azienda/${identificativo}`);
+  const spesa = ((corpo.costoCentesimi ?? 0) / 100).toFixed(2).replace('.', ',');
+  return {
+    ok: true,
+    messaggio: `${corpo.verificate ?? 0} ${corpo.verificate === 1 ? 'persona verificata' : 'persone verificate'}, ${spesa} \u20ac.`,
+  };
+}
+
+/**
+ * Registra la decisione dell'intermediario su ogni candidato.
+ *
+ * E' la parte che chiude l'obbligo: la ricerca la fa la macchina, la valutazione la fa una
+ * persona, e in ispezione si guarda la seconda. Finisce nel registro delle operazioni, che
+ * nessuno puo' riscrivere.
+ */
+export async function decidiVerificaAzione(
+  _precedente: EsitoVerifica | null,
+  modulo: FormData,
+): Promise<EsitoVerifica> {
+  const identificativo = testo(modulo, 'identificativo');
+  const verificaId = testo(modulo, 'verificaId');
+  const nota = testo(modulo, 'nota').trim();
+
+  const decisioni: Record<string, string> = {};
+  for (const [chiave, valore] of modulo.entries()) {
+    if (!chiave.startsWith('decisione:')) continue;
+    const scelta = typeof valore === 'string' ? valore : '';
+    if (scelta === 'confermato' || scelta === 'escluso') {
+      decisioni[chiave.slice('decisione:'.length)] = scelta;
+    }
+  }
+
+  const risposta = await chiamaApiConSessione(
+    `/api/adeguata-verifica/${encodeURIComponent(verificaId)}/decisione`,
+    { metodo: 'POST', corpo: { decisioni, ...(nota === '' ? {} : { nota }) } },
+  );
+  const corpo = (await risposta.json().catch(() => ({}))) as { errore?: string };
+
+  if (!risposta.ok) {
+    return { ok: false, messaggio: corpo.errore ?? 'Decisione non registrata.' };
+  }
+
+  revalidatePath(`/azienda/${identificativo}`);
+  const quanti = Object.keys(decisioni).length;
+  return {
+    ok: true,
+    messaggio:
+      quanti === 0
+        ? 'Nessun riscontro da valutare: la verifica resta a verbale.'
+        : `Decisione registrata su ${quanti} ${quanti === 1 ? 'riscontro' : 'riscontri'}.`,
+  };
+}
+
+export interface EsitoVerifica {
+  readonly ok: boolean;
+  readonly messaggio: string;
+}

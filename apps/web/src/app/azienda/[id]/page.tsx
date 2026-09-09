@@ -6,10 +6,13 @@ import {
   statoServizio,
   collegamentiDiAzienda,
   compagnieCensite,
+  leggiAdeguataVerifica,
   leggiImmaginiUbicazioni,
 } from '@/lib/api';
 import { ImmaginiUbicazione } from './ImmaginiUbicazione';
 import { TitolareEffettivo } from './TitolareEffettivo';
+import { AdeguataVerifica } from './AdeguataVerifica';
+import { personeDaVerificare } from './persone-da-verificare';
 import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
 // Le scale della matrice di rischio, prese da dove sono definite invece che ricopiate:
 // due elenchi di parole tenuti a mano in due posti divergono, e quello sbagliato finisce
@@ -93,6 +96,18 @@ export default async function PaginaAzienda({
     duplicare in ogni congelamento. Un guasto qui non deve far cadere la pagina — senza
     fotografie l'analisi resta intera.
   */
+  /*
+    L'adeguata verifica: l'elenco di quelle gia' svolte e il costo della prossima.
+
+    Si legge sempre, anche quando non c'e' niente: la sezione deve poter dire «nessuna
+    verifica finora», che e' un'informazione, invece di sparire. Una funzione che non
+    compare quando manca il dato insegna che l'obbligo non esiste.
+  */
+  const adeguataVerifica = await leggiAdeguataVerifica(id).catch(() => ({
+    verifiche: [],
+    costoCentesimi: 0,
+  }));
+
   const immagini = await leggiImmaginiUbicazioni(id)
     .then((r) => r.immagini)
     .catch(() => []);
@@ -555,6 +570,14 @@ export default async function PaginaAzienda({
       >
         <div className="mb-4">
           <TitolareEffettivo dati={analisi.titolareEffettivo} />
+
+          <AdeguataVerifica
+            identificativo={id}
+            persone={personeDaVerificare(analisi, componentiDelGiorno(new Date()).anno)}
+            verifiche={adeguataVerifica.verifiche}
+            costoCentesimi={adeguataVerifica.costoCentesimi}
+            dimostrativa={listino !== null && !listino.datiReali}
+          />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
