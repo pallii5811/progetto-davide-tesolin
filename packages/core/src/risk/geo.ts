@@ -12,6 +12,9 @@
  */
 
 import { sismicaComunale } from './data/sismica-comunale.js';
+import { idrogeoComunale } from './data/idrogeo-comunale.js';
+import { livelloFrana, livelloIdraulico } from './idrogeo.js';
+import type { IndicatoriIdrogeo } from './idrogeo.js';
 
 export type ExposureLevel = 'bassa' | 'media' | 'alta';
 
@@ -150,6 +153,22 @@ export const SISMICA_NON_DETERMINATA = 'non determinata';
 
 /** Fonte del dataset comunale, pronta da stampare in scheda. */
 export const FONTE_SISMICA_COMUNALE = sismicaComunale.fonte;
+export const FONTE_IDROGEO_COMUNALE = idrogeoComunale.fonte;
+
+const INDICATORI_COMUNALI = idrogeoComunale.livelli as Readonly<Record<string, IndicatoriIdrogeo>>;
+
+/**
+ * Gli indicatori idraulici e da frana di un comune, se ce ne sono.
+ *
+ * La chiave e' la stessa della sismica — «SIGLA|nome normalizzato» — e i due archivi
+ * differiscono per nove comuni su settemilanovecento: fusioni recenti e varianti di grafia
+ * come Jonadi/Ionadi. Sono differenze vere fra due edizioni, non un difetto di chiave: ogni
+ * ricerca risponde `null` per conto suo, e il prodotto dice «non determinata» dove non sa.
+ */
+export function indicatoriIdrogeoDelComune(comune: string, provincia: string): IndicatoriIdrogeo | null {
+  const sigla = provincia.trim().toUpperCase();
+  return INDICATORI_COMUNALI[`${sigla}|${normalizzaComune(comune)}`] ?? null;
+}
 
 const LIVELLI_COMUNALI = sismicaComunale.livelli as Readonly<Record<string, ExposureLevel>>;
 
@@ -176,6 +195,27 @@ export interface TerritorialExposure {
   readonly idraulicaEtichetta: string;
   /** True se la sismica viene dal dataset comunale PC, non dalla tabella provinciale. */
   readonly sismicaComunale?: boolean | undefined;
+
+  /**
+   * Pericolosità da frana del comune, dagli indicatori ISPRA.
+   *
+   * Non c'era affatto, e sui capannoni di collina è il rischio che si materializza per
+   * primo. `null` dove il comune non è stato risolto: assenza di lettura, non assenza di
+   * frane.
+   */
+  readonly frane?: ExposureLevel | null | undefined;
+  readonly franeEtichetta?: string | undefined;
+
+  /**
+   * I numeri sotto le tre parole, per chi vuole vederli.
+   *
+   * Le parole — alta, media, bassa — sono una convenzione di questo prodotto; le
+   * percentuali sono il dato di ISPRA. Chi non condivide la soglia deve poter guardare la
+   * misura, e per farlo deve arrivargli.
+   */
+  readonly indicatoriIdrogeo?: IndicatoriIdrogeo | undefined;
+  /** `true` quando idraulica e frane vengono dal comune e non dal ripiego provinciale. */
+  readonly idrogeoComunale?: boolean | undefined;
 }
 
 export interface LuogoPerEsposizione {
@@ -204,6 +244,18 @@ function etichettaIdraulica(livello: ExposureLevel | null): string {
 
 function etichettaSismica(livello: ExposureLevel | null): string {
   return livello ?? SISMICA_NON_DETERMINATA;
+}
+
+/**
+ * L'etichetta delle frane, che ha la sua e non prende in prestito quella sismica.
+ *
+ * Le due assenze significano cose diverse: la sismica non determinata e' una provincia
+ * fuori tabella, le frane non determinate sono un comune che non sta nell'archivio ISPRA.
+ * Una costante condivisa le farebbe sembrare la stessa cosa il giorno che una delle due
+ * cambia parole.
+ */
+function etichettaFrane(livello: ExposureLevel | null): string {
+  return livello ?? 'non determinata';
 }
 
 function sismicaProvinciale(sigla: string): ExposureLevel | null {
@@ -246,8 +298,24 @@ export function territorialExposure(provincia: string): TerritorialExposure {
 }
 
 /**
- * Esposizione per ubicazione: sismica comunale se risolvibile, altrimenti ripiego
- * provinciale; idraulica ancora provinciale finché non arriva la misura ISPRA.
+ * Esposizione per ubicazione: comunale dove il comune si risolve, provinciale altrove.
+ *
+ * Tre fonti, tutte a maglia comunale e tutte locali — nessuna chiamata di rete mentre
+ * l'intermediario guarda la scheda:
+ *
+ *   sismica    classificazione ufficiale (Protezione Civile, OPCM 3519/2003)
+ *   idraulica  quota di imprese in area a pericolosita' elevata o media (ISPRA IdroGEO)
+ *   frane      quota di imprese in area a pericolosita' elevata o molto elevata (idem)
+ *
+ * L'idraulica arrivava dalla sola tabella provinciale, che conosce le province ad alta
+ * esposizione storica e per tutte le altre tace: due terzi d'Italia uscivano «non
+ * determinata». Adesso tace solo dove il comune non si risolve.
+ *
+ * Le frane non c'erano affatto, e su un capannone di collina sono il rischio che si
+ * materializza per primo.
+ *
+ * Resta il limite, e va ripetuto dove qualcuno potrebbe non leggerlo: e' il dato del
+ * COMUNE. Dice quante imprese del territorio sono esposte, non se lo e' questa.
  */
 export function territorialExposureDi(luogo: LuogoPerEsposizione): TerritorialExposure {
   const base = territorialExposure(luogo.provincia);
@@ -255,13 +323,31 @@ export function territorialExposureDi(luogo: LuogoPerEsposizione): TerritorialEx
   if (comune === '') return base;
 
   const sismicaComune = sismicaDelComune(comune, base.provincia);
-  if (sismicaComune === null) return base;
+  const idrogeo = indicatoriIdrogeoDelComune(comune, base.provincia);
+
+  const conSismica: TerritorialExposure =
+    sismicaComune === null
+      ? base
+      : {
+          ...base,
+          sismica: sismicaComune,
+          sismicaEtichetta: etichettaSismica(sismicaComune),
+          sismicaComunale: true,
+        };
+
+  if (idrogeo === null) return conSismica;
+
+  const idraulica = livelloIdraulico(idrogeo);
+  const frane = livelloFrana(idrogeo);
 
   return {
-    ...base,
-    sismica: sismicaComune,
-    sismicaEtichetta: etichettaSismica(sismicaComune),
-    sismicaComunale: true,
+    ...conSismica,
+    idraulica,
+    idraulicaEtichetta: etichettaIdraulica(idraulica),
+    frane,
+    franeEtichetta: etichettaFrane(frane),
+    indicatoriIdrogeo: idrogeo,
+    idrogeoComunale: true,
   };
 }
 

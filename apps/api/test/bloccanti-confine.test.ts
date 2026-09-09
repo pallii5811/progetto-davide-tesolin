@@ -23,6 +23,7 @@ import {
   territorialExposure,
   DEMO_AS_OF,
   IDRAULICA_NON_DETERMINATA,
+  territorialExposureDi,
 } from '@aegis/core';
 import type { CompanyProfile, PolizzaInEssere } from '@aegis/core';
 import { presentAnalysis } from '../src/presenter.js';
@@ -173,10 +174,36 @@ describe('Reperto 19 · il tipo dell’idraulica dice quello che il server manda
     expect([...prodotti].sort()).toEqual([...VALORI_PROVINCIALI].sort());
   });
 
-  it('l’API manda «non determinata» su una provincia che la tabella non ha misurato', () => {
+  /*
+    Questa asserzione diceva il contrario, e diceva bene: fino al 09/09/2026 l'idraulica
+    veniva dalla sola tabella provinciale, che conosce le province ad alta esposizione
+    storica e per tutte le altre tace. Le ubicazioni dimostrative stanno in BS, che non e'
+    fra quelle, e uscivano «non determinata».
+
+    Da quando gli indicatori comunali ISPRA sono in casa, un comune risolto produce una
+    misura. Cio' che va tenuto fermo non e' piu' l'assenza: e' che l'assenza compaia SOLO
+    dove non si e' guardato, e mai come ripiego comodo su un comune sconosciuto.
+  */
+  it('un comune risolto produce una misura, non piu' + "'" + 'assenza', () => {
     const dto = presentAnalysis(analyzeCompany(demoCompanyProfile(), demoPolizze(), DEMO_AS_OF));
     const etichette = new Set(dto.ubicazioni.elenco.map((u) => u.idraulica));
-    expect(etichette.has(IDRAULICA_NON_DETERMINATA)).toBe(true);
+    expect(etichette.size).toBeGreaterThan(0);
+    expect(etichette.has(IDRAULICA_NON_DETERMINATA), 'Adro ed Erbusco sono nell’archivio ISPRA').toBe(
+      false,
+    );
+    for (const e of etichette) expect(['alta', 'media', 'bassa']).toContain(e);
+  });
+
+  it('un comune che l’archivio non ha resta «non determinata», e non diventa «bassa»', () => {
+    /*
+      Il ripiego comodo sarebbe dire «bassa» dove non si sa: nessuno protesterebbe, e la
+      tabella sarebbe piu' bella. Sarebbe anche la regola 3 del progetto violata nel punto
+      in cui costa di piu' — un capannone dichiarato al sicuro senza averlo guardato.
+    */
+    const inventato = territorialExposureDi({ provincia: 'BS', comune: 'Comune Che Non Esiste' });
+    expect(inventato.idraulicaEtichetta).toBe(IDRAULICA_NON_DETERMINATA);
+    expect(inventato.idraulica).toBeNull();
+    expect(inventato.frane ?? null).toBeNull();
   });
 
   it('il tipo del frontend ammette ogni valore che il server può mandare', () => {

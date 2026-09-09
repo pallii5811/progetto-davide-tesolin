@@ -554,6 +554,25 @@ export interface AnalisiDto {
        * misura ISPRA puntuale (`alta` | `media` | `bassa`).
        */
       idraulica: 'alta' | 'media' | 'bassa' | 'non determinata';
+      /**
+       * Pericolosita' da frana del comune (ISPRA IdroGEO): elevata o molto elevata.
+       *
+       * `non determinata` dove il comune non e' nell'archivio: assenza di lettura, non
+       * assenza di frane.
+       */
+      frane: 'alta' | 'media' | 'bassa' | 'non determinata';
+      /**
+       * Le percentuali sotto le tre parole, quando il comune e' stato risolto.
+       *
+       * Quota di imprese del comune in area a pericolosita': idraulica elevata, idraulica
+       * media, da frana elevata o molto elevata. Le parole sono una convenzione di questo
+       * prodotto, questi numeri sono il dato di ISPRA.
+       */
+      indicatoriIdrogeo: {
+        impreseIdraulicaElevata: number;
+        impreseIdraulicaMedia: number;
+        impreseFranaElevata: number;
+      } | null;
       piuEsposta: boolean;
       /**
        * Contesto fisico attorno all'ubicazione: caserme e attività confinanti.

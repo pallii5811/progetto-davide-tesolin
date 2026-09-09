@@ -26,6 +26,7 @@ import {
   conIdraulicaPuntuale,
   territorialExposureDi,
   worstOfExposures,
+  FONTE_IDROGEO_COMUNALE,
   FONTE_SISMICA_COMUNALE,
 } from '../risk/geo.js';
 import type { ExposureLevel, TerritorialExposure } from '../risk/geo.js';
@@ -482,17 +483,34 @@ function note(
     );
   }
 
-  if (ubicazioni.some((u) => u.esposizione.idraulica !== null && u.esposizione.idraulica !== 'alta')) {
+  /*
+    La fonte dell'idraulica e delle frane, con il suo limite attaccato.
+
+    Fino al 09/09/2026 l'idraulica veniva dalla sola tabella provinciale, che conosce le
+    province ad alta esposizione storica e per tutte le altre tace: due terzi d'Italia
+    uscivano «non determinata». Adesso i due livelli vengono dagli indicatori comunali
+    ISPRA, tenuti in casa — nessuna chiamata di rete mentre qualcuno guarda la scheda.
+
+    Il limite si scrive qui e si ripete accanto a ogni percentuale in tabella: è il dato
+    del COMUNE. Dice quante imprese del territorio sono esposte, non se lo è questa. Chi
+    legge una riga sola deve trovarci accanto ciò che quel numero non dice; una nota in
+    fondo alla pagina la legge chi ha già finito di farsi l'idea sbagliata.
+  */
+  const conIdrogeo = ubicazioni.filter((u) => u.esposizione.idrogeoComunale === true);
+  if (conIdrogeo.length === ubicazioni.length && ubicazioni.length > 0) {
     elenco.push(
-      'Pericolosità idraulica puntuale da mosaicatura ISPRA (P3/P2/P1) sulle coordinate dell’ubicazione.',
+      `Alluvioni e frane: quota di imprese del comune in area a pericolosità, da ${FONTE_IDROGEO_COMUNALE}. ` +
+        'È il dato del comune e non della sede: dove la decisione pesa, la verifica sull’indirizzo resta necessaria.',
     );
-  } else if (ubicazioni.some((u) => u.esposizione.idraulica === 'alta')) {
+  } else if (conIdrogeo.length > 0) {
     elenco.push(
-      'Esposizione idraulica: misura puntuale ISPRA oppure ripiego provinciale sulle province ad alta esposizione storica.',
+      `Alluvioni e frane: indicatori comunali ISPRA su ${conIdrogeo.length} ubicazioni su ${ubicazioni.length}; ` +
+        'sulle altre il comune non è stato risolto nell’archivio e l’esposizione resta non determinata.',
     );
   } else {
     elenco.push(
-      'Pericolosità idraulica non determinata sulle ubicazioni: manca la misura puntuale ISPRA e la provincia non è nell’elenco delle alte.',
+      'Alluvioni e frane non determinate: i comuni delle ubicazioni non sono stati risolti nell’archivio ISPRA. ' +
+        'Non è un’assenza di pericolosità, è un’assenza di lettura.',
     );
   }
 

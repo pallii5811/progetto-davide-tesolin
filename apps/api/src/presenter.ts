@@ -459,6 +459,23 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
       // hanno misurato. Il dominio compone la frase, qui si inoltra e basta.
       sismica: x.esposizione.sismicaEtichetta,
       idraulica: x.esposizione.idraulicaEtichetta,
+      frane: x.esposizione.franeEtichetta ?? 'non determinata',
+      /*
+        Le percentuali sotto le tre parole.
+
+        «Alta», «media» e «bassa» sono una convenzione di questo prodotto; le percentuali
+        sono il dato di ISPRA. Fermarsi alla parola costringerebbe a fidarsi di una soglia
+        che nessuna legge stabilisce — e chi legge un documento assicurativo ha il diritto
+        di vedere il numero e farsi la propria idea.
+      */
+      indicatoriIdrogeo:
+        x.esposizione.indicatoriIdrogeo === undefined
+          ? null
+          : {
+              impreseIdraulicaElevata: x.esposizione.indicatoriIdrogeo.impIdrA,
+              impreseIdraulicaMedia: x.esposizione.indicatoriIdrogeo.impIdrM,
+              impreseFranaElevata: x.esposizione.indicatoriIdrogeo.impFrnA,
+            },
       piuEsposta: x.id === u.ubicazionePeggiore?.id,
       contesto:
         x.contesto === null

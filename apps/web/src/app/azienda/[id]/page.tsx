@@ -464,6 +464,7 @@ export default async function PaginaAzienda({
                     <th className="px-4 py-2.5 font-medium">Superficie</th>
                     <th className="px-4 py-2.5 font-medium">Sisma</th>
                     <th className="px-4 py-2.5 font-medium">Acqua</th>
+                    <th className="px-4 py-2.5 font-medium">Frane</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -499,6 +500,19 @@ export default async function PaginaAzienda({
                       </td>
                       <td className="px-4 py-3">
                         <BadgeEsposizione valore={u.idraulica} />
+                        {u.indicatoriIdrogeo !== null && (
+                          <span className="mt-0.5 block text-xs text-testo-debole">
+                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)} delle imprese
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <BadgeEsposizione valore={u.frane} />
+                        {u.indicatoriIdrogeo !== null && (
+                          <span className="mt-0.5 block text-xs text-testo-debole">
+                            {percentualeIt(u.indicatoriIdrogeo.impreseFranaElevata)} delle imprese
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -2478,6 +2492,18 @@ function numeroIt(valore: number, decimali: number): string {
     minimumFractionDigits: decimali,
     maximumFractionDigits: decimali,
   }).format(valore);
+}
+
+/**
+ * Una percentuale con un decimale, come la scrive il resto della pagina.
+ *
+ * Il decimale resta anche sopra il dieci per cento: questo numero e' IL dato — ISPRA lo
+ * pubblica cosi' — mentre la parola che gli sta accanto («alta», «media», «bassa») e' una
+ * convenzione di questo prodotto. Chi non condivide la soglia si fa l'idea sul numero, e il
+ * numero deve arrivargli intero.
+ */
+function percentualeIt(valore: number): string {
+  return `${numeroIt(Math.round(valore * 10) / 10, valore % 1 === 0 ? 0 : 1)} %`;
 }
 
 /**

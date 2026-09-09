@@ -36,7 +36,16 @@
  * descrizione con la maiuscola, o da niente. «94.48 gg» resta un decimale: dopo c'è una
  * minuscola. «39.93%» pure: dopo c'è un simbolo.
  */
-export const CONTESTI_CON_PUNTO = /ATECO|NACE|SIC|D\.Lgs|D\.P\.R|art\.|artt\.|c\.c\.|CCII|ISO|http|@|v\d/;
+export const CONTESTI_CON_PUNTO =
+  /ATECO|NACE|SIC|D\.Lgs|D\.P\.R|art\.|artt\.|c\.c\.|CCII|ISO|OPCM|Creative Commons|CC BY|http|@|v\d/;
+
+/*
+  «CC BY 4.0» e «OPCM 3519/2003» sono entrati in questo elenco il 09/09/2026, quando la
+  citazione della licenza ISPRA e' arrivata nelle note delle ubicazioni: il quattro punto
+  zero di una licenza non e' un decimale scritto all'inglese, come non lo era il «2026.1»
+  della versione del catalogo. Un rilievo falso costa piu' di uno mancato, perche' insegna
+  a ignorare l'elenco.
+*/
 
 /** `52.10.10 Magazzini…`, `28.99.99`, `25.72 Fabbricazione…`: la forma di un codice ATECO. */
 function haLaFormaDiUnAteco(numero: string, dopo: string): boolean {
