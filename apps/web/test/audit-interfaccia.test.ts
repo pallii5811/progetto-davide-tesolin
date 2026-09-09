@@ -728,6 +728,44 @@ describe('73 · il documento dell’art. 58 dichiara quando non è intestato', (
   });
 
   /*
+    Il segnaposto dell'installazione vale quanto un campo vuoto, e il controllo non lo
+    vedeva: guardava solo la stringa vuota, e «Studio da configurare» vuoto non e'. Un
+    intermediario che compilava il numero RUI senza toccare il nome vedeva l'avviso
+    sparire, e il documento usciva intestato con il nome provvisorio — in mano a un
+    assicurato, con l'art. 58 formalmente rispettato e sostanzialmente no.
+
+    La denominazione la mette l'intermediario, non chi installa: il prodotto non puo'
+    scriverla al posto suo, puo' solo non lasciarla passare in silenzio.
+  */
+  it('i segnaposti dell’installazione non contano come denominazione', async () => {
+    const { avvisoIntestazione } = await import('../src/lib/avviso-intestazione.js');
+    const base = {
+      numeroRui: 'B000123456',
+      partitaIva: null,
+      indirizzo: null,
+      email: null,
+      telefono: null,
+      logo: null,
+    };
+
+    for (const segnaposto of [
+      'Studio da configurare',
+      'Intermediario predefinito',
+      '  STUDIO DA CONFIGURARE  ',
+    ]) {
+      const avviso = avvisoIntestazione({ ...base, denominazione: segnaposto });
+      expect(avviso, `«${segnaposto}» e' passato come denominazione vera`).not.toBeNull();
+      expect(avviso ?? '').toMatch(/denominazione dell’intermediario/);
+      // Nomina il nome che finirebbe sul documento: «manca la denominazione» davanti a un
+      // campo pieno sembra un guasto del programma, e si impara a ignorarlo.
+      expect(avviso ?? '').toMatch(/uscirebbe intestato/);
+    }
+
+    // Un nome vero resta un nome vero, anche se contiene la parola «studio».
+    expect(avvisoIntestazione({ ...base, denominazione: 'Studio Assicurativo Bianchi' })).toBeNull();
+  });
+
+  /*
     Si cerca la CHIAMATA e la resa, non il nome. La riga di import basta a soddisfare una
     ricerca del solo nome, e un import inutilizzato non cambia un pixel del documento.
   */

@@ -22,6 +22,30 @@ export interface IntestazioneStudio {
   readonly numeroRui: string | null;
 }
 
+/**
+ * I nomi che il prodotto si dà da solo quando nessuno gliene ha dato uno.
+ *
+ * Non sono denominazioni: sono segnaposti, e per l'art. 58 valgono quanto un campo vuoto.
+ * Il primo lo scrive l'installazione (`deploy/02-database.sh`), il secondo è il ripiego del
+ * servizio quando `AEGIS_TENANT` resta da compilare (`apps/api/src/persistenza.ts`).
+ *
+ * Perché esistono qui: il controllo sotto guardava soltanto la stringa vuota, e un
+ * segnaposto vuoto non è. Un intermediario che compilava il numero RUI senza toccare il
+ * nome vedeva l'avviso sparire, e il documento usciva intestato «Studio da configurare» —
+ * consegnato a un assicurato, con l'obbligo formalmente rispettato e sostanzialmente no.
+ * Il difetto era invisibile proprio perché il campo era pieno.
+ *
+ * La denominazione la mette l'intermediario, non chi installa: è il suo nome, e nessun
+ * altro lo conosce. Il prodotto non può metterlo al posto suo; può solo non lasciarlo
+ * passare in silenzio.
+ */
+const SEGNAPOSTI: readonly string[] = ['studio da configurare', 'intermediario predefinito'];
+
+function denominazioneNonCompilata(denominazione: string): boolean {
+  const pulita = denominazione.trim().toLowerCase();
+  return pulita === '' || SEGNAPOSTI.includes(pulita);
+}
+
 export function avvisoIntestazione(studio: IntestazioneStudio | null): string | null {
   if (studio === null) {
     return (
@@ -32,8 +56,18 @@ export function avvisoIntestazione(studio: IntestazioneStudio | null): string | 
     );
   }
 
+  const senzaNome = denominazioneNonCompilata(studio.denominazione);
+  /*
+    Il segnaposto si nomina, invece di dire genericamente «manca».
+
+    «Manca la denominazione» davanti a un campo che sullo schermo contiene «Studio da
+    configurare» sembra un guasto del programma, e si impara a ignorarlo. Dire quale nome
+    finirebbe sul documento rende evidente cosa succede a non intervenire.
+  */
+  const segnaposto = senzaNome && studio.denominazione.trim() !== '';
+
   const mancanti = [
-    studio.denominazione.trim() === '' ? 'la denominazione dell’intermediario' : null,
+    senzaNome ? 'la denominazione dell’intermediario' : null,
     studio.numeroRui === null || studio.numeroRui.trim() === '' ? 'il numero di iscrizione al RUI' : null,
   ].filter((v): v is string => v !== null);
 
@@ -41,7 +75,11 @@ export function avvisoIntestazione(studio: IntestazioneStudio | null): string | 
 
   return (
     `Intestazione incompleta: manca ${mancanti.join(' e ')}, che l’art. 58 del Reg. IVASS ` +
-    '40/2018 richiede sui documenti consegnati al contraente. Completare l’anagrafica in ' +
-    'Impostazioni → Anagrafica studio prima della consegna.'
+    '40/2018 richiede sui documenti consegnati al contraente. ' +
+    (segnaposto
+      ? `Il documento uscirebbe intestato «${studio.denominazione.trim()}», che è il nome ` +
+        'provvisorio dell’installazione e non quello dello studio. '
+      : '') +
+    'Completare l’anagrafica in Impostazioni → Anagrafica studio prima della consegna.'
   );
 }
