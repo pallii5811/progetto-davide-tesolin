@@ -15,6 +15,7 @@ import {
   RISK_CATALOG,
   analyzeCompany,
   applicaFiltroPortafoglio,
+  componiEsito,
   esportaPortafoglioCsv,
   nomeFileEsportazione,
   parsePartitaIva,
@@ -89,6 +90,8 @@ import {
   elencoSolidita,
   invitoAttivo,
   registraAudit,
+  registraDecisione,
+  salvaVerifica,
   revocaInviti,
   risolviInvito,
   salvaSolidita,
@@ -97,6 +100,7 @@ import {
   spesaOdierna,
   spesaOdiernaComplessiva,
   trovaAziendaPerChiave,
+  verifichePerAzienda,
 } from '@aegis/db';
 import { MemoryDossierStore, MemoryImmaginiStore, MemoryPortafoglioStore, normalizza } from './store.js';
 import type { DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
@@ -175,6 +179,15 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     OPENAPI_DEFAULT_CONFIG,
     prezziDaConfigurazione(process.env['AEGIS_PREZZI_CENTESIMI']),
   );
+
+  /*
+    Il costo di una verifica antiriciclaggio, dichiarato PRIMA che qualcuno prema il tasto.
+
+    Viene dal listino come ogni altro prezzo, e non da una costante scritta a mano: se il
+    contratto cambia, cambia qui e cambia a schermo insieme. Un prezzo mostrato piu basso
+    del vero e' il numero su cui l'intermediario decide se puo' permettersi la verifica.
+  */
+  const costoScreening = listino.services.screeningPersona.costoCentesimi;
 
   const provider =
     options.provider ??
@@ -1987,6 +2000,188 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   });
 
   // ── Dossier: dati di intervista e polizze ──────────────────────────────────
+  // ── Adeguata verifica della clientela (D.Lgs. 231/2007) ────────────────────
+  /*
+    L'obbligo dell'intermediario, non un miglioramento dell'analisi.
+
+    Prima di instaurare un rapporto continuativo il distributore identifica il cliente e i
+    suoi titolari effettivi e li verifica contro liste di sanzioni e persone politicamente
+    esposte. AEGIS sa già CHI verificare — il titolare effettivo lo ricava dai soci che ha
+    comprato — e qui aggiunge il confronto con le liste.
+
+    Tre rotte, e la terza è quella che chiude l'obbligo: la ricerca la fa la macchina, la
+    valutazione la fa una persona, e in ispezione si guarda la seconda.
+  */
+  app.get<{ Params: { id: string } }>('/api/aziende/:id/adeguata-verifica', async (request) => {
+    if (persistenza === undefined) return { verifiche: [], costoCentesimi: 0 };
+
+    const tenantId = request.sessione?.tenantId ?? persistenza.tenantPredefinito;
+    const aziendaId = await conTenant(persistenza.db, tenantId, (tx) =>
+      trovaAziendaPerChiave(tx, tenantId, request.params.id),
+    );
+    if (aziendaId === null) return { verifiche: [], costoCentesimi: costoScreening };
+
+    const verifiche = await conTenant(persistenza.db, tenantId, (tx) =>
+      verifichePerAzienda(tx, tenantId, aziendaId),
+    );
+
+    return {
+      // Il costo della prossima verifica, dichiarato PRIMA che qualcuno prema il tasto.
+      costoCentesimi: costoScreening,
+      verifiche: verifiche.map((v) => ({
+        id: v.id,
+        nome: v.nome,
+        ruolo: v.ruolo,
+        annoNascita: v.annoNascita,
+        stato: v.stato,
+        conclusione: v.conclusione,
+        candidati: v.candidati,
+        decisioni: v.decisioni,
+        nota: v.nota,
+        verificataIl: v.verificataIl?.toISOString() ?? null,
+        decisaIl: v.decisaIl?.toISOString() ?? null,
+      })),
+    };
+  });
+
+  app.post<{ Params: { id: string } }>('/api/aziende/:id/adeguata-verifica', async (request, reply) => {
+    if (persistenza === undefined) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile' });
+    }
+
+    const parsed = adeguataVerificaSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi', dettagli: parsed.error.issues });
+    }
+
+    // La verifica è un acquisto: il ruolo in sola lettura consulta, non compra.
+    const sessione = request.sessione;
+    if (sessione !== undefined && !puoScrivere(sessione.ruolo)) {
+      return reply.status(403).send({
+        errore: 'L’adeguata verifica è un acquisto, e resta ai ruoli che possono scrivere.',
+      });
+    }
+
+    const esitoTetto = await oltreIlTetto(request);
+    if (esitoTetto !== null) {
+      return reply
+        .status(429)
+        .send({ errore: messaggioTetto(esitoTetto, 'Le verifiche riprendono domani.') });
+    }
+
+    const tenantId = sessione?.tenantId ?? persistenza.tenantPredefinito;
+    const aziendaId = await conTenant(persistenza.db, tenantId, (tx) =>
+      trovaAziendaPerChiave(tx, tenantId, request.params.id),
+    );
+
+    const quando = new Date();
+    const salvate: string[] = [];
+
+    for (const persona of parsed.data.persone) {
+      /*
+          Una persona per volta, e ognuna con il proprio esito salvato.
+
+          Non si accorpano in un'unica riga: le decisioni si prendono su una persona
+          per volta, spesso in giorni diversi, e un fascicolo che le tiene insieme
+          costringerebbe a rivalutare tutti per registrarne uno.
+        */
+      const candidati = await provider.screeningPersona(persona.nome, persona.annoNascita ?? undefined);
+      const esito = componiEsito(
+        {
+          nome: persona.nome,
+          ruolo: persona.ruolo,
+          ...(persona.annoNascita === undefined ? {} : { annoDiNascita: persona.annoNascita }),
+        },
+        candidati,
+        quando,
+      );
+
+      const id = await conTenant(persistenza.db, tenantId, (tx) =>
+        salvaVerifica(tx, {
+          tenantId,
+          aziendaId,
+          nome: persona.nome,
+          ruolo: persona.ruolo,
+          annoNascita: persona.annoNascita ?? null,
+          stato: esito.stato,
+          conclusione: esito.conclusione,
+          candidati: esito.riscontri,
+          costoCentesimi: costoScreening,
+          verificataIl: quando,
+        }),
+      );
+      salvate.push(id);
+
+      await registraAudit(persistenza.db, {
+        tenantId,
+        utenteId: sessione?.utenteId ?? null,
+        azione: 'adeguata-verifica.eseguita',
+        entita: 'azienda',
+        ...(aziendaId === null ? {} : { entitaId: aziendaId }),
+        dettagli: {
+          nome: persona.nome,
+          ruolo: persona.ruolo,
+          stato: esito.stato,
+          candidati: esito.riscontri.length,
+          costoCentesimi: costoScreening,
+        },
+      });
+    }
+
+    return { verificate: salvate.length, costoCentesimi: costoScreening * salvate.length };
+  });
+
+  /*
+    La decisione, che è ciò che chiude l'obbligo.
+
+    Il prodotto non conclude mai al posto dell'intermediario: la fonte cerca per nome, e un
+    nome può appartenere a due persone diverse — una in lista e una no. Qui si registra chi
+    ha guardato, quando, e cosa ha concluso su ogni candidato. Il registro delle operazioni
+    ne conserva la prova in modo che nessuno possa riscriverla.
+  */
+  app.post<{ Params: { id: string } }>('/api/adeguata-verifica/:id/decisione', async (request, reply) => {
+    if (persistenza === undefined) {
+      return reply.status(503).send({ errore: 'Archivio non disponibile' });
+    }
+
+    const parsed = decisioneVerificaSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Dati non validi', dettagli: parsed.error.issues });
+    }
+
+    const sessione = request.sessione;
+    if (sessione === undefined) {
+      return reply.status(401).send({ errore: 'Sessione richiesta' });
+    }
+
+    const quando = new Date();
+    const aggiornata = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+      registraDecisione(tx, {
+        id: request.params.id,
+        tenantId: sessione.tenantId,
+        decisioni: parsed.data.decisioni,
+        nota: parsed.data.nota ?? null,
+        utenteId: sessione.utenteId,
+        quando,
+      }),
+    );
+
+    if (!aggiornata) {
+      return reply.status(404).send({ errore: 'Verifica non trovata' });
+    }
+
+    await registraAudit(persistenza.db, {
+      tenantId: sessione.tenantId,
+      utenteId: sessione.utenteId,
+      azione: 'adeguata-verifica.decisa',
+      entita: 'verifica-antiriciclaggio',
+      entitaId: request.params.id,
+      dettagli: { decisioni: parsed.data.decisioni, nota: parsed.data.nota ?? null },
+    });
+
+    return { decisa: true, decisaIl: quando.toISOString() };
+  });
+
   app.get<{ Params: { id: string } }>('/api/aziende/:id/dossier', async (request) => {
     return (
       (await contestoDi(request).dossier.get(request.params.id)) ?? {
@@ -2492,6 +2687,39 @@ const INTERVALLO_PULIZIA_SESSIONI_MS = 60 * 60 * 1_000;
  */
 const ESCA_VERIFICA =
   'scrypt$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+const adeguataVerificaSchema = z.object({
+  /*
+    Chi verificare, dichiarato da chi chiede.
+
+    Il tetto di dieci non è prudenza generica: ogni nome è una chiamata a pagamento, e una
+    richiesta con cento nomi svuoterebbe il tetto giornaliero in un colpo. Un'impresa con
+    più di dieci titolari effettivi esiste, e in quel caso si verifica in due volte —
+    guardando cosa si sta comprando.
+  */
+  persone: z
+    .array(
+      z.object({
+        nome: z.string().trim().min(2).max(200),
+        ruolo: z.string().trim().min(2).max(120),
+        annoNascita: z.number().int().min(1900).max(2100).optional(),
+      }),
+    )
+    .min(1)
+    .max(10),
+});
+
+const decisioneVerificaSchema = z.object({
+  /*
+    La decisione su ogni candidato, per identificativo.
+
+    «confermato» significa «è la stessa persona»; «escluso» significa «è un omonimo». Non
+    esiste un terzo valore, e non esiste il silenzio: un candidato lasciato senza decisione
+    resta da valutare, ed è giusto che si veda.
+  */
+  decisioni: z.record(z.string(), z.enum(['confermato', 'escluso'])),
+  nota: z.string().trim().max(2000).optional(),
+});
 
 const loginSchema = z.object({
   email: z.string().trim().email().max(200),

@@ -7,6 +7,7 @@
  * una riga di motore.
  */
 
+import type { CandidatoDiRiscontro } from '@aegis/core';
 import type {
   Anagrafica,
   BilancioSintetico,
@@ -262,6 +263,17 @@ export interface CompanyDataProvider {
    * prodotto non deve commettere nessuno dei due.
    */
   acquistoSenzaSpesa(identifier: string, cosa: AcquistoFacoltativo): Promise<boolean>;
+
+  /**
+   * Adeguata verifica di una persona o di un ente su liste sanzioni, PEP e stampa avversa.
+   *
+   * Restituisce **candidati**, non un verdetto: la fonte cerca per nome, e uno stesso nome
+   * puo appartenere a due persone diverse — una in lista e una no. Chi chiama li pesa con
+   * `componiEsito` e li mostra all'intermediario, che decide sul documento d'identita.
+   *
+   * Costa, e il costo finisce nel registro come ogni altra chiamata.
+   */
+  screeningPersona(nome: string, annoDiNascita?: number): Promise<readonly CandidatoDiRiscontro[]>;
 }
 
 /** Errori di provider distinti per poter reagire in modo diverso: ritentare, degradare, fallire. */

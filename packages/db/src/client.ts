@@ -489,6 +489,29 @@ const DDL: readonly string[] = [
   // Il tetto complessivo somma tutti gli studi: senza indice sulla sola data quella
   // lettura scansiona un registro che cresce di una riga per chiamata e non si pota mai.
   `CREATE INDEX IF NOT EXISTS costi_per_giorno ON registro_costi_dati (avvenuto_il)`,
+
+  // Adeguata verifica: l'esito della ricerca e la decisione dell'intermediario.
+  // Le policy di isolamento stanno nella migrazione 0012 e non qui, come per tutte le
+  // altre: su PGlite si gira come superutente e non morderebbero comunque.
+  `CREATE TABLE IF NOT EXISTS verifiche_antiriciclaggio (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    azienda_id uuid REFERENCES aziende(id) ON DELETE CASCADE,
+    nome text NOT NULL,
+    ruolo text NOT NULL,
+    anno_nascita integer,
+    stato text NOT NULL,
+    conclusione text NOT NULL,
+    candidati jsonb NOT NULL DEFAULT '[]'::jsonb,
+    decisioni jsonb NOT NULL DEFAULT '{}'::jsonb,
+    nota text,
+    costo_centesimi bigint NOT NULL DEFAULT 0,
+    verificata_il timestamptz,
+    decisa_da uuid REFERENCES utenti(id),
+    decisa_il timestamptz,
+    creata_il timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS verifiche_da_valutare ON verifiche_antiriciclaggio (tenant_id, azienda_id, decisa_il)`,
 ];
 
 /**

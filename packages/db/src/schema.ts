@@ -764,6 +764,53 @@ export const registroCostiDati = pgTable(
   ],
 );
 
+/**
+ * Adeguata verifica della clientela: l'esito della ricerca e la decisione di chi l'ha letto.
+ *
+ * L'obbligo del D.Lgs. 231/2007 non si chiude con la ricerca. La fonte cerca per nome e
+ * restituisce **candidati** — sulla prima chiamata vera uno stesso nome ne ha prodotti due,
+ * una persona sanzionata e una omonima che non lo è — e distinguerli è lavoro
+ * dell'intermediario davanti al documento d'identità. Qui si conserva quello che è tornato
+ * e quello che lui ne ha concluso.
+ *
+ * `candidati` tiene l'esito per intero, pesato: chi legge il fascicolo a distanza di anni
+ * deve poter vedere ciò che fu mostrato, non un riassunto. `decisioni` resta vuoto finché
+ * nessuno ha guardato, ed è la differenza fra «trovato» e «valutato».
+ *
+ * Il verdetto non si conserva perché non esiste: esiste la decisione di una persona, con
+ * il suo nome e la sua data. Il registro delle operazioni ne conserva la prova.
+ */
+export const verificheAntiriciclaggio = pgTable(
+  'verifiche_antiriciclaggio',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    aziendaId: uuid('azienda_id').references(() => aziende.id, { onDelete: 'cascade' }),
+
+    /** Chi è stato verificato, e perché lo si doveva verificare. */
+    nome: text('nome').notNull(),
+    ruolo: text('ruolo').notNull(),
+    annoNascita: integer('anno_nascita'),
+
+    /** `nessun-riscontro` | `da-esaminare` | `non-eseguita`. */
+    stato: text('stato').notNull(),
+    conclusione: text('conclusione').notNull(),
+
+    candidati: jsonb('candidati').notNull().default([]),
+    decisioni: jsonb('decisioni').notNull().default({}),
+    nota: text('nota'),
+
+    costoCentesimi: denaro('costo_centesimi').notNull().default(0),
+    verificataIl: timestamp('verificata_il', { withTimezone: true }),
+    decisaDa: uuid('decisa_da').references(() => utenti.id),
+    decisaIl: timestamp('decisa_il', { withTimezone: true }),
+    creataIl: timestamp('creata_il', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('verifiche_da_valutare').on(t.tenantId, t.aziendaId, t.decisaIl)],
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Relazioni
 // ─────────────────────────────────────────────────────────────────────────────

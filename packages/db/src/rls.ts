@@ -65,7 +65,19 @@ const TABELLE_CON_TENANT: readonly string[] = [
   'gap_coperture',
   'eventi_monitoraggio',
   'registro_costi_dati',
+  'verifiche_antiriciclaggio',
 ];
+
+/**
+ * Le tabelle protette dalla migrazione 0010, che è già applicata in produzione.
+ *
+ * Una migrazione applicata non si riscrive: drizzle non la riesegue, e cambiarla farebbe
+ * divergere il file dal database senza che nulla lo dica. Le tabelle nuove entrano quindi
+ * con una migrazione nuova, e questo elenco resta la fotografia di ciò che 0010 contiene.
+ * `TABELLE_CON_TENANT` resta l'elenco completo: è quello su cui il collaudo verifica che
+ * nessuna tabella con `tenant_id` sia rimasta scoperta, comunque sia entrata.
+ */
+export const TABELLE_PROTETTE_DA_0010: readonly string[] = TABELLE_CON_TENANT.slice(0, 11);
 
 /**
  * Tabelle che hanno `tenant_id` e restano deliberatamente fuori dalle policy, con il
@@ -119,8 +131,8 @@ const CONDIZIONE_ACCESSO =
  * che è anche proprietario, una REVOKE su sé stesso non regge, e fingere il contrario
  * sarebbe una sicurezza dichiarata e non vera.
  */
-export function sqlAbilitaRls(): string {
-  const blocchi = TABELLE_CON_TENANT.map(
+export function sqlAbilitaRls(tabelle: readonly string[] = TABELLE_CON_TENANT): string {
+  const blocchi = tabelle.map(
     (tabella) => `
 ALTER TABLE ${tabella} ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ${tabella} FORCE ROW LEVEL SECURITY;

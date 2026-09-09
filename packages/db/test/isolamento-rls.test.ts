@@ -32,7 +32,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ESCLUSIONI_MOTIVATE, TABELLE_MULTI_TENANT, sqlAbilitaRls } from '../src/rls.js';
+import {
+  ESCLUSIONI_MOTIVATE,
+  TABELLE_MULTI_TENANT,
+  TABELLE_PROTETTE_DA_0010,
+  sqlAbilitaRls,
+} from '../src/rls.js';
 
 const RADICE = fileURLToPath(new URL('../../..', import.meta.url));
 const leggi = (relativo: string): string => readFileSync(resolve(RADICE, relativo), 'utf8');
@@ -277,11 +282,11 @@ describe('La migrazione delle policy coincide con il generatore', () => {
 
   it('ogni istruzione del generatore sta nel file, e il file non ne ha altre', () => {
     const daFile = normalizza(leggi('packages/db/migrazioni/0010_isolamento_rls.sql'));
-    const daGeneratore = normalizza(sqlAbilitaRls());
+    const daGeneratore = normalizza(sqlAbilitaRls(TABELLE_PROTETTE_DA_0010));
 
     expect(daFile, 'rigenerare con: npx tsx scripts/genera-migrazione-rls.ts').toEqual(daGeneratore);
     // Undici tabelle × (enable, force, drop, create): un conto che si può rifare a mente.
-    expect(daGeneratore.length).toBe(TABELLE_MULTI_TENANT.length * 4);
+    expect(daGeneratore.length).toBe(TABELLE_PROTETTE_DA_0010.length * 4);
   });
 
   it('la migrazione è registrata nel diario che drizzle applica', () => {
@@ -289,6 +294,29 @@ describe('La migrazione delle policy coincide con il generatore', () => {
       entries: { tag: string }[];
     };
     expect(diario.entries.map((e) => e.tag)).toContain('0010_isolamento_rls');
+  });
+
+  /*
+    Una migrazione applicata non si riscrive: drizzle non la riesegue, e cambiarla farebbe
+    divergere il file dal database in silenzio. Le tabelle nuove entrano con migrazioni
+    nuove — ed è qui che si verifica che NESSUNA sia rimasta per strada, comunque sia
+    entrata. È la domanda che conta: «tutte le tabelle con dati di studio hanno la loro
+    policy in qualche migrazione?»
+  */
+  it('ogni tabella protetta ha la sua policy in una migrazione, non solo nel codice', () => {
+    const tutte = readdirSync(resolve(RADICE, 'packages/db/migrazioni'))
+      .filter((f) => f.endsWith('.sql'))
+      .map((f) => leggi(`packages/db/migrazioni/${f}`))
+      .join('\n');
+
+    for (const tabella of TABELLE_MULTI_TENANT) {
+      expect(tutte, `«${tabella}» non ha una policy in nessuna migrazione`).toContain(
+        `CREATE POLICY ${tabella}_isolamento_tenant ON ${tabella}`,
+      );
+      expect(tutte, `«${tabella}» non ha FORCE in nessuna migrazione`).toContain(
+        `ALTER TABLE ${tabella} FORCE ROW LEVEL SECURITY`,
+      );
+    }
   });
 
   /*

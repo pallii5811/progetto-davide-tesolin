@@ -10,6 +10,7 @@
  */
 
 import { DATI_DICHIARATI_VUOTI, demoCompanyProfile, euro, parsePartitaIva } from '@aegis/core';
+import type { CandidatoDiRiscontro } from '@aegis/core';
 import type { AtecoCode, CompanyProfile, EventiNegativi } from '@aegis/core';
 import { ProviderError } from './port.js';
 import type {
@@ -239,6 +240,19 @@ export class MockCompanyProvider implements CompanyDataProvider {
    */
   acquistoSenzaSpesa(): Promise<boolean> {
     return Promise.resolve(true);
+  }
+
+  /**
+   * In dimostrativa nessuno risulta in lista, e questo va detto per quello che è.
+   *
+   * Un elenco vuoto qui significa «la fonte non è stata interrogata», non «la persona è
+   * pulita»: chi mostra il risultato dichiara la modalità dimostrativa accanto, come già
+   * fa per l'analisi. Inventare un riscontro sarebbe peggio — un cliente inventato
+   * accusato di essere sanzionato — e inventare una risposta rassicurante insegnerebbe a
+   * fidarsi di un controllo che non è avvenuto.
+   */
+  screeningPersona(): Promise<readonly CandidatoDiRiscontro[]> {
+    return Promise.resolve([]);
   }
 
   fetchProfile(identifier: string, level: FetchLevel): Promise<CompanyProfile> {
