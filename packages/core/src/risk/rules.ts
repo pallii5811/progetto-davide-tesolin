@@ -207,6 +207,27 @@ function idraulicaAlta(facts: CompanyFacts): Verdict {
 }
 
 /** Vero se l'azienda dichiara una certificazione fra quelle indicate (confronto insensibile a maiuscole). */
+/**
+ * Pericolosità da frana elevata su almeno un'ubicazione.
+ *
+ * È arrivata con gli indicatori comunali ISPRA, e per un giorno è rimasta un numero
+ * mostrato in tabella e ignorato dal motore: il rischio «alluvione, inondazione, frana»
+ * saliva solo sull'acqua. Su un capannone di collina — dove la frana è il rischio che si
+ * materializza per primo, e l'acqua non arriva mai — il registro non si muoveva.
+ *
+ * Un dato misurato e non usato è peggio di un dato assente: costa lavoro, occupa spazio a
+ * schermo, e induce a credere che il motore ne abbia tenuto conto.
+ */
+function franaAlta(facts: CompanyFacts): Verdict {
+  const esposizioni = facts.esposizioniTerritoriali;
+  // Il ripiego provinciale non conosce le frane: senza comune risolto non si sa, e «non
+  // so» non è «non ce ne sono».
+  if (esposizioni.length === 0) return 'ignoto';
+  if (esposizioni.some((e) => e.frane === 'alta')) return true;
+  if (esposizioni.every((e) => (e.frane ?? null) === null)) return 'ignoto';
+  return false;
+}
+
 function certificata(facts: CompanyFacts, ...norme: readonly string[]): Verdict {
   if (facts.certificazioni.length === 0) return 'ignoto';
   const dichiarate = facts.certificazioni.map((c) => c.toUpperCase().replace(/[\s:]/g, ''));
@@ -368,7 +389,29 @@ export const RISK_RULES: readonly RiskRule[] = [
     risk: 'catastrofale-alluvione',
     when: idraulicaAlta,
     likelihood: 1,
-    rationale: 'Insediamento in provincia ad elevata pericolosità idraulica.',
+    rationale: 'Comune con quota elevata di imprese in area a pericolosità idraulica (indicatori ISPRA).',
+  },
+  /*
+    La frana muove lo stesso rischio dell'acqua, e per una ragione che non è di comodo: il
+    catalogo tiene «alluvione, inondazione, frana» come un rischio solo, perché la copertura
+    che li trasferisce è la stessa. Se la frana non lo modulasse, il capannone di collina —
+    dove l'acqua non arriva mai e la frana sì — resterebbe al livello di base.
+
+    Una sola modulazione anche quando entrambe sono alte: il motore satura, e due volte lo
+    stesso evento non lo rende due volte più probabile.
+  */
+  {
+    kind: 'modula',
+    id: 'alluvione/zona-frana-alta',
+    rationaleSeIgnoto:
+      'La pericolosità da frana delle ubicazioni non è stata determinata: il comune non è stato ' +
+      'risolto nell’archivio ISPRA, e l’assenza di lettura non è assenza di frane.',
+    risk: 'catastrofale-alluvione',
+    when: franaAlta,
+    likelihood: 1,
+    rationale:
+      'Comune con quota elevata di imprese in area a pericolosità da frana elevata o molto elevata ' +
+      '(indicatori ISPRA).',
   },
 
   {
@@ -1206,4 +1249,5 @@ export const predicates = {
   certificata,
   sismicaAlta,
   idraulicaAlta,
+  franaAlta,
 } as const;
