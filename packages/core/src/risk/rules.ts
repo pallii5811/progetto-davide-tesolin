@@ -21,6 +21,7 @@ import type { CompanyFacts } from '../company/facts.js';
 import { atecoStartsWith } from '../shared/identifiers.js';
 import type { RiskId } from './taxonomy.js';
 import { territorialExposure } from './geo.js';
+import type { TerritorialExposure } from './geo.js';
 import {
   categoriaSocietaria,
   normaResponsabilitaAmministratori,
@@ -187,9 +188,21 @@ function numeroOltre(value: number | null, soglia: number): Verdict {
   livello misurato. Finché una provincia operativa non è classificata, «no» non è una
   risposta che il prodotto possa dare.
 */
-function sismicaAlta(facts: CompanyFacts): Verdict {
+/**
+ * Le esposizioni su cui ragionano le regole territoriali.
+ *
+ * Quelle risolte per ubicazione quando ci sono, il ripiego sulle sole sigle provinciali
+ * altrove. Sta scritta una volta perché la condizione e il motivo devono guardare le
+ * STESSE righe: se divergessero, la frase racconterebbe una misura diversa da quella che ha
+ * mosso il punteggio, ed è un errore che nessun numero mostra.
+ */
+function esposizioniDi(facts: CompanyFacts): readonly TerritorialExposure[] {
   const risolte = facts.esposizioniTerritoriali;
-  const esposizioni = risolte.length > 0 ? risolte : facts.provinceOperative.map(territorialExposure);
+  return risolte.length > 0 ? risolte : facts.provinceOperative.map(territorialExposure);
+}
+
+function sismicaAlta(facts: CompanyFacts): Verdict {
+  const esposizioni = esposizioniDi(facts);
   if (esposizioni.length === 0) return 'ignoto';
   if (esposizioni.some((e) => e.sismica === 'alta')) return true;
   if (esposizioni.some((e) => e.sismica === null)) return 'ignoto';
@@ -197,13 +210,50 @@ function sismicaAlta(facts: CompanyFacts): Verdict {
 }
 
 function idraulicaAlta(facts: CompanyFacts): Verdict {
-  const risolte = facts.esposizioniTerritoriali;
-  const esposizioni = risolte.length > 0 ? risolte : facts.provinceOperative.map(territorialExposure);
+  const esposizioni = esposizioniDi(facts);
   if (esposizioni.length === 0) return 'ignoto';
   if (esposizioni.some((e) => e.idraulica === 'alta')) return true;
   // Con misure puntuali, «non alta» è una risposta; sul ripiego provinciale l'assenza
   // di misura sulle non-alte restava false (non alta), e resta tale.
   return false;
+}
+
+/*
+  ── Il motivo dice DA DOVE viene la misura ──────────────────────────────────
+
+  Il registro dei rischi diceva «Sede o unità locali in PROVINCIA a sismicità prevalente
+  elevata» su un'impresa la cui zona sismica era stata letta sul COMUNE: Agnosine, zona 2,
+  in una provincia — Brescia — che a sismicità prevalente elevata non è. La frase era
+  rimasta indietro rispetto alla fonte, e affermava del territorio largo ciò che si sapeva
+  di quello stretto.
+
+  Vale identico al contrario, ed è il difetto che avevo appena introdotto io: una frase che
+  dice «comune» quando il dato è provinciale promette una precisione che non c'è. Un
+  intermediario che porta quella riga in un fascicolo di adeguatezza sta scrivendo una cosa
+  che la fonte non dice.
+
+  Quindi il motivo si compone dai valori, come ogni altra frase di questo prodotto: si
+  guardano le ubicazioni che hanno FATTO scattare la regola, e si nomina la fonte che le ha
+  misurate. Dove le fonti sono miste vince la più prudente, perché la frase deve restare
+  vera per tutte le righe che sta riassumendo.
+*/
+export function motivoSismica(facts: CompanyFacts): string {
+  const alte = esposizioniDi(facts).filter((e) => e.sismica === 'alta');
+  const tutteComunali = alte.length > 0 && alte.every((e) => e.sismicaComunale === true);
+  return tutteComunali
+    ? 'Ubicazioni in comune classificato in zona sismica 1 o 2 (classificazione ufficiale, OPCM 3519/2003).'
+    : 'Ubicazioni in provincia a sismicità prevalente elevata (zone 1-2): la classificazione del ' +
+        'singolo comune non è stata risolta.';
+}
+
+export function motivoIdraulica(facts: CompanyFacts): string {
+  const alte = esposizioniDi(facts).filter((e) => e.idraulica === 'alta');
+  const tutteComunali = alte.length > 0 && alte.every((e) => e.idrogeoComunale === true);
+  return tutteComunali
+    ? 'Comune con quota elevata di imprese in area a pericolosità idraulica elevata o media ' +
+        '(indicatori ISPRA).'
+    : 'Provincia a elevata pericolosità idraulica: il comune non è stato risolto, e vale il dato ' +
+        'provinciale.';
 }
 
 /** Vero se l'azienda dichiara una certificazione fra quelle indicate (confronto insensibile a maiuscole). */
@@ -368,7 +418,7 @@ export const RISK_RULES: readonly RiskRule[] = [
     risk: 'catastrofale-sisma',
     when: sismicaAlta,
     likelihood: 1,
-    rationale: 'Sede o unità locali in provincia a sismicità prevalente elevata (zone 1-2).',
+    rationale: motivoSismica,
   },
 
   {
@@ -389,7 +439,7 @@ export const RISK_RULES: readonly RiskRule[] = [
     risk: 'catastrofale-alluvione',
     when: idraulicaAlta,
     likelihood: 1,
-    rationale: 'Comune con quota elevata di imprese in area a pericolosità idraulica (indicatori ISPRA).',
+    rationale: motivoIdraulica,
   },
   /*
     La frana muove lo stesso rischio dell'acqua, e per una ragione che non è di comodo: il
