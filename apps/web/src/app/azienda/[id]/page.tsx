@@ -89,6 +89,18 @@ export default async function PaginaAzienda({
   const { azienda, sintesi, catNat, gap, assetto, gruppo, ubicazioni } = analisi;
 
   /*
+    Cosa c'e' davvero a schermo, che non e' sempre cio' che l'indirizzo ha chiesto.
+
+    Un approfondimento comprato resta in archivio trenta giorni, e in quel periodo il server
+    lo usa anche senza il parametro: costa zero, ed e' roba di chi guarda. I pulsanti e le
+    sezioni devono seguire QUESTO, altrimenti offrono di comprare cio' che e' gia' sotto gli
+    occhi — ed e' esattamente cio' che faceva la scheda di COMINOTTI, che diceva «gia'
+    acquistata» accanto a uno score «non determinabile».
+  */
+  const approfonditaMostrata = analisi.livelloMostrato.approfondita;
+  const negativitaMostrata = analisi.livelloMostrato.eventiNegativi;
+
+  /*
     Le fotografie si leggono a parte, dopo l'analisi.
 
     Sono l'unica cosa in archivio che pesa megabyte, e non entrano in nessun calcolo:
@@ -138,8 +150,8 @@ export default async function PaginaAzienda({
       <Intestazione
         analisi={analisi}
         identificativo={id}
-        approfondita={approfondita}
-        conNegativita={conNegativita}
+        approfondita={approfonditaMostrata}
+        conNegativita={negativitaMostrata}
         listino={listino}
       />
 
@@ -428,7 +440,7 @@ export default async function PaginaAzienda({
       <RecordCamerale registro={analisi.registro} fonte={analisi.azienda.fonte} />
 
       {haIndicatoriArchivio(analisi.indicatoriArchivio) && (
-        <IndicatoriArchivio dati={analisi.indicatoriArchivio} approfondita={approfondita} />
+        <IndicatoriArchivio dati={analisi.indicatoriArchivio} approfondita={approfonditaMostrata} />
       )}
 
       {/* ── Ubicazioni e rischio territoriale ─────────────────────────────── */}

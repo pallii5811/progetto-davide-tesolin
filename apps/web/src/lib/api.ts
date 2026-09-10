@@ -462,6 +462,20 @@ export interface AnalisiDto {
     approfondimento: boolean;
     eventiNegativi: boolean;
   };
+  /**
+   * Cosa la scheda sta mostrando davvero, che non e' sempre cio' che ha chiesto.
+   *
+   * Il parametro nell'indirizzo serve a COMPRARE. Cio' che e' gia' in archivio si mostra
+   * comunque, senza chiedere un clic: chi ha pagato l'approfondimento lo vede riaprendo la
+   * scheda, non ricomprando l'intenzione di vederlo.
+   *
+   * I pulsanti seguono questo, non il parametro: altrimenti offrirebbero di acquistare cio'
+   * che e' gia' a schermo.
+   */
+  livelloMostrato: {
+    approfondita: boolean;
+    eventiNegativi: boolean;
+  };
   /** Le quattro fasce di impatto, con importo e giorni di fermo equivalenti. */
   metricheDiImpatto: MetricheDiImpattoDto;
   /** Da quali voci nasce il margine di contribuzione, e con quali quote. */

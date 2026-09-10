@@ -1606,13 +1606,51 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       ricompra l'anagrafica. È il costo di **una** operazione, non quello di una giornata
       senza tetto — e il tetto viene comunque riletto a ogni richiesta successiva.
     */
+    /*
+      Cio' che e' gia' stato pagato si mostra, senza chiedere di ricliccare.
+
+      L'approfondimento comprato resta in archivio trenta giorni. Per tutto quel tempo il
+      pulsante diceva «gia' acquistata» — e la pagina, senza il parametro nell'indirizzo,
+      continuava a costruire l'analisi ORDINARIA. Su COMINOTTI il risultato era «Score di
+      credito: non determinabile» e «Fido consigliato: non determinabile» su un'impresa il
+      cui profilo completo era in casa e gratuito: il prodotto nascondeva un dato che il
+      cliente aveva gia' comprato, e chiedeva un clic per mostrarlo.
+
+      Il parametro nell'indirizzo serve a COMPRARE, non a vedere cio' che si possiede. Da
+      qui in avanti: se la risposta e' servibile dalla cache — cioe' se non costa nulla —
+      si usa, punto. Chi apre la scheda vede sempre il meglio di cio' che ha pagato.
+
+      La spesa resta una scelta esplicita: `acquistoSenzaSpesa` risponde `true` solo quando
+      la risposta e' in archivio e ancora valida, quindi questa scorciatoia non puo'
+      addebitare niente. Se la validita' scade fra questo controllo e la lettura, si ricade
+      sul comportamento di prima e la richiesta esplicita torna necessaria.
+    */
+    const gia = {
+      approfondimento: await provider.acquistoSenzaSpesa(request.params.id, 'approfondimento'),
+      eventiNegativi: await provider.acquistoSenzaSpesa(request.params.id, 'eventi-negativi'),
+    };
+    const approfonditaEffettiva = parsed.data.approfondita === true || gia.approfondimento;
+    const negativitaEffettiva = parsed.data.eventiNegativi === true || gia.eventiNegativi;
+    /** Quello che questa richiesta ADDEBITA davvero: e' su questo che pesa il tetto. */
+    const spendeDavvero =
+      (parsed.data.approfondita === true && !gia.approfondimento) ||
+      (parsed.data.eventiNegativi === true && !gia.eventiNegativi);
+
     const esito = await oltreIlTetto(request);
     if (esito !== null && !(await giaInArchivio(request, request.params.id))) {
       return reply.status(429).send({
         errore: messaggioTetto(esito, 'Le analisi riprendono domani.'),
       });
     }
-    if (esito !== null && (parsed.data.approfondita === true || parsed.data.eventiNegativi === true)) {
+    /*
+      Il tetto pesa su cio' che si addebita, non su cio' che si chiede.
+
+      Diceva «approfondita richiesta» e basta: raggiunto il tetto, un intermediario non
+      poteva piu' rileggere un approfondimento comprato la settimana prima, che non costava
+      niente. Il tetto esiste per fermare un ciclo impazzito, non per confiscare i dati di
+      chi li ha gia' pagati.
+    */
+    if (esito !== null && spendeDavvero) {
       return reply.status(429).send({
         errore: messaggioTetto(
           esito,
@@ -1628,11 +1666,13 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           : { datiDichiarati: toDatiDichiarati(parsed.data.datiDichiarati) }),
         ...(parsed.data.polizze === undefined ? {} : { polizze: parsed.data.polizze.map(toPolizza) }),
         ...(parsed.data.asOf === undefined ? {} : { asOf: parsed.data.asOf }),
-        // L'approfondimento si chiede esplicitamente: costa quasi cinque volte l'analisi
-        // ordinaria, e nessuno deve trovarselo addebitato per una svista.
-        ...(parsed.data.approfondita === true ? { livello: 'profondito' as const } : {}),
-        // Anche questa è una spesa dichiarata, non un automatismo.
-        conEventiNegativi: parsed.data.eventiNegativi === true,
+        /*
+          L'approfondimento si COMPRA esplicitamente — costa quasi cinque volte l'analisi
+          ordinaria, e nessuno deve trovarselo addebitato per una svista — ma si USA sempre
+          quando e' gia' in casa. Sono due cose diverse, e per un anno sono state la stessa.
+        */
+        ...(approfonditaEffettiva ? { livello: 'profondito' as const } : {}),
+        conEventiNegativi: negativitaEffettiva,
       }),
     );
 
@@ -1656,7 +1696,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       fiducia riguarda i soldi di chi lo usa.
     */
     const accertamentiInCorso =
-      parsed.data.eventiNegativi === true &&
+      negativitaEffettiva &&
       analisi.profile.eventiNegativi === null &&
       OPENAPI_DEFAULT_CONFIG.services.eventiNegativi.verificato &&
       !provider.name.startsWith('Demo');
@@ -1679,12 +1719,22 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       dalle stesse opzioni della richiesta vera, e così non esiste una seconda copia che
       possa divergere.
     */
-    const senzaSpesa = {
-      approfondimento: await provider.acquistoSenzaSpesa(request.params.id, 'approfondimento'),
-      eventiNegativi: await provider.acquistoSenzaSpesa(request.params.id, 'eventi-negativi'),
+    /*
+      Le stesse due letture di prima, non ripetute: fra l'una e l'altra ci sarebbe stata la
+      lettura del profilo, che riempie la cache — e il pulsante avrebbe detto «gia'
+      acquistata» di un dato appena comprato in questa richiesta. Vero, ma per un istante
+      soltanto, e chi legge non ha modo di saperlo.
+    */
+    return {
+      ...presentAnalysis(analisi),
+      accertamentiInCorso,
+      senzaSpesa: gia,
+      /** Cosa la pagina sta mostrando davvero, che non e' sempre cio' che ha chiesto. */
+      livelloMostrato: {
+        approfondita: approfonditaEffettiva,
+        eventiNegativi: negativitaEffettiva,
+      },
     };
-
-    return { ...presentAnalysis(analisi), accertamentiInCorso, senzaSpesa };
   });
 
   // ── Salvataggio dei dati di intervista, senza ricalcolo ─────────────────────
