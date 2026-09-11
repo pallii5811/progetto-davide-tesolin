@@ -45,6 +45,26 @@ fi
 
 echo "── File di configurazione ─────────────────────────────────────────────"
 umask 077
+# NIENTE APICI INVERSI NE' $(...) NEL BLOCCO QUI SOTTO, se non per le variabili che si
+# vogliono davvero espandere.
+#
+# Il delimitatore non e' quotato — e non puo' esserlo, perche' $UTENTE, $PASSWORD e $DB
+# devono espandersi. Questo pero' rende attiva anche la sostituzione di comando: un
+# frammento di codice citato fra apici inversi dentro un COMMENTO viene eseguito, e il suo
+# risultato prende il posto del testo.
+#
+# Successo il 12/09/2026, durante l'installazione su una macchina nuova. Il commento
+# citava un source del file fra apici inversi; bash lo ha eseguito, quel comando e' fallito
+# con «.env: No such file or directory» — un errore che in mezzo a un'installazione sembra
+# un guasto grave — e nel file e' finita la frase «leggono con  prima di applicare le
+# migrazioni», con un buco al posto di cio' che spiegava.
+#
+# Nessun danno quella volta, per fortuna: il comando citato non faceva niente. Ma si e'
+# trattato di fortuna, non di progetto — qualunque cosa fra quegli apici viene eseguita
+# COME ROOT, in un file che genera i segreti della macchina.
+#
+# E' la stessa forma del difetto che questo lavoro ha gia' pagato altrove: un carattere che
+# dentro un testo sembra decorazione e per l'interprete e' sintassi.
 cat > "$ENV" <<CONF
 # Configurazione di AEGIS in produzione.
 # Generato da deploy/02-database.sh. Contiene segreti: permessi 600, mai in un repository.
@@ -80,7 +100,7 @@ AEGIS_CREDITO_CARICATO_CENTESIMI=0
 #
 # Le virgolette non sono decorative: systemd legge questo file col proprio formato e
 # tollera i valori non quotati, ma gli script di installazione e di aggiornamento lo
-# leggono con `. .env` prima di applicare le migrazioni — e lì un valore con spazi si
+# caricano con un source della shell prima di applicare le migrazioni — e lì un valore con spazi si
 # spezza in comandi. Il sintomo è una riga come «da: command not found» in mezzo a
 # un'operazione riuscita a metà.
 #
