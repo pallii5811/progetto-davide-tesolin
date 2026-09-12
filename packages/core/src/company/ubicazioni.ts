@@ -83,6 +83,16 @@ export interface AnalisiUbicazioni {
   readonly unicoComplesso: boolean;
   readonly esposizionePeggiore: TerritorialExposure | null;
   readonly ubicazionePeggiore: Ubicazione | null;
+  /**
+   * TUTTE le ubicazioni al rango massimo, non solo la prima.
+   *
+   * Su un'impresa con ventitre' sedi ce n'erano cinque esposte allo stesso modo e una
+   * sola portava l'etichetta: vinceva perche' compariva prima nell'elenco, non perche'
+   * fosse peggiore. Chi legge «la piu' esposta» conclude che le altre lo siano meno, e
+   * decide dove andare a fare il sopralluogo su un pareggio risolto dall'ordine di
+   * lettura.
+   */
+  readonly ubicazioniPeggiori: readonly Ubicazione[];
   /** Distanza fra le due ubicazioni più lontane, in chilometri. `null` senza coordinate. */
   readonly distanzaMassimaKm: number | null;
   readonly province: readonly string[];
@@ -370,25 +380,46 @@ function raggruppaPerComune(ubicazioni: readonly Ubicazione[]): readonly Aggrega
 function peggiore(ubicazioni: readonly Ubicazione[]): {
   esposizionePeggiore: TerritorialExposure | null;
   ubicazionePeggiore: Ubicazione | null;
+  ubicazioniPeggiori: readonly Ubicazione[];
 } {
   const rango = (u: Ubicazione): number => {
     // `null` non misurato = 0; `bassa` misurata = 1 — distinguere «non so» da «so che è bassa».
-    const punti = (l: ExposureLevel | null): number =>
+    const punti = (l: ExposureLevel | null | undefined): number =>
       l === 'alta' ? 3 : l === 'media' ? 2 : l === 'bassa' ? 1 : 0;
-    return punti(u.esposizione.sismica) + punti(u.esposizione.idraulica);
+    /*
+      Le frane pesano come il sisma e l'acqua, e per un po' non pesavano affatto.
+
+      Sono arrivate con gli indicatori comunali ISPRA, sono entrate nella tabella e nel
+      motore dei rischi, e questa funzione e' rimasta indietro: sceglieva la sede «piu'
+      esposta» guardando solo sismica e idraulica. Su un capannone di collina — dove la
+      frana e' il rischio che si materializza per primo — indicava l'ubicazione sbagliata a
+      chi deve decidere dove andare a fare il sopralluogo.
+
+      Il file, intanto, la frana la CITAVA: le uniche quattro occorrenze della parola stavano
+      nella nota sulle fonti, che dichiara a chi legge di aver tenuto conto anche di quella.
+      Un dato citato e non usato e' peggio di un dato assente, perche' chi legge la nota
+      smette di cercarlo altrove.
+    */
+    return punti(u.esposizione.sismica) + punti(u.esposizione.idraulica) + punti(u.esposizione.frane);
   };
 
-  let scelta: Ubicazione | null = null;
-  for (const u of ubicazioni) {
-    if (scelta === null || rango(u) > rango(scelta)) scelta = u;
-  }
+  /*
+    Tutte quelle al massimo, non la prima che lo raggiunge.
+
+    Il ciclo di prima usava un confronto stretto: a parita' di rango vinceva chi compariva
+    prima nell'elenco, cioe' l'ordine in cui il registro aveva restituito le sedi.
+  */
+  let massimo = -1;
+  for (const u of ubicazioni) massimo = Math.max(massimo, rango(u));
+  const peggiori = ubicazioni.filter((u) => rango(u) === massimo);
 
   return {
     esposizionePeggiore:
       ubicazioni.length === 0
         ? null
-        : (worstOfExposures(ubicazioni.map((u) => u.esposizione)) ?? scelta?.esposizione ?? null),
-    ubicazionePeggiore: scelta,
+        : (worstOfExposures(ubicazioni.map((u) => u.esposizione)) ?? peggiori[0]?.esposizione ?? null),
+    ubicazionePeggiore: peggiori[0] ?? null,
+    ubicazioniPeggiori: peggiori,
   };
 }
 

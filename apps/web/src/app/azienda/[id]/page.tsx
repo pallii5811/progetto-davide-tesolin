@@ -88,6 +88,9 @@ export default async function PaginaAzienda({
 
   const { azienda, sintesi, catNat, gap, assetto, gruppo, ubicazioni } = analisi;
 
+  /** Quante ubicazioni sono al primo posto: se sono piu' d'una, l'etichetta va al plurale. */
+  const quantePiuEsposte = ubicazioni.elenco.filter((u) => u.piuEsposta).length;
+
   /*
     Cosa c'e' davvero a schermo, che non e' sempre cio' che l'indirizzo ha chiesto.
 
@@ -500,7 +503,13 @@ export default async function PaginaAzienda({
                         </span>
                         {u.piuEsposta && ubicazioni.elenco.length > 1 && (
                           <span className="mt-1 inline-block rounded bg-attenzione/15 px-1.5 py-0.5 text-xs font-medium text-attenzione">
-                            la più esposta
+                            {/*
+                              Al plurale quando il primo posto è pari, e non è pignoleria di lingua:
+                              «la più esposta» su una di cinque ubicazioni identiche dice che le altre
+                              quattro lo sono meno, e l’intermediario sceglie dove andare a fare il
+                              sopralluogo su un’informazione falsa.
+                            */}
+                            {quantePiuEsposte > 1 ? 'fra le più esposte' : 'la più esposta'}
                           </span>
                         )}
                       </td>

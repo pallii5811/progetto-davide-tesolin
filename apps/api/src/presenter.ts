@@ -476,7 +476,7 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
               impreseIdraulicaMedia: x.esposizione.indicatoriIdrogeo.impIdrM,
               impreseFranaElevata: x.esposizione.indicatoriIdrogeo.impFrnA,
             },
-      piuEsposta: x.id === u.ubicazionePeggiore?.id,
+      piuEsposta: u.ubicazioniPeggiori.some((p) => p.id === x.id),
       contesto:
         x.contesto === null
           ? null
