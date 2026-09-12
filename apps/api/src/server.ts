@@ -41,6 +41,7 @@ import { CachePersistente } from './cache-persistente.js';
 import type { CompanyDataProvider, FetchLevel } from '@aegis/providers';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import { timingSafeEqual } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
@@ -269,10 +270,67 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     `Contesto territoriale: ${contestoAttivo ? `attivo · ${process.env['OVERPASS_URL'] ?? 'Overpass pubblico'}` : `spento (CONTESTO_TERRITORIALE=${modoContesto}, provider ${provider.name})`}`,
   );
 
-  // `credentials: true` è indispensabile perché il cookie di sessione viaggi:
-  // senza, il browser lo scarta silenziosamente e l'utente resta disconnesso senza capire.
-  void app.register(cors, { origin: true, credentials: true });
+  /*
+    ── Il CORS non e' piu' aperto a chiunque ──────────────────────────────────
+
+    Diceva `origin: true` con `credentials: true`: qualunque sito del mondo poteva far
+    partire dal browser di un utente collegato una richiesta autenticata a questa API. Era
+    innocuo per una ragione sola, scritta in deploy/01-macchina.sh: l'API ascolta su
+    127.0.0.1 e il firewall chiude la porta. Il giorno che la si espone — ed e' il giorno
+    in cui il frontend va altrove — quella riga diventa il difetto piu' grave del prodotto.
+
+    Il browser questa API non la chiama MAI: le richieste partono dal server di Next, che
+    inoltra il cookie come intestazione. Quindi in produzione non serve nessuna origine
+    consentita, e il valore predefinito e' «nessuna». Chi ne avesse davvero bisogno la
+    dichiara, una per una, in AEGIS_ORIGINI_CONSENTITE.
+  */
+  const origini = (process.env['AEGIS_ORIGINI_CONSENTITE'] ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter((o) => o !== '');
+  const inProduzione = process.env['NODE_ENV'] === 'production';
+  // `credentials: true` resta indispensabile dove un'origine e' consentita: senza, il
+  // browser scarta il cookie in silenzio e l'utente resta disconnesso senza capire.
+  void app.register(cors, {
+    origin: origini.length > 0 ? origini : !inProduzione,
+    credentials: true,
+  });
   void app.register(cookie);
+
+  /*
+    ── La chiave che permette di esporre l'API ─────────────────────────────
+
+    Finche' l'API vive dietro a 127.0.0.1 la sua difesa e' la rete. Se il frontend si
+    sposta — su Vercel, su un'altra macchina, ovunque — quella difesa sparisce e resta
+    solo il cookie di sessione: cioe' chiunque potrebbe interrogare le rotte pubbliche,
+    provare password, e misurare il prodotto dall'esterno.
+
+    AEGIS_CHIAVE_FRONTEND e' un segreto che conosce solo chi serve le pagine. Quando c'e',
+    ogni richiesta deve portarlo; quando NON c'e', non cambia niente — ed e' voluto: su una
+    macchina sola, con l'API su localhost, aggiungere un segreto non protegge da nulla e
+    aggiunge un modo di sbagliare.
+
+    Il confronto e' a tempo costante. Confrontare due stringhe con === esce al primo
+    carattere diverso, e su una rotta pubblica quella differenza di tempo e' misurabile:
+    si indovina un segreto un carattere per volta senza mai vederlo.
+
+    `/health` resta fuori: e' la sonda di vita, non dice nulla che non si veda da fuori, e
+    la escludono gli script di installazione e di aggiornamento che la interrogano.
+  */
+  const chiaveFrontend = process.env['AEGIS_CHIAVE_FRONTEND'] ?? '';
+  if (chiaveFrontend !== '') {
+    const attesa = Buffer.from(chiaveFrontend);
+    app.addHook('onRequest', async (request, reply) => {
+      if ((request.url.split('?')[0] ?? '') === '/health') return;
+      const fornita = request.headers['x-aegis-frontend'];
+      const ricevuta = Buffer.from(typeof fornita === 'string' ? fornita : '');
+      if (ricevuta.length !== attesa.length || !timingSafeEqual(ricevuta, attesa)) {
+        // Non si dice che esiste una chiave ne' che era sbagliata: a chi ha diritto di
+        // parlare con questa API la risposta non serve, e a chi non ce l'ha non si regala.
+        return reply.status(404).send({ errore: 'Non trovato' });
+      }
+    });
+  }
 
   /**
    * Corpi non JSON.

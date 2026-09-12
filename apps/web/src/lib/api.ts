@@ -6,6 +6,7 @@
  */
 
 import { NOME_COOKIE_SESSIONE } from './cookie-sessione';
+import { intestazioneChiaveFrontend } from './chiave-frontend';
 
 export { NOME_COOKIE_SESSIONE };
 
@@ -777,6 +778,7 @@ async function chiama<T>(percorso: string, init?: RequestInit): Promise<T> {
     cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
+      ...intestazioneChiaveFrontend(),
       ...(await intestazioniSessione()),
       ...(init?.headers ?? {}),
     },

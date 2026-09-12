@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NOME_COOKIE_SESSIONE } from './cookie-sessione';
+import { intestazioneChiaveFrontend } from './chiave-frontend';
 
 /**
  * Chiamata all'API dalle Server Action, con la sessione dell'utente collegato.
@@ -27,6 +28,7 @@ export async function chiamaApiConSessione(
       // significherebbe non revocare la sessione — e chi ne avesse una copia potrebbe
       // continuare a usarla dopo che l'utente crede di essere uscito.
       ...(init.corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...intestazioneChiaveFrontend(),
       ...(sessione === undefined ? {} : { cookie: `${NOME_COOKIE_SESSIONE}=${sessione.value}` }),
     },
     ...(init.corpo === undefined ? {} : { body: JSON.stringify(init.corpo) }),
@@ -55,7 +57,10 @@ export async function chiamaQuestionarioPubblico(
 ): Promise<Response> {
   return fetch(`${BASE_URL}/api/questionario/${encodeURIComponent(token)}`, {
     method: init.metodo,
-    headers: init.corpo === undefined ? {} : { 'Content-Type': 'application/json' },
+    headers: {
+      ...intestazioneChiaveFrontend(),
+      ...(init.corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
     ...(init.corpo === undefined ? {} : { body: JSON.stringify(init.corpo) }),
     cache: 'no-store',
   });

@@ -1,0 +1,49 @@
+# Caddy davanti all'API, quando il frontend NON sta su questa macchina.
+#
+# Il segnaposto DOMINIO_API viene sostituito con il nome scelto per l'API.
+#
+# ── QUANDO SERVE, E QUANDO NO ────────────────────────────────────────────────
+#
+# Non serve affatto, finché il sito e l'API girano insieme: l'API ascolta su 127.0.0.1:3001,
+# il sito la raggiunge da lì, e il firewall tiene chiusa la porta. È la configurazione più
+# sicura che ci sia, e va lasciata così se non c'è una ragione per cambiarla.
+#
+# Serve quando il frontend si sposta — su Vercel, su un'altra macchina — perché allora le
+# pagine vengono servite da fuori e devono poter parlare con l'archivio.
+#
+# ── COSA PROTEGGE QUESTO FILE, E COSA NO ─────────────────────────────────────
+#
+# Questo file dà solo HTTPS e un nome. La protezione vera è `AEGIS_CHIAVE_FRONTEND` in
+# /opt/aegis/.env: senza quel segreto l'API risponde 404 a chiunque, comprese le rotte
+# pubbliche dove si prova una password. Esporre l'API senza quella chiave significa mettere
+# su internet un servizio che accetta tentativi di accesso senza limite.
+#
+# `/health` resta raggiungibile senza chiave: è la sonda di vita, non dice nulla che non si
+# veda da fuori, e la interrogano gli script di installazione e di aggiornamento.
+
+DOMINIO_API {
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:3001
+
+	header {
+		X-Content-Type-Options nosniff
+		# Nessuno deve poter incorniciare l'API: non ha pagine da mostrare, e una risposta
+		# JSON dentro un frame è un modo noto di leggerla da un'altra origine.
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	request_body {
+		max_size 25MB
+	}
+
+	log {
+		output file /var/log/caddy/aegis-api.log {
+			roll_size 20MB
+			roll_keep 5
+		}
+	}
+}
