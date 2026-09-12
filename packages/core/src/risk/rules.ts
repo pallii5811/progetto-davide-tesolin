@@ -21,6 +21,8 @@ import type { CompanyFacts } from '../company/facts.js';
 import { atecoStartsWith } from '../shared/identifiers.js';
 import type { RiskId } from './taxonomy.js';
 import { territorialExposure } from './geo.js';
+import { ESPOSIZIONE_SETTORIALE } from './data/esposizione-settoriale.js';
+import type { EsposizioneSettoriale } from './data/esposizione-settoriale.js';
 import type { TerritorialExposure } from './geo.js';
 import {
   categoriaSocietaria,
@@ -278,6 +280,51 @@ function franaAlta(facts: CompanyFacts): Verdict {
   return false;
 }
 
+/*
+  ── Il settore gradua, invece di dividere in due ─────────────────────────────
+
+  Il rischio incendio si modulava su un elenco di ventidue divisioni ATECO, tutte uguali fra
+  loro: dentro l'elenco +1, fuori niente. Misurato contro un catalogo settoriale che gradua
+  le stesse ventidue da 4 a 7 su 7, il difetto si vede in due direzioni.
+
+  Dentro: un impianto chimico (classe 7) e un laboratorio di confezioni (classe 4) prendevano
+  la STESSA modulazione.
+
+  Fuori, e pesa di piu': trentadue divisioni con pericolosita' da 4 a 5 non prendevano NIENTE.
+  Fra queste il magazzinaggio e deposito — la divisione 52, il cui mestiere e' precisamente
+  il capannone pieno di merce — e le costruzioni. Il motore le trattava come uno studio di
+  consulenza.
+
+  ── COSA SONO QUESTI PUNTEGGI, E COSA NON SONO ──────────────────────────
+
+  Giudizio esperto, non sinistrosita' misurata. Il documento d'origine cita ISTAT come fonte
+  di ogni riga, ma ISTAT pubblica la classificazione delle attivita', non la loro
+  pericolosita'. In assunzione si ragiona cosi' tutti i giorni ed e' legittimo — ma un numero
+  che promette una misura dove c'e' un giudizio vale meno di quanto sembra, e la motivazione
+  a schermo lo dice: parla di «classificazione settoriale», non di statistiche di sinistro.
+*/
+function esposizioneSettoriale(facts: CompanyFacts): EsposizioneSettoriale | null {
+  const divisione = facts.atecoDivisione;
+  if (divisione === null) return null;
+  return ESPOSIZIONE_SETTORIALE[divisione] ?? null;
+}
+
+/** Vero se la classe settoriale raggiunge la soglia; «ignoto» se il settore non si risolve. */
+function classeSettoriale(
+  facts: CompanyFacts,
+  quale: keyof EsposizioneSettoriale,
+  soglia: number,
+): Verdict {
+  const esposizione = esposizioneSettoriale(facts);
+  if (esposizione === null) return 'ignoto';
+  return esposizione[quale] >= soglia;
+}
+
+function classeIncendio(facts: CompanyFacts): string {
+  const esposizione = esposizioneSettoriale(facts);
+  return esposizione === null ? '—' : String(esposizione.incendio);
+}
+
 function certificata(facts: CompanyFacts, ...norme: readonly string[]): Verdict {
   if (facts.certificazioni.length === 0) return 'ignoto';
   const dichiarate = facts.certificazioni.map((c) => c.toUpperCase().replace(/[\s:]/g, ''));
@@ -360,10 +407,32 @@ export const RISK_RULES: readonly RiskRule[] = [
   {
     kind: 'modula',
     id: 'incendio/attivita-produttiva',
+    rationaleSeIgnoto:
+      'Il codice di attività non è stato acquisito: è il dato che dice quanto l’attività svolta ' +
+      'concentra fonti di innesco e materiali combustibili.',
     risk: 'incendio-fabbricati',
-    when: (f) => divisione(f, ...DIVISIONI_PRODUTTIVE),
+    when: (f) => classeSettoriale(f, 'incendio', 4),
     likelihood: 1,
-    rationale: 'Attività di trasformazione con presenza di fonti di innesco e materiali combustibili.',
+    rationale: (f) =>
+      `Attività con pericolosità di incendio di classe ${classeIncendio(f)} su 7 ` +
+      '(classificazione settoriale): presenza ordinaria di fonti di innesco, materiali ' +
+      'combustibili o concentrazione di merci.',
+  },
+  /*
+    La seconda soglia si somma alla prima, e non e' un doppio conteggio: la prima dice che
+    l'attivita' un carico di incendio ce l'ha, la seconda che e' fra le piu' alte della scala.
+    Insieme portano la probabilita' da 2 a 4 su 5, che su un impianto chimico e' il punto
+    giusto e su un laboratorio di confezioni non si raggiunge.
+  */
+  {
+    kind: 'modula',
+    id: 'incendio/attivita-molto-pericolosa',
+    risk: 'incendio-fabbricati',
+    when: (f) => classeSettoriale(f, 'incendio', 6),
+    likelihood: 1,
+    rationale: (f) =>
+      `Classe ${classeIncendio(f)} su 7: il settore concentra processi a caldo, sostanze ` +
+      'infiammabili o lavorazioni a rischio di esplosione.',
   },
 
   {
@@ -814,6 +883,56 @@ export const RISK_RULES: readonly RiskRule[] = [
     when: (f) => divisione(f, ...DIVISIONI_PRODUTTIVE),
     impact: 1,
     rationale: 'Sistemi gestionali e di controllo di produzione interconnessi: il blocco ferma la linea.',
+  },
+  /*
+    Il cyber si modula su colonne DISTINTE, non su un punteggio unico.
+
+    Il catalogo settoriale tiene separate la dipendenza digitale, la sensibilita' dei dati,
+    l'esposizione alle transazioni e l'attrattivita' per l'attaccante — e sono cose diverse:
+    uno studio legale tratta dati sensibilissimi e quasi nessuna transazione, un negozio il
+    contrario. Fonderle in una media e poi spalmarla su tutti i rischi cyber butterebbe via
+    proprio l'informazione che serve.
+
+    Il ransomware resta fuori di proposito: la sua probabilita' di base e' gia' 4 su 5, e una
+    modulazione in piu' lo porterebbe al massimo su meta' del catalogo. La sua modulazione
+    esistente parla di impatto ed e' un'altra cosa: quando la linea di produzione e'
+    interconnessa, il blocco ferma la linea.
+  */
+  {
+    kind: 'modula',
+    id: 'data-breach/settore-a-dati-sensibili',
+    rationaleSeIgnoto:
+      'Il codice di attività non è stato acquisito: è il dato che dice quanto sono sensibili le ' +
+      'informazioni trattate di norma in quel settore.',
+    risk: 'data-breach',
+    when: (f) => classeSettoriale(f, 'sensibilitaDati', 6),
+    likelihood: 1,
+    /*
+      La frase dice cio' che vale per la CLASSE, non per questa impresa.
+
+      Diceva «dati sanitari, finanziari, giudiziari o di identificazione», ed elencare
+      categorie e' un'affermazione su chi si ha davanti: letta sulla scheda di una societa'
+      di software — che in quella classe ci sta per l'accesso ai sistemi dei clienti —
+      attribuiva trattamenti che quell'impresa puo' non avere mai visto. La classificazione
+      dice quanto pesa una violazione nel settore; quali dati siano, lo dice l'intervista.
+    */
+    rationale:
+      'Settore classificato ad alta sensibilità delle informazioni trattate (classificazione ' +
+      'settoriale): una violazione espone a sanzioni e danno reputazionale superiori alla media.',
+  },
+  {
+    kind: 'modula',
+    id: 'frode-informatica/settore-a-transazioni',
+    rationaleSeIgnoto:
+      'Il codice di attività non è stato acquisito: è il dato che dice quanto l’attività passa da ' +
+      'pagamenti e ordini digitali.',
+    risk: 'frode-informatica',
+    when: (f) => classeSettoriale(f, 'esposizioneTransazioni', 6),
+    likelihood: 1,
+    rationale:
+      'Settore a elevata esposizione su pagamenti, ordini e trasferimenti digitali ' +
+      '(classificazione settoriale): è la superficie su cui agiscono il cambio IBAN e la ' +
+      'compromissione della posta aziendale.',
   },
   {
     kind: 'identifica',
@@ -1300,4 +1419,5 @@ export const predicates = {
   sismicaAlta,
   idraulicaAlta,
   franaAlta,
+  classeSettoriale,
 } as const;

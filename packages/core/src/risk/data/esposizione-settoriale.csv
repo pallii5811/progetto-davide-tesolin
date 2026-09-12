@@ -1,0 +1,88 @@
+divisione;denominazione;incendio;dipendenzaDigitale;sensibilitaDati;esposizioneTransazioni;attrattivitaAttacco;motivazioneIncendio
+01;Produzioni vegetali e animali, caccia e servizi connessi;4;2;2;2;2;Moderate physical operations, machinery, storage and combustible materials.
+02;Silvicoltura e utilizzo di aree forestali;5;2;1;1;2;Forestry equipment plus significant combustible material exposure.
+03;Pesca e acquacoltura;4;2;1;2;2;Operational equipment, vessels/aquaculture facilities and moderate physical exposure.
+05;Estrazione di carbone e lignite;7;4;2;2;4;Very high fire/explosion and heavy industrial process exposure.
+06;Estrazione di petrolio greggio e gas naturale;7;5;2;3;5;Very high flammable/explosion process exposure.
+07;Estrazione di minerali metalliferi;6;4;2;2;4;Heavy industrial extraction, machinery and processing exposure.
+08;Altre attività estrattive;6;4;2;2;4;Heavy extraction machinery and high physical/process exposure.
+09;Attività dei servizi di supporto all’estrazione;6;4;2;2;4;Field operations, heavy equipment and hazardous extraction support.
+10;Produzione di prodotti alimentari;5;4;3;3;5;Heat, refrigeration, processing machinery and stock exposure.
+11;Produzione di bevande;5;4;2;3;4;Processing, bottling, storage and machinery exposure.
+12;Produzione di prodotti del tabacco;6;4;2;4;4;Combustible raw materials, processing and storage exposure.
+13;Fabbricazione di tessili;5;3;2;2;4;Combustible materials, machinery and process heat exposure.
+14;Fabbricazione di articoli di abbigliamento;4;3;2;2;3;Combustible stock and light manufacturing exposure.
+15;Fabbricazione di pelli e cuoio e articoli in pelle e simili di altri materiali;5;3;2;2;3;Processing equipment, chemicals and combustible materials.
+16;Produzione e lavorazione del legno e dei prodotti a base di legno e sughero, esclusi i mobili, fabbricazione di articoli in paglia e materiale da intreccio;6;3;1;2;4;High combustible load, dust and woodworking machinery exposure.
+17;Fabbricazione di carta e di prodotti di carta;6;4;2;2;4;High combustible load, process machinery and heat exposure.
+18;Stampa e riproduzione di supporti registrati;5;4;3;3;4;Paper/ink stock, machinery and some flammable-process exposure.
+19;Fabbricazione di coke e prodotti derivanti dalla raffinazione del petrolio;7;5;2;3;6;Extreme flammable, explosion and high-temperature process exposure.
+20;Fabbricazione di prodotti chimici;7;5;3;3;6;High chemical, fire, explosion and process exposure.
+21;Fabbricazione di prodotti farmaceutici di base e di preparati farmaceutici;6;6;6;4;6;Controlled production, chemicals, laboratories and high-value equipment.
+22;Fabbricazione di prodotti in gomma e in materie plastiche;6;4;2;2;5;Combustible materials, heat and industrial machinery exposure.
+23;Fabbricazione di altri prodotti della lavorazione di minerali non metalliferi;6;4;2;2;5;High-temperature processes and heavy industrial equipment.
+24;Fabbricazione di metalli di base;7;5;2;2;5;Foundry/smelting processes, extreme heat and heavy machinery.
+25;Fabbricazione di prodotti in metallo, esclusi macchinari e attrezzature;6;4;2;2;5;Welding/cutting, heat, machinery and industrial operations.
+26;Fabbricazione di computer e prodotti di elettronica e ottica;5;6;4;3;6;High-value equipment and components, moderate manufacturing hazard.
+27;Fabbricazione di apparecchiature elettriche;5;5;3;3;5;Manufacturing machinery, electrical testing and component stock.
+28;Fabbricazione di macchinari e apparecchiature n.c.a.;6;5;3;2;5;Heavy machinery production, welding/cutting and industrial processes.
+29;Fabbricazione di autoveicoli, rimorchi e semirimorchi;6;6;3;3;6;Large production facilities, paint/welding and machinery exposure.
+30;Fabbricazione di altri mezzi di trasporto;6;6;3;3;6;Large-scale manufacturing, welding, coatings and machinery exposure.
+31;Fabbricazione di mobili;6;3;2;2;4;Wood/foam/textile combustibility plus production machinery.
+32;Altre attività manifatturiere;5;4;3;3;4;Mixed manufacturing exposure, moderate-to-high default.
+33;Riparazione, manutenzione e installazione di macchine e apparecchiature;5;4;2;2;4;Workshop, hot-work, tools and machinery exposure.
+35;Fornitura di energia elettrica, gas, vapore e aria condizionata;7;7;4;4;7;Critical infrastructure with high electrical, gas, heat and process exposure.
+36;Raccolta, trattamento e fornitura di acqua;4;6;4;3;6;Infrastructure and plant equipment, limited combustibility.
+37;Gestione delle reti fognarie;5;5;3;2;5;Plant/infrastructure, pumps and treatment process exposure.
+38;Attività di raccolta, recupero e smaltimento dei rifiuti;6;5;3;2;5;High combustible/unknown-material load and processing equipment.
+39;Attività di risanamento e altri servizi di gestione dei rifiuti;6;4;2;2;4;Hazardous-site work, remediation equipment and variable materials.
+41;Costruzione di edifici residenziali e non residenziali;5;3;3;3;4;Construction-site equipment, temporary works and hot-work exposure.
+42;Ingegneria civile;5;4;3;3;5;Heavy equipment and large construction/infrastructure works.
+43;Lavori di costruzione specializzati;5;3;2;2;4;On-site tools, hot-work and specialist construction operations.
+46;Commercio all’ingrosso;4;4;4;5;4;Warehousing and stock exposure, broad mix of goods.
+47;Commercio al dettaglio;3;5;5;6;5;Retail premises and stock, generally limited industrial process exposure.
+49;Trasporto terrestre e trasporto mediante condotte;4;6;4;4;6;Vehicles/depots and transport infrastructure exposure.
+50;Trasporto marittimo e per vie d’acqua interne;5;5;3;3;5;Vessels, port-related equipment and fuel exposure.
+51;Trasporto aereo;5;7;5;6;7;Aircraft/airport support assets and fuel-related operational exposure.
+52;Magazzinaggio, deposito e attività di supporto ai trasporti;5;6;4;4;6;Concentrated stock, warehouses, handling equipment and logistics exposure.
+53;Attività postali e di corriere;3;6;4;5;5;Sorting/depot operations with moderate equipment and stock exposure.
+55;Servizi di alloggio;4;6;6;6;5;Large premises, kitchens/laundry and guest-property occupancy exposure.
+56;Attività di servizi di ristorazione;4;4;5;6;4;Cooking heat, gas/electrical equipment and combustible contents.
+58;Attività editoriali;2;6;5;4;5;Predominantly office/digital activity with limited physical process hazard.
+59;Attività di produzione, post-produzione e distribuzione cinematografica, di video e programmi televisivi, di registrazioni musicali e sonore;3;6;4;4;5;Studios/equipment and production sets, moderate physical exposure.
+60;Attività di programmazione, trasmissione, agenzie di stampa e altre attività di distribuzione di contenuti;3;7;5;4;6;Broadcast equipment/studios with generally low-to-moderate hazard.
+61;Telecomunicazioni;3;7;6;5;7;Network equipment and technical sites, moderate infrastructure exposure.
+62;Attività di programmazione, consulenza informatica e attività connesse;2;7;6;5;7;Predominantly office-based activity and limited physical-process hazard.
+63;Infrastrutture informatiche, elaborazione dati, hosting e altri servizi di informazione;4;7;7;6;7;Data-centre/server infrastructure can create concentrated electrical/equipment exposure.
+64;Attività dei servizi finanziari, escluse le assicurazioni e i fondi pensione;2;7;7;7;7;Predominantly office-based with low intrinsic property hazard.
+65;Assicurazioni, riassicurazioni e fondi pensione, escluse le assicurazioni sociali obbligatorie;2;7;7;7;7;Predominantly office-based with low intrinsic property hazard.
+66;Attività ausiliarie dei servizi finanziari e delle attività assicurative;2;7;7;7;6;Predominantly office-based with low intrinsic property hazard.
+68;Attività immobiliari;3;4;5;5;4;Property-centric activity but usually limited process hazard.
+69;Attività legali e di contabilità;1;6;7;6;5;Office-based professional activity with minimal intrinsic property hazard.
+70;Attività di sedi centrali e consulenza gestionale;1;6;6;4;5;Office-based professional activity with minimal intrinsic property hazard.
+71;Attività di architettura e ingegneria, collaudi e analisi tecniche;2;5;4;3;4;Mostly offices, some technical/lab/testing exposure.
+72;Ricerca scientifica e sviluppo;3;6;6;4;6;Laboratory and prototype exposure varies, moderate default.
+73;Attività di pubblicità, ricerche di mercato e pubbliche relazioni;2;6;6;5;5;Predominantly office/studio-based activity.
+74;Altre attività professionali, scientifiche e tecniche;2;5;5;4;4;Generally professional-service premises with low process hazard.
+75;Servizi veterinari;3;5;7;5;5;Clinical equipment, medicines and small operational premises.
+77;Attività di noleggio e leasing operativo;4;5;5;6;5;Physical fleets/equipment may be central to operations.
+78;Attività di ricerca, selezione, fornitura di risorse umane;1;6;7;4;5;Office-based service with minimal property hazard.
+79;Attività di agenzie di viaggio, tour operator e altri servizi di prenotazione e attività connesse;1;7;6;7;5;Predominantly office/digital service.
+80;Attività di investigazione e vigilanza;3;6;7;4;6;Operational/security equipment and some field activity.
+81;Attività di servizi per edifici e per la cura del paesaggio;4;3;3;3;3;Cleaning/maintenance equipment, chemicals and field operations.
+82;Attività amministrative, di supporto per le funzioni di ufficio e altri servizi di supporto alle imprese;2;6;6;5;5;Primarily office/support activities, low physical-process hazard.
+84;Amministrazione pubblica e difesa, assicurazione sociale obbligatoria;2;7;7;5;7;Broad institutional/office occupancy, low default process hazard.
+85;Istruzione e formazione;2;6;7;4;5;Education premises with generally low process hazard.
+86;Attività per la salute umana;4;7;7;6;7;Hospitals/clinics can contain valuable equipment, gases and complex infrastructure.
+87;Attività di assistenza residenziale;3;6;7;5;6;Residential occupancy, kitchens/laundry and moderate equipment exposure.
+88;Attività di assistenza sociale non residenziale;2;5;7;4;5;Service-based activity with relatively limited physical hazard.
+90;Attività di creazione artistica e rappresentazioni artistiche;4;4;4;4;4;Theatres/stages/workshops, electrical rigs and combustible scenery.
+91;Attività di biblioteche, archivi, musei e altre attività culturali;3;5;6;3;5;Significant contents/concentration but limited hazardous processes.
+92;Attività di giochi d’azzardo e scommesse;3;7;7;7;7;Commercial premises/equipment with limited process hazard.
+93;Attività sportive, di intrattenimento e divertimento;4;5;5;6;5;Large/varied premises, equipment and public occupancy.
+94;Attività di organizzazioni associative;2;4;6;4;5;Predominantly office/community premises.
+95;Riparazione e manutenzione di computer, beni per uso personale e per la casa, autoveicoli e motocicli;5;4;3;4;4;Workshop, batteries/fuels, hot-work and repair-equipment exposure.
+96;Attività di servizi alla persona;3;3;5;5;3;Varied small premises, heat/electrical/chemical exposure in some activities.
+97;Attività di famiglie e convivenze come datori di lavoro per personale domestico;1;1;3;1;1;No meaningful B2B industrial property-process exposure.
+98;Produzione di beni e servizi indifferenziati per uso proprio da parte di famiglie e convivenze;1;1;1;1;1;Outside normal B2B scope, minimal default activity hazard.
+99;Attività di organizzazioni e organismi extraterritoriali;2;7;7;5;7;Predominantly institutional/office premises.
