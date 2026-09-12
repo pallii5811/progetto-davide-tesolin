@@ -26,6 +26,35 @@
  * etichette già pronte da stampare (`…Etichetta`) sono escluse per costruzione: sono la
  * forma testuale di un livello, e il motore legge il livello.
  *
+ * ── DUE LIMITI PIÙ GRANDI, TROVATI SBATTENDOCI CONTRO ────────────────────────
+ *
+ * Il 12/09/2026, confrontando il prodotto con il modello di rischio di un intermediario, è
+ * emerso che il tipo di unità locale — ufficio, magazzino, stabilimento — viene mappato dal
+ * fornitore, fuso in `ubicazioni.ts` fra visura e intervista, e poi non letto da niente: né
+ * dal motore né dallo schermo. Sembrava un difetto identico a quello delle frane.
+ *
+ * **Primo limite: questo controllo non lo avrebbe visto**, e la ragione è misurata invece che
+ * supposta. Il campo si chiama `tipo`, e prima che qualcuno lo usasse la parola compariva già
+ * 3 volte nel motore e 2 in `facts.ts`, in tutt'altri contesti. Qualunque conteggio per nome
+ * lo avrebbe dichiarato «usato». Non è un difetto dell'implementazione: è il tetto di ciò che
+ * una ricerca testuale può fare, e nessuna soglia lo sposta. Prenderlo richiede un'analisi
+ * vera dei riferimenti — l'API del compilatore TypeScript, che sa distinguere la proprietà
+ * `tipo` di `UnitaLocale` dalla parola «tipo».
+ *
+ * **Secondo limite, e vale più del primo: un campo non letto non è sempre un campo da usare.**
+ * Il tipo di unità è stato portato fino al motore, con regola e collaudo, e poi tolto —
+ * perché l'archivio non lo contiene. Sulle risposte già pagate `officeType` ha due soli
+ * valori, `SSL` e `UL`: sede legale e unità locale, categorie amministrative. «Magazzino» e
+ * «stabilimento» non esistono in quella fonte, e nemmeno il questionario li chiede. La regola
+ * sarebbe stata corretta, provata, e incapace di accendersi su qualunque impresa.
+ *
+ * La lezione da tenere: prima di usare un campo mai letto si guarda **cosa contiene sui dati
+ * veri**, non cosa promette il suo tipo. Un campo vuoto per costruzione non è un'occasione
+ * mancata, è un campo vuoto. Vedi la nota su `normalizzaTipoUnitaLocale` nel mapper.
+ *
+ * Quindi: questo file copre le misure territoriali e **non** copre il resto. Sta scritto qui
+ * perché nessuno legga un verde e concluda che il prodotto è stato guardato tutto.
+ *
  * PROVA CHE FALLISCE. Sul commit precedente ad `aaf0c65` — cioè prima che la regola
  * `alluvione/zona-frana-alta` esistesse — questo controllo segnala `frane`. Un controllo
  * che non ha mai fallito non è un controllo:

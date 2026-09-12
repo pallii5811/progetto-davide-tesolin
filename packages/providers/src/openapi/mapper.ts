@@ -108,6 +108,29 @@ function statoNonOperativo(valore: string | null): boolean {
   return valore !== null && normalizzaStatoAttivita(valore) !== 'attiva';
 }
 
+/**
+ * QUANTO VALE DAVVERO, MISURATO IL 12/09/2026 — leggere prima di costruirci sopra.
+ *
+ * Questa funzione riconosce stabilimenti, magazzini, punti vendita e uffici. L'archivio
+ * camerale, pero', non li dichiara: su tutte le risposte gia' pagate il campo `officeType`
+ * ha DUE soli valori, e sono categorie amministrative invece che fisiche.
+ *
+ *   SSL  Administrative headquarter and registered office   -> sede-legale
+ *   UL   Local units                                        -> altro
+ *
+ * Nessuna occorrenza di stabilimento, magazzino, ufficio o punto vendita. Nemmeno il
+ * questionario li chiede: `ImmobileDichiarato` raccoglie superficie, titolo di godimento,
+ * tipologia costruttiva e protezioni, non la destinazione d'uso.
+ *
+ * Percio' `TipoUnitaLocale` oggi vale «sede-legale» oppure «altro», e basta. Il vocabolario
+ * ricco resta perche' e' corretto e perche' l'intervista potrebbe un giorno riempirlo — non
+ * perche' sia riempito adesso.
+ *
+ * Costato: una regola di rischio scritta per intero, con il suo collaudo, e poi tolta. Il
+ * modello di rischio di un intermediario dava al tipo di sede il 20 % del punteggio incendio
+ * dichiarando «Source: Registro Imprese / InfoCamere»; quella fonte quel dato non ce l'ha, e
+ * la misura su risposte vere è l'unico modo di accorgersene prima di costruirci un motore.
+ */
 function normalizzaTipoUnitaLocale(valore: string | null): TipoUnitaLocale {
   if (valore === null) return 'altro';
   const testo = valore.toLowerCase();
