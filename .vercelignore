@@ -1,0 +1,19 @@
+# Cosa NON deve salire su Vercel.
+#
+# Senza questo file la CLI carica tutto ciò che trova nella cartella: su un altro progetto
+# ha significato 1,3 GB fra backup, cache e file di ambiente. Il caricamento è lento, e
+# soprattutto finisce in un posto che non è questo repository.
+
+.sonda/
+.dati/
+backups/
+test-results/
+playwright-report/
+*.dump
+*.sql
+.env
+.env.*
+!.env.example
+.next/
+dist/
+schermate/
