@@ -41,6 +41,7 @@ import {
   Sezione,
   Spiegazione,
 } from '@/components/ui';
+import { etichettaAddetti } from '@/lib/etichetta-addetti';
 
 export const dynamic = 'force-dynamic';
 
@@ -1987,7 +1988,7 @@ function Intestazione({
       </p>
       <p className="mt-0.5 text-sm text-testo-debole">
         {azienda.dimensioneEtichetta}
-        {azienda.addetti !== null && ` · ${azienda.addetti} addetti`}
+        {azienda.addetti !== null && ` · ${etichettaAddetti(azienda.addetti, azienda.addettiFonte)}`}
         {azienda.anniDiAttivita !== null && ` · attiva da ${azienda.anniDiAttivita} anni`}
         {sintesi.datiDaCompletare > 0 &&
           ` · ${sintesi.datiDaCompletare} rischi da confermare in intervista`}

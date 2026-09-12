@@ -449,11 +449,17 @@ export function analyzeCompany(
     ubicazioni.ubicazioni.map((u) => u.esposizione),
   );
   // ── 4. Somme assicurande ──────────────────────────────────────────────────
-  const superficieCartograficaMq = superficieRilevata(ubicazioni);
+  const cartografia = superficieRilevata(ubicazioni);
 
   const sommeAssicurande = computeSumsInsured(facts, bilancio, profile.datiDichiarati.immobili, {
     ...options.sommeAssicurande,
-    ...(superficieCartograficaMq === null ? {} : { superficieCartograficaMq }),
+    ...(cartografia === null
+      ? {}
+      : {
+          superficieCartograficaMq: cartografia.mq,
+          ubicazioniConSuperficie: cartografia.coperte,
+          ubicazioniTotali: cartografia.totali,
+        }),
     periodoIndennizzoMesi:
       options.sommeAssicurande?.periodoIndennizzoMesi ??
       profile.datiDichiarati.periodoIndennizzoMesi ??
@@ -630,9 +636,12 @@ export interface AndamentoEsercizio {
  *
  * `null` quando nessuna ubicazione ha fabbricati mappati: assente, non zero.
  */
-function superficieRilevata(ubicazioni: AnalisiUbicazioni): number | null {
+function superficieRilevata(
+  ubicazioni: AnalisiUbicazioni,
+): { mq: number; coperte: number; totali: number } | null {
   const viste = new Set<string>();
   let totale = 0;
+  let coperte = 0;
 
   for (const u of ubicazioni.ubicazioni) {
     const impronta = u.contesto?.fabbricati;
@@ -646,7 +655,8 @@ function superficieRilevata(ubicazioni: AnalisiUbicazioni): number | null {
     viste.add(chiave);
 
     totale += impronta.superficieCopertaMq;
+    coperte += 1;
   }
 
-  return totale > 0 ? totale : null;
+  return totale > 0 ? { mq: totale, coperte, totali: ubicazioni.ubicazioni.length } : null;
 }

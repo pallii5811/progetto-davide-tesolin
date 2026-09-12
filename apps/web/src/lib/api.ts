@@ -267,6 +267,8 @@ export interface AnalisiDto {
     dimensioneEtichetta: string;
     anniDiAttivita: number | null;
     addetti: number | null;
+    /** Da dove viene il numero: il bilancio conta i dipendenti, l'archivio gli addetti. */
+    addettiFonte: 'intervista' | 'bilancio' | 'archivio' | null;
     fonte: { descrizione: string; osservatoIl: string } | null;
   };
   /**

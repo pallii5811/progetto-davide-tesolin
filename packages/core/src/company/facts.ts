@@ -40,6 +40,19 @@ export interface CompanyFacts {
   // Dimensione
   readonly dimensione: CompanySize;
   readonly addetti: number | null;
+  /**
+   * Da dove viene il numero qui sopra, perche' ce ne sono due e non dicono la stessa cosa.
+   *
+   * L'archivio camerale pubblica gli ADDETTI, che comprendono chi non e' dipendente; il
+   * bilancio pubblica i DIPENDENTI al 31 dicembre. Su un autotrasportatore di Brescia
+   * facevano 45 e 40, e la scheda li stampava tutti e due chiamandoli «addetti»: uno
+   * nell'intestazione, l'altro nel record camerale, a mezza pagina di distanza.
+   *
+   * Nessuno dei due era sbagliato. Sbagliata era l'etichetta, ed e' il difetto piu'
+   * insidioso di un rapporto: chi legge fa l'unico controllo che puo' fare — confrontare
+   * due righe — e conclude che il conto non torni.
+   */
+  readonly addettiFonte: 'intervista' | 'bilancio' | 'archivio' | null;
   readonly fatturato: Euro | null;
   readonly totaleAttivo: Euro | null;
   readonly patrimonioNetto: Euro | null;
@@ -207,6 +220,15 @@ export function deriveFacts(
     sintetico?.dipendenti ??
     a.numeroAddetti ??
     null;
+  /* La stessa gerarchia, dichiarata: chi legge il numero deve poter sapere che cosa conta. */
+  const addettiFonte: CompanyFacts['addettiFonte'] =
+    dichiarati.numeroDipendenti !== null
+      ? 'intervista'
+      : (bilancio?.numeroDipendenti ?? sintetico?.dipendenti ?? null) !== null
+        ? 'bilancio'
+        : a.numeroAddetti !== null
+          ? 'archivio'
+          : null;
   const totaleAttivo = bilancio?.sp.totaleAttivo ?? sintetico?.totaleAttivo ?? null;
 
   const dimensione = classifySize({ addetti, fatturato, totaleAttivo }).value;
@@ -298,6 +320,7 @@ export function deriveFacts(
 
     dimensione,
     addetti,
+    addettiFonte,
     fatturato,
     totaleAttivo,
     patrimonioNetto: bilancio?.sp.patrimonioNetto ?? sintetico?.patrimonioNetto ?? null,

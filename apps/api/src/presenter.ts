@@ -122,6 +122,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
       dimensioneEtichetta: COMPANY_SIZE_LABEL[analisi.dimensione.value],
       anniDiAttivita: analisi.facts.anniDiAttivita,
       addetti: analisi.facts.addetti,
+      addettiFonte: analisi.facts.addettiFonte,
       fonte: fonte(analisi.profile.anagrafica),
     },
     /*

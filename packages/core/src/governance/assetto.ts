@@ -451,6 +451,32 @@ function implicazioni(
             `ha la rappresentanza legale${p.ruolo === null ? '' : ` (${(traduciDescrizioneArchivio(p.ruolo) ?? p.ruolo).toLowerCase()})`}`
           : `${detiene} e ne ha la rappresentanza legale`;
 
+    /*
+      ── Rappresentare e decidere sono due cose diverse ─────────────────────────
+
+      Piu' su sta scritto che «un sindaco o un procuratore non entrano: rispondono, ma la loro
+      uscita non ferma l'impresa». L'intenzione era giusta e non si avverava: il filtro e' il
+      booleano del fornitore, e il fornitore marca come rappresentante legale anche il
+      procuratore speciale — verificato sulle risposte vere di un'impresa di Brescia, dove
+      accanto al presidente e al vice compariva un procuratore con lo stesso flag.
+
+      Il risultato era una frase falsa su un documento che l'intermediario firma: «la sua
+      assenza improvvisa blocca le decisioni sociali» detto di chi ha una procura. Il
+      consiglio delibera lo stesso; la procura e' un potere di firma su atti determinati, non
+      un organo.
+
+      Percio' il booleano resta quello del fornitore per dire CHI RAPPRESENTA — quella scelta
+      era ed e' giusta, e una regex in piu' avrebbe reso il concetto diverso da posto a posto.
+      Qui pero' la domanda e' un'altra: chi manca blocca le decisioni? A quella risponde il
+      RUOLO, e il ruolo e' il dato giusto per rispondere.
+
+      E il prodotto non sa quanto sia ampia una procura: l'archivio non la descrive. Proporre
+      una key man su chi potrebbe firmare solo le bolle sarebbe una raccomandazione costruita
+      su un'ipotesi.
+    */
+    const tradotto = (traduciDescrizioneArchivio(p.ruolo ?? '') ?? p.ruolo ?? '').toLowerCase();
+    if (tradotto.includes('procurator')) continue;
+
     esiti.push({
       titolo: `Persona chiave — ${p.denominazione}`,
       conseguenza: `${p.denominazione} ${perche}: la sua assenza improvvisa blocca le decisioni sociali e, di norma, i rapporti commerciali e bancari.`,

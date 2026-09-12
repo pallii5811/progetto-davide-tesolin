@@ -77,6 +77,21 @@ export interface SumsInsuredOptions {
    * superficie dichiarata. Vedi `calcolaFabbricati` per i limiti che la accompagnano.
    */
   readonly superficieCartograficaMq?: number | undefined;
+  /**
+   * Su quante ubicazioni quella superficie e' stata rilevata, e quante ce ne sono.
+   *
+   * Senza questi due numeri il capitale non sa di essere parziale, e non puo' dirlo.
+   * Su un'impresa vera con cinque siti — un autotrasportatore in provincia di Brescia —
+   * la cartografia copriva UNA sola ubicazione, le altre quattro contribuivano zero, e la
+   * scheda presentava 4,7 milioni come «somma assicuranda fabbricati» a confidenza media,
+   * poi ripresa come capitale CAT NAT da assicurare per legge.
+   *
+   * Il percorso degli immobili DICHIARATI la nota parziale ce l'aveva gia' — «il totale e'
+   * per difetto, ed e' la base su cui al sinistro opera la regola proporzionale». Quello
+   * cartografico no: restavano gli avvisi sul METODO e nessuno sulla COPERTURA.
+   */
+  readonly ubicazioniConSuperficie?: number | undefined;
+  readonly ubicazioniTotali?: number | undefined;
   readonly coefficienteRivalutazione?: number | undefined;
   readonly coefficientePiccoScorte?: number | undefined;
   readonly periodoIndennizzoMesi?: number | undefined;
@@ -248,6 +263,8 @@ function calcolaFabbricati(
     per un rilievo.
   */
   const cartografica = options.superficieCartograficaMq;
+  const coperte = options.ubicazioniConSuperficie;
+  const totali = options.ubicazioniTotali;
   if (cartografica !== undefined && cartografica > 0) {
     const costoMq = options.costoRicostruzioneEuroMq ?? COSTO_RICOSTRUZIONE_EUR_MQ.default;
     const stima = Money.multiply(Money.euro(costoMq), cartografica);
@@ -265,7 +282,19 @@ function calcolaFabbricati(
         'La cartografia collaborativa può non riflettere ampliamenti recenti. Rilevare i metri quadri ' +
           'in sede di intervista resta la singola attività che più riduce il rischio di sottoassicurazione.',
       )
-      .confidence('media')
+      .noteIf(
+        coperte !== undefined && totali !== undefined && coperte < totali,
+        `SOMMA PARZIALE: la superficie è stata rilevata su ${coperte ?? 0} ubicazione/i su ` +
+          `${totali ?? 0}. Le altre non concorrono al capitale, che è quindi per difetto — ed è la ` +
+          'base su cui al sinistro opera la regola proporzionale. Rilevare i metri quadri delle ' +
+          'ubicazioni mancanti prima di quotare.',
+      )
+      .confidence(
+        // Un capitale che copre meno di metà delle ubicazioni non è a confidenza media: e'
+        // un ordine di grandezza di una parte, e chi lo legge deve vederlo dall'etichetta
+        // prima ancora di arrivare alla nota.
+        coperte !== undefined && totali !== undefined && coperte * 2 < totali ? 'bassa' : 'media',
+      )
       .value(Money.commercialRoundUp(stima));
   }
 

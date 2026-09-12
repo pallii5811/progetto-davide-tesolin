@@ -17,3 +17,16 @@ playwright-report/
 .next/
 dist/
 schermate/
+
+# Il marcatore di stato di TypeScript, e la ragione per cui sta qui.
+#
+# Escludere dist/ senza escludere questo produce il guasto più confondente della serie:
+# il marcatore dice a tsc «è già tutto compilato», tsc non produce niente, e la
+# compilazione del sito fallisce con «Can't resolve @aegis/core» — un errore che sembra
+# una dipendenza mancante invece di una compilazione saltata. Due secondi di tsc senza
+# una riga di output sono il segnale.
+#
+# Serve dirlo perché quando esiste un .vercelignore il .gitignore NON viene più
+# consultato: ciò che git ignorava, qui sale lo stesso se non lo si ripete.
+*.tsbuildinfo
+node_modules/

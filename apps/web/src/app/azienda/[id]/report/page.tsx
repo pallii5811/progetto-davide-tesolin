@@ -15,6 +15,7 @@ import { formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
 import { traduciDescrizioneArchivio } from '@/lib/traduzioni-archivio';
 import { avvisoIntestazione } from '@/lib/avviso-intestazione';
 import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
+import { etichettaAddetti } from '@/lib/etichetta-addetti';
 
 export const dynamic = 'force-dynamic';
 
@@ -262,7 +263,7 @@ export default async function PaginaReport({
           </p>
           <p className="text-sm text-testo-tenue">
             {azienda.ateco} {azienda.atecoDescrizione} · {azienda.dimensioneEtichetta}
-            {azienda.addetti !== null && ` · ${azienda.addetti} addetti`}
+            {azienda.addetti !== null && ` · ${etichettaAddetti(azienda.addetti, azienda.addettiFonte)}`}
           </p>
           <p className="mt-3 text-xs text-testo-debole">
             Documento generato il {dataAnalisi} · metodologia ISO 31000:2018 · catalogo rischi v
