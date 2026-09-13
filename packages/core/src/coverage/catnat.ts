@@ -78,18 +78,29 @@ function fineDelGiorno(giorno: string): Date {
  * Tabella volutamente isolata e datata: la materia è stata oggetto di proroghe ripetute
  * e va aggiornata qui, in un punto solo.
  *
- * Ultimo allineamento: agosto 2026.
+ * Ultimo allineamento: settembre 2026, sulla pagina del MIMIT aggiornata al 3 giugno 2026.
+ *
+ * Piccole e micro dicevano 01/01/2026, un giorno oltre il termine: il D.L. 39/2025 e il
+ * MIMIT scrivono 31 dicembre 2025. Su RED GROUP S.R.L. la scheda stampava «termine scaduto
+ * il 01/01/2026» e «scaduto da 255 giorni». Un giorno non cambia l'inadempimento, ma una
+ * data di legge sbagliata nel documento dell'intermediario è la prima cosa che il cliente
+ * va a controllare.
  */
 export const TERMINI_CATNAT: Readonly<Record<CompanySize, Date>> = {
   grande: fineDelGiorno('2025-03-31'),
   media: fineDelGiorno('2025-10-01'),
-  piccola: fineDelGiorno('2026-01-01'),
-  micro: fineDelGiorno('2026-01-01'),
+  piccola: fineDelGiorno('2025-12-31'),
+  micro: fineDelGiorno('2025-12-31'),
 };
 
 /**
  * Proroghe settoriali per micro e piccole imprese (Milleproroghe).
  * Chiave: divisione ATECO. Valore: termine prorogato.
+ *
+ * La pesca NON è al 31 marzo 2026, anche se il Milleproroghe (D.L. 200/2025 art. 15 c. 2)
+ * diceva quello: il D.L. 25/2026 art. 9 c. 6 l'ha portata al 31 dicembre 2026. Verificato
+ * sulla pagina del MIMIT il 13/09/2026. Chi rilegge il solo Milleproroghe crede di trovare
+ * un errore qui, e correggendolo dichiarerebbe inadempiente un peschereccio che non lo è.
  */
 export const PROROGHE_SETTORIALI: Readonly<
   Record<string, { readonly termine: Date; readonly settore: string }>

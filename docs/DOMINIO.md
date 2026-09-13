@@ -412,7 +412,7 @@ provenienza del dato, non perché siano state accertate.
 | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
 | Grandi imprese                                                                                   | 31/03/2025                                           |
 | Medie imprese                                                                                    | 01/10/2025                                           |
-| Piccole e micro imprese                                                                          | 01/01/2026                                           |
+| Piccole e micro imprese                                                                          | 31/12/2025                                           |
 | Micro/piccole di comparti prorogati (pesca, acquacoltura, somministrazione, turistico-ricettivo) | 31/03/2026 — pesca e acquacoltura fino al 31/12/2026 |
 
 **Conseguenze dell'inadempimento**: non è prevista una sanzione pecuniaria diretta, ma

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Rotella } from '@/components/Rotella';
 import type { RuoloUtente, UtenteElencoDto } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { creaUtenteAzione, gestisciUtenteAzione } from '../actions';
@@ -148,7 +149,7 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
                 <input type="hidden" name="attivo" value={utente.attivo ? 'false' : 'true'} />
                 <Azione
                   etichetta={utente.attivo ? 'Sospendi' : 'Riattiva'}
-                  inCorso="…"
+                  inCorso={utente.attivo ? 'Sospensione…' : 'Riattivazione…'}
                   pericolosa={utente.attivo}
                 />
               </form>
@@ -157,7 +158,7 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
                 <form action={agisci}>
                   <input type="hidden" name="id" value={utente.id} />
                   <input type="hidden" name="operazione" value="revoca" />
-                  <Azione etichetta="Chiudi sessioni" inCorso="…" />
+                  <Azione etichetta="Chiudi sessioni" inCorso="Chiusura…" />
                 </form>
               )}
             </>
@@ -196,8 +197,10 @@ function Azione({
     <button
       type="submit"
       disabled={pending}
-      className={`rounded px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${classi}`}
+      aria-busy={pending}
+      className={`inline-flex items-center gap-1.5 rounded px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${classi}`}
     >
+      {pending && <Rotella />}
       {pending ? inCorso : etichetta}
     </button>
   );

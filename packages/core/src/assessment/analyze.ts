@@ -215,12 +215,32 @@ function arricchimentoBilancioDettagliato(ind: FinancialIndicators | null): Arri
   const sbloccherebbe: string[] = [
     'Margine di contribuzione, e quindi la somma assicuranda per i danni indiretti',
   ];
-  if (manca(ind?.currentRatio) || manca(ind?.quickRatio) || manca(ind?.cicloCircolante)) {
-    sbloccherebbe.push('Indici di liquidità (current ratio, quick ratio) e ciclo del circolante');
+  /*
+    Riga per riga, e dentro la riga indice per indice.
+
+    Su RED GROUP S.R.L. la copertura degli oneri finanziari c'era — 7,99×, stampata nel
+    punteggio — e mancava la sola PFN/EBITDA: la voce chiedeva entrambe perché il controllo
+    guardava se ne mancasse almeno una. Quando mancano tutte, le frasi sono quelle di prima.
+  */
+  const indiciDiLiquidita = [
+    manca(ind?.currentRatio) ? 'current ratio' : null,
+    manca(ind?.quickRatio) ? 'quick ratio' : null,
+  ].filter((v): v is string => v !== null);
+  if (indiciDiLiquidita.length > 0 || manca(ind?.cicloCircolante)) {
+    const indici =
+      indiciDiLiquidita.length > 0 ? `Indici di liquidità (${indiciDiLiquidita.join(', ')})` : null;
+    const ciclo = manca(ind?.cicloCircolante);
+    sbloccherebbe.push(
+      indici === null ? 'Ciclo del circolante' : ciclo ? `${indici} e ciclo del circolante` : indici,
+    );
   }
   sbloccherebbe.push("Altman Z''-score");
-  if (manca(ind?.pfnSuEbitda) || manca(ind?.coperturaOneriFinanziari)) {
-    sbloccherebbe.push('Sostenibilità del debito (PFN/EBITDA, copertura oneri finanziari)');
+  const indiciDelDebito = [
+    manca(ind?.pfnSuEbitda) ? 'PFN/EBITDA' : null,
+    manca(ind?.coperturaOneriFinanziari) ? 'copertura oneri finanziari' : null,
+  ].filter((v): v is string => v !== null);
+  if (indiciDelDebito.length > 0) {
+    sbloccherebbe.push(`Sostenibilità del debito (${indiciDelDebito.join(', ')})`);
   }
   sbloccherebbe.push('Valore di rimanenze e immobilizzazioni, base per furto, guasti macchine e CAT NAT');
   return { dato: 'Bilancio in schema CEE dettagliato', sbloccherebbe };

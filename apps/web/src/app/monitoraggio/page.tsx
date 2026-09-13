@@ -4,6 +4,8 @@ import { leggiMonitoraggio } from '@/lib/api';
 import type { EventoMonitoraggioDto } from '@/lib/api';
 import { Scheda, ServizioNonRaggiungibile } from '@/components/ui';
 import { BottoneAggiorna } from './BottoneAggiorna';
+import { BottoneInvio } from '@/components/BottoneInvio';
+import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import { segnaGestito } from './actions';
 import { formattaGiorno } from '@aegis/core/tempo';
 
@@ -116,7 +118,7 @@ function FiltroLink({
   children: React.ReactNode;
 }) {
   return (
-    <Link
+    <CollegamentoAzione
       href={href}
       aria-current={attivo ? 'page' : undefined}
       className={`rounded-full border px-3 py-1.5 text-sm transition ${
@@ -126,7 +128,7 @@ function FiltroLink({
       }`}
     >
       {children}
-    </Link>
+    </CollegamentoAzione>
   );
 }
 
@@ -168,12 +170,12 @@ function RigaEvento({ evento }: { evento: EventoMonitoraggioDto }) {
         {!gestito && (
           <form action={segnaGestito}>
             <input type="hidden" name="id" value={evento.id} />
-            <button
-              type="submit"
+            <BottoneInvio
+              inCorso="Registrazione…"
               className="rounded border border-bordo-forte px-3 py-1.5 text-xs font-medium text-testo-tenue transition hover:text-testo"
             >
               Segna gestito
-            </button>
+            </BottoneInvio>
           </form>
         )}
       </div>

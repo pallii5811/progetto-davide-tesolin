@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { Rotella } from '@/components/Rotella';
 
 /**
  * Il modulo di ricerca.
@@ -90,12 +91,7 @@ export function ModuloRicerca({
         data-testid="pulsante-cerca"
         className="flex items-center justify-center gap-2 self-end rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {inCorso && (
-          <span
-            aria-hidden="true"
-            className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-          />
-        )}
+        {inCorso && <Rotella />}
         {inCorso ? 'Interrogazione…' : 'Cerca'}
       </button>
 

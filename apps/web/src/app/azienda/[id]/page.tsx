@@ -17,7 +17,7 @@ import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegi
 // Le scale della matrice di rischio, prese da dove sono definite invece che ricopiate:
 // due elenchi di parole tenuti a mano in due posti divergono, e quello sbagliato finisce
 // sempre sullo schermo del cliente.
-import { IMPACT_LABEL, LIKELIHOOD_LABEL, riskLevel } from '@aegis/core';
+import { IMPACT_LABEL, LIKELIHOOD_LABEL, importoEMonteSalari, riskLevel } from '@aegis/core';
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
 import { RitornoAllElenco } from '../../prospect/UltimoElenco';
@@ -42,6 +42,10 @@ import {
   Spiegazione,
 } from '@/components/ui';
 import { etichettaAddetti } from '@/lib/etichetta-addetti';
+import { CollegamentoAzione } from '@/components/CollegamentoAzione';
+import { sottotitoloSomme } from '@/lib/sottotitolo-somme';
+import { etichettaPiuEsposta } from '@/lib/ubicazione-piu-esposta';
+import { ubicazioniDeiFabbricati } from '@/lib/nota-patrimonio';
 
 export const dynamic = 'force-dynamic';
 
@@ -502,7 +506,8 @@ export default async function PaginaAzienda({
                           */}
                           {!u.haCoordinate && ' · senza coordinate'}
                         </span>
-                        {u.piuEsposta && ubicazioni.elenco.length > 1 && (
+                        {etichettaPiuEsposta(u.piuEsposta, quantePiuEsposte, ubicazioni.elenco.length) !==
+                          null && (
                           <span className="mt-1 inline-block rounded bg-attenzione/15 px-1.5 py-0.5 text-xs font-medium text-attenzione">
                             {/*
                               Al plurale quando il primo posto è pari, e non è pignoleria di lingua:
@@ -510,7 +515,7 @@ export default async function PaginaAzienda({
                               quattro lo sono meno, e l’intermediario sceglie dove andare a fare il
                               sopralluogo su un’informazione falsa.
                             */}
-                            {quantePiuEsposte > 1 ? 'fra le più esposte' : 'la più esposta'}
+                            {etichettaPiuEsposta(u.piuEsposta, quantePiuEsposte, ubicazioni.elenco.length)}
                           </span>
                         )}
                       </td>
@@ -1042,7 +1047,7 @@ export default async function PaginaAzienda({
       <Sezione
         id="somme"
         titolo="Somme assicurande"
-        sottotitolo="Calcolate dal bilancio depositato e dai dati rilevati in intervista"
+        sottotitolo={sottotitoloSomme(analisi.livelloDatiEconomici, analisi.completezza.percentuale)}
       >
         <div className="grid gap-3 md:grid-cols-2">
           {Object.entries(analisi.sommeAssicurande)
@@ -1850,7 +1855,9 @@ function componiNotaPatrimonio(somme: AnalisiDto['sommeAssicurande']): string {
     else fuori.push(etichetta);
   };
 
-  voce('fabbricati', somme.fabbricati);
+  // «Solo fabbricati di 1 ubicazione su 2»: il capitale in testata è quello di una parte delle sedi.
+  const parziale = ubicazioniDeiFabbricati(somme.fabbricati);
+  voce(parziale === null ? 'fabbricati' : `fabbricati di ${parziale}`, somme.fabbricati);
   voce('macchinari', somme.contenuto);
   voce('scorte', somme.scorte);
 
@@ -1925,9 +1932,22 @@ function Intestazione({
             che non avrebbe addebitato. Un prezzo scritto dove non c'è addebito costa lavoro
             non fatto, esattamente come un addebito taciuto costa fiducia.
           */}
+          {/*
+            LA ROTELLA. Premuto «Analisi approfondita» su RED GROUP S.R.L., per alcuni secondi
+            non cambiava niente — il server comprava e ricalcolava — e l'intermediario ha
+            ricaricato la pagina credendo che il tasto non andasse. `CollegamentoAzione` mostra
+            l'attesa sul pulsante premuto e non accetta un secondo clic finché la scheda nuova
+            non è arrivata.
+
+            `prefetch` spento sui due che spendono, per prudenza: oggi il prefetch di una pagina
+            dinamica si ferma a `loading.tsx` e non esegue la scheda, ma qui l'indirizzo È
+            l'acquisto, e non deve diventarlo il giorno che quel file cambia.
+          */}
           {!conNegativita && (
-            <Link
+            <CollegamentoAzione
               href={`/azienda/${identificativo}?negativita=1${approfondita ? '&approfondita=1' : ''}`}
+              prefetch={false}
+              inAttesa="Verifica di protesti e procedure in corso"
               className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Verifica protesti e procedure{' '}
@@ -1936,11 +1956,13 @@ function Intestazione({
               ) : (
                 <span className="text-testo-debole">{prezzo(listino?.costoEventiNegativiCentesimi)}</span>
               )}
-            </Link>
+            </CollegamentoAzione>
           )}
           {!approfondita && (
-            <Link
+            <CollegamentoAzione
               href={`/azienda/${identificativo}?approfondita=1${conNegativita ? '&negativita=1' : ''}`}
+              prefetch={false}
+              inAttesa="Analisi approfondita in corso"
               className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Analisi approfondita{' '}
@@ -1949,9 +1971,9 @@ function Intestazione({
               ) : (
                 <span className="text-testo-debole">{prezzo(listino?.costoApprofondimentoCentesimi)}</span>
               )}
-            </Link>
+            </CollegamentoAzione>
           )}
-          <Link
+          <CollegamentoAzione
             href={`/azienda/${identificativo}/dati`}
             className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
           >
@@ -1959,7 +1981,7 @@ function Intestazione({
             <span className="tabular text-testo-debole">
               {Math.round(analisi.completezza.percentuale * 100)}%
             </span>
-          </Link>
+          </CollegamentoAzione>
           {/*
             Il report eredita ciò che è stato comprato.
 
@@ -1970,12 +1992,13 @@ function Intestazione({
             testata. Non si compra nulla di nuovo — l'analisi a quel livello è già in
             archivio — si chiede la stessa che si sta guardando.
           */}
-          <Link
+          <CollegamentoAzione
             href={`/azienda/${identificativo}/report${acquistiNellIndirizzo(approfondita, conNegativita)}`}
+            inAttesa="Preparazione del report in corso"
             className="rounded bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90"
           >
             Report per il cliente
-          </Link>
+          </CollegamentoAzione>
         </div>
       </div>
 
@@ -2064,7 +2087,8 @@ function VoceGap({
           )}
         </div>
         <p className="tabular text-sm text-testo-tenue">
-          consigliato{' '}
+          {/* Il monte salari degli infortuni è una base, non un capitale: si chiama per nome. */}
+          {importoEMonteSalari(voce.copertura) ? 'monte salari' : 'consigliato'}{' '}
           <strong className="text-testo">
             {voce.capitaleRaccomandato.valore?.formattato ?? 'da definire'}
           </strong>

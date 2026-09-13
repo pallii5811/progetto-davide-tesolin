@@ -32,7 +32,13 @@ import { presentAnalysis } from '../src/presenter.js';
 const SORGENTE_DTO_WEB = fileURLToPath(new URL('../../web/src/lib/api.ts', import.meta.url));
 
 function sorgenteDtoWeb(): string {
-  return readFileSync(SORGENTE_DTO_WEB, 'utf8');
+  /*
+    Fine riga normalizzati. Su Windows git può estrarre il file in CRLF, e le righe lette qui
+    finivano con un ritorno a capo in più: il parser dei gruppi ne trovava 1 su 17 e quattro
+    prove diventavano rosse su un file identico, byte per byte, a quello che sta in git.
+    Un controllo che dipende da come il disco salva gli a capo misura il disco, non il DTO.
+  */
+  return readFileSync(SORGENTE_DTO_WEB, 'utf8').replace(/\r\n/g, '\n');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

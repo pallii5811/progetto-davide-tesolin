@@ -22,6 +22,7 @@ import {
 } from '../shared/math.js';
 import { ageInMonths, weakestConfidence } from '../shared/provenance.js';
 import type { Confidence, Sourced } from '../shared/provenance.js';
+import { conPatrimonioNettoAutorevole } from '../company/financials.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
 import { assenzaDi } from '../company/indicators.js';
 import type { FinancialIndicators } from '../company/indicators.js';
@@ -418,11 +419,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   // La confidenza non può superare quella consentita dal livello di dati disponibili.
   if (livelloDati === 'sintetico') {
     confidenza = 'media';
-    builder.note(
-      'Analisi condotta sugli aggregati di bilancio (fatturato, patrimonio netto, totale attivo, ' +
-        'costo del personale). Redditività, liquidità e sostenibilità del debito non sono ' +
-        'valutabili senza il bilancio in schema CEE dettagliato.',
-    );
+    builder.note(notaLivelloSintetico(factors));
   }
 
   if (profile.eventiNegativi === null) {
@@ -574,10 +571,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
       )
       .noteIf(cap !== null, `Punteggio limitato dall'alto: ${cap ?? ''}`)
       .input('Data di valutazione', formatDate(asOf))
-      .input(
-        'Esercizio di riferimento',
-        bilancio === null ? 'da rilevare in intervista' : String(bilancio.anno),
-      )
+      .input('Esercizio di riferimento', esercizioDiRiferimento(profile, bilancio))
       // `formatPercent` su un'assenza scriverebbe «0,00%», che è una PD bassissima: la
       // regola 2d del progetto vista dal lato della formattazione.
       .input(
@@ -728,13 +722,43 @@ function fattoreRedditivita(ind: FinancialIndicators | null): ScoreFactor {
           ? 'La gestione caratteristica genera margini solidi e sostenibili.'
           : score >= 45
             ? 'Redditività modesta: margini sufficienti ma poco spazio di assorbimento degli shock.'
-            : 'Redditività insufficiente: la gestione operativa non remunera il capitale investito.',
+            : motivoDellaRedditivitaInsufficiente(ind),
     details: [
       `ROI: ${ind.roi === null ? assenzaDi('roi') : formatPercent(ind.roi)}`,
       `EBITDA margin: ${ind.ebitdaMargin === null ? assenzaDi('ebitdaMargin') : formatPercent(ind.ebitdaMargin)}`,
       `Crescita EBITDA: ${ind.crescitaEbitda === null ? assenzaDi('crescitaEbitda') : formatPercent(ind.crescitaEbitda)}`,
     ],
   };
+}
+
+/**
+ * La redditività insufficiente, detta con l'indice che l'ha misurata.
+ *
+ * «La gestione operativa non remunera il capitale investito» è un giudizio sul ROI. Sul
+ * percorso dell'archivio il ROI resta fuori dal punteggio — non se ne conosce il
+ * denominatore — e il fattore si regge sul solo margine EBITDA. Su RED GROUP S.R.L. la
+ * frase stava sotto un margine del 3,5 %, e più su la scheda stampava ROE 17,89 % e ROA
+ * monetario 7,02 %: il capitale era remunerato, erano i margini a essere sottili.
+ */
+function motivoDellaRedditivitaInsufficiente(ind: FinancialIndicators): string {
+  if (ind.roi !== null) {
+    return 'Redditività insufficiente: la gestione operativa non remunera il capitale investito.';
+  }
+  if (ind.ebitdaMargin !== null && ind.ebitdaMargin < 0) {
+    // Un margine negativo non lascia «poco spazio»: non ne lascia. Trovato dall'istantanea
+    // del motore, su un'impresa vera con EBITDA di −209.451 €.
+    return (
+      `Redditività insufficiente: il margine EBITDA è negativo (${formatPercent(ind.ebitdaMargin)} del ` +
+      'valore della produzione), e la gestione caratteristica non copre i propri costi.'
+    );
+  }
+  if (ind.ebitdaMargin !== null) {
+    return (
+      `Redditività insufficiente: il margine EBITDA è il ${formatPercent(ind.ebitdaMargin)} del valore ` +
+      'della produzione, e lascia poco spazio per assorbire un aumento dei costi o un calo dei volumi.'
+    );
+  }
+  return 'Redditività insufficiente sugli indici disponibili.';
 }
 
 /**
@@ -1222,7 +1246,81 @@ function patrimonioNettoNoto(
   bilancio: BilancioRiclassificato | null,
 ): Euro | null {
   if (bilancio !== null) return bilancio.sp.patrimonioNetto;
-  return ultimoBilancioSintetico(profile)?.value.patrimonioNetto ?? null;
+  /*
+    IL TERZO CONSUMATORE, che la correzione del patrimonio non aveva raggiunto.
+
+    L'anagrafica estesa porta nei bilanci sintetici un campo che non è il patrimonio netto:
+    su TRANSPECIAL S.R.L. valeva −121.388 € nel 2025, cioè la perdita d'esercizio, mentre il
+    patrimonio vero era 393.127 €. `conPatrimonioNettoAutorevole` esiste per questo, e il suo
+    commento dice che i consumatori sono due. Erano tre: questo leggeva ancora il campo
+    grezzo, vedeva un «patrimonio netto negativo» in una perdita d'anno, e tagliava lo
+    score da 43 a 35 mentre la stessa pagina stampava 393.127 € nel record camerale,
+    nell'equity ratio e nel fido.
+  */
+  return (
+    conPatrimonioNettoAutorevole(
+      ultimoBilancioSintetico(profile)?.value ?? null,
+      profile.indicatoriFornitore.aggregati?.patrimonioNetto ?? null,
+    )?.patrimonioNetto ?? null
+  );
+}
+
+/**
+ * La nota del livello sintetico, composta dai fattori invece che scritta una volta.
+ *
+ * Diceva sempre «Redditività, liquidità e sostenibilità del debito non sono valutabili senza
+ * il bilancio in schema CEE dettagliato». Era vero finché il punteggio non ha cominciato a
+ * leggere gli indici che il Registro Imprese elabora sul bilancio depositato. Da allora, su
+ * RED GROUP S.R.L., la stessa spiegazione elencava quei tre fattori a 42, 78 e 90 su cento
+ * — il 64 % del punteggio — e la nota subito sotto li dichiarava non valutabili.
+ *
+ * Quando nessuno dei tre è valutato la frase è identica a prima, parola per parola.
+ */
+function notaLivelloSintetico(factors: readonly ScoreFactor[]): string {
+  const delLivello = factors.filter((f) =>
+    ['redditivita', 'liquidita', 'sostenibilita-debito'].includes(f.key),
+  );
+  const valutati = delLivello.filter((f) => f.score !== null);
+  const mancanti = delLivello.filter((f) => f.score === null);
+
+  let nota =
+    'Analisi condotta sugli aggregati di bilancio (fatturato, patrimonio netto, totale attivo, ' +
+    'costo del personale).';
+  if (valutati.length > 0) {
+    nota +=
+      ` ${elencoDiFattori(valutati)} ${valutati.length === 1 ? 'è valutata' : 'sono valutate'} ` +
+      'sugli indici che il Registro Imprese elabora sul bilancio depositato.';
+  }
+  if (mancanti.length > 0) {
+    nota +=
+      ` ${elencoDiFattori(mancanti)} ${mancanti.length === 1 ? 'non è valutabile' : 'non sono valutabili'} ` +
+      'senza il bilancio in schema CEE dettagliato.';
+  }
+  return nota;
+}
+
+/** «Redditività, liquidità e sostenibilità del debito»: la prima maiuscola, le altre no. */
+function elencoDiFattori(fattori: readonly ScoreFactor[]): string {
+  const nomi = fattori.map((f) => f.label.toLowerCase());
+  const elenco =
+    nomi.length <= 1 ? (nomi[0] ?? '') : `${nomi.slice(0, -1).join(', ')} e ${nomi.at(-1) ?? ''}`;
+  return `${elenco.charAt(0).toUpperCase()}${elenco.slice(1)}`;
+}
+
+/**
+ * L'esercizio su cui il punteggio ha lavorato, anche quando non è uno schema CEE.
+ *
+ * Diceva «da rilevare in intervista» ogni volta che mancava il bilancio dettagliato. Su RED
+ * GROUP S.R.L. il fattore anzianità, tre righe più su, contava nove esercizi disponibili, e
+ * gli indici del punteggio venivano dal bilancio 2025 depositato: l'esercizio era noto, e
+ * mandare a chiederlo al cliente era chiedergli un dato già comprato.
+ */
+function esercizioDiRiferimento(profile: CompanyProfile, bilancio: BilancioRiclassificato | null): string {
+  if (bilancio !== null) return String(bilancio.anno);
+  const sintetico = ultimoBilancioSintetico(profile);
+  return sintetico === null
+    ? 'da rilevare in intervista'
+    : `${String(sintetico.value.anno)} (aggregati del Registro Imprese)`;
 }
 
 function notEvaluable(key: string, label: string, weight: number, motivo: string): ScoreFactor {

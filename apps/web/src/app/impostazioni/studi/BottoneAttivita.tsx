@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import { Rotella } from '@/components/Rotella';
 import { cambiaAttivita } from './actions';
 
 /**
@@ -31,9 +32,11 @@ export function BottoneAttivita({
         if (attivo && !confirm(`Sospendere «${denominazione}»? Gli accessi cessano subito.`)) return;
         avvia(() => void cambiaAttivita(id, !attivo));
       }}
-      className="rounded border border-bordo-forte px-2.5 py-1 text-xs text-testo-tenue transition hover:text-testo disabled:opacity-50"
+      aria-busy={inCorso}
+      className="inline-flex items-center gap-1 rounded border border-bordo-forte px-2.5 py-1 text-xs text-testo-tenue transition hover:text-testo disabled:opacity-50"
     >
-      {inCorso ? '…' : attivo ? 'Sospendi' : 'Riattiva'}
+      {inCorso && <Rotella className="h-3 w-3" />}
+      {attivo ? 'Sospendi' : 'Riattiva'}
     </button>
   );
 }

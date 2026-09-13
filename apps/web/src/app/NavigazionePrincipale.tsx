@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { eAttiva } from '@/lib/voce-attiva';
+import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
 
 /**
  * Il menu principale, e quale voce è aperta.
@@ -54,6 +55,7 @@ export function NavigazionePrincipale() {
             }
           >
             {voce.testo}
+            <AttesaDelCollegamento />
           </Link>
         );
       })}

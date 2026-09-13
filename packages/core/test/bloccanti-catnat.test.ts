@@ -39,8 +39,10 @@ describe('Le sette date di legge sono quelle di docs/DOMINIO.md', () => {
   it('le quattro scadenze per classe dimensionale', () => {
     expect(formattaGiorno(TERMINI_CATNAT.grande), 'grandi imprese').toBe('31/03/2025');
     expect(formattaGiorno(TERMINI_CATNAT.media), 'medie imprese').toBe('01/10/2025');
-    expect(formattaGiorno(TERMINI_CATNAT.piccola), 'piccole imprese').toBe('01/01/2026');
-    expect(formattaGiorno(TERMINI_CATNAT.micro), 'micro imprese').toBe('01/01/2026');
+    // D.L. 39/2025 e MIMIT: 31 dicembre 2025. Qui c'era 01/01/2026, e il collaudo difendeva
+    // la data sbagliata invece di impedirla.
+    expect(formattaGiorno(TERMINI_CATNAT.piccola), 'piccole imprese').toBe('31/12/2025');
+    expect(formattaGiorno(TERMINI_CATNAT.micro), 'micro imprese').toBe('31/12/2025');
   });
 
   it('e le tre proroghe settoriali', () => {
@@ -61,19 +63,19 @@ describe('Le sette date di legge sono quelle di docs/DOMINIO.md', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Il termine scade quando finisce il giorno che il prodotto stampa', () => {
-  // Termine delle piccole imprese: 01/01/2026. A Roma finisce alle 23:59:59 di quel giorno.
+  // Termine delle piccole imprese: 31/12/2025. A Roma finisce alle 23:59:59 di quel giorno.
   const PICCOLA: Partial<CompanyFacts> = { dimensione: 'piccola', atecoDivisione: '25' };
 
   it('il giorno del termine non è ancora scaduto, e mancano zero giorni', () => {
-    const esito = valuta(PICCOLA, new Date('2026-01-01T12:00:00Z')).value;
+    const esito = valuta(PICCOLA, new Date('2025-12-31T12:00:00Z')).value;
     expect(esito.status).toBe('in-scadenza');
     expect(esito.giorniAlTermine).toBe(0);
   });
 
   it('il giorno dopo è scaduto, e lo è per tutte e ventiquattro le ore', () => {
     for (let ora = 0; ora < 24; ora += 1) {
-      const quando = new Date(Date.UTC(2026, 0, 2, ora, 30, 0));
-      const dove = `alle ${String(ora)}:30 UTC del 02/01/2026`;
+      const quando = new Date(Date.UTC(2026, 0, 1, ora, 30, 0));
+      const dove = `alle ${String(ora)}:30 UTC del 01/01/2026`;
       const esito = valuta(PICCOLA, quando).value;
       expect(esito.status, dove).toBe('inadempiente');
       expect(esito.giorniAlTermine, dove).toBeLessThan(0);
@@ -81,7 +83,7 @@ describe('Il termine scade quando finisce il giorno che il prodotto stampa', () 
   });
 
   it('e non produce mai un meno zero, che minore di zero non è', () => {
-    const esito = valuta(PICCOLA, new Date('2026-01-02T00:30:00Z'));
+    const esito = valuta(PICCOLA, new Date('2026-01-01T00:30:00Z'));
     expect(Object.is(esito.value.giorniAlTermine, -0)).toBe(false);
     expect(esito.explanation.notes.join(' ')).not.toContain('entro 0 giorni');
   });

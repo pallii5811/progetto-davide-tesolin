@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import { CollegamentoAzione } from '@/components/CollegamentoAzione';
+import { BottoneInvioGet } from '@/components/BottoneInvioGet';
 import { richiediSessione } from '@/lib/sessione';
 import { cercaProspect } from '@/lib/api';
 import type { RisultatoProspezione } from '@/lib/api';
@@ -264,12 +265,12 @@ export default async function PaginaProspect({
           {haDescrittoUnImpresa && <ConfrontoConElencoComprato criteri={criteri} />}
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
+            <BottoneInvioGet
+              inCorso="Conteggio in corso…"
               className="rounded border border-bordo-forte px-5 py-2 text-sm font-medium transition hover:border-marchio"
             >
               Quante sono? <span className="text-testo-debole">gratis</span>
-            </button>
+            </BottoneInvioGet>
 
             {/*
               Il pulsante che spende **invia questo modulo**, quindi compra per costruzione
@@ -420,12 +421,13 @@ export default async function PaginaProspect({
                       {azienda.provincia !== null && ` (${azienda.provincia})`}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
+                      <CollegamentoAzione
                         href={`/azienda/${azienda.providerId}`}
+                        inAttesa="Analisi in corso"
                         className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
                       >
                         Analizza
-                      </Link>
+                      </CollegamentoAzione>
                     </td>
                   </tr>
                 ))}

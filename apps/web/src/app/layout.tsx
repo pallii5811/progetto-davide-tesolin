@@ -4,6 +4,7 @@ import { autenticazioneRichiesta, utenteCorrente } from '@/lib/api';
 import type { UtenteCorrente } from '@/lib/api';
 import { esci } from './accedi/actions';
 import { NavigazionePrincipale } from './NavigazionePrincipale';
+import { BottoneInvio } from '@/components/BottoneInvio';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -54,12 +55,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       {utente.nome}
                     </Link>
                     <form action={esci}>
-                      <button
-                        type="submit"
-                        className="rounded text-xs text-testo-tenue underline-offset-2 hover:text-testo hover:underline"
-                      >
+                      <BottoneInvio className="rounded text-xs text-testo-tenue underline-offset-2 hover:text-testo hover:underline">
                         Esci
-                      </button>
+                      </BottoneInvio>
                     </form>
                   </div>
                 )}

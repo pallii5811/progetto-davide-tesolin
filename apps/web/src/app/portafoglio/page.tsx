@@ -1,5 +1,6 @@
 import { richiediSessione } from '@/lib/sessione';
 import Link from 'next/link';
+import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import { leggiPortafoglio } from '@/lib/api';
 import type { VocePortafoglio } from '@/lib/api';
 import { applicaFiltroPortafoglio } from '@aegis/core';
@@ -97,12 +98,12 @@ export default async function PaginaPortafoglio({
           >
             Esporta in CSV
           </a>
-          <Link
+          <CollegamentoAzione
             href="/portafoglio/importa"
             className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo"
           >
             Importa elenco clienti
-          </Link>
+          </CollegamentoAzione>
         </div>
       </div>
       {/*
@@ -212,7 +213,7 @@ export default async function PaginaPortafoglio({
         ].map((voce) => {
           const attivo = filtro === voce.chiave;
           return (
-            <Link
+            <CollegamentoAzione
               key={voce.testo}
               href={voce.chiave === undefined ? '/portafoglio' : `/portafoglio?filtro=${voce.chiave}`}
               aria-current={attivo ? 'page' : undefined}
@@ -223,7 +224,7 @@ export default async function PaginaPortafoglio({
               }`}
             >
               {voce.testo}
-            </Link>
+            </CollegamentoAzione>
           );
         })}
       </nav>
@@ -277,12 +278,13 @@ export default async function PaginaPortafoglio({
                 Dati di intervista {Math.round(azienda.completezza * 100)}%
                 {azienda.coperturaAssente > 0 && ` · ${azienda.coperturaAssente} coperture assenti`}
               </span>
-              <Link
+              <CollegamentoAzione
                 href={`/azienda/${azienda.identificativo}`}
+                inAttesa="Apertura della scheda in corso"
                 className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
               >
                 Apri
-              </Link>
+              </CollegamentoAzione>
             </div>
           </li>
         ))}
@@ -358,12 +360,13 @@ export default async function PaginaPortafoglio({
                 </td>
 
                 <td className="px-4 py-3 text-right">
-                  <Link
+                  <CollegamentoAzione
                     href={`/azienda/${azienda.identificativo}`}
+                    inAttesa="Apertura della scheda in corso"
                     className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
                   >
                     Apri
-                  </Link>
+                  </CollegamentoAzione>
                 </td>
               </tr>
             ))}

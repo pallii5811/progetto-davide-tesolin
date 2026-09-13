@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Rotella } from '@/components/Rotella';
 import { Avviso, Scheda } from '@/components/ui';
 import type { CandidatoVerificaDto, VerificaDto } from '@/lib/api';
 import { decidiVerificaAzione, eseguiAdeguataVerificaAzione } from './actions';
@@ -50,8 +51,10 @@ function Bottone({ etichetta, inCorso }: { etichetta: string; inCorso: string })
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-accento px-3 py-2 text-sm font-medium text-su-accento disabled:opacity-60"
+      aria-busy={pending}
+      className="inline-flex items-center gap-1.5 rounded-md bg-accento px-3 py-2 text-sm font-medium text-su-accento disabled:opacity-60"
     >
+      {pending && <Rotella />}
       {pending ? inCorso : etichetta}
     </button>
   );

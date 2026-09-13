@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { Rotella } from '@/components/Rotella';
 import { apriStudio } from './actions';
 import type { EsitoApertura } from './actions';
 
@@ -32,8 +33,10 @@ export function ModuloStudio() {
         <button
           type="submit"
           disabled={inCorso}
-          className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+          aria-busy={inCorso}
+          className="inline-flex items-center gap-1.5 rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
         >
+          {inCorso && <Rotella />}
           {inCorso ? 'Apertura…' : 'Apri lo studio'}
         </button>
         {esito !== null && !esito.ok && <span className="text-sm text-critico">{esito.messaggio}</span>}

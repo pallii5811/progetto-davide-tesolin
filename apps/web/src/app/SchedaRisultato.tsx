@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import type { RisultatoRicerca } from '@/lib/api';
 import { formattaGiorno } from '@aegis/core/tempo';
 
@@ -60,12 +60,13 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
               {azienda.statoAttivita.replace('-', ' ')}
             </span>
           )}
-          <Link
+          <CollegamentoAzione
             href={`/azienda/${azienda.providerId}`}
+            inAttesa="Analisi in corso"
             className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
           >
             Analizza
-          </Link>
+          </CollegamentoAzione>
         </div>
       </div>
 

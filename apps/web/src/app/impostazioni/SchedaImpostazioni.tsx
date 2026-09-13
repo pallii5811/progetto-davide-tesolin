@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
 
 /**
  * Una scheda delle impostazioni, e se è quella aperta.
@@ -31,6 +32,7 @@ export function SchedaImpostazioni({ href, children }: { href: string; children:
       }
     >
       {children}
+      <AttesaDelCollegamento />
     </Link>
   );
 }

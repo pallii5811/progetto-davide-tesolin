@@ -464,14 +464,16 @@ describe('Obbligo CAT NAT', () => {
     expect(ignota.motivoEsclusione).toBeNull();
   });
 
-  it('applica alle piccole imprese il termine del 1° gennaio 2026', () => {
+  it('applica alle piccole imprese il termine del 31 dicembre 2025', () => {
     const risultato = assessCatNat({
       facts,
       baseAssicurabile: euro(1_000_000),
       giaCoperta: false,
       asOf: DEMO_AS_OF,
     });
-    expect(risultato.value.termine?.getUTCFullYear()).toBe(2026);
+    // Diceva «1° gennaio 2026» e controllava l'anno 2026: il D.L. 39/2025 e il MIMIT scrivono
+    // 31 dicembre 2025. La fine di quel giorno a Roma è le 22:59:59 UTC.
+    expect(risultato.value.termine?.toISOString()).toBe('2025-12-31T22:59:59.999Z');
     expect(risultato.value.status).toBe('inadempiente');
   });
 

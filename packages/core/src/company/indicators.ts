@@ -459,6 +459,35 @@ function daPercentuale(valore: number | null | undefined): number | null {
   return valore === null || valore === undefined ? null : valore / 100;
 }
 
+/**
+ * PFN su EBITDA dall'archivio: due campi con lo stesso numero, e un segno che inganna.
+ *
+ * L'archivio lo pubblica due volte — `pfnEbitda` ed `ebitdaNetLeverage` — e non sempre
+ * valorizza il primo. Su RED GROUP S.R.L. il primo era vuoto: il punteggio stampava
+ * «PFN / EBITDA: da rilevare in intervista» mentre il riquadro dell'archivio, più su,
+ * mostrava «Leva netta su EBITDA 0,97». Che siano lo stesso indice si prova, non si deduce
+ * dal nome:
+ *
+ *   campione 01528120981   pfnEbitda −45,5959   ebitdaNetLeverage −45,5959
+ *   campione 12485671007   pfnEbitda −1,338     ebitdaNetLeverage −1,338
+ *   RED GROUP S.R.L.       debito netto su patrimonio 0,3294 × patrimonio 408.279 €
+ *                          ÷ EBITDA 139.088 € = 0,9669   ebitdaNetLeverage 0,967
+ *
+ * IL SEGNO. Con l'EBITDA negativo il rapporto esce negativo, e la curva del punteggio legge
+ * un rapporto negativo come cassa netta, cioè il voto massimo. Sul primo campione un EBITDA
+ * di −209.451 € dava PFN / EBITDA −45,6 e il massimo alla sostenibilità del debito di
+ * un'impresa in perdita operativa. Il calcolo sul bilancio in schema CEE restituisce null
+ * quando l'EBITDA non è positivo; qui si fa lo stesso, e senza un EBITDA noto il segno non
+ * si può leggere.
+ */
+function pfnSuEbitdaDaArchivio(
+  lev: IndicatoriFornitore['leveFinanziarie'],
+  ebitda: number | null | undefined,
+): number | null {
+  if (ebitda === null || ebitda === undefined || !(ebitda > 0)) return null;
+  return lev?.pfnSuEbitda ?? lev?.ebitdaLevaNetta ?? null;
+}
+
 export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialIndicators | null {
   const red = fornitore.redditivita;
   const sol = fornitore.solidita;
@@ -520,7 +549,7 @@ export function indicatoriDaArchivio(fornitore: IndicatoriFornitore): FinancialI
     coperturaImmobilizzazioni: sol?.tassoCoperturaImmobilizzazioni ?? null,
 
     // Sostenibilità del debito: EBIT sugli interessi, non EBITDA.
-    pfnSuEbitda: lev?.pfnSuEbitda ?? null,
+    pfnSuEbitda: pfnSuEbitdaDaArchivio(lev, fornitore.risultatiOperativi?.ebitda),
     coperturaOneriFinanziari: cop?.ebitSuInteressiLordi ?? null,
     incidenzaOneriFinanziari: null,
 

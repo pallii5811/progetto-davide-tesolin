@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Rotella } from '@/components/Rotella';
 import {
   CampoData,
   CampoNumero,
@@ -201,6 +202,9 @@ export function EditorDossier({
   const [polizze, setPolizze] = useState<PolizzaForm[]>(polizzeIniziali);
   const [esito, setEsito] = useState<{ ok: boolean; messaggio: string } | null>(null);
   const [inCorso, avvia] = useTransition();
+  // La navigazione verso la scheda ha la sua attesa: `router.push` da solo non dice quando ha
+  // finito, e la scheda ricalcolata impiega secondi ad arrivare.
+  const [navigando, avviaNavigazione] = useTransition();
 
   /*
     C'È QUALCOSA DI NON SALVATO?
@@ -779,16 +783,24 @@ export function EditorDossier({
                 )}
                 <button
                   type="button"
-                  disabled={inCorso}
+                  disabled={inCorso || navigando}
+                  aria-busy={navigando}
                   onClick={() => {
                     if (!modificato) {
-                      router.push(collegamentoAnalisi);
+                      avviaNavigazione(() => {
+                        router.push(collegamentoAnalisi);
+                      });
                       return;
                     }
-                    onSalva(() => router.push(collegamentoAnalisi));
+                    onSalva(() => {
+                      avviaNavigazione(() => {
+                        router.push(collegamentoAnalisi);
+                      });
+                    });
                   }}
-                  className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio disabled:cursor-not-allowed disabled:opacity-60"
                 >
+                  {navigando && <Rotella />}
                   Vedi l’analisi
                 </button>
               </div>
@@ -800,8 +812,10 @@ export function EditorDossier({
               // posto di quel seguito, e il salvataggio proverebbe a eseguirlo.
               onClick={() => onSalva()}
               disabled={inCorso}
-              className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+              aria-busy={inCorso}
+              className="inline-flex items-center gap-1.5 rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
             >
+              {inCorso && <Rotella />}
               {inCorso ? 'Salvataggio…' : 'Salva e ricalcola'}
             </button>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { BottoneInvioGet } from '@/components/BottoneInvioGet';
 
 /**
  * Il pulsante che spende, e che dopo il primo clic non spende una seconda volta.
@@ -28,38 +28,17 @@ import { useEffect, useRef, useState } from 'react';
  * è gratuito, e scrivergli sopra «acquisto in corso» sarebbe una bugia sul denaro.
  */
 export function BottoneElenco({ etichetta }: { etichetta: string }) {
-  const [inCorso, setInCorso] = useState(false);
-  const riferimento = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const modulo = riferimento.current?.form;
-    if (!modulo) return undefined;
-
-    const allInvio = (evento: SubmitEvent): void => {
-      if (evento.submitter !== riferimento.current) return;
-      // Zero millisecondi, ma un giro dopo: la navigazione è cominciata e spegnere il
-      // pulsante non la può più annullare.
-      setTimeout(() => setInCorso(true), 0);
-    };
-
-    modulo.addEventListener('submit', allInvio);
-    return () => modulo.removeEventListener('submit', allInvio);
-  }, []);
-
+  // La logica dello spegnimento differito sta in BottoneInvioGet, dove la usa anche
+  // «Quante sono?»: due copie della stessa sottigliezza divergerebbero alla prima correzione.
   return (
-    <button
-      ref={riferimento}
-      type="submit"
+    <BottoneInvioGet
       name="scarica"
       value="1"
-      data-testid="scarica-elenco"
-      disabled={inCorso}
-      // Chi usa un lettore di schermo deve sentire che l'acquisto è partito: senza, per lui
-      // non è cambiato niente, ed è esattamente il caso in cui si riprova.
-      aria-live="polite"
-      className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      testId="scarica-elenco"
+      inCorso="Acquisto in corso…"
+      className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-60"
     >
-      {inCorso ? 'Acquisto in corso…' : etichetta}
-    </button>
+      {etichetta}
+    </BottoneInvioGet>
   );
 }

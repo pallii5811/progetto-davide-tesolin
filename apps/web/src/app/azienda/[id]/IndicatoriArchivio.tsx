@@ -4,6 +4,7 @@ import { inizialeMinuscola } from '@aegis/core';
 import { formattaGiorno } from '@aegis/core/tempo';
 import { notaCampiMancanti } from '@/lib/nota-campi-mancanti';
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
+import { fasciaDiFatturato } from '@/lib/fascia-fatturato';
 
 /**
  * Gli indicatori che l'archivio camerale restituisce già calcolati.
@@ -426,7 +427,7 @@ function Qualifiche({
     // IT-full risponde «Small enterprise»: la classe dimensionale è la stessa delle soglie
     // UE, e in italiano si dice da sempre «piccola impresa».
     ['Dimensione', traduciDescrizioneArchivioMaiuscola(q.dimensioneImpresa)],
-    ['Fascia di fatturato', q.fasciaDiFatturato],
+    ['Fascia di fatturato', fasciaDiFatturato(q.fasciaDiFatturato)],
     /*
       L'ANNO DEL FATTURATO, che mancava.
 

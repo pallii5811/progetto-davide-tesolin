@@ -771,6 +771,23 @@ const DATO_MANCANTE: Readonly<Record<BasiDiCalcolo, string | null>> = {
   'da-definire': null,
 };
 
+/**
+ * Se l'importo raccomandato di una copertura è il monte salari, e non un capitale.
+ *
+ * Si decide sull'importo, non sulla base del premio. Anche l'RCO dichiara
+ * `base: 'monte-salari'`, perché il premio si calcola sulle retribuzioni, ma raccomanda il
+ * massimale per persona. La prima versione di questa correzione guardava la base, e
+ * l'istantanea del motore l'ha trovata scrivere «Attivare la copertura RCO sul monte salari
+ * annuo di 2.500.000 €» su nove imprese su undici. L'importo è il monte salari solo dove
+ * `capitaleRaccomandato` lo prende da `sums.monteSalari`.
+ *
+ * Esportata perché la usa anche la scheda, che accanto a quel numero scrive «monte salari»
+ * invece di «consigliato».
+ */
+export function importoEMonteSalari(copertura: string): boolean {
+  return copertura === 'infortuni-dipendenti';
+}
+
 function descriviAzione(
   definition: CoverageDefinition,
   status: GapStatus,
@@ -787,6 +804,19 @@ function descriviAzione(
     avesse guardato il suo fascicolo, e la prima cosa che il cliente risponde è che quella
     polizza l'ha comprata.
   */
+  /*
+    Come si nomina l'importo, secondo che cosa è.
+
+    «Attivare la copertura Infortuni dipendenti con capitale di 609.215 €» su RED GROUP
+    S.R.L.: quel numero è il monte salari annuo, la base retributiva della copertura. Il
+    capitale assicurato si fissa per dipendente, e un intermediario che legge «capitale»
+    porta in quotazione una somma che non esiste.
+  */
+  const conImporto = (importo: Euro): string =>
+    importoEMonteSalari(definition.id)
+      ? `sul monte salari annuo di ${Money.formatCompact(importo)}, che è la base retributiva della copertura e non il capitale assicurato`
+      : `con capitale di ${Money.formatCompact(importo)}`;
+
   if (polizza !== null && isScaduta(polizza, asOf)) {
     const giorni = Math.abs(giorniAllaScadenza(polizza, asOf));
     const premessa =
@@ -794,14 +824,14 @@ function descriviAzione(
       `(${giorni} giorni fa): la garanzia non è in vigore.`;
     return raccomandato === null
       ? `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla, con capitale da definire in sede di intervista.`
-      : `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla con capitale di ${Money.formatCompact(raccomandato)}.`;
+      : `${premessa} Verificarne il rinnovo e, in mancanza, riattivarla ${conImporto(raccomandato)}.`;
   }
 
   switch (status) {
     case 'assente':
       return raccomandato === null
         ? `Attivare la copertura ${definition.label}, con capitale da definire in sede di intervista.`
-        : `Attivare la copertura ${definition.label} con capitale di ${Money.formatCompact(raccomandato)}.`;
+        : `Attivare la copertura ${definition.label} ${conImporto(raccomandato)}.`;
     case 'sottoassicurata': {
       const delta =
         raccomandato !== null && inEssere !== null ? Money.subtract(raccomandato, inEssere) : null;

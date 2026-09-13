@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Rotella } from '@/components/Rotella';
 import type { EsitoAccesso } from './actions';
 
 function Bottone() {
@@ -10,8 +11,10 @@ function Bottone() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded bg-azione px-4 py-2.5 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+      aria-busy={pending}
+      className="flex w-full items-center justify-center gap-1.5 rounded bg-azione px-4 py-2.5 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
+      {pending && <Rotella />}
       {pending ? 'Verifica in corso…' : 'Entra'}
     </button>
   );

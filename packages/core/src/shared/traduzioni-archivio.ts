@@ -41,6 +41,22 @@ const VOCI: Readonly<Record<string, string | undefined>> = {
     qualcun altro. «Amministratore» è vero di entrambi: è la degradazione, non l'ipotesi.
   */
   'managing director': 'amministratore',
+  /*
+    Misurate sulle risposte già pagate, codice per codice (13/09/2026): `AMM` scrive
+    «Director», `RTC` «Technical manager», `PC` «Procurator/attorney/representative», `RC`
+    «Auditor». Una descrizione, un codice: qui non si sceglie, si rende.
+
+    «Director» restava in inglese su RED GROUP S.R.L., nella carica («Director · in carica
+    dal 18/12/2008») e nella frase della persona chiave («rappresentanza legale (director)»),
+    mentre il socio accanto, `AUN`, era già «Amministratore».
+
+    «Auditor» diventa «revisore» e non «revisore contabile»: il codice misurato è uno solo,
+    e «revisore» resta vero anche se la stessa descrizione coprisse il revisore unico.
+  */
+  director: 'amministratore',
+  'technical manager': 'responsabile tecnico',
+  'procurator/attorney/representative': 'procuratore',
+  auditor: 'revisore',
   'chairman of board of auditors': 'presidente del collegio sindacale',
   'permanent auditor': 'sindaco effettivo',
   'temporary auditor': 'sindaco supplente',

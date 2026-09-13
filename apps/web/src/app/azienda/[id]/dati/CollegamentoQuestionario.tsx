@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Rotella } from '@/components/Rotella';
 import { creaInvitoQuestionario, revocaInvitoQuestionario } from './actions';
 import type { InvitoQuestionarioDto } from '@/lib/api';
 import { formattaGiornoEOra, formattaGiornoEsteso } from '@aegis/core/tempo';
@@ -30,8 +31,11 @@ export function CollegamentoQuestionario({
   const [esito, setEsito] = useState<{ ok: boolean; messaggio: string } | null>(null);
   const [copiato, setCopiato] = useState(false);
   const [inCorso, avvia] = useTransition();
+  // Quale dei due è stato premuto: la rotella va su quello, non su entrambi.
+  const [premuto, setPremuto] = useState<'genera' | 'revoca' | null>(null);
 
   function genera(): void {
+    setPremuto('genera');
     setEsito(null);
     setCopiato(false);
     avvia(() => {
@@ -48,6 +52,7 @@ export function CollegamentoQuestionario({
   }
 
   function revoca(): void {
+    setPremuto('revoca');
     setEsito(null);
     setIndirizzo(null);
     avvia(() => {
@@ -108,8 +113,10 @@ export function CollegamentoQuestionario({
           type="button"
           onClick={genera}
           disabled={inCorso}
-          className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50 disabled:opacity-50"
+          aria-busy={inCorso && premuto === 'genera'}
+          className="inline-flex items-center gap-1.5 rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50 disabled:opacity-50"
         >
+          {inCorso && premuto === 'genera' && <Rotella />}
           {invito === null ? 'Genera collegamento' : 'Genera un nuovo collegamento'}
         </button>
         {invito !== null && (
@@ -117,8 +124,10 @@ export function CollegamentoQuestionario({
             type="button"
             onClick={revoca}
             disabled={inCorso}
-            className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-critico disabled:opacity-50"
+            aria-busy={inCorso && premuto === 'revoca'}
+            className="inline-flex items-center gap-1.5 rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-critico disabled:opacity-50"
           >
+            {inCorso && premuto === 'revoca' && <Rotella />}
             Revoca
           </button>
         )}

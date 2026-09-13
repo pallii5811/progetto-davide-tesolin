@@ -68,6 +68,15 @@ export const COEFF_PICCO_SCORTE = 1.3;
 /** Periodo di indennizzo di default per i danni indiretti, in mesi. */
 export const PERIODO_INDENNIZZO_DEFAULT_MESI = 12;
 
+/**
+ * L'etichetta dell'input che conta le ubicazioni misurate, quando non sono tutte.
+ *
+ * Esportata perché la legge anche l'interfaccia: la didascalia del patrimonio esposto in
+ * testata dice «di 1 ubicazione su 2» leggendo questo input, e un'etichetta ricopiata a
+ * mano smetterebbe di combaciare il giorno che qualcuno la ritocca da una parte sola.
+ */
+export const UBICAZIONI_CON_SUPERFICIE = 'Ubicazioni con superficie rilevata';
+
 export interface SumsInsuredOptions {
   readonly costoRicostruzioneEuroMq?: number | undefined;
   /**
@@ -268,6 +277,12 @@ function calcolaFabbricati(
   if (cartografica !== undefined && cartografica > 0) {
     const costoMq = options.costoRicostruzioneEuroMq ?? COSTO_RICOSTRUZIONE_EUR_MQ.default;
     const stima = Money.multiply(Money.euro(costoMq), cartografica);
+
+    // Il conteggio sta anche fra gli input, non solo nella nota: la testata della scheda lo
+    // legge da qui per dire che il patrimonio esposto è quello di una parte delle sedi.
+    if (coperte !== undefined && totali !== undefined && coperte < totali) {
+      builder.input(UBICAZIONI_CON_SUPERFICIE, `${String(coperte)} su ${String(totali)}`);
+    }
 
     return builder
       .formula('Superficie coperta rilevata da cartografia × costo di ricostruzione €/mq')

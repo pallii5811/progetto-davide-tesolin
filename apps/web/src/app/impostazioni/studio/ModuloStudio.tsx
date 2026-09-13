@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Rotella } from '@/components/Rotella';
 import { salvaStudioAzione } from '../actions';
 import { CampoLogo } from './CampoLogo';
 import type { DatiStudio } from '@/lib/api';
@@ -16,8 +17,10 @@ function Bottone() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+      aria-busy={pending}
+      className="inline-flex items-center gap-1.5 rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
+      {pending && <Rotella />}
       {pending ? 'Salvataggio…' : 'Salva anagrafica'}
     </button>
   );
