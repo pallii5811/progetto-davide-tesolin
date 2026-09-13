@@ -334,6 +334,9 @@ function applicaVariante(base: CompanyProfile, variante: Variante): CompanyProfi
         atecoPrimario: parseAtecoOrThrow(variante.ateco),
         atecoPrimarioDescrizione: variante.atecoDescrizione,
         numeroAddetti: scala(base.anagrafica.value.numeroAddetti ?? 30),
+        // Il codice catastale segue il comune: ereditato dal profilo di base, le aziende di
+        // Avellino e Ravenna mostravano quello di Adro accanto a una sede in un'altra città.
+        codiceCatastale: variante.codiceCatastale,
         sedeLegale:
           base.anagrafica.value.sedeLegale === null
             ? null

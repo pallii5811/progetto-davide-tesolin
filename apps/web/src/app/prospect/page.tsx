@@ -494,7 +494,11 @@ export default async function PaginaProspect({
               */}
               <div>
                 <p className="tabular text-2xl font-bold">{risultato.totale.toLocaleString('it-IT')}</p>
-                <p className="text-sm text-testo-tenue">aziende corrispondono ai criteri</p>
+                <p className="text-sm text-testo-tenue">
+                  {risultato.totale === 1
+                    ? 'azienda corrisponde ai criteri'
+                    : 'aziende corrispondono ai criteri'}
+                </p>
                 {/*
                   Il prezzo unitario si **divide**, non si ricorda.
 
@@ -537,7 +541,8 @@ export default async function PaginaProspect({
             quante={risultato.aziende.length}
           />
           <p className="mb-3 text-sm text-testo-tenue">
-            {risultato.aziende.length} aziende scaricate ·{' '}
+            {risultato.aziende.length}{' '}
+            {risultato.aziende.length === 1 ? 'azienda scaricata' : 'aziende scaricate'} ·{' '}
             {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi. Analizzarne una
             consuma credito a parte, come qualunque altra analisi.
           </p>

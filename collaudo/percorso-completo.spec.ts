@@ -148,7 +148,7 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     await page.getByRole('combobox', { name: 'Città' }).fill('Adro');
     await page.getByRole('option', { name: 'Adro (BS)' }).click();
     await page.getByRole('button', { name: /Quante sono/i }).click();
-    await expect(page.getByText(/aziende corrispondono/i)).toBeVisible();
+    await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toBeVisible();
 
     /*
       Il prezzo si legge prima di premere.
@@ -183,7 +183,7 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     // ── 2. Compra l'elenco ────────────────────────────────────────────────
     await page.getByTestId('scarica-elenco').click();
     await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByText(/aziende scaricate/i)).toBeVisible();
+    await expect(page.getByText(/aziend(a|e) scaricat(a|e)/i)).toBeVisible();
 
     // ── 3. Analizza la prima, e le tre protezioni ci sono ─────────────────
     await page.getByRole('link', { name: 'Analizza' }).first().click();

@@ -173,7 +173,10 @@ export function demoCompanyProfile(): CompanyProfile {
         fatturatoDichiarato: euro(6_480_000),
         dataCessazione: null,
         codiceFiscaleCessato: false,
-        codiceCatastale: 'A057',
+        // Il codice vero di Adro nell'elenco ISTAT. Era A057, che è Adrara San Martino (BG): dal
+        // 13/09/2026 il selettore della città mostra A060 per Adro, e la stessa scheda si
+        // sarebbe contraddetta con il modulo sopra di lei.
+        codiceCatastale: 'A060',
       },
       PROVIDER,
       'IT-company-advanced',

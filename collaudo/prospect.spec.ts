@@ -73,7 +73,9 @@ test.describe('Ricerca di nuovi clienti', () => {
     await expect(page).toHaveURL(/comune=A060/);
     // Il conteggio compare, e con esso il prezzo dell'elenco: chi cerca vede quanto
     // costerebbe **prima** di pagarlo.
-    await expect(page.getByText(/aziende corrispondono/i)).toBeVisible();
+    await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toBeVisible();
+    // Ad Adro l'azienda dimostrativa è una sola: «1 azienda corrisponde», non «1 aziende corrispondono».
+    await expect(page.getByText('azienda corrisponde ai criteri', { exact: true })).toBeVisible();
 
     // Il pulsante che spende sta accanto a quello che conta, non dopo: il conteggio non
     // deve essere un passaggio obbligato per arrivare all'elenco.
@@ -122,7 +124,7 @@ test.describe('Ricerca di nuovi clienti', () => {
     await page.waitForTimeout(1_500);
 
     expect(navigazioni, 'il modulo è stato inviato senza città').toEqual([]);
-    await expect(page.getByText(/aziende corrispondono/i)).toHaveCount(0);
+    await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toHaveCount(0);
     await expect(page.getByRole('table')).toHaveCount(0);
     const messaggio = await page
       .getByRole('combobox', { name: 'Città' })
@@ -144,7 +146,7 @@ test.describe('Ricerca di nuovi clienti', () => {
   test('i filtri facoltativi, se ci sono, restringono la ricerca', async ({ page }) => {
     // Nella città dell'azienda dimostrativa di meccanica: con il suo settore c'è, con un altro no.
     await page.goto('/prospect?comune=A060&ateco=2562');
-    await expect(page.getByText(/aziende corrispondono/i)).toBeVisible();
+    await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toBeVisible();
 
     await page.goto('/prospect?comune=A060&ateco=4120');
     await expect(page.getByText(/Nessuna azienda corrisponde/i)).toBeVisible();
@@ -155,7 +157,9 @@ test.describe('Ricerca di nuovi clienti', () => {
     await page.getByTestId('scarica-elenco').click();
 
     await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByText(/aziende scaricate/i)).toBeVisible();
+    await expect(page.getByText(/aziend(a|e) scaricat(a|e)/i)).toBeVisible();
+    // Ad Adro l'azienda dimostrativa è una sola: la frase va al singolare, non «1 aziende».
+    await expect(page.getByText('1 azienda scaricata')).toBeVisible();
     // Il consuntivo di spesa accanto ai risultati: si è appena speso, e va detto.
     await expect(page.getByText(/€ spesi/i)).toBeVisible();
     // Da ogni riga si passa all'analisi: è il punto in cui il prospect diventa cliente.
@@ -181,7 +185,7 @@ test.describe('Ricerca di nuovi clienti', () => {
     await page.goto('/prospect?provincia=BS&ateco=2562');
 
     await expect(page.getByText('Manca la città', { exact: true })).toBeVisible();
-    await expect(page.getByText(/aziende corrispondono/i)).toHaveCount(0);
+    await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toHaveCount(0);
     await expect(page.getByText(/Nessuna azienda corrisponde/i)).toHaveCount(0);
   });
 
@@ -252,6 +256,6 @@ test.describe('Ricerca di nuovi clienti', () => {
 
     // Il modulo dei nuovi clienti resta lì sopra, senza aver cercato niente per conto suo.
     await expect(page.getByRole('combobox', { name: 'Città' })).toHaveValue('');
-    await expect(page.getByText(/aziende corrispondono/i)).toHaveCount(0);
+    await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toHaveCount(0);
   });
 });
