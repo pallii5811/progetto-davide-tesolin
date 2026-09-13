@@ -451,7 +451,14 @@ function Qualifiche({
     ['Addetti', valoreONull(intero(q.addetti))],
     ['Fascia addetti', q.fasciaAddetti],
     ['Andamento addetti', valoreONull(percentuale(q.andamentoAddettiPercentuale))],
-    ['Unità locali', valoreONull(intero(q.numeroUnitaLocali))],
+    /*
+      FUORI DALLA SEDE, misurato e non dedotto. TRANSPECIAL S.R.L. risultava «Unità locali 0»
+      mentre l'elenco delle sedi riporta un'unità locale al civico 22 della stessa via. Il
+      conteggio dell'archivio esclude l'unità locale all'indirizzo della sede, su tre imprese:
+      RED GROUP 1 (Soncino; esclusa quella di Chiari, sede), TRANSPECIAL 0, GALENO 3 (esclusa
+      quella di Leno, sede). Con l'etichetta nuda la riga sembrava contraddire la tabella.
+    */
+    ['Unità locali fuori dalla sede', valoreONull(intero(q.numeroUnitaLocali))],
     ['Settore RAE', q.settoreRae],
     ['Settore SAE', q.settoreSae],
     ['ATECO secondario', codiceAteco(q.atecoSecondario)],

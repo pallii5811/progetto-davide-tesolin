@@ -396,7 +396,13 @@ interface ContestoDto {
   /** Attribuzione della fonte: viaggia col dato perché la licenza ODbL la impone. */
   readonly fonte: string;
   /** Impronta a terra dei fabbricati, quando la cartografia li ha mappati. */
-  readonly fabbricati: { quanti: number; superficieCopertaMq: number; maggioreMq: number } | null;
+  readonly fabbricati: {
+    quanti: number;
+    superficieCopertaMq: number;
+    maggioreMq: number;
+    principaleMq: number | null;
+    principaleDistanzaMetri: number | null;
+  } | null;
   /** Serie storica degli eventi atmosferici. `null` se la raccolta non è attiva. */
   readonly meteo: {
     readonly anni: number;
@@ -503,6 +509,8 @@ function presentUbicazioni(analisi: CompanyAnalysis): UbicazioniDto {
                       quanti: x.contesto.fabbricati.quanti,
                       superficieCopertaMq: x.contesto.fabbricati.superficieCopertaMq,
                       maggioreMq: x.contesto.fabbricati.maggioreMq,
+                      principaleMq: x.contesto.fabbricati.principaleMq ?? null,
+                      principaleDistanzaMetri: x.contesto.fabbricati.principaleDistanzaMetri ?? null,
                     },
               meteo:
                 x.contesto.meteo === null
@@ -780,6 +788,7 @@ interface DannoMassimoDto {
   readonly quota?: number;
   /** Vuoto quando la quota è la sola classe di settore: la scheda deve poterlo dire. */
   readonly protezioniAccertate?: readonly string[];
+  readonly concentrazioneApplicata?: boolean;
   readonly forma?: FormaConsigliata;
   readonly motivazioneForma?: string;
   readonly domandeCheAbbassanoLaStima?: readonly string[];
@@ -803,6 +812,7 @@ function presentDannoMassimo(analisi: CompanyAnalysis): DannoMassimoDto {
     probabile: money(d.value.probabile),
     quota: d.value.quota,
     protezioniAccertate: d.value.protezioniAccertate,
+    concentrazioneApplicata: d.value.concentrazioneApplicata,
     forma: d.value.forma,
     motivazioneForma: d.value.motivazioneForma,
     domandeCheAbbassanoLaStima: d.value.domandeCheAbbassanoLaStima,

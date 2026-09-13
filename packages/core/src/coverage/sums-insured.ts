@@ -69,6 +69,9 @@ export const COEFF_PICCO_SCORTE = 1.3;
 /** Periodo di indennizzo di default per i danni indiretti, in mesi. */
 export const PERIODO_INDENNIZZO_DEFAULT_MESI = 12;
 
+/** Oltre quante volte le immobilizzazioni a bilancio la stima da cartografia va verificata. */
+export const SOGLIA_PLAUSIBILITA_SU_IMMOBILIZZAZIONI = 5;
+
 /**
  * L'etichetta dell'input che conta le ubicazioni misurate, quando non sono tutte.
  *
@@ -102,6 +105,11 @@ export interface SumsInsuredOptions {
    */
   readonly ubicazioniConSuperficie?: number | undefined;
   readonly ubicazioniTotali?: number | undefined;
+  /**
+   * Le immobilizzazioni a bilancio, in euro: il controllo di plausibilità della stima da
+   * cartografia. Vedi `immobilizzazioniDiBilancio` in `assessment/analyze.ts`.
+   */
+  readonly immobilizzazioniDiBilancioEuro?: number | undefined;
   readonly coefficienteRivalutazione?: number | undefined;
   readonly coefficientePiccoScorte?: number | undefined;
   readonly periodoIndennizzoMesi?: number | undefined;
@@ -279,6 +287,36 @@ function calcolaFabbricati(
     const costoMq = options.costoRicostruzioneEuroMq ?? COSTO_RICOSTRUZIONE_EUR_MQ.default;
     const stima = Money.multiply(Money.euro(costoMq), cartografica);
 
+    /*
+      Il controllo col bilancio, prima di tutto il resto.
+
+      Un fabbricato può sorgere sull'indirizzo e non essere dell'impresa — in affitto,
+      condiviso, di un'altra società. La cartografia non lo sa; il bilancio sì, almeno
+      nell'ordine di grandezza. Su TRANSPECIAL S.R.L. l'impronta del fabbricato
+      dell'indirizzo vale 5.600.000 € a nuovo, e le immobilizzazioni a bilancio sono
+      774.212 € in tutto, automezzi compresi. Un valore a nuovo può superare il valore di
+      libro anche di qualche volta, per gli ammortamenti; cinque volte è la soglia oltre la
+      quale la proprietà va verificata prima di assicurare quel capitale. Il numero resta —
+      se l'immobile è dell'impresa è quello giusto — ma la confidenza scende e la nota dice
+      perché, con i due importi.
+    */
+    const immobilizzazioni = options.immobilizzazioniDiBilancioEuro;
+    const implausibile =
+      immobilizzazioni !== undefined &&
+      immobilizzazioni > 0 &&
+      Money.toEuro(stima) > SOGLIA_PLAUSIBILITA_SU_IMMOBILIZZAZIONI * immobilizzazioni;
+    if (implausibile) {
+      builder
+        .input('Immobilizzazioni a bilancio', Money.formatCompact(Money.euro(immobilizzazioni)))
+        .note(
+          `DA VERIFICARE PRIMA DI QUOTARE: la stima vale ${Money.formatCompact(Money.commercialRoundUp(stima))}, ` +
+            `più di ${String(SOGLIA_PLAUSIBILITA_SU_IMMOBILIZZAZIONI)} volte le immobilizzazioni a bilancio ` +
+            `(${Money.formatCompact(Money.euro(immobilizzazioni))} in tutto). Il fabbricato potrebbe non essere ` +
+            'dell’impresa — in affitto, condiviso con altri — e allora non va assicurato come suo: va rilevato ' +
+            'il titolo di godimento, e per un conduttore resta il rischio locativo.',
+        );
+    }
+
     // Il conteggio sta anche fra gli input, non solo nella nota: la testata della scheda lo
     // legge da qui per dire che il patrimonio esposto è quello di una parte delle sedi.
     if (coperte !== undefined && totali !== undefined && coperte < totali) {
@@ -290,9 +328,11 @@ function calcolaFabbricati(
       .input('Superficie coperta (impronta a terra)', `${formatNumber(cartografica, 0)} mq`)
       .input('Costo di ricostruzione', `${Money.formatCompact(Money.euro(costoMq))}/mq`)
       .note(
-        'STIMA. La superficie non è stata rilevata in intervista: è ricavata dall’impronta a terra dei ' +
-          'fabbricati su cartografia collaborativa (OpenStreetMap). Misura la superficie coperta, non ' +
-          'quella sviluppata: su un edificio a più piani il capitale risulta sottostimato.',
+        'STIMA. La superficie non è stata rilevata in intervista: è l’impronta a terra del fabbricato ' +
+          'che sorge sull’indirizzo, su cartografia collaborativa (OpenStreetMap). I fabbricati vicini ' +
+          'non sono contati: se l’impresa ne occupa più d’uno vanno rilevati in intervista. Misura la ' +
+          'superficie coperta, non quella sviluppata: su un edificio a più piani il capitale risulta ' +
+          'sottostimato.',
       )
       .note(
         'La cartografia collaborativa può non riflettere ampliamenti recenti. Rilevare i metri quadri ' +
@@ -309,7 +349,9 @@ function calcolaFabbricati(
         // Un capitale che copre meno di metà delle ubicazioni non è a confidenza media: e'
         // un ordine di grandezza di una parte, e chi lo legge deve vederlo dall'etichetta
         // prima ancora di arrivare alla nota.
-        coperte !== undefined && totali !== undefined && coperte * 2 < totali ? 'bassa' : 'media',
+        implausibile || (coperte !== undefined && totali !== undefined && coperte * 2 < totali)
+          ? 'bassa'
+          : 'media',
       )
       .value(Money.commercialRoundUp(stima));
   }

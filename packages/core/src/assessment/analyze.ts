@@ -480,6 +480,7 @@ export function analyzeCompany(
           ubicazioniConSuperficie: cartografia.coperte,
           ubicazioniTotali: cartografia.totali,
         }),
+    immobilizzazioniDiBilancioEuro: immobilizzazioniDiBilancio(profile, bilancio) ?? undefined,
     periodoIndennizzoMesi:
       options.sommeAssicurande?.periodoIndennizzoMesi ??
       profile.datiDichiarati.periodoIndennizzoMesi ??
@@ -656,6 +657,39 @@ export interface AndamentoEsercizio {
  *
  * `null` quando nessuna ubicazione ha fabbricati mappati: assente, non zero.
  */
+/**
+ * Le immobilizzazioni a bilancio, per il controllo di plausibilità del capitale fabbricati.
+ *
+ * Dal bilancio in schema CEE quando c'è. Altrimenti dagli indici dell'archivio, e si prova:
+ * il margine di struttura è patrimonio netto meno immobilizzazioni, e l'indice del margine è
+ * il loro rapporto. Su TRANSPECIAL S.R.L. il primo dà 393.127 − (−381.085) = 774.212 € e il
+ * secondo 393.127 / 0,51 = 770.837 €: due strade indipendenti sullo stesso numero. Se non
+ * concordano entro il cinque per cento, non si usa niente.
+ */
+export function immobilizzazioniDiBilancio(
+  profile: CompanyProfile,
+  bilancio: BilancioRiclassificato | null,
+): number | null {
+  if (bilancio !== null) {
+    const sp = bilancio.sp;
+    return Money.toEuro(
+      Money.add(
+        Money.add(sp.immobilizzazioniImmateriali, sp.immobilizzazioniMateriali),
+        sp.immobilizzazioniFinanziarie,
+      ),
+    );
+  }
+  const archivio = profile.indicatoriFornitore;
+  const patrimonio = archivio.aggregati?.patrimonioNetto ?? null;
+  const margine = archivio.solidita?.margineDiStruttura ?? null;
+  const indice = archivio.solidita?.indiceMargineDiStruttura ?? null;
+  if (patrimonio === null || margine === null || indice === null || indice <= 0) return null;
+  const daMargine = patrimonio - margine;
+  const daIndice = patrimonio / indice;
+  if (daMargine <= 0 || Math.abs(daMargine - daIndice) / daMargine > 0.05) return null;
+  return daMargine;
+}
+
 function superficieRilevata(
   ubicazioni: AnalisiUbicazioni,
 ): { mq: number; coperte: number; totali: number } | null {
@@ -666,6 +700,14 @@ function superficieRilevata(
   for (const u of ubicazioni.ubicazioni) {
     const impronta = u.contesto?.fabbricati;
     if (impronta === undefined || impronta === null) continue;
+    /*
+      Il solo fabbricato dell'indirizzo, mai la somma del raggio osservato: la somma
+      comprendeva l'isolato (TRANSPECIAL: sette capannoni per 18.944 m², fino a 70 m dalla
+      coordinata). `?? null` perché un contesto salvato prima di questo campo non lo porta,
+      e allora non si stima invece di stimare male.
+    */
+    const principale = impronta.principaleMq ?? null;
+    if (principale === null || principale <= 0) continue;
 
     const { latitudine, longitudine } = u.indirizzo;
     if (latitudine === null || longitudine === null) continue;
@@ -674,7 +716,7 @@ function superficieRilevata(
     if (viste.has(chiave)) continue;
     viste.add(chiave);
 
-    totale += impronta.superficieCopertaMq;
+    totale += principale;
     coperte += 1;
   }
 

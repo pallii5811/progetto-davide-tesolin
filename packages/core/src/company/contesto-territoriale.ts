@@ -50,11 +50,20 @@ export interface CasermaVigiliDelFuoco {
  * spesso non c'è ancora nulla.
  */
 export interface ImprontaFabbricati {
+  /** Fabbricati mappati nel raggio osservato attorno alla coordinata: è CONTESTO, non capitale. */
   readonly quanti: number;
-  /** Somma delle aree coperte, in metri quadri. */
+  /** Somma delle loro aree coperte, in metri quadri: comprende i vicini, e non va assicurata. */
   readonly superficieCopertaMq: number;
-  /** L'edificio più grande: su un lotto industriale è quasi sempre il capannone. */
+  /** Il più grande fra loro. */
   readonly maggioreMq: number;
+  /**
+   * Il fabbricato dell'indirizzo: quello che contiene la coordinata o il più vicino entro
+   * trenta metri. È l'unico che entra nel capitale fabbricati. `null` quando nessuno è
+   * abbastanza vicino da essere attribuito all'impresa.
+   */
+  readonly principaleMq: number | null;
+  /** Distanza del fabbricato dell'indirizzo dalla coordinata: zero se la contiene. */
+  readonly principaleDistanzaMetri: number | null;
 }
 
 /**

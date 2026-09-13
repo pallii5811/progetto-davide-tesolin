@@ -63,6 +63,28 @@ const RAGGIO_CASERME_METRI = 25_000;
 const RAGGIO_FABBRICATI_METRI = 80;
 
 /**
+ * Entro quanti metri dalla coordinata un fabbricato è «quello dell'indirizzo».
+ *
+ * Gli ottanta metri qui sopra restano il raggio in cui si GUARDA, non quello in cui si CONTA.
+ * Contare tutto ciò che vi cade dentro sommava l'isolato, misurato il 13/09/2026 su tre
+ * imprese vere:
+ *
+ *   TRANSPECIAL S.R.L.   7 fabbricati, 18.944 m² sommati → 18.000.000 €; quello a 1 m: 5.928 m²
+ *   RED GROUP S.R.L.     40 fabbricati quasi tutti residenziali, 8.264 m² → 7.900.000 €;
+ *                        quello che contiene il punto: 349 m²
+ *   GALENO S.R.L.        26 fabbricati del centro di Leno, 7.664 m² → 7.300.000 €;
+ *                        quello a 1 m: 314 m²
+ *
+ * La somma finiva nel patrimonio esposto, nel capitale CAT NAT e in quello incendio. Ora si
+ * conta il solo fabbricato che contiene la coordinata o, se nessuno la contiene, il più
+ * vicino entro trenta metri: la coordinata della visura cade sul civico, spesso sulla strada
+ * davanti al lotto. Trenta è un numero scelto, non trovato: copre l'arretramento di un
+ * capannone dal filo stradale e resta sotto la distanza a cui cominciano i vicini. Oltre,
+ * nessun fabbricato è attribuibile all'impresa, e il capitale resta da rilevare.
+ */
+const RAGGIO_FABBRICATO_DELL_INDIRIZZO_METRI = 30;
+
+/**
  * Minuti per chilometro di percorrenza dei mezzi di soccorso.
  *
  * Tre minuti al chilometro — venti km/h medi — tiene conto di uscita dalla caserma,
@@ -177,7 +199,13 @@ export async function leggiEsitoContesto(
 ): Promise<EsitoContesto> {
   const url = options.baseUrl ?? OVERPASS_PREDEFINITO;
   const richiesta = options.fetchImpl ?? fetch;
-  const chiave = `overpass:${latitudine.toFixed(5)}:${longitudine.toFixed(5)}`;
+  /*
+    «v2» perché il contenuto della cache è cambiato forma e significato: i contesti salvati
+    prima portano la somma dell'isolato e non il fabbricato dell'indirizzo, e resterebbero
+    in uso novanta giorni. Con una chiave nuova la prossima analisi rilegge la fonte, che è
+    gratuita; le voci vecchie scadono da sole.
+  */
+  const chiave = `overpass:v2:${latitudine.toFixed(5)}:${longitudine.toFixed(5)}`;
 
   /*
     La cache è la difesa vera verso un servizio donato: il contesto di un'ubicazione non
@@ -371,6 +399,8 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
   const caserme: CasermaVigiliDelFuoco[] = [];
   const vicine: PuntoDiInteresse[] = [];
   const areeFabbricati: number[] = [];
+  // Per ogni fabbricato anche la distanza dal punto: serve a riconoscere quello dell'indirizzo.
+  const fabbricatiMisurati: { readonly area: number; readonly distanza: number }[] = [];
 
   for (const elemento of elementi) {
     /*
@@ -382,7 +412,10 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
       const area = areaPoligonoMq(elemento.geometry);
       // Sotto i venti metri quadri è una tettoia, una cabina, un chiosco: sommarla
       // gonfierebbe il conto con cose che nessuno assicura come fabbricato.
-      if (area >= 20) areeFabbricati.push(area);
+      if (area >= 20) {
+        areeFabbricati.push(area);
+        fabbricatiMisurati.push({ area, distanza: distanzaDalPoligonoMetri(elemento.geometry, lat, lon) });
+      }
       continue;
     }
 
@@ -421,6 +454,12 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
 
   areeFabbricati.sort((a, b) => b - a);
 
+  // Il fabbricato dell'indirizzo: quello a distanza minima, e a parità il più grande.
+  const principale =
+    [...fabbricatiMisurati]
+      .filter((f) => f.distanza <= RAGGIO_FABBRICATO_DELL_INDIRIZZO_METRI)
+      .sort((a, b) => a.distanza - b.distanza || b.area - a.area)[0] ?? null;
+
   return {
     // Tre caserme bastano: oltre, l'informazione è la stessa e la pagina si allunga.
     vigiliDelFuoco: caserme.slice(0, 3),
@@ -431,6 +470,8 @@ function interpreta(dati: unknown, lat: number, lon: number): ContestoTerritoria
             quanti: areeFabbricati.length,
             superficieCopertaMq: Math.round(areeFabbricati.reduce((s, a) => s + a, 0)),
             maggioreMq: Math.round(areeFabbricati[0] ?? 0),
+            principaleMq: principale === null ? null : Math.round(principale.area),
+            principaleDistanzaMetri: principale === null ? null : Math.round(principale.distanza),
           },
     /*
       Lo storico meteo non arriva da qui: è una fonte diversa, con una licenza diversa, e
@@ -475,6 +516,49 @@ function categoriaDi(tags: Record<string, string>): { etichetta: string; aggrava
  *
  * Formula dell'emisenoverso: esatta su distanze urbane, e senza dipendenze.
  */
+/**
+ * Distanza in metri fra un punto e un poligono: zero se il punto sta dentro.
+ *
+ * Proiezione locale come per l'area: alle distanze di un lotto la curvatura è irrilevante.
+ * Dentro si decide col conteggio degli attraversamenti; fuori vale la distanza minima dai
+ * lati, non dai vertici — un capannone lungo ha il lato vicino e i vertici lontani.
+ */
+function distanzaDalPoligonoMetri(
+  vertici: readonly { readonly lat: number; readonly lon: number }[],
+  lat: number,
+  lon: number,
+): number {
+  const metriPerGradoLat = 110_574;
+  const metriPerGradoLon = 111_320 * Math.cos((lat * Math.PI) / 180);
+  const punti = vertici.map((v) => ({
+    x: (v.lon - lon) * metriPerGradoLon,
+    y: (v.lat - lat) * metriPerGradoLat,
+  }));
+  if (punti.length < 3) return Number.POSITIVE_INFINITY;
+
+  let dentro = false;
+  for (let i = 0, j = punti.length - 1; i < punti.length; j = i++) {
+    const a = punti[i];
+    const b = punti[j];
+    if (a === undefined || b === undefined) continue;
+    if (a.y > 0 !== b.y > 0 && 0 < ((b.x - a.x) * (0 - a.y)) / (b.y - a.y) + a.x) dentro = !dentro;
+  }
+  if (dentro) return 0;
+
+  let minima = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < punti.length; i++) {
+    const a = punti[i];
+    const b = punti[(i + 1) % punti.length];
+    if (a === undefined || b === undefined) continue;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lunghezza2 = dx * dx + dy * dy;
+    const t = lunghezza2 === 0 ? 0 : Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / lunghezza2));
+    minima = Math.min(minima, Math.hypot(a.x + t * dx, a.y + t * dy));
+  }
+  return minima;
+}
+
 function distanzaMetri(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const RAGGIO_TERRESTRE_M = 6_371_000;
   const rad = (g: number): number => (g * Math.PI) / 180;

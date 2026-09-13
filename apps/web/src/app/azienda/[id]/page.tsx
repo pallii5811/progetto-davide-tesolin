@@ -47,6 +47,7 @@ import { sottotitoloSomme } from '@/lib/sottotitolo-somme';
 import { etichettaPiuEsposta } from '@/lib/ubicazione-piu-esposta';
 import { ubicazioniDeiFabbricati } from '@/lib/nota-patrimonio';
 import { etichetteDelGruppo } from '@/lib/etichette-ubicazioni';
+import { didascaliaDannoProbabile } from '@/lib/didascalia-danno';
 
 export const dynamic = 'force-dynamic';
 
@@ -1125,9 +1126,10 @@ export default async function PaginaAzienda({
                   */}
                   <dd className="mt-1 text-xs leading-snug text-testo-tenue">
                     {Math.round(analisi.dannoMassimo.quota * 100)}% del valore
-                    {analisi.dannoMassimo.protezioniAccertate.length > 0
-                      ? `, tenuto conto di: ${analisi.dannoMassimo.protezioniAccertate.join(', ')}`
-                      : ', per la sola classe di rischio del settore: nessuna protezione è stata accertata'}
+                    {didascaliaDannoProbabile(
+                      analisi.dannoMassimo.protezioniAccertate,
+                      analisi.dannoMassimo.concentrazioneApplicata === true,
+                    )}
                   </dd>
                 </dl>
                 <BadgeConfidenza livello={analisi.dannoMassimo.confidenza} />

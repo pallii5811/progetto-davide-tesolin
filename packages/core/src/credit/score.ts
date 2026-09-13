@@ -218,7 +218,7 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   const factors: ScoreFactor[] = [];
 
   factors.push(fattoreSolidita(indicatori));
-  factors.push(fattoreRedditivita(indicatori));
+  factors.push(fattoreRedditivita(indicatori, ebitNoto(profile, bilancio)));
   factors.push(fattoreLiquidita(indicatori));
   factors.push(fattoreSostenibilitaDebito(indicatori));
   const anagrafica = profile.anagrafica.value;
@@ -663,7 +663,21 @@ function fattoreSolidita(ind: FinancialIndicators | null): ScoreFactor {
   };
 }
 
-function fattoreRedditivita(ind: FinancialIndicators | null): ScoreFactor {
+/**
+ * L'EBIT noto, dal bilancio in schema CEE o dall'archivio: serve alla frase, non al punteggio.
+ *
+ * Il fattore si regge sul margine EBITDA, che resta positivo anche quando ammortamenti e
+ * accantonamenti portano in perdita il risultato operativo. TRANSPECIAL S.R.L.: margine EBITDA
+ * 3,28 %, EBIT −109.612 €, e la frase parlava di «poco spazio per assorbire un aumento dei
+ * costi» a un'impresa che quei costi non li copriva già.
+ */
+function ebitNoto(profile: CompanyProfile, bilancio: BilancioRiclassificato | null): number | null {
+  if (bilancio !== null) return Money.toEuro(bilancio.ce.ebit);
+  const ebit = profile.indicatoriFornitore.risultatiOperativi?.ebit ?? null;
+  return ebit !== null && Number.isFinite(ebit) ? ebit : null;
+}
+
+function fattoreRedditivita(ind: FinancialIndicators | null, ebit: number | null = null): ScoreFactor {
   if (ind === null) {
     return notEvaluable('redditivita', 'Redditività', PESI.redditivita, 'Bilancio non disponibile');
   }
@@ -718,17 +732,29 @@ function fattoreRedditivita(ind: FinancialIndicators | null): ScoreFactor {
     rationale:
       score === null
         ? 'Indici di redditività non calcolabili.'
-        : score >= 70
-          ? 'La gestione caratteristica genera margini solidi e sostenibili.'
-          : score >= 45
-            ? 'Redditività modesta: margini sufficienti ma poco spazio di assorbimento degli shock.'
-            : motivoDellaRedditivitaInsufficiente(ind),
+        : ebit !== null && ebit < 0 && (ind.ebitdaMargin === null || ind.ebitdaMargin >= 0)
+          ? motivoConEbitNegativo(ind, ebit)
+          : score >= 70
+            ? 'La gestione caratteristica genera margini solidi e sostenibili.'
+            : score >= 45
+              ? 'Redditività modesta: margini sufficienti ma poco spazio di assorbimento degli shock.'
+              : motivoDellaRedditivitaInsufficiente(ind),
     details: [
       `ROI: ${ind.roi === null ? assenzaDi('roi') : formatPercent(ind.roi)}`,
       `EBITDA margin: ${ind.ebitdaMargin === null ? assenzaDi('ebitdaMargin') : formatPercent(ind.ebitdaMargin)}`,
       `Crescita EBITDA: ${ind.crescitaEbitda === null ? assenzaDi('crescitaEbitda') : formatPercent(ind.crescitaEbitda)}`,
     ],
   };
+}
+
+/** Margine EBITDA positivo, ma risultato operativo in perdita: si dice tutti e due. */
+function motivoConEbitNegativo(ind: FinancialIndicators, ebit: number): string {
+  const perdita = `EBIT ${formatNumber(ebit, 0)} €`;
+  return ind.ebitdaMargin === null
+    ? `Risultato operativo negativo (${perdita}): la gestione caratteristica non copre i propri costi.`
+    : `Il margine EBITDA è il ${formatPercent(ind.ebitdaMargin)} del valore della produzione, ma dopo ` +
+        `ammortamenti e accantonamenti il risultato operativo è negativo (${perdita}): la gestione ` +
+        'caratteristica non copre tutti i propri costi.';
 }
 
 /**
@@ -759,6 +785,29 @@ function motivoDellaRedditivitaInsufficiente(ind: FinancialIndicators): string {
     );
   }
   return 'Redditività insufficiente sugli indici disponibili.';
+}
+
+/**
+ * La fascia di mezzo della liquidità, detta con i numeri.
+ *
+ * TRANSPECIAL S.R.L.: «Liquidità appena sufficiente» sopra un current ratio di 0,94, cioè
+ * attività correnti che non coprono gli impegni a breve. Il punteggio stava a 55 per il ciclo
+ * del circolante breve, 43 giorni, e la frase scelta dalla soglia diceva «sufficiente».
+ */
+function motivoDellaLiquiditaIntermedia(ind: FinancialIndicators): string {
+  const corrente = ind.currentRatio;
+  if (corrente === null || corrente >= 1) {
+    return 'Liquidità appena sufficiente: il circolante assorbe cassa in misura rilevante.';
+  }
+  const ciclo = ind.cicloCircolante;
+  const breve =
+    ciclo !== null && ciclo < 60
+      ? `, con un ciclo del circolante breve (${formatNumber(ciclo, 0)} gg)`
+      : '';
+  return (
+    `Liquidità in equilibrio precario: le attività correnti non coprono per intero gli impegni a breve ` +
+    `(${formatNumber(corrente)}×)${breve}.`
+  );
 }
 
 /**
@@ -798,6 +847,19 @@ function motivoDellaTensione(ind: FinancialIndicators): string {
 function motivoDellaSolidita(ind: FinancialIndicators): string {
   const equity = ind.equityRatio;
   if (equity === null || equity >= 0.2) {
+    /*
+      «Nella norma» non si dice a immobilizzazioni scoperte. TRANSPECIAL S.R.L.: patrimonio al
+      21,6 % dell'attivo, ma immobilizzazioni coperte 0,68× dalle fonti durevoli e margine di
+      struttura secondario negativo: una parte degli investimenti poggia sui debiti a breve.
+    */
+    const durevole = ind.coperturaImmobilizzazioni;
+    if (durevole !== null && durevole < 1) {
+      return (
+        `Immobilizzazioni coperte solo ${formatNumber(durevole)}× dalle fonti durevoli: una parte degli ` +
+        'investimenti poggia sui debiti a breve' +
+        (equity === null ? '.' : `, con il patrimonio al ${formatPercent(equity)} dell’attivo.`)
+      );
+    }
     return 'Patrimonializzazione nella norma, con dipendenza significativa da fonti di terzi.';
   }
   const debiti =
@@ -867,7 +929,7 @@ function fattoreLiquidita(ind: FinancialIndicators | null): ScoreFactor {
         : score >= 70
           ? 'Buon equilibrio fra impegni a breve e risorse disponibili.'
           : score >= 45
-            ? 'Liquidità appena sufficiente: il circolante assorbe cassa in misura rilevante.'
+            ? motivoDellaLiquiditaIntermedia(ind)
             : motivoDellaTensione(ind),
     details: [
       `Current ratio: ${ind.currentRatio === null ? assenzaDi('currentRatio') : `${formatNumber(ind.currentRatio)}×`}`,

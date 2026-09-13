@@ -510,6 +510,8 @@ export interface AnalisiDto {
         quota: number;
         /** Le protezioni che hanno abbassato la quota. Vuoto: nessuna è stata accertata. */
         protezioniAccertate: string[];
+        /** Quota alzata del 15 % per valori in un unico complesso. Assente sulle analisi precedenti. */
+        concentrazioneApplicata?: boolean;
         forma: 'valore-intero' | 'primo-rischio-assoluto';
         motivazioneForma: string;
         domandeCheAbbassanoLaStima: string[];
@@ -609,7 +611,13 @@ export interface AnalisiDto {
         attivitaCheAggravano: number;
         raggioAnalizzatoMetri: number;
         fonte: string;
-        fabbricati: { quanti: number; superficieCopertaMq: number; maggioreMq: number } | null;
+        fabbricati: {
+          quanti: number;
+          superficieCopertaMq: number;
+          maggioreMq: number;
+          principaleMq: number | null;
+          principaleDistanzaMetri: number | null;
+        } | null;
         meteo: {
           anni: number;
           dal: string;

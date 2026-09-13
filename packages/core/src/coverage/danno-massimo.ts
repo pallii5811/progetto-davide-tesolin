@@ -54,6 +54,13 @@ export interface DannoMassimo {
    * l'unica cosa con cui il lettore decide quanto fidarsi del numero.
    */
   readonly protezioniAccertate: readonly string[];
+  /**
+   * Se la quota è stata alzata del 15 % perché i valori stanno in un unico complesso.
+   *
+   * La didascalia diceva «81% del valore, per la sola classe di rischio del settore» su
+   * TRANSPECIAL S.R.L.: la classe dava il 70 %, l'altro 11 % veniva dalla concentrazione.
+   */
+  readonly concentrazioneApplicata: boolean;
   readonly forma: FormaConsigliata;
   readonly motivazioneForma: string;
   /** Cosa chiedere al cliente per stimare meglio, in ordine di impatto. */
@@ -216,6 +223,7 @@ export function stimaDannoMassimo(
       ? ubicazioni.unicoComplesso
       : immobili.length <= 1 && (facts.numeroUnitaLocali ?? 1) <= 1;
 
+  const quotaSenzaConcentrazione = quota;
   if (unicaUbicazione) {
     quota = Math.min(1, quota * 1.15);
     costruttore.note(
@@ -292,6 +300,8 @@ export function stimaDannoMassimo(
     probabile,
     quota: quotaFinale,
     protezioniAccertate,
+    // Solo se ha spostato il numero stampato: a quota già piena, o sotto il minimo, no.
+    concentrazioneApplicata: quotaFinale > Math.max(QUOTA_MINIMA, Math.min(1, quotaSenzaConcentrazione)),
     forma,
     motivazioneForma: motivazioneForma(forma, valoreBeni, probabile, quotaFinale),
     domandeCheAbbassanoLaStima: domande,

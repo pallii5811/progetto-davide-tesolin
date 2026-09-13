@@ -243,14 +243,19 @@ export function analizzaUbicazioni(input: {
     const esistente = perChiave.get(id);
     const origini = esistente === undefined ? [s.origine] : [...new Set([...esistente.origini, s.origine])];
 
+    // Fra due scritture dello stesso indirizzo si tiene quella con le coordinate, e
+    // l'etichetta si compone da QUELLA: su TRANSPECIAL la tabella diceva «VIA FORNACI
+    // 20/22» e le fotografie «VIA FORNACI, 20/22», perché venivano da due scritture diverse.
+    const indirizzoScelto =
+      esistente !== undefined && esistente.haCoordinate ? esistente.indirizzo : s.indirizzo;
     perChiave.set(id, {
       id,
-      etichetta: etichettaDi(s.indirizzo, origini),
+      etichetta: etichettaDi(indirizzoScelto, origini),
       origini,
       // Il tipo dichiarato dalla visura prevale su quello assente dell'intervista.
       tipo: s.tipo ?? esistente?.tipo ?? null,
       // Fra due scritture dello stesso indirizzo si tiene quella con le coordinate.
-      indirizzo: esistente !== undefined && esistente.haCoordinate ? esistente.indirizzo : s.indirizzo,
+      indirizzo: indirizzoScelto,
       superficieMq: s.superficieMq ?? esistente?.superficieMq ?? null,
       addetti: s.addetti ?? esistente?.addetti ?? null,
       esposizione: conIdraulicaPuntuale(
@@ -464,13 +469,18 @@ function domande(ubicazioni: readonly Ubicazione[]): readonly string[] {
     const quante =
       senzaSuperficie.length === 1 ? 'questa ubicazione' : `queste ${senzaSuperficie.length} ubicazioni`;
     const conImpronta = senzaSuperficie.filter(
-      (u) => (u.contesto?.fabbricati?.superficieCopertaMq ?? 0) > 0,
+      (u) => (u.contesto?.fabbricati?.principaleMq ?? 0) > 0,
     ).length;
 
     elenco.push(
       conImpronta === 0
         ? `Qual è la superficie di ${quante}? Senza i metri quadri il capitale fabbricati resta da rilevare.`
-        : `Qual è la superficie di ${quante}? Su ${conImpronta === 1 ? 'una di esse' : `${conImpronta} di esse`} il capitale fabbricati è stato stimato dall’impronta a terra rilevata da cartografia, che ignora i piani: su un edificio a più livelli sottostima, ed è la sottostima su cui al sinistro opera la regola proporzionale.`,
+        : // «Su una di esse» detto di un'ubicazione sola: TRANSPECIAL, una sede e una domanda al plurale.
+          `Qual è la superficie di ${quante}? ${
+            senzaSuperficie.length === 1
+              ? 'Il capitale fabbricati'
+              : `Su ${conImpronta === 1 ? 'una di esse' : `${conImpronta} di esse`} il capitale fabbricati`
+          } è stato stimato dall’impronta a terra rilevata da cartografia, che ignora i piani: su un edificio a più livelli sottostima, ed è la sottostima su cui al sinistro opera la regola proporzionale.`,
     );
   }
 

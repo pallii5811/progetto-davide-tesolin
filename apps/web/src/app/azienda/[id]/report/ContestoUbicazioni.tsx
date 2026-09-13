@@ -20,6 +20,21 @@ import type { AnalisiDto } from '@/lib/api';
 
 type Ubicazione = AnalisiDto['ubicazioni']['elenco'][number];
 
+function descriviImpronta(f: {
+  quanti: number;
+  superficieCopertaMq: number;
+  principaleMq: number | null;
+}): string {
+  const altri = f.principaleMq === null ? f.quanti : f.quanti - 1;
+  const contorno =
+    altri <= 0
+      ? ''
+      : `; nel raggio osservato ${altri === 1 ? 'c’è un altro fabbricato' : `ci sono altri ${altri} fabbricati`}, non contati`;
+  return f.principaleMq === null
+    ? `nessun fabbricato abbastanza vicino all’indirizzo da essere attribuito all’impresa (${f.quanti} nel raggio osservato)`
+    : `il fabbricato dell’indirizzo misura ${f.principaleMq.toLocaleString('it-IT')} m²${contorno}`;
+}
+
 export function ContestoUbicazioni({ ubicazioni }: { ubicazioni: readonly Ubicazione[] }) {
   const osservate = ubicazioni.filter((u) => u.contesto !== null);
   const nonOsservate = ubicazioni.filter((u) => u.contesto === null);
@@ -104,9 +119,12 @@ function SchedaUbicazione({ ubicazione }: { ubicazione: Ubicazione }) {
       {c.fabbricati !== null && (
         <p className="mt-3 text-sm">
           <span className="text-testo-tenue">Impronta a terra rilevata: </span>
-          {c.fabbricati.quanti === 1
-            ? `un fabbricato di ${c.fabbricati.maggioreMq.toLocaleString('it-IT')} m²`
-            : `${c.fabbricati.quanti} fabbricati per ${c.fabbricati.superficieCopertaMq.toLocaleString('it-IT')} m² complessivi, il maggiore di ${c.fabbricati.maggioreMq.toLocaleString('it-IT')} m²`}
+          {/*
+            Il fabbricato dell'indirizzo prima di tutto, perché è l'unico che entra nel capitale;
+            gli altri mappati attorno sono contesto. Prima questa riga dava la somma di tutti,
+            che su un centro abitato comprendeva decine di case (vedi contesto.ts).
+          */}
+          {descriviImpronta(c.fabbricati)}
           <span className="mt-0.5 block text-xs leading-relaxed text-testo-debole">
             Superficie coperta, non sviluppata: su un edificio a più piani è inferiore alla superficie
             reale. Serve a stimare il capitale sui fabbricati quando le superfici non sono state rilevate in

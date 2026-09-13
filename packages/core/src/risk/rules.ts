@@ -24,6 +24,7 @@ import { territorialExposure } from './geo.js';
 import { ESPOSIZIONE_SETTORIALE } from './data/esposizione-settoriale.js';
 import type { EsposizioneSettoriale } from './data/esposizione-settoriale.js';
 import type { TerritorialExposure } from './geo.js';
+import { trasportoSuStrada } from '../company/trasporto-su-strada.js';
 import {
   categoriaSocietaria,
   normaResponsabilitaAmministratori,
@@ -1229,8 +1230,35 @@ export const RISK_RULES: readonly RiskRule[] = [
       'Il parco veicoli non è stato rilevato: ogni veicolo aziendale è soggetto a obbligo ' +
       'assicurativo per la circolazione e a rischio di sinistro.',
     risk: 'sinistro-flotta',
-    when: (f) => (f.numeroVeicoli === null ? 'ignoto' : f.numeroVeicoli > 0),
-    rationale: 'Presenza di veicoli aziendali soggetti a obbligo assicurativo e a rischio di sinistro.',
+    // Chi fa trasporto su strada i veicoli li ha: sono lo strumento dell'attività, e «non
+    // rilevato» non basta a lasciarli nel dubbio (vedi company/trasporto-su-strada.ts).
+    when: (f) => {
+      if (f.numeroVeicoli !== null) return f.numeroVeicoli > 0;
+      return trasportoSuStrada(f) === true ? true : 'ignoto';
+    },
+    rationale: (f) =>
+      f.numeroVeicoli === null && trasportoSuStrada(f) === true
+        ? 'Trasporto su strada: i veicoli sono lo strumento dell’attività, soggetti a obbligo assicurativo ' +
+          'per la circolazione e al rischio di sinistro.'
+        : 'Presenza di veicoli aziendali soggetti a obbligo assicurativo e a rischio di sinistro.',
+  },
+  {
+    kind: 'modula',
+    id: 'flotta/trasporto-su-strada',
+    risk: 'sinistro-flotta',
+    // Un numero scelto e dichiarato: il catalogo parte da impatto 2, pensato per le auto di
+    // un'impresa comune. Un mezzo pesante o un veicolo con passeggeri che causa vittime o
+    // feriti gravi non è un danno «minore»: da 2 a 4, «grave» sulla scala dell'impatto.
+    //
+    // Sull'ATECO ignoto la regola tace invece di rispondere «ignoto»: il motore su dato
+    // ignoto non modula, scrive solo una verifica, e quella del parco veicoli la scrive già
+    // flotta/veicoli-aziendali. Una seconda riga «da accertare se fa trasporto» su ogni
+    // impresa senza ATECO non aggiungerebbe nulla da chiedere.
+    when: (f) => trasportoSuStrada(f) === true,
+    impact: 2,
+    rationale:
+      'Trasporto su strada di merci o persone: un sinistro con mezzi pesanti o con passeggeri a bordo può ' +
+      'causare vittime e feriti gravi, oltre il danno tipico del parco auto di un’impresa.',
   },
   {
     kind: 'modula',

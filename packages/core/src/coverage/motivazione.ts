@@ -29,6 +29,7 @@ import type { Confidence } from '../shared/provenance.js';
 import { formattaGiorno } from '../shared/tempo.js';
 import { inizialeMinuscola } from '../shared/testo.js';
 import { titoloObbligoSanitario } from './obbligo-sanitario.js';
+import { trasportoSuStrada } from '../company/trasporto-su-strada.js';
 
 /**
  * Un pezzo di motivazione che si accende su un fatto.
@@ -348,6 +349,18 @@ const posizioneNelGruppo: Regola = (f) => {
 
 /** L'obbligo RCA nasce dal veicolo, non dall'impresa. */
 const obbligoRcAuto: Regola = (f) => {
+  if (f.numeroVeicoli === null && trasportoSuStrada(f) === true) {
+    return {
+      testo:
+        'Trasporto su strada: i veicoli sono lo strumento dell’attività, e per ciascuno di essi ' +
+        'l’assicurazione della responsabilità civile è obbligatoria per la circolazione.',
+      fondamento:
+        'Attività di trasporto su strada (ATECO 49.3 o 49.4): il parco veicoli va rilevato a libro matricola.',
+      riferimento: 'Art. 122 D.Lgs. 209/2005',
+      // L'obbligo poggia sull'ATECO, che è accertato: ignoto è solo il numero dei veicoli.
+      suDatoIgnoto: false,
+    };
+  }
   if (f.numeroVeicoli === null) {
     return {
       testo:
@@ -594,6 +607,16 @@ export function obbligoPerImpresa(
     // L'obbligo dell'art. 122 nasce dal veicolo posto in circolazione: senza veicoli non
     // c'è obbligo, e senza il dato non c'è nemmeno la certezza che non ci sia.
     if (facts.numeroVeicoli === null) {
+      // Chi fa trasporto su strada i veicoli li mette in circolazione per mestiere: l'obbligo
+      // c'è anche se il parco non è stato ancora contato.
+      if (trasportoSuStrada(facts) === true) {
+        return {
+          dovuto: true,
+          fonte: 'Art. 122 D.Lgs. 209/2005 · trasporto su strada',
+          motivoEsclusione: null,
+          termine: null,
+        };
+      }
       return { dovuto: null, fonte: null, motivoEsclusione: null, termine: null };
     }
     return {
