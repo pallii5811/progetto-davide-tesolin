@@ -79,53 +79,72 @@ test.describe('Analisi di un’azienda', () => {
     await accedi(page);
   });
 
-  test('l’analisi si apre con score, fido ed esposizione', async ({ page }) => {
+  /*
+    Dal 13/09/2026 la testata porta le tre protezioni del foglio «Veezco_Analisi Rischio.xlsx»
+    al posto di score, fido, patrimonio esposto ed esposizione non assicurata.
+  */
+  test('l’analisi si apre con Property Risk, Business Interruption e Cyber Risk', async ({ page }) => {
     const sorveglianza = sorvegliaErrori(page);
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
 
-    for (const metrica of [
-      'score-di-credito',
-      'fido-consigliato',
-      'patrimonio-esposto',
-      'esposizione-non-assicurata',
-    ]) {
-      const carta = page.getByTestId(`metrica-${metrica}`);
-      await expect(carta, metrica).toBeVisible();
-
-      // Ogni riquadro deve mostrare un numero, non un segnaposto: «da rilevare» al posto
-      // di una cifra significa che il motore non ha saputo calcolare, e va visto subito.
-      await expect(carta.locator('dd').first(), metrica).toHaveText(/\d/);
+    for (const metrica of ['property-risk', 'business-interruption', 'cyber-risk']) {
+      await expect(page.getByTestId(`metrica-${metrica}`), metrica).toBeVisible();
     }
+
+    /*
+      Il Property Risk resta non calcolabile e deve dirlo: il foglio rinvia, per i pericoli
+      naturali, a una tabella che nel file non c'è. Un numero in questo riquadro sarebbe
+      inventato sul 50% del punteggio.
+    */
+    await expect(page.getByTestId('metrica-property-risk').locator('dd').first()).toHaveText(
+      'non calcolabile',
+    );
+    // L'impresa dimostrativa ha ATECO e bilancio: gli altri due riquadri portano un numero.
+    await expect(page.getByTestId('metrica-business-interruption').locator('dd').first()).toHaveText(/\d/);
+    /*
+      ADRIATICA LOGISTICA S.R.L., ATECO 52.10.10: nel foglio la divisione 52 vale 6, 4, 4 e 6,
+      cioè 6 × 30% + 4 × 30% + 4 × 15% + 6 × 25% = 5,1. Il numero atteso viene dal foglio.
+    */
+    await expect(page.getByTestId('metrica-cyber-risk').locator('dd').first()).toHaveText('5,1 su 7');
 
     expect(sorveglianza.errori).toEqual([]);
   });
 
-  test('ogni numero sa spiegarsi', async ({ page }) => {
+  test('ogni protezione dice in testa come è stata calcolata, con la formula in chiaro', async ({
+    page,
+  }) => {
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
 
-    const spiegazioni = page.getByText('Come è stato calcolato');
-    expect(await spiegazioni.count()).toBeGreaterThan(3);
-
-    await spiegazioni.first().click();
-    await expect(page.getByText(/Formula:/).first()).toBeVisible();
+    for (const [id, formula] of [
+      ['property-risk', /Property Risk = 30% × rischio dell’attività/],
+      ['business-interruption', /Perdita giornaliera = margine di contribuzione annuo ÷ 365/],
+      ['cyber-risk', /Cyber Risk = arrotondato a un decimale/],
+    ] as const) {
+      const sezione = page.locator(`#${id}`);
+      await expect(sezione.getByText('Come è stato calcolato'), id).toBeVisible();
+      // Visibile senza aprire nulla: la formula sta sopra il risultato, non in un blocco chiuso.
+      await expect(sezione.getByText(formula), id).toBeVisible();
+    }
   });
 
-  test('l’esposizione non supera patrimonio più margine', async ({ page }) => {
+  test('gli scenari di fermo tornano con la perdita giornaliera stampata', async ({ page }) => {
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
+    const sezione = page.locator('#business-interruption');
 
-    const leggiEuro = async (metrica: string): Promise<number> => {
-      const testo = await page.getByTestId(`metrica-${metrica}`).locator('dd').first().innerText();
-      const cifra = /([\d.]+)\s*€/.exec(testo)?.[1] ?? '0';
-      return Number(cifra.replace(/\./g, ''));
+    const importoDi = async (selettore: string): Promise<number> => {
+      const testo = await sezione.locator(selettore).locator('td').last().innerText();
+      return Number(testo.replace(/[^\d,]/g, '').replace(',', '.'));
     };
 
-    const patrimonio = await leggiEuro('patrimonio-esposto');
-    const esposizione = await leggiEuro('esposizione-non-assicurata');
-
-    // Il doppio conteggio delle scorte gonfiava proprio questo rapporto. Il margine può
-    // farla superare il patrimonio, ma non di un multiplo.
-    expect(esposizione).toBeGreaterThan(0);
-    expect(esposizione).toBeLessThan(patrimonio * 3);
+    // Per identificativo, non per testo: «perdita giornaliera × 90» sta anche nelle righe degli
+    // scenari, e una ricerca sul testo le prendeva tutte.
+    const giornaliera = await importoDi('[data-testid="bi-perdita-giornaliera"]');
+    expect(giornaliera).toBeGreaterThan(0);
+    for (const giorni of [7, 30, 90]) {
+      const scenario = await importoDi(`[data-testid="bi-scenario-${giorni}"]`);
+      // Al centesimo: chi rifà la moltiplicazione con il numero a schermo trova lo stesso importo.
+      expect(Math.round(scenario * 100), `${giorni} giorni`).toBe(Math.round(giornaliera * 100) * giorni);
+    }
   });
 
   test('il report per il cliente si apre e riporta le motivazioni', async ({ page }) => {
@@ -138,107 +157,47 @@ test.describe('Analisi di un’azienda', () => {
 });
 
 /**
- * Il danno massimo probabile è il numero con cui un assicuratore dimensiona davvero
- * l'incendio, e la scelta di forma che ne discende è la parte di maggior valore per chi
- * consiglia: decide se il cliente resta esposto alla regola proporzionale o ne è fuori.
- */
-test.describe('Danno massimo e forma della copertura', () => {
-  test.beforeEach(async ({ page }) => {
-    await accedi(page);
-    await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
-  });
-
-  test('mostra possibile, probabile e la forma consigliata', async ({ page }) => {
-    const sezione = page.locator('#danno-massimo');
-    await expect(sezione).toBeVisible();
-
-    await expect(sezione.getByText('Danno massimo possibile')).toBeVisible();
-    await expect(sezione.getByText('Danno massimo probabile')).toBeVisible();
-    await expect(sezione.getByText(/Forma consigliata:/)).toBeVisible();
-  });
-
-  test('il probabile non supera mai il possibile', async ({ page }) => {
-    const leggiEuro = async (etichetta: string): Promise<number> => {
-      const testo = await page
-        .locator('#danno-massimo')
-        .locator('dl')
-        .filter({ hasText: etichetta })
-        .innerText();
-      return Number((/([\d.]+)\s*€/.exec(testo)?.[1] ?? '0').replace(/\./g, ''));
-    };
-
-    const possibile = await leggiEuro('Danno massimo possibile');
-    const probabile = await leggiEuro('Danno massimo probabile');
-
-    expect(possibile).toBeGreaterThan(0);
-    expect(probabile).toBeGreaterThan(0);
-    expect(probabile).toBeLessThanOrEqual(possibile);
-  });
-
-  test('spiega la scelta citando la regola proporzionale', async ({ page }) => {
-    // È l'argomento che un assicuratore riconosce: senza, la proposta è solo un numero.
-    await expect(page.locator('#danno-massimo').getByText(/regola proporzionale/i)).toBeVisible();
-  });
-
-  test('dichiara cosa chiedere quando la stima resta prudenziale', async ({ page }) => {
-    const sezione = page.locator('#danno-massimo');
-    const domande = sezione.getByText(/Cosa chiedere per stimare meglio/);
-
-    // L'azienda dimostrativa non ha compartimentazione dichiarata: la piattaforma deve
-    // dire quale domanda abbasserebbe il capitale, invece di limitarsi a un numero alto.
-    if ((await domande.count()) > 0) {
-      // Compare sia nell'elenco delle domande sia fra le note del calcolo: basta che ci
-      // sia, non che sia in un punto solo.
-      await expect(sezione.getByText(/compartimentazione/i).first()).toBeVisible();
-    }
-  });
-});
-
-/**
- * Capacità e propensione al rischio.
+ * La scheda porta le protezioni e il profilo aziendale, non l'analisi assicurativa di prima.
  *
- * È il primo passo dell'ISO 31000 e l'unico che trasforma il trattamento in una decisione
- * dell'imprenditore. Se la propensione non è stata chiesta, la piattaforma deve dirlo: una
- * franchigia proposta su un'ipotesi non è documentazione di adeguatezza.
+ * Il 13/09/2026 piano d'azione, registro e matrice dei rischi, somme assicurande, danno
+ * massimo, capacità di ritenzione e prevenzione hanno lasciato il posto a Property, Business
+ * Interruption e Cyber Risk del foglio Veezco. Il report per il cliente resta com'era. Qui si
+ * verifica che sulla scheda non ne resti un pezzo, e che il profilo aziendale sia intero.
  */
-test.describe('Capacità e propensione al rischio', () => {
+test.describe('La scheda porta le protezioni e il profilo, non l’analisi di prima', () => {
   test.beforeEach(async ({ page }) => {
     await accedi(page);
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
+    await expect(page.getByTestId('metrica-cyber-risk')).toBeVisible();
   });
 
-  test('mostra franchigia sostenibile e vincolo più stringente', async ({ page }) => {
-    const sezione = page.locator('#ritenzione');
-    if ((await sezione.count()) === 0) return; // senza bilancio non si propone nulla
-
-    await expect(sezione.getByTestId('metrica-franchigia-sostenibile')).toBeVisible();
-    await expect(sezione.getByTestId('metrica-vincolo-piu-stringente')).toBeVisible();
+  test('le sezioni tolte non ci sono più', async ({ page }) => {
+    for (const id of [
+      'piano',
+      'rischi',
+      'matrice',
+      'somme',
+      'danno-massimo',
+      'ritenzione',
+      'prevenzione',
+    ]) {
+      await expect(page.locator(`#${id}`), id).toHaveCount(0);
+    }
+    await expect(page.getByText(/Intervista (non ancora )?compilata/)).toHaveCount(0);
+    await expect(page.getByText(/Obbligo assicurativo catastrofale|Obbligo CAT NAT/)).toHaveCount(0);
   });
 
-  test('quando la propensione non è stata chiesta lo dichiara', async ({ page }) => {
-    const sezione = page.locator('#ritenzione');
-    if ((await sezione.count()) === 0) return;
-
-    const avviso = sezione.getByText(/Propensione al rischio non ancora rilevata/);
-    if ((await avviso.count()) > 0) {
-      // Compare nell'avviso e fra le note del calcolo: basta che ci sia.
-      await expect(sezione.getByText(/ipotesi prudente/i).first()).toBeVisible();
+  test('il profilo aziendale resta intero', async ({ page }) => {
+    for (const id of ['record-camerale', 'ubicazioni', 'assetto', 'credito']) {
+      await expect(page.locator(`#${id}`), id).toHaveCount(1);
     }
   });
 
-  test('la franchigia non supera mai la capacità per sinistro', async ({ page }) => {
-    const sezione = page.locator('#ritenzione');
-    if ((await sezione.count()) === 0) return;
-
-    const leggi = async (testid: string): Promise<number> => {
-      const testo = await sezione.getByTestId(testid).locator('dd').first().innerText();
-      return Number((/([\d.]+)\s*€/.exec(testo)?.[1] ?? '0').replace(/\./g, ''));
-    };
-
-    // La ritenzione annua è un multiplo del singolo sinistro: se fosse minore, il modello
-    // starebbe dicendo che due sinistri costano meno di uno.
-    expect(await leggi('metrica-ritenzione-annua')).toBeGreaterThanOrEqual(
-      await leggi('metrica-franchigia-sostenibile'),
-    );
+  test('il Cyber Risk dell’impresa dimostrativa è quello del foglio per la divisione 52', async ({
+    page,
+  }) => {
+    const sezione = page.locator('#cyber-risk');
+    await expect(sezione.getByText(/Divisione ATECO 52/)).toBeVisible();
+    await expect(sezione.getByText('5,1 su 7')).toBeVisible();
   });
 });

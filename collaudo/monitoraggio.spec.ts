@@ -14,7 +14,7 @@ test.describe('Monitoraggio continuo', () => {
 
     // Serve almeno un'azienda analizzata: il monitoraggio confronta fotografie salvate.
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
-    await expect(page.getByTestId('metrica-score-di-credito')).toBeVisible();
+    await expect(page.getByTestId('metrica-cyber-risk')).toBeVisible();
 
     await page.goto('/monitoraggio');
     await page.getByRole('button', { name: /aggiorna monitoraggio/i }).click();

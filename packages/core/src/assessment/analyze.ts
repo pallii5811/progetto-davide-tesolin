@@ -68,6 +68,8 @@ import { analizzaAssetto } from '../governance/assetto.js';
 import { analizzaTitolareEffettivo } from '../governance/titolare-effettivo.js';
 import type { AnalisiTitolareEffettivo } from '../governance/titolare-effettivo.js';
 import type { AssettoProprietario } from '../governance/assetto.js';
+import { calcolaProtezioni } from '../protezioni/protezioni.js';
+import type { Protezioni } from '../protezioni/protezioni.js';
 
 export interface AnalyzeOptions {
   readonly riclassificazione?: ReclassifyOptions | undefined;
@@ -153,6 +155,11 @@ export interface CompanyAnalysis {
   readonly prevenzione: readonly RaccomandazioneDiPrevenzione[];
   readonly catNat: Explained<CatNatAssessment>;
   readonly gap: GapAnalysis;
+  /**
+   * Property, Business Interruption e Cyber Risk, con le formule e le tabelle del foglio
+   * «Veezco_Analisi Rischio.xlsx». Sono i tre numeri in testa alla scheda dell'azienda.
+   */
+  readonly protezioni: Protezioni;
   /**
    * Chi possiede e chi risponde.
    *
@@ -583,6 +590,7 @@ export function analyzeCompany(
     assetto,
     titolareEffettivo,
     ubicazioni,
+    protezioni: calcolaProtezioni(factsPerRischi, ubicazioni),
     completezza: valutaCompletezza(profile.datiDichiarati, factsPerRischi),
     livelloDatiEconomici: livelloDati,
     arricchimentiPossibili: arricchimentiPer(livelloDati, profile.eventiNegativi !== null, indicatori),

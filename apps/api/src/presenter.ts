@@ -186,6 +186,7 @@ export function presentAnalysis(analisi: CompanyAnalysis) {
       versioneRegole: analisi.rischi.rulesVersion,
     },
     sommeAssicurande: presentSomme(analisi),
+    protezioni: presentProtezioni(analisi),
     dannoMassimo: presentDannoMassimo(analisi),
     ritenzione: presentRitenzione(analisi),
     metricheDiImpatto: presentMetricheDiImpatto(analisi),
@@ -747,6 +748,51 @@ function presentRisk(rischio: AssessedRisk) {
         suDatoIgnoto: r.suDatoIgnoto,
         saturata: r.saturata === true,
       })),
+    },
+  };
+}
+
+/**
+ * Le tre protezioni del foglio Veezco, così come il motore le ha calcolate.
+ *
+ * Nessuna frase si compone qui: formule, dettagli e note arrivano dal motore, e il presentatore
+ * converte solo gli importi in centesimi, euro e testo formattato.
+ */
+function presentProtezioni(analisi: CompanyAnalysis) {
+  const { fonte, property, businessInterruption: bi, cyber } = analisi.protezioni;
+  return {
+    fonte,
+    property: {
+      formula: property.formula,
+      formulaPericoliNaturali: property.formulaPericoliNaturali,
+      divisioneAteco: property.divisioneAteco,
+      titoloDivisione: property.titoloDivisione,
+      punteggio: property.punteggio,
+      ubicazioneDiRiferimento: property.ubicazioneDiRiferimento,
+      ubicazioni: property.ubicazioni.map((u) => ({
+        id: u.id,
+        etichetta: u.etichetta,
+        punteggio: u.punteggio,
+        voci: u.voci.map((v) => ({ ...v })),
+      })),
+      note: [...property.note],
+    },
+    businessInterruption: {
+      formule: [...bi.formule],
+      punteggioFisico: bi.punteggioFisico,
+      base: bi.base,
+      baseAnnua: moneyOrNull(bi.baseAnnua),
+      perditaGiornaliera: moneyOrNull(bi.perditaGiornaliera),
+      scenari: bi.scenari.map((s) => ({ giorni: s.giorni, perdita: money(s.perdita) })),
+      note: [...bi.note],
+    },
+    cyber: {
+      formula: cyber.formula,
+      divisioneAteco: cyber.divisioneAteco,
+      titoloDivisione: cyber.titoloDivisione,
+      punteggio: cyber.punteggio,
+      voci: cyber.voci.map((v) => ({ ...v })),
+      note: [...cyber.note],
     },
   };
 }

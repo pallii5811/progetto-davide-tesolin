@@ -40,7 +40,7 @@ test.describe('Percorso completo dell’intermediario', () => {
     // ── 2. Aprila ─────────────────────────────────────────────────────────
     await page.getByRole('link', { name: 'Analizza' }).first().click();
     await expect(page).toHaveURL(new RegExp(`/azienda/${AZIENDA}`));
-    await expect(page.getByText(/Score di credito/i).first()).toBeVisible();
+    await expect(page.getByTestId('metrica-property-risk')).toBeVisible();
 
     /*
       Il nome deve esserci, e deve essere un nome.
@@ -53,8 +53,9 @@ test.describe('Percorso completo dell’intermediario', () => {
 
     // ── 3. Le sezioni che compongono il valore ────────────────────────────
     for (const sezione of [
-      /Piano d’azione sulle coperture/i,
-      /Somme assicurande/i,
+      /Property Risk/,
+      /Business Interruption/,
+      /Cyber Risk/,
       /Merito creditizio/i,
       /Record camerale/i,
     ]) {
@@ -115,7 +116,7 @@ test.describe('La navigazione dell’analisi', () => {
       c'è», conclude «questo programma è rotto». E ha ragione.
     */
     await page.goto(`/azienda/${AZIENDA}`);
-    await expect(page.getByText(/Score di credito/i).first()).toBeVisible();
+    await expect(page.getByTestId('metrica-property-risk')).toBeVisible();
 
     const ancore = await page
       .locator('nav[aria-label="Sezioni dell’analisi"] a')
@@ -182,11 +183,12 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     await expect(page.getByRole('table')).toBeVisible();
     await expect(page.getByText(/aziende scaricate/i)).toBeVisible();
 
-    // ── 3. Analizza la prima, e il registro dei rischi c'è ────────────────
+    // ── 3. Analizza la prima, e le tre protezioni ci sono ─────────────────
     await page.getByRole('link', { name: 'Analizza' }).first().click();
-    await expect(page.getByText(/Score di credito/i).first()).toBeVisible();
-    await expect(page.getByText(/Registro dei rischi/i)).toBeVisible();
-    await expect(page.getByText(/ISO 31000/i).first()).toBeVisible();
+    await expect(page.getByTestId('metrica-property-risk')).toBeVisible();
+    for (const id of ['property-risk', 'business-interruption', 'cyber-risk']) {
+      await expect(page.locator(`#${id}`).getByText('Come è stato calcolato'), id).toBeVisible();
+    }
 
     // ── 4. Il portafoglio si esporta, e il file non accusa nessuno ────────
     await page.goto('/portafoglio');

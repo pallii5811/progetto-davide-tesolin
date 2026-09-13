@@ -138,10 +138,15 @@ describe('Difetto 1 · nessuna schermata cita l’art. 1907 su una garanzia che 
     expect(REPORT).toMatch(/sottoassicurazione\.spiegazione\.note/);
   });
 
-  it('la scrivania stampa la spiegazione del motore, non una frase propria', () => {
+  /*
+    Dal 13/09/2026 la scrivania non stampa più le coperture: al posto del piano d'azione la
+    scheda azienda porta Property, Business Interruption e Cyber Risk del foglio Veezco, e la
+    verifica della sottoassicurazione vive soltanto nel fascicolo per il cliente. Resta vero
+    anche qui che la scheda non scriva una frase propria sull'art. 1907.
+  */
+  it('la scrivania non scrive una frase propria sulla regola proporzionale', () => {
     expect(SCRIVANIA).not.toMatch(/1907/);
     expect(SCRIVANIA).not.toMatch(/Regola proporzionale/);
-    expect(SCRIVANIA).toMatch(/sottoassicurazione\.spiegazione\.note/);
   });
 
   /**
@@ -151,12 +156,12 @@ describe('Difetto 1 · nessuna schermata cita l’art. 1907 su una garanzia che 
    * furto — il motore dice che non sa giudicare il limite, e le due schermate non
    * stampavano nulla: la cautela moriva al confine.
    */
-  it('le due schermate leggono i tre stati, non il booleano', () => {
-    for (const schermata of [REPORT, SCRIVANIA]) {
-      expect(schermata).toMatch(/adeguatezzaDelLimite/);
-      expect(schermata).toMatch(/adeguatezzaDelLimite === 'insufficiente'/);
-      expect(schermata).not.toMatch(/sottoassicurata === true/);
-    }
+  it('il fascicolo legge i tre stati, non il booleano', () => {
+    expect(REPORT).toMatch(/adeguatezzaDelLimite/);
+    expect(REPORT).toMatch(/adeguatezzaDelLimite === 'insufficiente'/);
+    expect(REPORT).not.toMatch(/sottoassicurata === true/);
+    // E la scrivania non torni al booleano, se un giorno ristampa le coperture.
+    expect(SCRIVANIA).not.toMatch(/sottoassicurata === true/);
   });
 
   it('i tre stati che le schermate devono distinguere sono quelli del DTO', () => {

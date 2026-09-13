@@ -263,6 +263,39 @@ process.stdout.write('\n  ── Frasi dei fattori ─────────�
 for (const f of analisi.creditScore.value.factors) process.stdout.write(`    ${f.label}: ${f.rationale}\n`);
 
 /*
+  I tre numeri in testa alla scheda dal 13/09/2026, con le voci da cui escono: si verificano
+  in produzione senza aprire il browser. Il Property usa la cartografia solo per i pericoli
+  territoriali, che arrivano anche senza `--contesto`.
+*/
+const numero = (v: number | null): string => (v === null ? '—' : v.toLocaleString('it-IT'));
+const { property, businessInterruption, cyber } = analisi.protezioni;
+process.stdout.write('\n  ── Protezioni del foglio Veezco ─────────────────────\n');
+riga(
+  'Property Risk',
+  property.punteggio === null ? 'non calcolabile' : `${numero(property.punteggio)} su 7`,
+);
+for (const u of property.ubicazioni) {
+  process.stdout.write(
+    `    · ${u.etichetta}: ${u.voci.map((v) => `${v.voce} ${numero(v.punteggio)}`).join(' · ')}\n`,
+  );
+}
+riga(
+  'Business Interruption',
+  businessInterruption.perditaGiornaliera === null
+    ? 'da rilevare'
+    : `${euro(businessInterruption.perditaGiornaliera)} al giorno · base ${businessInterruption.base ?? '—'}`,
+);
+for (const s of businessInterruption.scenari) {
+  process.stdout.write(`    · ${s.giorni} giorni di fermo: ${euro(s.perdita)}\n`);
+}
+riga(
+  'Cyber Risk',
+  cyber.punteggio === null
+    ? 'non calcolabile'
+    : `${numero(cyber.punteggio)} su 7 · ATECO ${cyber.divisioneAteco ?? '—'} ${cyber.titoloDivisione ?? ''}`,
+);
+
+/*
   ── Il testo, per intero ─────────────────────────────────────────────────────
 
   I sei difetti corretti il 01/09/2026 sono stati trovati tutti allo stesso modo: leggendo

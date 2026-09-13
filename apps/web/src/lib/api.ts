@@ -253,8 +253,54 @@ export interface GapDto {
   insidie: string[];
 }
 
+/** Una riga del calcolo di una protezione del foglio Veezco: punteggio da 1 a 7, peso e contributo. */
+export interface VoceDiCalcoloDto {
+  voce: string;
+  punteggio: number | null;
+  peso: number;
+  contributo: number | null;
+  dettaglio: string;
+}
+
+/** Property, Business Interruption e Cyber Risk, con le formule del foglio «Veezco_Analisi Rischio.xlsx». */
+export interface ProtezioniDto {
+  fonte: string;
+  property: {
+    formula: string;
+    formulaPericoliNaturali: string;
+    divisioneAteco: string | null;
+    titoloDivisione: string | null;
+    punteggio: number | null;
+    ubicazioneDiRiferimento: string | null;
+    ubicazioni: { id: string; etichetta: string; punteggio: number | null; voci: VoceDiCalcoloDto[] }[];
+    note: string[];
+  };
+  businessInterruption: {
+    formule: string[];
+    punteggioFisico: number | null;
+    base: 'margine-di-contribuzione' | 'fatturato' | null;
+    baseAnnua: MoneyDto | null;
+    perditaGiornaliera: MoneyDto | null;
+    scenari: { giorni: number; perdita: MoneyDto }[];
+    note: string[];
+  };
+  cyber: {
+    formula: string;
+    divisioneAteco: string | null;
+    titoloDivisione: string | null;
+    punteggio: number | null;
+    voci: VoceDiCalcoloDto[];
+    note: string[];
+  };
+}
+
 export interface AnalisiDto {
   asOf: string;
+  /**
+   * Le tre protezioni del foglio Veezco. Facoltativo: un servizio non ancora aggiornato non le
+   * manda, e la scheda deve aprirsi lo stesso dicendolo.
+   */
+  protezioni?: ProtezioniDto;
   azienda: {
     denominazione: string;
     partitaIva: string | null;

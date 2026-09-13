@@ -53,6 +53,13 @@ export * from './coverage/underinsurance.js';
 export * from './coverage/danno-massimo.js';
 export * from './coverage/metriche-impatto.js';
 
+// Protezioni del foglio «Veezco_Analisi Rischio.xlsx»
+export * from './protezioni/tabelle-veezco.js';
+export * from './protezioni/property-risk.js';
+export * from './protezioni/business-interruption.js';
+export * from './protezioni/cyber-risk.js';
+export * from './protezioni/protezioni.js';
+
 // ── Portafoglio ──────────────────────────────────────────────────────────────
 export * from './portfolio/import.js';
 export * from './portfolio/export.js';

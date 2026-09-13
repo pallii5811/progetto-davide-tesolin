@@ -64,29 +64,13 @@ test.describe('Solidità delle compagnie', () => {
     await expect(page.getByText(/Come è stato calcolato/i).first()).toBeVisible();
   });
 
-  test('la solidità compare accanto alla polizza, dove si decide', async ({ page }) => {
-    /*
-      È il collaudo dell'intera catena: censimento → anagrafe condivisa → incrocio per
-      nome normalizzato → badge accanto alla polizza nell'analisi. Ogni giuntura può
-      staccarsi in silenzio — è già successo: la funzione esisteva, il dato esisteva, e
-      nessuno dei due arrivava dove si prende la decisione.
+  /*
+    «La solidità compare accanto alla polizza, dove si decide» stava qui fino al 13/09/2026.
 
-      Il nome è scritto **diversamente** dalla polizza («Compagnia Alfa Assicurazioni
-      S.p.A.») di proposito: sulla carta le ragioni sociali non coincidono mai, e un
-      confronto letterale passerebbe questo collaudo solo per poi fallire su ogni polizza
-      vera.
-    */
-    await page.goto('/impostazioni/compagnie');
-    await page.getByLabel(/Denominazione/i).fill('Compagnia Alfa Assicurazioni S.p.A.');
-    await page.getByLabel(/Esercizio/i).fill('2025');
-    await page.getByLabel(/Fonte/i).fill('SFCR 2025');
-    await page.getByLabel(/Solvency ratio/i).fill('240');
-    await page.getByRole('button', { name: /Censisci/i }).click();
-    await expect(page.getByText('Compagnia Alfa Assicurazioni S.p.A.').first()).toBeVisible();
-
-    // L'azienda dimostrativa con l'intervista compilata ha polizze della «Compagnia
-    // Alfa Assicurazioni S.p.A.»: il badge deve comparire accanto a quelle.
-    await page.goto('/azienda/03158460174');
-    await expect(page.getByText(/solidità \d+\/100/).first()).toBeVisible();
-  });
+    Il badge viveva nel piano d'azione della scheda azienda, accanto a ogni polizza censita.
+    Quel giorno, su richiesta di Simone, la scheda ha lasciato l'analisi assicurativa per le
+    tre protezioni del foglio Veezco, e il piano d'azione con lei: la solidità resta in questa
+    pagina e nei suoi collaudi qui sopra, ma non compare più accanto alle polizze. Il collaudo
+    non si è spostato altrove perché nessuna schermata incrocia oggi polizze e compagnie.
+  */
 });
