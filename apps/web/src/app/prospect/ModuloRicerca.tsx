@@ -47,7 +47,11 @@ export function ModuloRicerca({
         // `useTransition` tiene `inCorso` vero finché il server non ha finito di
         // costruire la pagina: è l'unico modo di sapere davvero quando la ricerca è
         // conclusa, invece di indovinarlo con un tempo fisso.
-        avvia(() => router.push(`/?${parametri.toString()}`));
+        //
+        // Dal 13/09/2026 il modulo sta in fondo a «Nuovi clienti», come sezione a parte.
+        // `scroll: false` lascia la pagina dov'è: tornando in cima, i risultati
+        // comparirebbero sotto, fuori dallo schermo, e sembrerebbe non successo niente.
+        avvia(() => router.push(`/prospect?${parametri.toString()}`, { scroll: false }));
       }}
       className="grid gap-4 sm:grid-cols-[2fr_1fr_auto]"
     >

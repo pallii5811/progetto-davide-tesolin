@@ -554,6 +554,45 @@ describe('Prospezione: il conteggio è gratuito', () => {
     expect(chiamate[0]).not.toContain('minEmployees');
     expect(chiamate[0]).not.toContain('companyName');
   });
+
+  it('filtra per città con il codice catastale, che il fornitore chiama townCode', async () => {
+    const chiamate: string[] = [];
+    const { provider: p } = provider(CONTEGGIO_REALE, chiamate);
+
+    await p.cercaProspect({ comune: ' b157 ' }, { soloConteggio: true });
+
+    // Il fornitore filtra sul codice (specifica pubblica di /IT-search): il nome al suo
+    // posto non troverebbe nulla, e sembrerebbe una città senza aziende.
+    expect(chiamate[0]).toContain('townCode=B157');
+    expect(chiamate[0]).not.toContain('province=');
+  });
+
+  it('con la città fissata la diagnosi dello zero non propone mai di toglierla', async () => {
+    const chiamate: string[] = [];
+    const fetchImpl = ((url: string): Promise<Response> => {
+      const indirizzo = String(url);
+      chiamate.push(indirizzo);
+      const count = indirizzo.includes('minEmployees') ? 0 : 42;
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [], count, success: true, message: '', error: null }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+    const p = new OpenApiProvider({ token: 't', fetchImpl, ledger: new MemoryCostLedger() });
+
+    const esito = await p.cercaProspect({ comune: 'B157', addettiMin: 500 }, { soloConteggio: true });
+
+    expect(esito.totale).toBe(0);
+    // Un solo filtro facoltativo basta a diagnosticare: togliendolo resta la città.
+    expect(esito.diagnosiZero).toEqual([
+      { filtro: 'minEmployees', etichetta: 'min dipendenti', totaleSenza: 42 },
+    ]);
+    // E nessun conteggio, nemmeno quelli della diagnosi, esce dalla città.
+    expect(chiamate.length).toBeGreaterThan(2);
+    expect(chiamate.every((u) => u.includes('townCode=B157'))).toBe(true);
+  });
 });
 
 /**

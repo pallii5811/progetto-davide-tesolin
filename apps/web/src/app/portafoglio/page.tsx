@@ -57,7 +57,7 @@ export default async function PaginaPortafoglio({
               Carica l’elenco dei tuoi clienti
             </Link>{' '}
             per prenderli in carico tutti insieme, oppure{' '}
-            <Link href="/" className="text-marchio underline">
+            <Link href="/prospect#ricerca-azienda" className="text-marchio underline">
               cerca la prima azienda
             </Link>
             .

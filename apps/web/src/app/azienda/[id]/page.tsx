@@ -69,7 +69,7 @@ export default async function PaginaAzienda({
       <Avviso tono="critico" titolo="Analisi non disponibile">
         {errore instanceof Error ? errore.message : 'Errore imprevisto'}
         <p className="mt-3">
-          <Link href="/" className="text-marchio underline">
+          <Link href="/prospect" className="text-marchio underline">
             Torna alla ricerca
           </Link>
         </p>
@@ -1328,7 +1328,7 @@ function Intestazione({
       */}
       <div className="flex flex-wrap items-center gap-4">
         <RitornoAllElenco />
-        <Link href="/" className="text-xs text-marchio hover:underline">
+        <Link href="/prospect" className="text-xs text-marchio hover:underline">
           ← Nuova ricerca
         </Link>
       </div>

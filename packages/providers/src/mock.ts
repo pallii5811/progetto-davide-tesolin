@@ -28,6 +28,8 @@ interface Variante {
   readonly partitaIva: string;
   readonly comune: string;
   readonly provincia: string;
+  /** Codice catastale del comune: la ricerca di nuovi clienti filtra per questo. */
+  readonly codiceCatastale: string;
   readonly ateco: string;
   readonly atecoDescrizione: string;
   readonly moltiplicatore: number;
@@ -59,6 +61,7 @@ const VARIANTI: readonly Variante[] = [
     partitaIva: '03158460174',
     comune: 'Adro',
     provincia: 'BS',
+    codiceCatastale: 'A060',
     ateco: '25.62.00',
     atecoDescrizione: 'Lavori di meccanica generale',
     moltiplicatore: 1,
@@ -69,6 +72,7 @@ const VARIANTI: readonly Variante[] = [
     partitaIva: '02657870644',
     comune: 'Avellino',
     provincia: 'AV',
+    codiceCatastale: 'A509',
     ateco: '41.20.00',
     atecoDescrizione: 'Costruzione di edifici residenziali e non residenziali',
     moltiplicatore: 0.65,
@@ -79,6 +83,7 @@ const VARIANTI: readonly Variante[] = [
     partitaIva: '02413390390',
     comune: 'Ravenna',
     provincia: 'RA',
+    codiceCatastale: 'H199',
     ateco: '52.10.10',
     atecoDescrizione: 'Magazzini di custodia e deposito',
     moltiplicatore: 1.4,
@@ -195,6 +200,10 @@ export class MockCompanyProvider implements CompanyDataProvider {
 
     const corrispondenti = VARIANTI.filter((v) => {
       if (criteri.provincia !== undefined && v.provincia !== criteri.provincia.toUpperCase()) {
+        return false;
+      }
+      // Come il fornitore reale: la città per codice catastale, non per nome.
+      if (criteri.comune !== undefined && v.codiceCatastale !== criteri.comune.trim().toUpperCase()) {
         return false;
       }
       // Come il fornitore reale: il confronto è sul codice senza punti, dall'inizio.

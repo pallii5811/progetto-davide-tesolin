@@ -22,8 +22,11 @@ import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
  * aperta, e i lettori di schermo lo annunciano come «pagina corrente» invece che come un
  * generico «corrente».
  */
+/*
+  «Ricerca» non c'è più: tolta su richiesta di Simone del 13/09/2026. La ricerca per partita
+  IVA vive dentro «Nuovi clienti», come sezione a parte, e «/» rinvia lì.
+*/
 const VOCI: readonly { readonly href: string; readonly testo: string }[] = [
-  { href: '/', testo: 'Ricerca' },
   { href: '/prospect', testo: 'Nuovi clienti' },
   { href: '/portafoglio', testo: 'Portafoglio' },
   { href: '/monitoraggio', testo: 'Monitoraggio' },

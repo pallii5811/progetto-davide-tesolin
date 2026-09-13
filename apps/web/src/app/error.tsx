@@ -49,7 +49,7 @@ export default function Errore({ error, reset }: { error: Error; reset: () => vo
           Riprova
         </button>
         <a
-          href="/"
+          href="/prospect"
           className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio"
         >
           Torna alla ricerca

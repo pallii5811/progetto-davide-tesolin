@@ -211,6 +211,8 @@ export class OpenApiProvider implements CompanyDataProvider {
     const filtri = {
       companyName: criteri.denominazione,
       province: criteri.provincia?.toUpperCase(),
+      // Il comune va per codice catastale: `townCode=B157`, non il nome.
+      townCode: criteri.comune?.trim().toUpperCase(),
       // Il fornitore confronta il codice così com'è archiviato, cioè **senza punti**:
       // «25.62.00» non trova nulla, «2562» trova sessantuno aziende.
       atecoCode: criteri.ateco?.replace(/[^0-9]/g, ''),
@@ -321,19 +323,29 @@ export class OpenApiProvider implements CompanyDataProvider {
       companyName: 'denominazione',
       province: 'provincia',
       atecoCode: 'codice ATECO',
-      minEmployees: 'addetti da',
-      maxEmployees: 'addetti a',
+      minEmployees: 'min dipendenti',
+      maxEmployees: 'max dipendenti',
       minTurnover: 'fatturato da',
       maxTurnover: 'fatturato a',
       legalFormCode: 'forma giuridica',
       shareHolderTaxCode: 'codice fiscale del socio',
     };
+    /*
+      La città non compare fra le etichette, di proposito: non si toglie mai.
+
+      È l'unico filtro obbligatorio della ricerca, e «senza città → 180.000 aziende» direbbe
+      quante imprese ci sono in tutta Italia, cioè un consiglio che chi cerca non può seguire.
+      Per la stessa ragione con la città fissata basta UN filtro facoltativo per avere
+      qualcosa da diagnosticare: togliendolo resta la città, e il numero dice quanto quel
+      filtro stava stringendo.
+    */
+    const conCitta = filtri['townCode'] !== undefined && filtri['townCode'] !== '';
 
     const attivi = Object.keys(filtri).filter(
       (k) => k in ETICHETTE && filtri[k] !== undefined && filtri[k] !== '',
     );
-    // Con un filtro solo non c'è nulla da diagnosticare: è quello, e si vede.
-    if (attivi.length < 2) return [];
+    // Senza città, con un filtro solo non c'è nulla da diagnosticare: è quello, e si vede.
+    if (attivi.length < (conCitta ? 1 : 2)) return [];
 
     const esiti = await Promise.all(
       attivi.map(async (chiave) => {

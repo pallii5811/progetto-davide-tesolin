@@ -16,8 +16,8 @@ import { accedi, AZIENDA_DI_PROVA } from './aiuti.js';
 const LARGHEZZA_TELEFONO = 390;
 
 const PAGINE: readonly { readonly percorso: string; readonly nome: string }[] = [
-  { percorso: '/', nome: 'ricerca' },
   { percorso: '/prospect', nome: 'nuovi clienti' },
+  { percorso: '/prospect?piva=03158460174', nome: 'nuovi clienti, ricerca per partita IVA' },
   { percorso: '/portafoglio', nome: 'portafoglio' },
   { percorso: '/monitoraggio', nome: 'monitoraggio' },
   { percorso: '/catalogo', nome: 'catalogo rischi' },

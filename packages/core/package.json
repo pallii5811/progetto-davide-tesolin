@@ -18,6 +18,10 @@
     "./testo": {
       "types": "./dist/shared/testo.d.ts",
       "default": "./dist/shared/testo.js"
+    },
+    "./comuni": {
+      "types": "./dist/shared/comuni.d.ts",
+      "default": "./dist/shared/comuni.js"
     }
   },
   "files": [

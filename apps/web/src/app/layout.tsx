@@ -25,7 +25,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen">
         <header className="no-print border-b border-bordo bg-superficie">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
-            <Link href="/" className="flex items-baseline gap-2.5">
+            <Link href="/prospect" className="flex items-baseline gap-2.5">
               <span className="text-lg font-bold tracking-tight text-marchio">AEGIS</span>
               <span className="hidden text-xs text-testo-debole sm:inline">
                 Credit &amp; Insurance Risk Intelligence

@@ -82,7 +82,7 @@ describe('Tetto di spesa giornaliero', () => {
 
     const risposta = await app.inject({
       method: 'GET',
-      url: '/api/prospect?provincia=BS&soloConteggio=1',
+      url: '/api/prospect?comune=A060&soloConteggio=1',
       headers: { cookie },
     });
 

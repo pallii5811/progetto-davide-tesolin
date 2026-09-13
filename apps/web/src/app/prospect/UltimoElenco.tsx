@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { comunePerCodiceCatastale, etichettaComune } from '@aegis/core/comuni';
 
 const CHIAVE = 'aegis:ultimo-elenco-prospect';
 
@@ -59,7 +60,17 @@ function useElencoRicordato(): ElencoRicordato | null {
         typeof letto === 'object' &&
         letto !== null &&
         typeof (letto as { query?: unknown }).query === 'string' &&
-        typeof (letto as { quante?: unknown }).quante === 'number'
+        typeof (letto as { quante?: unknown }).quante === 'number' &&
+        /*
+          Un elenco ricordato senza una città valida non si offre di riaprirlo.
+
+          Fino al 13/09/2026 la ricerca era per provincia; da allora la città è obbligatoria
+          e la pagina non cerca senza. Un elenco comprato prima, riaperto, mostrerebbe un
+          modulo senza città e nessun risultato: un «Riaprilo» che non riapre niente è
+          peggio di nessun collegamento. L'archivio lo conserva comunque ventiquattro ore.
+        */
+        comunePerCodiceCatastale(new URLSearchParams((letto as { query: string }).query).get('comune')) !==
+          null
       ) {
         setUltimo(letto as ElencoRicordato);
       }
@@ -93,17 +104,24 @@ export function UltimoElenco() {
 
 /** Come si chiamano i filtri quando bisogna dirli a una persona. */
 const ETICHETTE: Readonly<Record<string, string>> = {
+  comune: 'città',
   denominazione: 'denominazione',
-  provincia: 'provincia',
   ateco: 'codice ATECO',
-  addettiMin: 'addetti da',
-  addettiMax: 'addetti a',
+  addettiMin: 'min dipendenti',
+  addettiMax: 'max dipendenti',
   fatturatoMinEuro: 'fatturato da',
   fatturatoMaxEuro: 'fatturato a',
   socioCodiceFiscale: 'codice fiscale del socio',
   formaGiuridicaCodice: 'forma giuridica',
   limite: 'quante aziende',
 };
+
+/** La città si dice col nome e la sigla, non col codice catastale che viaggia nell'indirizzo. */
+function valoreLeggibile(chiave: string, valore: string): string {
+  if (chiave !== 'comune' || valore === '') return valore;
+  const comune = comunePerCodiceCatastale(valore);
+  return comune === null ? valore : etichettaComune(comune);
+}
 
 /**
  * Prima di spendere: hai già comprato questo elenco?
@@ -131,7 +149,13 @@ export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Reco
   for (const [chiave, etichetta] of Object.entries(ETICHETTE)) {
     const prima = (precedenti.get(chiave) ?? '').trim();
     const adesso = (criteri[chiave] ?? '').trim();
-    if (prima !== adesso) differenze.push({ etichetta, prima, adesso });
+    if (prima !== adesso) {
+      differenze.push({
+        etichetta,
+        prima: valoreLeggibile(chiave, prima),
+        adesso: valoreLeggibile(chiave, adesso),
+      });
+    }
   }
 
   const riapri = (

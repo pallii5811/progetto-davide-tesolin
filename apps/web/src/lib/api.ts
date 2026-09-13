@@ -1043,8 +1043,9 @@ export async function statoFornitura(): Promise<StatoFornitura> {
 }
 
 export interface CriteriProspezione {
+  /** Codice catastale della città, es. `B157`: l'unico filtro obbligatorio. */
+  comune: string;
   denominazione?: string;
-  provincia?: string;
   ateco?: string;
   addettiMin?: string;
   addettiMax?: string;

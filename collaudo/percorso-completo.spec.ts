@@ -30,7 +30,8 @@ test.describe('Percorso completo dell’intermediario', () => {
     test.setTimeout(180_000);
 
     // ── 1. Trova l'impresa ────────────────────────────────────────────────
-    await page.goto('/');
+    // La ricerca per partita IVA è una sezione di «Nuovi clienti» dal 13/09/2026.
+    await page.goto('/prospect');
     await page.getByPlaceholder('11 cifre').fill(AZIENDA);
     await page.getByRole('button', { name: 'Cerca' }).click();
 
@@ -144,7 +145,8 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
 
     // ── 1. Descrive l'insieme che cerca ───────────────────────────────────
     await page.goto('/prospect');
-    await page.getByLabel('Provincia').fill('BS');
+    await page.getByRole('combobox', { name: 'Città' }).fill('Adro');
+    await page.getByRole('option', { name: 'Adro (BS)' }).click();
     await page.getByRole('button', { name: /Quante sono/i }).click();
     await expect(page.getByText(/aziende corrispondono/i)).toBeVisible();
 

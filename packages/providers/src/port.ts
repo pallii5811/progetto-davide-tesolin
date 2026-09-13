@@ -124,6 +124,15 @@ export interface CriteriProspezione {
   /** Sigla provinciale, es. `BS`. */
   readonly provincia?: string | undefined;
   /**
+   * Codice catastale del comune (Belfiore), es. `B157` per Brescia.
+   *
+   * Il fornitore filtra per comune con `townCode`, e vuole il codice, non il nome: i nomi
+   * non sono unici — Livo è in provincia di Como e in quella di Trento. Parametro letto
+   * sulla specifica pubblica di `/IT-search` il 13/09/2026. Nella ricerca di nuovi clienti
+   * è l'unico filtro obbligatorio.
+   */
+  readonly comune?: string | undefined;
+  /**
    * Codice ATECO **senza punti**.
    *
    * Il confronto del fornitore è esatto: `25` e `2562` sono due insiemi diversi, e il

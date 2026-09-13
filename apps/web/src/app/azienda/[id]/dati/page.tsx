@@ -26,7 +26,7 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
     return (
       <Avviso tono="critico" titolo="Azienda non disponibile">
         Impossibile caricare l&apos;azienda richiesta.{' '}
-        <Link href="/" className="text-marchio underline">
+        <Link href="/prospect" className="text-marchio underline">
           Torna alla ricerca
         </Link>
       </Avviso>

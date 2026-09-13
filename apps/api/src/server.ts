@@ -22,6 +22,7 @@ import {
   valutaCompletezza,
 } from '@aegis/core';
 import type { CompanyProfile, DatiDichiarati, PolizzaInEssere } from '@aegis/core';
+import { comunePerCodiceCatastale } from '@aegis/core/comuni';
 import {
   MemoryCache,
   MemoryCostLedger,
@@ -1420,9 +1421,22 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const { soloConteggio, ...criteri } = parsed.data;
-    const haFiltri = Object.values(criteri).some((v) => v !== undefined && v !== '');
-    if (!haFiltri) {
-      return reply.status(400).send({ errore: 'Indicare almeno un criterio di ricerca' });
+    /*
+      La città è obbligatoria, e tutto il resto no.
+
+      Richiesta di Simone del 13/09/2026: si cerca in una città, e gli altri filtri si
+      mettono solo se servono. Il controllo sta anche qui e non solo nel modulo, perché
+      questa rotta spende: senza città la ricerca coprirebbe l'Italia intera, e con un
+      codice che non è un comune il fornitore risponderebbe zero — un «nessuna azienda»
+      che è in realtà un errore di chi chiama.
+    */
+    if (criteri.comune === undefined || criteri.comune === '') {
+      return reply.status(400).send({ errore: 'Indicare la città: è l’unico filtro obbligatorio' });
+    }
+    if (comunePerCodiceCatastale(criteri.comune) === null) {
+      return reply
+        .status(400)
+        .send({ errore: 'Città non riconosciuta: sceglierla dall’elenco dei comuni italiani' });
     }
 
     // Il conteggio è gratuito e non tocca il tetto: bloccarlo impedirebbe di capire
@@ -2873,7 +2887,9 @@ const numeroFacoltativo = z
 
 const prospezioneSchema = z.object({
   denominazione: z.string().trim().max(120).optional(),
-  provincia: z.string().trim().length(2).toUpperCase().optional(),
+  // Codice catastale del comune, es. B157: obbligatorio, e verificato nella rotta contro
+  // l'elenco ISTAT perché il messaggio dica cosa manca invece di «filtri non validi».
+  comune: z.string().trim().max(4).toUpperCase().optional(),
   ateco: z.string().trim().max(12).optional(),
   addettiMin: numeroFacoltativo,
   addettiMax: numeroFacoltativo,

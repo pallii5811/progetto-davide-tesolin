@@ -1,11 +1,16 @@
 import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import { BottoneInvioGet } from '@/components/BottoneInvioGet';
 import { richiediSessione } from '@/lib/sessione';
-import { cercaProspect } from '@/lib/api';
+import { INDIRIZZO_API, cercaAziende, cercaProspect, statoServizio } from '@/lib/api';
 import type { RisultatoProspezione } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
+import { comunePerCodiceCatastale, etichettaComune } from '@aegis/core/comuni';
+import { formattaGiornoEsteso } from '@aegis/core/tempo';
 import { SelettoreLotto } from './SelettoreLotto';
+import { SelettoreComune } from './SelettoreComune';
 import { BottoneElenco } from './BottoneElenco';
+import { ModuloRicerca } from './ModuloRicerca';
+import { SchedaRisultato } from './SchedaRisultato';
 import { ConfrontoConElencoComprato, RicordaElenco, UltimoElenco } from './UltimoElenco';
 import { centesimiPerRiga } from '@/lib/prezzo-prospect';
 
@@ -30,17 +35,21 @@ export const dynamic = 'force-dynamic';
 const CENTESIMI_PER_AZIENDA = 5;
 
 /**
- * Ricerca di prospect.
+ * Ricerca di nuovi clienti, e ricerca di un'azienda per partita IVA.
  *
- * È l'unica pagina che porta clienti **nuovi** invece di analizzare quelli che si hanno
- * già, e l'unica in cui si descrive un insieme — un territorio, un settore, una
- * dimensione — invece di una singola azienda.
+ * È la pagina che porta clienti **nuovi** invece di analizzare quelli che si hanno già:
+ * si descrive un insieme — una città, e se serve un settore, una dimensione — e si scopre
+ * chi lo popola.
  *
- * Ciò che la rende usabile è il conteggio gratuito: il numero di aziende corrispondenti
- * si ottiene senza scaricare nulla e senza spendere, e l'elenco si acquista solo quando
- * quel numero ha senso. Senza, comporre una ricerca per tentativi costerebbe un centesimo
- * a tentativo — poco, ma abbastanza da far smettere di provare, che è il modo peggiore
- * di risparmiare.
+ * Dal 13/09/2026, su richiesta di Simone: la città è l'unico filtro obbligatorio e prende
+ * il posto della provincia; ogni altro filtro è facoltativo. E la ricerca per partita IVA,
+ * che aveva una pagina sua, sta qui in fondo come sezione a parte.
+ *
+ * Ciò che rende usabile la ricerca è il conteggio gratuito: il numero di aziende
+ * corrispondenti si ottiene senza scaricare nulla e senza spendere, e l'elenco si acquista
+ * solo quando quel numero ha senso. Senza, comporre una ricerca per tentativi costerebbe
+ * un centesimo a tentativo — poco, ma abbastanza da far smettere di provare, che è il
+ * modo peggiore di risparmiare.
  */
 export default async function PaginaProspect({
   searchParams,
@@ -51,8 +60,9 @@ export default async function PaginaProspect({
   const parametri = await searchParams;
 
   const criteri = {
+    // Il codice catastale della città scelta: è con quello che il fornitore filtra.
+    comune: (parametri['comune'] ?? '').trim().toUpperCase(),
     denominazione: parametri['denominazione'] ?? '',
-    provincia: parametri['provincia'] ?? '',
     ateco: parametri['ateco'] ?? '',
     addettiMin: parametri['addettiMin'] ?? '',
     addettiMax: parametri['addettiMax'] ?? '',
@@ -63,7 +73,7 @@ export default async function PaginaProspect({
     // dalle ditte individuali significa pagare righe che non si possono valutare.
     formaGiuridicaCodice: parametri['formaGiuridicaCodice'] ?? 'SR',
     // Quante aziende scaricare: il prezzo è **a record**, non a ricerca, e senza un lotto
-    // dichiarato un elenco su una provincia intera costerebbe centinaia di euro.
+    // dichiarato un elenco su una città grande costerebbe centinaia di euro.
     /*
       Cinque, non venticinque.
 
@@ -78,16 +88,23 @@ export default async function PaginaProspect({
     limite: parametri['limite'] ?? '5',
   };
 
-  const haFiltri = Object.values(criteri).some((v) => v.trim() !== '');
+  /*
+    La città decide se si cerca.
+
+    Prima bastava un filtro qualunque, e poiché forma giuridica e quante aziende arrivano
+    già compilate, la pagina appena aperta contava tutte le S.r.l. d'Italia. Ora senza una
+    città valida non parte nessuna chiamata; con la città, anche da sola, sì — gli altri
+    filtri restringono solo se ci sono.
+  */
+  const comuneScelto = comunePerCodiceCatastale(criteri.comune);
   // `scarica` è l'unica azione che spende: senza, la pagina si limita a contare.
   const scarica = parametri['scarica'] === '1';
 
   /*
     Ha descritto un'impresa, o ha solo aperto la pagina?
 
-    Non è la stessa domanda di `haFiltri`: forma giuridica e quante aziende arrivano già
-    compilate a chi non ha scritto niente, quindi `haFiltri` è vero anche sul modulo
-    vuoto. Da soli quei due campi non sono una ricerca — non si cerca «una S.r.l.».
+    Forma giuridica e quante aziende arrivano già compilate a chi non ha scritto niente:
+    da soli quei due campi non sono una ricerca — non si cerca «una S.r.l.».
 
     La distinzione serve perché a schermo ci sono due richiami diversi allo stesso
     elenco già comprato, e ciascuno risponde a una domanda che l'altro non pone:
@@ -100,15 +117,40 @@ export default async function PaginaProspect({
   const haDescrittoUnImpresa = Object.entries(criteri).some(
     ([campo, valore]) => !SOLO_PREDEFINITI.includes(campo) && valore.trim() !== '',
   );
+  // I filtri facoltativi davvero messi: senza, uno zero non ha niente da diagnosticare.
+  const haFiltriFacoltativi = Object.entries(criteri).some(
+    ([campo, valore]) => campo !== 'comune' && campo !== 'limite' && valore.trim() !== '',
+  );
+
+  // La ricerca di un'azienda già nota, nella sezione in fondo.
+  const denominazioneCercata = (parametri['q'] ?? '').trim();
+  const partitaIvaCercata = (parametri['piva'] ?? '').trim();
+  const cercaUnAzienda = denominazioneCercata !== '' || partitaIvaCercata !== '';
+
+  const stato = await statoServizio().catch(() => null);
 
   let risultato: RisultatoProspezione | null = null;
   let errore: string | null = null;
 
-  if (haFiltri) {
+  if (comuneScelto !== null) {
     try {
       risultato = await cercaProspect(criteri, { soloConteggio: !scarica });
     } catch (e) {
       errore = e instanceof Error ? e.message : 'Errore imprevisto';
+    }
+  }
+
+  let risultatiAzienda: Awaited<ReturnType<typeof cercaAziende>> | null = null;
+  let erroreAzienda: string | null = null;
+
+  if (cercaUnAzienda) {
+    try {
+      risultatiAzienda = await cercaAziende({
+        ...(denominazioneCercata === '' ? {} : { denominazione: denominazioneCercata }),
+        ...(partitaIvaCercata === '' ? {} : { partitaIva: partitaIvaCercata }),
+      });
+    } catch (e) {
+      erroreAzienda = e instanceof Error ? e.message : 'Errore imprevisto';
     }
   }
 
@@ -120,30 +162,104 @@ export default async function PaginaProspect({
         qui sotto, che dice la stessa cosa **e** in che cosa la ricerca di adesso
         differisce da quella già comprata: due richiami affiancati sarebbero la stessa
         frase due volte.
-
-        Non basta guardare se a schermo c'è un elenco: la pagina nuda fa comunque un
-        conteggio, quindi «nessun risultato» non la riconosce.
       */}
       {!haDescrittoUnImpresa && <UltimoElenco />}
 
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Ricerca di nuovi clienti</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-testo-tenue">
-          Descrivi l&apos;impresa che cerchi — territorio, settore, dimensione — e scopri quante ne
-          esistono. Contare non costa nulla: si paga solo l&apos;elenco, e solo quando lo chiedi.
+          Scegli la città e scopri quante imprese ci sono. Settore, dimensione e gli altri filtri sono
+          facoltativi: se li metti, la ricerca si restringe. Contare non costa nulla: si paga solo
+          l&apos;elenco, e solo quando lo chiedi.
         </p>
       </div>
 
+      {/*
+        Due messaggi diversi per lo stesso guasto, perché i lettori sono due.
+        In sviluppo serve l'indirizzo che non risponde e il comando per riavviare; in
+        esercizio quel testo direbbe a un intermediario di lanciare comandi che non può
+        lanciare, facendo sembrare rotto il prodotto invece del servizio.
+      */}
+      {stato === null && (
+        <div className="mb-6">
+          {process.env.NODE_ENV === 'production' ? (
+            <Avviso tono="critico" titolo="Servizio momentaneamente non disponibile">
+              Non è al momento possibile interrogare gli archivi. I dati già acquisiti restano consultabili
+              dal portafoglio. Se la situazione persiste, segnalarlo all&apos;assistenza.
+            </Avviso>
+          ) : (
+            <Avviso tono="critico" titolo="Servizio API non raggiungibile">
+              Nessuna risposta da <code className="font-mono">{INDIRIZZO_API}</code>. Avviare il servizio
+              con <code className="font-mono">npm run dev:api</code>, oppure indicare l&apos;indirizzo
+              corretto nella variabile <code className="font-mono">AEGIS_API_URL</code>.
+            </Avviso>
+          )}
+        </div>
+      )}
+
+      {/*
+        La modalità va dichiarata in entrambi i versi. Sapere di essere in dimostrativo
+        evita di prendere per buoni dei numeri inventati; sapere di essere sui dati reali
+        evita di scoprire a fine mese quanto è costato provare.
+
+        Il rimedio è diverso perché lo è chi legge, e dirgliene uno che non lo riguarda è
+        peggio del silenzio: la versione precedente rimandava «alle impostazioni», dove
+        non c'è nulla da attivare. Il collegamento agli archivi dipende dalla
+        configurazione con cui il servizio è stato avviato — chi sviluppa può cambiarla
+        con un comando, un intermediario no, e mandarcelo lo fa sentire incapace di una
+        cosa che è semplicemente fuori dalla sua portata.
+      */}
+      {stato !== null && !stato.datiReali && (
+        <div className="mb-6">
+          <Avviso tono="informativo" titolo="Modalità dimostrativa">
+            Le aziende che compaiono qui sono <strong>inventate</strong>, per quanto coerenti: servono a
+            provare il percorso e non consumano credito, ma su di esse non si fonda nessuna proposta a un
+            cliente.{' '}
+            {process.env.NODE_ENV === 'production' ? (
+              <>
+                Il collegamento agli archivi camerali non è attivo su questa installazione: segnalarlo
+                all&apos;assistenza.
+              </>
+            ) : (
+              <>
+                Per lavorare sulle aziende vere, riavviare il servizio con{' '}
+                <code className="font-mono">npm run dev:api</code> al posto di{' '}
+                <code className="font-mono">npm run dev:api:demo</code>.
+              </>
+            )}
+          </Avviso>
+        </div>
+      )}
+
+      {stato !== null && stato.datiReali && (
+        <div className="mb-6">
+          <Avviso tono="attenzione" titolo="Dati reali — ogni analisi consuma credito">
+            Ogni analisi interroga gli archivi camerali e consuma credito:{' '}
+            <strong>
+              {(stato.costoAnalisiCentesimi / 100).toFixed(2).replace('.', ',')} € per analisi
+            </strong>
+            , {(stato.costoAnalisiApprofonditaCentesimi / 100).toFixed(2).replace('.', ',')} € se
+            approfondita. Le aziende già in portafoglio non vengono riacquistate, e la ricerca di nuovi
+            clienti conta le aziende senza costo prima di scaricarne l&apos;elenco.
+            {process.env.NODE_ENV !== 'production' && (
+              <>
+                {' '}
+                Per provare senza spendere: <code className="font-mono">npm run dev:api:demo</code>.
+              </>
+            )}
+          </Avviso>
+        </div>
+      )}
+
       <Scheda className="mb-6">
         <form method="get" id="ricerca-prospect" className="space-y-4">
+          <p className="text-xs text-testo-tenue">
+            Solo la <strong className="font-medium text-testo">città</strong> è obbligatoria: tutti gli
+            altri filtri sono facoltativi.
+          </p>
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Campo
-              nome="provincia"
-              etichetta="Provincia"
-              valore={criteri.provincia}
-              segnaposto="BS"
-              maiuscolo
-            />
+            <SelettoreComune codiceIniziale={criteri.comune} />
             <Campo
               nome="ateco"
               etichetta="Codice ATECO"
@@ -153,14 +269,14 @@ export default async function PaginaProspect({
             />
             <Campo
               nome="addettiMin"
-              etichetta="Addetti da"
+              etichetta="Min dipendenti"
               valore={criteri.addettiMin}
               segnaposto="20"
               numerico
             />
             <Campo
               nome="addettiMax"
-              etichetta="Addetti a"
+              etichetta="Max dipendenti"
               valore={criteri.addettiMax}
               segnaposto="250"
               numerico
@@ -203,7 +319,7 @@ export default async function PaginaProspect({
               valore={criteri.socioCodiceFiscale}
               segnaposto="RSSGNN70A01A944X"
               maiuscolo
-              nota="Tutte le società partecipate dalla stessa persona."
+              nota="Le società partecipate dalla stessa persona, nella città scelta."
             />
 
             {/*
@@ -295,6 +411,24 @@ export default async function PaginaProspect({
         </form>
       </Scheda>
 
+      {/*
+        Filtri senza città: arriva da un indirizzo scritto a mano o da un collegamento di
+        prima del 13/09/2026, quando si cercava per provincia. Il modulo non lo permette —
+        il campo della città blocca l'invio — ma l'indirizzo sì, e una pagina che non dice
+        niente sembrerebbe una ricerca finita a vuoto.
+      */}
+      {haDescrittoUnImpresa && comuneScelto === null && (
+        <div className="mb-6">
+          <Avviso
+            tono="attenzione"
+            titolo={criteri.comune === '' ? 'Manca la città' : 'Città non riconosciuta'}
+          >
+            La città è l&apos;unico filtro obbligatorio: sceglila dall&apos;elenco dei comuni e ripeti la
+            ricerca. Finché manca non parte nessuna richiesta, e non si spende niente.
+          </Avviso>
+        </div>
+      )}
+
       {errore !== null && (
         <Avviso tono="attenzione" titolo="Ricerca non eseguita">
           {errore}
@@ -313,7 +447,8 @@ export default async function PaginaProspect({
                 Due filtri sensati possono avere un'intersezione vuota senza che nessuno dei
                 due sia sbagliato, e da fuori quel caso è identico a un guasto. Qui il
                 servizio ha già ricontato togliendone uno per volta — gratis, in `dryRun` —
-                e dice quale riaprirebbe la ricerca e con quante imprese.
+                e dice quale riaprirebbe la ricerca e con quante imprese. La città non si
+                toglie mai: è obbligatoria.
               */}
               {risultato.diagnosiZero !== undefined && risultato.diagnosiZero.length > 0 ? (
                 <div className="space-y-2">
@@ -333,10 +468,15 @@ export default async function PaginaProspect({
                     ))}
                   </ul>
                 </div>
-              ) : (
+              ) : haFiltriFacoltativi ? (
                 <p className="text-sm text-testo-tenue">
                   Nessuno dei filtri, tolto da solo, riapre la ricerca: l’insieme è vuoto in partenza.
-                  Conviene allargare il territorio o la dimensione.
+                  Conviene provare un comune vicino o allargare la dimensione.
+                </p>
+              ) : (
+                <p className="text-sm text-testo-tenue">
+                  In {comuneScelto === null ? 'questa città' : etichettaComune(comuneScelto)} l’archivio non
+                  registra imprese attive. Conviene provare un comune vicino.
                 </p>
               )}
 
@@ -436,6 +576,105 @@ export default async function PaginaProspect({
           </div>
         </>
       )}
+
+      {/*
+        La ricerca di un'azienda che si conosce già, come sezione a parte.
+
+        Aveva una pagina sua, «Ricerca», tolta il 13/09/2026 su richiesta di Simone: la si
+        trova qui, sotto la ricerca di nuovi clienti e separata da essa. Sono due moduli
+        distinti con parametri distinti — `q` e `piva` qui, i filtri là — quindi usarne uno
+        non compra niente per conto dell'altro.
+      */}
+      <section
+        id="ricerca-azienda"
+        aria-labelledby="titolo-ricerca-azienda"
+        className="mt-12 border-t border-bordo pt-8"
+      >
+        <h2 id="titolo-ricerca-azienda" className="text-lg font-semibold tracking-tight">
+          Cerca un&apos;azienda per partita IVA
+        </h2>
+        <p className="mb-4 mt-1 max-w-2xl text-sm leading-relaxed text-testo-tenue">
+          Se l&apos;azienda la conosci già: dalla partita IVA, o dalla ragione sociale, al profilo camerale
+          e da lì all&apos;analisi completa.
+        </p>
+
+        <Scheda className="mb-6">
+          <ModuloRicerca
+            denominazione={denominazioneCercata}
+            partitaIva={partitaIvaCercata}
+            aPagamento={stato?.datiReali === true}
+          />
+
+          {/*
+            Gli esempi hanno senso solo quando sono utilizzabili: sui dati reali quelle tre
+            partite IVA non esistono, e chi le provasse pagherebbe una ricerca per non
+            trovare nulla.
+          */}
+          {stato !== null && !stato.datiReali && (
+            <p className="mt-3 text-xs text-testo-debole">
+              Esempi in modalità dimostrativa: <code className="font-mono">03158460174</code> (meccanica,
+              Brescia) · <code className="font-mono">02657870644</code> (costruzioni, Avellino) ·{' '}
+              <code className="font-mono">02413390390</code> (logistica, Ravenna)
+            </p>
+          )}
+        </Scheda>
+
+        {erroreAzienda !== null && (
+          <Avviso tono="attenzione" titolo="Ricerca non eseguita">
+            {erroreAzienda}
+          </Avviso>
+        )}
+
+        {risultatiAzienda !== null && risultatiAzienda.risultati.length === 0 && (
+          <p className="text-sm text-testo-tenue">Nessuna azienda trovata con questi criteri.</p>
+        )}
+
+        {/*
+          Quando il risultato viene dall'archivio, dirlo cambia due cose.
+
+          La prima è la fiducia: chi ha appena cercato si aspetta di aver speso, e vedere
+          scritto «nessun costo» è l'unico modo di sapere che non è successo. La seconda è la
+          decisione: un dato acquistato mesi fa può essere vecchio, e chi lo sa può scegliere
+          di rinfrescarlo invece di scoprirlo dopo aver fatto una proposta.
+        */}
+        {risultatiAzienda !== null &&
+          risultatiAzienda.daArchivio === true &&
+          risultatiAzienda.risultati.length > 0 && (
+            <p className="mb-3 rounded border-l-2 border-basso bg-basso/5 py-1.5 pl-3 text-sm leading-relaxed">
+              <strong>Trovata nel suo archivio — nessun costo.</strong> Questi dati sono già stati
+              acquistati
+              {risultatiAzienda.aggiornatoIl == null
+                ? ''
+                : ` il ${formattaGiornoEsteso(risultatiAzienda.aggiornatoIl)}`}
+              : la ricerca non ha consumato credito. Aprendo l&apos;azienda, l&apos;analisi userà gli stessi
+              dati senza ricomprarli.
+            </p>
+          )}
+
+        {/*
+          Il risultato della ricerca è **una conferma di identità**, non l'analisi: cinque
+          campi per stabilire che l'azienda è quella giusta prima di spendere per il resto.
+          Il dato camerale che si sta leggendo è **già pagato**: l'analisi lo riusa e non lo
+          ricompra.
+        */}
+        {risultatiAzienda !== null && risultatiAzienda.risultati.length > 0 && (
+          <div className="mb-3 space-y-4">
+            {risultatiAzienda.risultati.map((azienda) => (
+              <SchedaRisultato key={azienda.providerId} azienda={azienda} />
+            ))}
+          </div>
+        )}
+
+        {/*
+          La ricerca per denominazione usa l'elenco camerale, che non porta il settore.
+          Dirlo solo quando manca davvero: una nota che compare sempre non viene più letta.
+        */}
+        {risultatiAzienda !== null && risultatiAzienda.risultati.some((a) => a.ateco === null) && (
+          <p className="mt-3 text-xs text-testo-debole">
+            Il settore delle aziende senza ATECO viene acquisito con l&apos;analisi.
+          </p>
+        )}
+      </section>
     </>
   );
 }

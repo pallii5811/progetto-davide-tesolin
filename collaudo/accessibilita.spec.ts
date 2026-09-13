@@ -16,8 +16,11 @@ import { accedi, AZIENDA_DI_PROVA } from './aiuti.js';
  * maggioranza e quelle che nessuno controlla mai.
  */
 const PAGINE: readonly (readonly [string, string])[] = [
-  ['ricerca', '/'],
   ['nuovi clienti', '/prospect'],
+  // Con un conteggio a schermo, e con i risultati della ricerca per partita IVA: dal
+  // 13/09/2026 quella ricerca è una sezione di «Nuovi clienti», non più una pagina.
+  ['nuovi clienti, conteggio in una città', '/prospect?comune=A060'],
+  ['nuovi clienti, ricerca per partita IVA', '/prospect?piva=03158460174'],
   ['portafoglio', '/portafoglio'],
   ['monitoraggio', '/monitoraggio'],
   ['catalogo rischi', '/catalogo'],
