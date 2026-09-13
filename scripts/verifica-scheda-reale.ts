@@ -3,6 +3,7 @@
  *
  *   npx tsx scripts/verifica-scheda-reale.ts [partita-iva]
  *   npx tsx scripts/verifica-scheda-reale.ts <partita-iva> --da-database
+ *   npx tsx scripts/verifica-scheda-reale.ts <partita-iva> --da-database --contesto --testo
  *
  * **Non spende niente.** Il provider è quello di produzione, con il suo `fetchProfile` e i
  * suoi mapper, ma la cache che gli si passa risponde dalle risposte già comprate — i file
@@ -30,6 +31,7 @@ import { Money } from '@aegis/core';
 import { OpenApiProvider } from '../packages/providers/src/openapi/provider.js';
 import { OPENAPI_DEFAULT_CONFIG } from '../packages/providers/src/openapi/config.js';
 import type { Cache, CacheEntry } from '../packages/providers/src/http.js';
+import { raccogliConEsito } from '../apps/api/src/contesto-ubicazioni.js';
 
 const DA_DATABASE = process.argv.includes('--da-database');
 const PIVA = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '01528120981';
@@ -110,7 +112,39 @@ const provider = new OpenApiProvider({
 });
 
 const profilo = await provider.fetchProfile(PIVA, 'profondito');
-const analisi = analyzeCompany(profilo, [], new Date());
+
+/*
+  `--contesto`: il contesto delle ubicazioni raccolto come lo raccoglie l'API, con le stesse
+  variabili d'ambiente — cartografia OpenStreetMap, gratuita, nella cache persistente.
+
+  Senza, il capitale fabbricati da cartografia non si vede: su TRANSPECIAL S.R.L. la
+  correzione del 13/09/2026 (il fabbricato dell'indirizzo invece della somma dell'isolato)
+  era verificabile solo riaprendo la scheda dal browser. Nessuna fonte a pagamento parte.
+*/
+const CONTESTO = process.argv.includes('--contesto');
+const territorio = CONTESTO
+  ? await raccogliConEsito(profilo, {
+      cache,
+      baseUrl: process.env['OVERPASS_URL'],
+      userAgent: process.env['OVERPASS_USER_AGENT'],
+      meteoAttivo: false,
+      idraulicaAttiva: process.env['IDRAULICA_ISPRA'] === 'attivo',
+      cacheIdraulica: cache,
+      baseUrlIdraulica: process.env['ISPRA_WFS_URL'],
+    })
+  : undefined;
+const analisi = analyzeCompany(
+  profilo,
+  [],
+  new Date(),
+  territorio === undefined
+    ? {}
+    : {
+        contestiTerritoriali: territorio.contesti,
+        esitoContesto: { occupate: territorio.occupate, nonRaggiunte: territorio.nonRaggiunte },
+        idraulichePuntuali: territorio.idraulichePuntuali,
+      },
+);
 
 const euro = (m: ReturnType<typeof Money.euro> | null | undefined): string =>
   m === null || m === undefined ? '—' : Money.format(m);
@@ -195,6 +229,38 @@ riga(
       ? 'nessuna'
       : analisi.dannoMassimo.value.protezioniAccertate.join(', '),
 );
+const danno = analisi.dannoMassimo.value;
+riga(
+  'Danno probabile',
+  danno === null
+    ? '—'
+    : `${euro(danno.probabile)} · ${Math.round(danno.quota * 100)}% · concentrazione ${danno.concentrazioneApplicata ? 'applicata' : 'no'}`,
+);
+
+process.stdout.write('\n  ── Capitale fabbricati ──────────────────────────────\n');
+if (!CONTESTO)
+  process.stdout.write(
+    '  (senza --contesto la cartografia non entra: il valore non è quello della scheda)\n',
+  );
+for (const u of analisi.ubicazioni.ubicazioni) {
+  const impronta = u.contesto?.fabbricati ?? null;
+  process.stdout.write(
+    `    · ${u.etichetta}: ${
+      impronta === null
+        ? 'nessuna impronta'
+        : `${impronta.quanti} fabbricati entro il raggio, ${impronta.superficieCopertaMq} m² in tutto; ` +
+          `dell’indirizzo ${impronta.principaleMq ?? '—'} m² a ${impronta.principaleDistanzaMetri ?? '—'} m`
+    }\n`,
+  );
+}
+const fabbricati = analisi.sommeAssicurande.fabbricati;
+riga('Fabbricati', `${euro(fabbricati.value)} · confidenza ${fabbricati.confidence}`);
+for (const i of fabbricati.explanation.inputs) process.stdout.write(`    ${i.label}: ${i.value}\n`);
+for (const n of fabbricati.explanation.notes) process.stdout.write(`    nota: ${n}\n`);
+for (const d of analisi.ubicazioni.domande) process.stdout.write(`    domanda: ${d}\n`);
+
+process.stdout.write('\n  ── Frasi dei fattori ────────────────────────────────\n');
+for (const f of analisi.creditScore.value.factors) process.stdout.write(`    ${f.label}: ${f.rationale}\n`);
 
 /*
   ── Il testo, per intero ─────────────────────────────────────────────────────

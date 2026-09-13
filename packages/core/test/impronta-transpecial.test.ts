@@ -79,13 +79,13 @@ describe('L’ubicazione di TRANSPECIAL: un’etichetta sola, e una domanda al s
   const indirizzo = (via: string, civico: string | null, coordinate: boolean) => ({
     via,
     civico,
-    cap: '25032',
-    comune: 'CHIARI',
+    cap: '25040',
+    comune: 'MONTICELLI BRUSATI',
     provincia: 'BS',
     regione: 'Lombardia',
     frazione: null,
-    latitudine: coordinate ? 45.53 : null,
-    longitudine: coordinate ? 9.93 : null,
+    latitudine: coordinate ? 45.62741 : null,
+    longitudine: coordinate ? 10.08347 : null,
   });
 
   it('l’etichetta si compone dalla scrittura tenuta, quella con le coordinate', () => {
@@ -109,7 +109,7 @@ describe('L’ubicazione di TRANSPECIAL: un’etichetta sola, e una domanda al s
   });
 
   it('una sola ubicazione: «Il capitale fabbricati», non «Su una di esse»', () => {
-    const sede = indirizzo('VIA SAN BERNARDINO', '10', true);
+    const sede = indirizzo('VIA FORNACI', '20/22', true);
     const id = analizzaUbicazioni({ sedeLegale: sede, unitaLocali: [], immobili: [] }).ubicazioni[0]!.id;
     const contesto = {
       vigiliDelFuoco: [],
