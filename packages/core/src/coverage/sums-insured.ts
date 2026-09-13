@@ -24,6 +24,7 @@ import type { CompanyFacts } from '../company/facts.js';
 import type { BilancioRiclassificato } from '../company/financials.js';
 import type { ImmobileDichiarato } from '../company/profile.js';
 import { haOrganoAmministrativo, normaResponsabilitaAmministratori } from '../governance/norme.js';
+import { minimoSanitarioPerSinistro } from './obbligo-sanitario.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Parametri di calcolo
@@ -761,7 +762,32 @@ function calcolaMassimaleRct(facts: CompanyFacts): Explained<Euro> {
     builder.note('Organico superiore a 50 addetti: maggiore esposizione al danno verso terzi.');
   }
 
-  const massimale = scala(indice);
+  let massimale = scala(indice);
+
+  /*
+    Il minimo di legge prima del benchmark.
+
+    Su una struttura sanitaria la polizza ha un massimale minimo per sinistro fissato dal
+    D.M. 232/2023: il benchmark per fatturato non lo conosceva, e su un ospedale con
+    fatturato modesto consigliava un massimale sotto la soglia che rende la polizza
+    adempiente. Si dichiara il minimo in ogni caso, e si alza il consigliato solo se serve.
+  */
+  const minimo = minimoSanitarioPerSinistro(facts);
+  if (minimo !== null) {
+    builder
+      .input(
+        'Minimo di legge per sinistro',
+        `${Money.formatCompact(Money.euro(minimo.euroPerSinistro))} — ${minimo.riferimento}`,
+      )
+      .note(minimo.nota)
+      .note('Il massimale per anno non può essere inferiore al triplo di quello per sinistro.');
+    if (Money.toEuro(massimale) < minimo.euroPerSinistro) {
+      massimale = Money.euro(minimo.euroPerSinistro);
+      builder.note(
+        'Il benchmark di mercato stava sotto il minimo di legge: il massimale consigliato è portato al minimo.',
+      );
+    }
+  }
   return builder
     .input(
       'Fatturato',

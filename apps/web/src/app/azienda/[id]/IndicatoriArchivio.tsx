@@ -5,6 +5,7 @@ import { formattaGiorno } from '@aegis/core/tempo';
 import { notaCampiMancanti } from '@/lib/nota-campi-mancanti';
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 import { fasciaDiFatturato } from '@/lib/fascia-fatturato';
+import { codiceAteco, coperturaSuInteressiNetti, elencoIndirizzi } from '@/lib/archivio-leggibile';
 
 /**
  * Gli indicatori che l'archivio camerale restituisce già calcolati.
@@ -149,9 +150,9 @@ export function IndicatoriArchivio({
         ['Cassa su debiti bancari a breve', dati.liquidita?.cassaSuDebitiBancariBreve, ''],
         ['Cassa su debiti finanziari a breve', dati.liquidita?.cassaSuDebitiFinanziariBreve, ''],
         ['EBITDA su interessi lordi', dati.coperturaOneri?.ebitdaSuInteressiLordi, ''],
-        ['EBITDA su interessi netti', dati.coperturaOneri?.ebitdaSuInteressiNetti, ''],
+        ['EBITDA su interessi netti', dati.coperturaOneri?.ebitdaSuInteressiNetti, 'netti:ebitda'],
         ['EBIT su interessi lordi', dati.coperturaOneri?.ebitSuInteressiLordi, ''],
-        ['EBIT su interessi netti', dati.coperturaOneri?.ebitSuInteressiNetti, ''],
+        ['EBIT su interessi netti', dati.coperturaOneri?.ebitSuInteressiNetti, 'netti:ebit'],
         /*
           `burdenIndex` è in punti percentuali, ed è la stessa grandezza che il riquadro
           «Marginalità» stampa come «Oneri finanziari su EBITDA» in rapporto.
@@ -356,7 +357,17 @@ export function IndicatoriArchivio({
                 {gruppo.voci.map(([etichetta, valore, unita]) => (
                   <div key={etichetta} className="flex items-baseline justify-between gap-4">
                     <dt className="text-sm text-testo-tenue">{etichetta}</dt>
-                    <dd className="tabular text-sm font-medium">{formatta(valore, unita)}</dd>
+                    <dd className="tabular text-sm font-medium">
+                      {/* Un rapporto negativo sugli interessi netti non si legge contro la soglia: vedi archivio-leggibile.ts */}
+                      {(unita === 'netti:ebitda' || unita === 'netti:ebit'
+                        ? coperturaSuInteressiNetti(
+                            valore,
+                            unita === 'netti:ebit'
+                              ? dati.risultatiOperativi?.ebit
+                              : dati.risultatiOperativi?.ebitda,
+                          )
+                        : null) ?? formatta(valore, unita)}
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -443,7 +454,7 @@ function Qualifiche({
     ['Unità locali', valoreONull(intero(q.numeroUnitaLocali))],
     ['Settore RAE', q.settoreRae],
     ['Settore SAE', q.settoreSae],
-    ['ATECO secondario', q.atecoSecondario],
+    ['ATECO secondario', codiceAteco(q.atecoSecondario)],
     ['NACE', q.codiceNace],
     ['SIC', [q.codiceSicPrimario, q.codiceSicSecondario].filter(Boolean).join(' / ') || null],
     /*
@@ -462,7 +473,7 @@ function Qualifiche({
     ['Paesi di esportazione', q.paesiExport],
     ['Sito web', q.sitoWeb],
     ['Telefono', q.telefono],
-    ['Posta elettronica', q.email],
+    ['Posta elettronica', elencoIndirizzi(q.email)],
     ['Fax', q.fax],
     /*
       Gli identificativi. Non servono a valutare un rischio, servono a EMETTERE: il codice

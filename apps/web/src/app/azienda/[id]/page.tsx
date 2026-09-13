@@ -46,6 +46,7 @@ import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import { sottotitoloSomme } from '@/lib/sottotitolo-somme';
 import { etichettaPiuEsposta } from '@/lib/ubicazione-piu-esposta';
 import { ubicazioniDeiFabbricati } from '@/lib/nota-patrimonio';
+import { etichetteDelGruppo } from '@/lib/etichette-ubicazioni';
 
 export const dynamic = 'force-dynamic';
 
@@ -529,7 +530,16 @@ export default async function PaginaAzienda({
                         <BadgeEsposizione valore={u.idraulica} />
                         {u.indicatoriIdrogeo !== null && (
                           <span className="mt-0.5 block text-xs text-testo-debole">
-                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)} delle imprese
+                            {/*
+                              Le due quote, non una. La classe somma le imprese in pericolosità
+                              elevata e media (idrogeo.ts), e la riga stampava solo la prima: su
+                              GALENO S.R.L. Cremona risultava «alta» con l'8,1 % e Palazzolo
+                              «media» con il 9,2 %. Giusto, e illeggibile — Cremona ha il 37,7 % di
+                              imprese in pericolosità media, Palazzolo il 9,6 %.
+                            */}
+                            imprese in pericolosità elevata{' '}
+                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)}, media{' '}
+                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaMedia)}
                           </span>
                         )}
                       </td>
@@ -558,7 +568,15 @@ export default async function PaginaAzienda({
                   <h3 className="mb-2 text-sm font-semibold">Un solo incendio, cosa raggiunge</h3>
                   <ul className="space-y-2 text-sm text-testo-tenue">
                     {ubicazioni.complessiIncendio.map((c) => (
-                      <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
+                      <li key={c.ubicazioni.join('|')}>
+                        {/* Un'ubicazione per riga, e il motivo sotto: vedi etichette-ubicazioni.ts. */}
+                        {etichetteDelGruppo(c.ubicazioni, ubicazioni.elenco).map((etichetta) => (
+                          <span key={etichetta} className="block font-medium text-testo">
+                            {etichetta}
+                          </span>
+                        ))}
+                        <span className="block">{c.motivo}</span>
+                      </li>
                     ))}
                   </ul>
                 </Scheda>

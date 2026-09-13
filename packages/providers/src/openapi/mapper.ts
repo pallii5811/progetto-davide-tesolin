@@ -450,8 +450,22 @@ function mappaAteco(raw: unknown): {
   );
 
   if (migliore !== null) {
-    const altri = candidati.map((c) => c.codice).filter((c) => c !== migliore.codice);
-    return { codice: migliore.codice, descrizione: migliore.descrizione, secondari: [...new Set(altri)] };
+    /*
+      I SECONDARI SONO QUELLI CHE IL FORNITORE DICHIARA TALI, non le altre versioni del primario.
+
+      Qui diventavano «secondari» tutti i candidati diversi dal migliore: lo stesso codice
+      nelle classificazioni 2007, 2022 e 2025, e la sua forma a quattro cifre. Su GALENO
+      S.R.L. la scheda stampava «ATECO secondari 86.22» accanto al primario 86.22.09 — il
+      primario stesso, troncato — mentre il secondario vero, 82.19.09, stava nel campo
+      `secondaryAteco2022` del profilo completo e non veniva letto.
+
+      Non era solo un'etichetta: `atecoTra` guarda i secondari per riconoscere i rischi, e
+      un secondario inventato può accendere quelli di un altro settore.
+    */
+    const secondario = atecoOf(classificazione, 'secondaryAteco2022', 'secondaryAteco');
+    const secondari =
+      secondario === null || candidati.some((c) => c.codice === secondario) ? [] : [secondario];
+    return { codice: migliore.codice, descrizione: migliore.descrizione, secondari };
   }
 
   // Forme piatte, usate da altri servizi dello stesso fornitore.

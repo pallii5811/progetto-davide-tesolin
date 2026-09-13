@@ -28,6 +28,7 @@ import { regimeDiResponsabilita } from '../governance/norme.js';
 import type { Confidence } from '../shared/provenance.js';
 import { formattaGiorno } from '../shared/tempo.js';
 import { inizialeMinuscola } from '../shared/testo.js';
+import { titoloObbligoSanitario } from './obbligo-sanitario.js';
 
 /**
  * Un pezzo di motivazione che si accende su un fatto.
@@ -283,6 +284,41 @@ const obbligoProfessionale: Regola = (f) => {
   };
 };
 
+/**
+ * L'obbligo della struttura sanitaria, per RCT, RCO e responsabilità professionale.
+ *
+ * Composto sul verdetto di `obbligo-sanitario.ts`, che è lo stesso da cui il piano d'azione
+ * ricava il segno dell'obbligo: la frase e il segno non possono dire cose diverse.
+ */
+const obbligoSanitarioStruttura: Regola = (f) => {
+  if (titoloObbligoSanitario(f) !== 'struttura') return null;
+  return {
+    testo:
+      'Struttura sanitaria o sociosanitaria privata: deve essere provvista di copertura assicurativa, o ' +
+      'di altre analoghe misure, per la responsabilità civile verso terzi e verso i prestatori d’opera, ' +
+      'anche per i danni cagionati dal personale a qualunque titolo operante; i requisiti minimi delle ' +
+      'polizze sono quelli del D.M. 232/2023, in vigore dal 16/03/2024.',
+    fondamento:
+      'Attività sanitaria o sociosanitaria (ATECO 86 o 87): l’autorizzazione della struttura va confermata.',
+    riferimento: 'Art. 10, c. 1, L. 24/2017 · D.M. 15/12/2023, n. 232',
+    suDatoIgnoto: true,
+  };
+};
+
+/** L'obbligo del professionista sanitario che esercita in forma individuale. */
+const obbligoSanitarioProfessionista: Regola = (f) => {
+  if (titoloObbligoSanitario(f) !== 'professionista') return null;
+  return {
+    testo:
+      'Esercente la professione sanitaria in forma individuale: l’assicurazione della responsabilità ' +
+      'civile per la propria attività è obbligatoria, con i requisiti minimi del D.M. 232/2023.',
+    fondamento:
+      'Ditta individuale nell’assistenza sanitaria (ATECO 86): l’iscrizione all’albo va confermata.',
+    riferimento: 'Art. 10, c. 2, L. 24/2017 · D.M. 15/12/2023, n. 232',
+    suDatoIgnoto: true,
+  };
+};
+
 /** La D&O ha senso dove esiste un organo amministrativo distinto dalla proprietà. */
 const posizioneNelGruppo: Regola = (f) => {
   if (f.esercitaDirezioneECoordinamento) {
@@ -404,11 +440,11 @@ const conduzionePersonale: Regola = (f) => {
  * comportamento di prima, e va bene finché quella frase è vera per chiunque.
  */
 const FRAMMENTI: Readonly<Partial<Record<CoverageId, readonly Regola[]>>> = {
-  rct: [patrimonioAggredibile, socioUnicoDiCapitali, fattoDeiCommessi],
-  rco: [obbligoDiSicurezza],
+  rct: [patrimonioAggredibile, socioUnicoDiCapitali, fattoDeiCommessi, obbligoSanitarioStruttura],
+  rco: [obbligoDiSicurezza, obbligoSanitarioStruttura],
   'rc-prodotti': [regimeDaProdotto],
   'rc-inquinamento': [regimeAmbientale],
-  'rc-professionale': [obbligoProfessionale],
+  'rc-professionale': [obbligoProfessionale, obbligoSanitarioStruttura, obbligoSanitarioProfessionista],
   'd-and-o': [posizioneNelGruppo],
   catastrofali: [obbligoCatNat],
   'rca-flotta': [obbligoRcAuto],
@@ -486,6 +522,14 @@ export interface ObbligoPerImpresa {
   readonly dovuto: boolean | null;
   readonly fonte: string | null;
   readonly motivoEsclusione: string | null;
+  /**
+   * Il termine dell'obbligo, quando la norma ne fissa uno.
+   *
+   * `null` per gli obblighi continuativi — RCA, responsabilità sanitaria — che non hanno una
+   * data: il piano d'azione prendeva il termine della CAT NAT per qualunque obbligo, e su un
+   * poliambulatorio avrebbe scritto «termine scaduto il 31/12/2025» sulla RC sanitaria.
+   */
+  readonly termine: Date | null;
 }
 
 /**
@@ -504,31 +548,63 @@ export function obbligoPerImpresa(
   facts: CompanyFacts,
   catNat: CatNatAssessment | null,
 ): ObbligoPerImpresa {
+  /*
+    La responsabilità sanitaria, che il catalogo non può dichiarare obbligatoria per tutti.
+
+    RCT, RCO e responsabilità professionale non sono obblighi di legge per chiunque: lo sono
+    per la struttura sanitaria (art. 10 c. 1 L. 24/2017) e, la sola professionale, per il
+    professionista sanitario (c. 2). Il flag del catalogo resta falso — la pagina del
+    catalogo lo mostra senza impresa in contesto — e l'obbligo nasce qui, dai fatti.
+  */
+  if (definition.id === 'rct' || definition.id === 'rco' || definition.id === 'rc-professionale') {
+    const titolo = titoloObbligoSanitario(facts);
+    if (titolo === 'struttura') {
+      return {
+        dovuto: true,
+        fonte: 'Art. 10, c. 1, L. 24/2017 · D.M. 232/2023',
+        motivoEsclusione: null,
+        termine: null,
+      };
+    }
+    if (titolo === 'professionista' && definition.id === 'rc-professionale') {
+      return {
+        dovuto: true,
+        fonte: 'Art. 10, c. 2, L. 24/2017 · D.M. 232/2023',
+        motivoEsclusione: null,
+        termine: null,
+      };
+    }
+  }
+
   if (!definition.obbligoDiLegge) {
-    return { dovuto: false, fonte: null, motivoEsclusione: null };
+    return { dovuto: false, fonte: null, motivoEsclusione: null, termine: null };
   }
 
   if (definition.id === 'catastrofali') {
-    if (catNat === null) return { dovuto: null, fonte: null, motivoEsclusione: null };
+    if (catNat === null) return { dovuto: null, fonte: null, motivoEsclusione: null, termine: null };
     return {
       dovuto: catNat.soggetta,
       fonte: catNat.soggetta ? 'L. 213/2023 art. 1 cc. 101-111' : null,
       motivoEsclusione: catNat.soggetta ? null : catNat.motivoEsclusione,
+      termine: catNat.soggetta ? catNat.termine : null,
     };
   }
 
   if (definition.id === 'rca-flotta') {
     // L'obbligo dell'art. 122 nasce dal veicolo posto in circolazione: senza veicoli non
     // c'è obbligo, e senza il dato non c'è nemmeno la certezza che non ci sia.
-    if (facts.numeroVeicoli === null) return { dovuto: null, fonte: null, motivoEsclusione: null };
+    if (facts.numeroVeicoli === null) {
+      return { dovuto: null, fonte: null, motivoEsclusione: null, termine: null };
+    }
     return {
       dovuto: facts.numeroVeicoli > 0,
       fonte: facts.numeroVeicoli > 0 ? 'Art. 122 D.Lgs. 209/2005' : null,
       motivoEsclusione: facts.numeroVeicoli > 0 ? null : 'nessun veicolo aziendale rilevato',
+      termine: null,
     };
   }
 
-  return { dovuto: true, fonte: null, motivoEsclusione: null };
+  return { dovuto: true, fonte: null, motivoEsclusione: null, termine: null };
 }
 
 function formattaData(d: Date): string {

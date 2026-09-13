@@ -57,6 +57,9 @@ const VOCI: Readonly<Record<string, string | undefined>> = {
   'technical manager': 'responsabile tecnico',
   'procurator/attorney/representative': 'procuratore',
   auditor: 'revisore',
+  // `SOU`, misurato su GALENO S.R.L.: la società unica socia di una S.r.l. unipersonale, che
+  // la scheda elencava fra le cariche come «Sole owner».
+  'sole owner': 'socio unico',
   'chairman of board of auditors': 'presidente del collegio sindacale',
   'permanent auditor': 'sindaco effettivo',
   'temporary auditor': 'sindaco supplente',

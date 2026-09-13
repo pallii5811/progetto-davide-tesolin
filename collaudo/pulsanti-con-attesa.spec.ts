@@ -15,20 +15,26 @@ const AZIENDA_MAI_APERTA = '09876543217';
  * non cambiava niente, e l'intermediario ha ricaricato la pagina credendo che il tasto non
  * andasse.
  *
- * PERCHÉ QUI SI PREME «REPORT PER IL CLIENTE» E NON «ANALISI APPROFONDITA». La prima versione
- * di questa prova premeva il pulsante del difetto, e non l'ha mai trovato: nella modalità
- * dimostrativa il fornitore restituisce il profilo intero, la scheda dichiara già mostrati
- * approfondimento ed eventi negativi, e i due pulsanti che spendono non compaiono affatto
- * (`Intestazione` riceve `livelloMostrato`). Nella demo non si possono premere, e fingere il
- * contrario vorrebbe dire provare un'altra pagina.
+ * PERCHÉ QUI SI PREME «REPORT PER IL CLIENTE». Nella modalità dimostrativa il fornitore
+ * restituisce il profilo intero, la scheda dichiara già mostrati approfondimento ed eventi
+ * negativi, e i due pulsanti che spendono non compaiono (`Intestazione` riceve
+ * `livelloMostrato`). «Report per il cliente» è lo stesso componente, `CollegamentoAzione`,
+ * su una navigazione che non ha uno scheletro d'attesa suo. Che i pulsanti a pagamento usino
+ * quel componente, senza prefetch, lo prova `apps/web/test/pulsanti-con-attesa.test.ts`.
  *
- * «Report per il cliente» è lo stesso componente — `CollegamentoAzione` — su una navigazione
- * che, come l'approfondimento, non ha uno scheletro d'attesa suo: senza la rotella la scheda
- * resterebbe ferma finché il report non arriva. Che i due pulsanti a pagamento usino quel
- * componente, senza prefetch, lo prova `apps/web/test/pulsanti-con-attesa.test.ts`.
+ * COME SI MISURA, dopo tre versioni che supponevano.
  *
- * Il server della demo risponde in un attimo, e una rotella accesa per venti millisecondi
- * non si può vedere né provare: la risposta si rallenta di proposito.
+ * La rotella resta accesa quanto la risposta tarda, e la demo risponde in pochi millisecondi:
+ * la richiesta della pagina nuova si rallenta di proposito. Le prime due versioni la
+ * riconoscevano dall'intestazione «rsc» e poi da un filtro sull'indirizzo, e la traccia ha
+ * mostrato la richiesta servita in 79 e 145 ms: il rallentamento non scattava, e il collaudo
+ * accusava la rotella. Da sola la prova passava per caso, quando il report veniva compilato al
+ * primo accesso.
+ *
+ * Ora si intercetta tutto, si rallenta ciò che porta «_rsc», e si CONTA: se nessuna richiesta
+ * è stata rallentata la prova lo dice, invece di dare la colpa alla rotella. E la rotella la
+ * registra un osservatore del documento installato prima del clic, così la vede anche se
+ * resta accesa un istante, e anche se quando il collaudo guarda la pagina è già cambiata.
  */
 test.describe('Pulsanti con attesa', () => {
   test('«Report per il cliente» mostra la rotella e apre il report senza ricaricare la pagina', async ({
@@ -41,30 +47,44 @@ test.describe('Pulsanti con attesa', () => {
     const pulsante = page.getByRole('link', { name: 'Report per il cliente' });
     await expect(pulsante).toBeVisible({ timeout: 90_000 });
 
-    // Un segno sulla finestra: se la pagina si ricaricasse, sparirebbe con lei.
-    await page.evaluate(() => {
-      (window as unknown as { senzaRicarica?: boolean }).senzaRicarica = true;
-    });
-
-    await page.route('**/azienda/**', async (percorso) => {
-      if (percorso.request().headers()['rsc'] === '1') {
+    const rallentate: string[] = [];
+    await page.route('**/*', async (percorso) => {
+      const indirizzo = percorso.request().url();
+      if (indirizzo.includes('_rsc=')) {
+        rallentate.push(indirizzo);
         await new Promise((fine) => setTimeout(fine, 2_000));
       }
       await percorso.continue();
     });
 
+    // Il segno sulla finestra sparisce se la pagina si ricarica; l'osservatore registra la rotella.
+    await page.evaluate(() => {
+      const finestra = window as unknown as { senzaRicarica?: boolean; rotellaVista?: boolean };
+      finestra.senzaRicarica = true;
+      finestra.rotellaVista = false;
+      new MutationObserver(() => {
+        if (document.querySelector('a [data-rotella]') !== null) finestra.rotellaVista = true;
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+
     await pulsante.click();
-    await expect(pulsante.locator('[data-rotella]'), 'la rotella non si è accesa').toBeVisible();
 
     await expect(page).toHaveURL(new RegExp(`/azienda/${AZIENDA_MAI_APERTA}/report`), {
       timeout: 90_000,
     });
     await expect(page.getByRole('link', { name: /Torna all.analisi/ })).toBeVisible({ timeout: 90_000 });
 
-    const senzaRicarica = await page.evaluate(
-      () => (window as unknown as { senzaRicarica?: boolean }).senzaRicarica,
-    );
-    expect(senzaRicarica, 'la pagina è stata ricaricata').toBe(true);
+    expect(
+      rallentate.length,
+      'nessuna richiesta della pagina nuova è stata rallentata: la prova non misurerebbe la rotella',
+    ).toBeGreaterThan(0);
+
+    const stato = await page.evaluate(() => {
+      const finestra = window as unknown as { senzaRicarica?: boolean; rotellaVista?: boolean };
+      return { senzaRicarica: finestra.senzaRicarica, rotellaVista: finestra.rotellaVista };
+    });
+    expect(stato.rotellaVista, 'la rotella non si è accesa').toBe(true);
+    expect(stato.senzaRicarica, 'la pagina è stata ricaricata').toBe(true);
     expect(errori).toEqual([]);
   });
 });

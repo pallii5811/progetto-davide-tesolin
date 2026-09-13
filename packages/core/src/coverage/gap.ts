@@ -309,7 +309,7 @@ function buildGap(
     motivazioneRiferimenti: motivazione.riferimenti,
     motivazioneConfidenza: motivazione.confidenza,
     insidie: definition.insidie,
-    piano: componiPiano(status, obbligo, livelloRischioMassimo, polizza, catNat, asOf),
+    piano: componiPiano(status, obbligo, livelloRischioMassimo, polizza, asOf),
   };
 }
 
@@ -325,7 +325,6 @@ function componiPiano(
   obbligo: ObbligoPerImpresa,
   livello: RiskLevel | null,
   polizza: PolizzaInEssere | null,
-  catNat: CatNatAssessment | null,
   asOf: Date,
 ): PianoDiTrattamento {
   const fraGiorni = (giorni: number): Date => new Date(asOf.getTime() + giorni * 86_400_000);
@@ -339,7 +338,9 @@ function componiPiano(
   if (obbligo.dovuto === true && status === 'assente') {
     return {
       urgenza: 'immediata',
-      termine: catNat?.termine ?? asOf,
+      // Il termine è quello dell'obbligo: la CAT NAT ne ha uno, la responsabilità sanitaria e
+      // l'RCA no — e prima prendevano tutte quello della CAT NAT.
+      termine: obbligo.termine ?? asOf,
       aCura: 'intermediario',
       motivazioneTermine:
         'Obbligo di legge: il termine è fissato dalla norma, non dalla pianificazione. Va documentato di averlo rappresentato al cliente anche se questi decide di non adempiere.',
