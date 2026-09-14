@@ -55,12 +55,38 @@ export interface UbicazionePerProperty {
   readonly indicatoriIdrogeo: IndicatoriIdrogeo | null;
 }
 
+/**
+ * I punteggi da 1 a 7 di una sede, uno per voce: quelli che il popup mostra come lancette.
+ *
+ * Sono gli stessi numeri delle voci, non un secondo calcolo: `attivita` è il punteggio della voce
+ * Attività, `pericoliNaturali` quello della voce Pericoli naturali. Nella slide di Luca l'attività si
+ * chiama «Rischio evento fiamme o esplosione», che è la definizione del foglio: «intrinsic fire,
+ * explosion and process hazard of the activity».
+ */
+export interface PunteggiUbicazione {
+  readonly attivita: number | null;
+  readonly tipoDiSito: number | null;
+  readonly terremoto: number | null;
+  readonly alluvione: number | null;
+  readonly frana: number | null;
+  readonly pericoliNaturali: number | null;
+}
+
+/** Da dove viene ciascun pericolo, in poche parole: la didascalia sotto la sua lancetta. */
+export interface DidascaliePericoli {
+  readonly terremoto: string;
+  readonly alluvione: string;
+  readonly frana: string;
+}
+
 export interface PropertyUbicazione {
   readonly id: string;
   readonly etichetta: string;
   readonly voci: readonly VoceDiCalcolo[];
   /** Somma dei contributi; `null` se anche una sola voce manca. */
   readonly punteggio: number | null;
+  readonly punteggi: PunteggiUbicazione;
+  readonly didascalie: DidascaliePericoli;
 }
 
 export interface PropertyRisk {
@@ -189,6 +215,8 @@ interface Pericoli {
   readonly voce: VoceDiCalcolo;
   /** In centesimi di punto; `null` se la voce non si calcola. */
   readonly contributoCentesimi: number | null;
+  readonly punteggi: Pick<PunteggiUbicazione, 'terremoto' | 'alluvione' | 'frana' | 'pericoliNaturali'>;
+  readonly didascalie: DidascaliePericoli;
 }
 
 function vocePericoli(u: UbicazionePerProperty): Pericoli {
@@ -239,6 +267,27 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
             `${quota(ind.impFrnA)} delle imprese dove è elevata o molto elevata.`,
         };
 
+  /*
+    Le didascalie sotto le lancette: brevi, e ciascuna con parole sue. Stanno una per lancetta,
+    quindi non devono ripetere la frase lunga del dettaglio, che la sezione stampa già.
+  */
+  const didascalie: DidascaliePericoli = {
+    terremoto: zona === null ? 'comune non classificato' : `zona sismica ${zona}`,
+    alluvione:
+      livelloAlluvione === null
+        ? 'comune fuori dall’archivio ISPRA'
+        : `pericolosità idraulica ${livelloAlluvione} nel comune`,
+    frana:
+      livelloFrane === null
+        ? 'comune fuori dall’archivio ISPRA'
+        : `pericolosità da frana ${livelloFrane} nel comune`,
+  };
+  const punteggiDisponibili = {
+    terremoto: terremoto?.punti ?? null,
+    alluvione: alluvione?.punti ?? null,
+    frana: frana?.punti ?? null,
+  };
+
   if (alluvione === null || terremoto === null || frana === null) {
     /*
       Frasi separate da un punto, non appese dopo «Non calcolabile:»: due due-punti nella stessa
@@ -266,6 +315,8 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
           ' Nessun pericolo si stima dagli altri.',
       },
       contributoCentesimi: null,
+      punteggi: { ...punteggiDisponibili, pericoliNaturali: null },
+      didascalie,
     };
   }
 
@@ -285,6 +336,8 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
         `50% × ${numero(calcolo.massimo)} + 50% × ${numero(calcolo.medio)} = ${numero(calcolo.punteggio)}.`,
     },
     contributoCentesimi,
+    punteggi: { ...punteggiDisponibili, pericoliNaturali: calcolo.punteggio },
+    didascalie,
   };
 }
 
@@ -347,6 +400,12 @@ export function calcolaPropertyRisk(
       etichetta: u.etichetta,
       voci: [voceAttivita, voceSito, pericoli.voce],
       punteggio: completa ? somma / 100 : null,
+      punteggi: {
+        attivita: voceAttivita.punteggio,
+        tipoDiSito: voceSito.punteggio,
+        ...pericoli.punteggi,
+      },
+      didascalie: pericoli.didascalie,
     };
   });
 

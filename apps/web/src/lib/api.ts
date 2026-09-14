@@ -262,6 +262,23 @@ export interface VoceDiCalcoloDto {
   dettaglio: string;
 }
 
+/** Una sede del Property Risk: le voci del calcolo e i punteggi che il popup mostra come lancette. */
+export interface PropertyUbicazioneDto {
+  id: string;
+  etichetta: string;
+  punteggio: number | null;
+  voci: VoceDiCalcoloDto[];
+  punteggi: {
+    attivita: number | null;
+    tipoDiSito: number | null;
+    terremoto: number | null;
+    alluvione: number | null;
+    frana: number | null;
+    pericoliNaturali: number | null;
+  };
+  didascalie: { terremoto: string; alluvione: string; frana: string };
+}
+
 /** Property, Business Interruption e Cyber Risk, con le formule del foglio «Veezco_Analisi Rischio.xlsx». */
 export interface ProtezioniDto {
   fonte: string;
@@ -274,7 +291,7 @@ export interface ProtezioniDto {
     punteggio: number | null;
     motivoNonCalcolabile: string | null;
     ubicazioneDiRiferimento: string | null;
-    ubicazioni: { id: string; etichetta: string; punteggio: number | null; voci: VoceDiCalcoloDto[] }[];
+    ubicazioni: PropertyUbicazioneDto[];
     note: string[];
   };
   businessInterruption: {

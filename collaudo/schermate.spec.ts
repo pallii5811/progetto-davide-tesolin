@@ -73,6 +73,27 @@ test.describe('@visuale schermate', () => {
     }
   });
 
+  /*
+    Il popup del Property Risk con le lancette (richiesta di Simone del 14/09/2026): una finestra
+    chiusa non compare nelle schermate della pagina, e un ago storto o una lancetta tagliata su
+    telefono non li descrive nessuna asserzione.
+  */
+  test('popup del Property Risk, aperto', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await accedi(page);
+    await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
+    await page.waitForLoadState('networkidle');
+
+    await page.getByTestId('apri-popup-property').click();
+    const popup = page.locator('dialog[open]');
+    await popup.waitFor();
+    await popup.screenshot({ path: 'schermate/popup-property-risk.png' });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await popup.screenshot({ path: 'schermate/popup-property-risk-stretto.png' });
+  });
+
   test('stampa del report', async ({ page }) => {
     test.setTimeout(120_000);
     await accedi(page);

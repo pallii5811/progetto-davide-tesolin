@@ -776,6 +776,8 @@ function presentProtezioni(analisi: CompanyAnalysis) {
         etichetta: u.etichetta,
         punteggio: u.punteggio,
         voci: u.voci.map((v) => ({ ...v })),
+        punteggi: { ...u.punteggi },
+        didascalie: { ...u.didascalie },
       })),
       note: [...property.note],
     },

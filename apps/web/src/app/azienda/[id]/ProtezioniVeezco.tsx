@@ -1,5 +1,6 @@
 import type { AnalisiDto, MoneyDto, ProtezioniDto, VoceDiCalcoloDto } from '@/lib/api';
 import { Metrica, Sezione } from '@/components/ui';
+import { PopupProperty } from './PopupProperty';
 
 /**
  * Property Risk, Business Interruption e Cyber Risk: i tre riquadri in testa alla scheda e le
@@ -57,16 +58,24 @@ export function RiquadriProtezioni({ protezioni }: { protezioni: Protezioni }) {
 
   return (
     <div className="mb-8 grid gap-3 sm:grid-cols-3">
-      <Metrica
-        etichetta="Property Risk"
-        valore={property.punteggio === null ? 'non calcolabile' : suSette(property.punteggio, 2)}
-        nota={
-          property.punteggio === null
-            ? (property.motivoNonCalcolabile ?? 'Il dettaglio è nella sezione Property Risk')
-            : `Ubicazione più esposta: ${property.ubicazioneDiRiferimento ?? '—'}`
-        }
-        tono={property.punteggio === null ? 'attenzione' : 'neutro'}
-      />
+      {/*
+        Il riquadro si apre in un popup con le lancette, come nella slide di Luca (richiesta di
+        Simone del 14/09/2026). Il pulsante trasparente copre il riquadro senza sostituirne il
+        contenuto: chi usa un lettore di schermo sente prima il punteggio, poi il pulsante.
+      */}
+      <div className="relative min-w-0">
+        <Metrica
+          etichetta="Property Risk"
+          valore={property.punteggio === null ? 'non calcolabile' : suSette(property.punteggio, 2)}
+          nota={`${
+            property.punteggio === null
+              ? (property.motivoNonCalcolabile ?? 'Il dettaglio è nella sezione Property Risk')
+              : `Ubicazione più esposta: ${property.ubicazioneDiRiferimento ?? '—'}`
+          }${property.ubicazioni.length > 0 ? ' · Clicca per le lancette' : ''}`}
+          tono={property.punteggio === null ? 'attenzione' : 'neutro'}
+        />
+        <PopupProperty property={property} innesco="riquadro" />
+      </div>
       <Metrica
         etichetta="Business Interruption"
         valore={
@@ -111,6 +120,11 @@ export function SezioniProtezioni({ protezioni }: { protezioni: Protezioni }) {
         id="property-risk"
         titolo="Property Risk"
         sottotitolo="Tutela i beni dell’impresa da incendio ed eventi naturali"
+        azione={
+          protezioni === undefined ? undefined : (
+            <PopupProperty property={protezioni.property} innesco="pulsante" />
+          )
+        }
       >
         {protezioni === undefined ? <NonDisponibile /> : <CorpoProperty protezioni={protezioni} />}
       </Sezione>
