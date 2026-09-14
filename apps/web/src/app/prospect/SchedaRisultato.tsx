@@ -220,10 +220,15 @@ function Voce({
   /** Gli indirizzi e le descrizioni ATECO su una sola colonna vanno a capo tre volte. */
   ampia?: boolean;
 }) {
+  /*
+    min-w-0 e break-words, come nella scheda azienda: una cella di griglia non si stringe sotto la
+    sua parola più lunga, e una PEC o un sito senza spazi allargavano la colonna fuori dallo
+    schermo stretto (37px sulla ricerca per partita IVA, collaudo del 14/09/2026).
+  */
   return (
-    <div className={ampia ? 'col-span-2' : ''}>
+    <div className={ampia ? 'col-span-2 min-w-0' : 'min-w-0'}>
       <dt className="text-xs text-testo-debole">{etichetta}</dt>
-      <dd className="mt-0.5 text-sm font-medium">{valore}</dd>
+      <dd className="mt-0.5 break-words text-sm font-medium">{valore}</dd>
     </div>
   );
 }
