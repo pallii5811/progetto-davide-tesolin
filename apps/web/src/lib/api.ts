@@ -649,13 +649,15 @@ export interface AnalisiDto {
        * Le percentuali sotto le tre parole, quando il comune e' stato risolto.
        *
        * Quota di imprese del comune in area a pericolosita': idraulica elevata, idraulica
-       * media, da frana elevata o molto elevata. Le parole sono una convenzione di questo
-       * prodotto, questi numeri sono il dato di ISPRA.
+       * media o elevata (la media comprende l'elevata), da frana elevata o molto elevata. Le
+       * parole sono una convenzione di questo prodotto, questi numeri sono il dato di ISPRA.
+       *
+       * Ciascuna `null` dove ISPRA non la pubblica.
        */
       indicatoriIdrogeo: {
-        impreseIdraulicaElevata: number;
-        impreseIdraulicaMedia: number;
-        impreseFranaElevata: number;
+        impreseIdraulicaElevata: number | null;
+        impreseIdraulicaMedia: number | null;
+        impreseFranaElevata: number | null;
       } | null;
       piuEsposta: boolean;
       /**

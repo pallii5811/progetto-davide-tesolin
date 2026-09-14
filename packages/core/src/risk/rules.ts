@@ -216,6 +216,12 @@ function idraulicaAlta(facts: CompanyFacts): Verdict {
   const esposizioni = esposizioniDi(facts);
   if (esposizioni.length === 0) return 'ignoto';
   if (esposizioni.some((e) => e.idraulica === 'alta')) return true;
+  /*
+    Ma se il comune è riconosciuto e il livello manca, non è il ripiego provinciale che tace: è
+    ISPRA che non pubblica la quota (la segnala con −1). Lì «non alta» sarebbe un'affermazione su
+    un dato che non c'è, come per la sismica.
+  */
+  if (esposizioni.some((e) => e.idraulica === null && e.idrogeoComunale === true)) return 'ignoto';
   // Con misure puntuali, «non alta» è una risposta; sul ripiego provinciale l'assenza
   // di misura sulle non-alte restava false (non alta), e resta tale.
   return false;

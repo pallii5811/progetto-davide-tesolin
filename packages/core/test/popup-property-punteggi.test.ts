@@ -20,7 +20,8 @@ const ESPOSTA: UbicazionePerProperty = {
   zonaSismica: 2,
   // Il 20% delle imprese del comune in pericolosità idraulica elevata: alluvione alta. Nessuna in
   // pericolosità da frana: frana bassa.
-  indicatoriIdrogeo: { idrA: 5, idrM: 10, impIdrA: 20, impIdrM: 0, frnA: 0, impFrnA: 0 },
+  // La quota media comprende l'elevata: non può essere minore.
+  indicatoriIdrogeo: { idrA: 5, idrM: 10, impIdrA: 20, impIdrM: 25, frnA: 0, impFrnA: 0 },
 };
 
 describe('I punteggi della sede per il popup', () => {

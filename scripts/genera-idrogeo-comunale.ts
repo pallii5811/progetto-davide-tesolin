@@ -80,15 +80,15 @@ interface ComuneIndice {
 
 /** I sei numeri che si tengono, per comune. Tutti percentuali, tutti da IdroGEO. */
 interface IndicatoriComune {
-  /** Territorio in pericolosità idraulica elevata (P3) e media (P2). */
-  readonly idrA: number;
-  readonly idrM: number;
+  /** Territorio in pericolosità idraulica elevata (P3) e media (P2). `null` se IdroGEO non lo pubblica. */
+  readonly idrA: number | null;
+  readonly idrM: number | null;
   /** Imprese in pericolosità idraulica elevata e media: il numero che conta qui. */
-  readonly impIdrA: number;
-  readonly impIdrM: number;
+  readonly impIdrA: number | null;
+  readonly impIdrM: number | null;
   /** Territorio e imprese in pericolosità da frana elevata e molto elevata (P3+P4). */
-  readonly frnA: number;
-  readonly impFrnA: number;
+  readonly frnA: number | null;
+  readonly impFrnA: number | null;
 }
 
 async function chiedi(percorso: string): Promise<unknown> {
@@ -104,8 +104,18 @@ async function chiedi(percorso: string): Promise<unknown> {
   return risposta.json();
 }
 
-function numero(valore: unknown): number {
-  return typeof valore === 'number' && Number.isFinite(valore) ? valore : 0;
+/**
+ * Il valore di IdroGEO, oppure `null` dove il dato non c'è.
+ *
+ * IdroGEO segnala un dato non pubblicato con −1: misurato il 14/09/2026 su Petriano e Aldino,
+ * dove la quota di imprese in pericolosità idraulica elevata vale −1 e non manca. Questa funzione
+ * lasciava passare il −1 e trasformava in zero ogni valore che non fosse un numero: due assenze
+ * scritte come due misure, «−1 % delle imprese» e «nessuna impresa esposta». Una quota è una
+ * percentuale, quindi nessun valore negativo è un dato.
+ */
+function numero(valore: unknown): number | null {
+  if (typeof valore !== 'number' || !Number.isFinite(valore)) return null;
+  return valore < 0 ? null : valore;
 }
 
 function siglaProvincia(c: ComuneIndice): string {
@@ -215,6 +225,8 @@ async function main(): Promise<void> {
     ` * e media (P2), territorio e imprese in pericolosità da frana elevata e molto elevata\n` +
     ` * (P3+P4). È un dato COMUNALE: dice quanto del comune è esposto, non se una singola\n` +
     ` * sede lo è.\n` +
+    ` *\n` +
+    ` * null dove IdroGEO non pubblica il dato, che segnala con −1.\n` +
     ` */\n\n` +
     /*
       Il tipo si dichiara, non si fa inferire.
@@ -227,7 +239,20 @@ async function main(): Promise<void> {
     `  readonly fonte: string;\n` +
     `  readonly generatoIl: string;\n` +
     `  readonly comuni: number;\n` +
-    `  readonly livelli: Readonly<Record<string, IndicatoriComune>>;\n` +
+    // Il tipo per esteso, come nel file già generato: IndicatoriComune non esiste in quel modulo.
+    `  readonly livelli: Readonly<\n` +
+    `    Record<\n` +
+    `      string,\n` +
+    `      {\n` +
+    `        readonly idrA: number | null;\n` +
+    `        readonly idrM: number | null;\n` +
+    `        readonly impIdrA: number | null;\n` +
+    `        readonly impIdrM: number | null;\n` +
+    `        readonly frnA: number | null;\n` +
+    `        readonly impFrnA: number | null;\n` +
+    `      }\n` +
+    `    >\n` +
+    `  >;\n` +
     `} = ${JSON.stringify({ fonte: FONTE, generatoIl: oggi, comuni: Object.keys(livelli).length, livelli })};\n`;
 
   writeFileSync(USCITA, contenuto);

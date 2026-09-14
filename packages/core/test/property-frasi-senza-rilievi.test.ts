@@ -24,7 +24,10 @@ const indicatori = idrogeoComunale.livelli as Readonly<Record<string, Indicatori
 const chiavi = Object.keys(indicatori).sort();
 
 function estremi(campo: keyof IndicatoriIdrogeo): string[] {
-  const ordinate = [...chiavi].sort((a, b) => indicatori[b]![campo] - indicatori[a]![campo]);
+  // Una quota non pubblicata va in fondo: il campione vuole gli estremi dei dati che ci sono.
+  const ordinate = [...chiavi].sort(
+    (a, b) => (indicatori[b]![campo] ?? -1) - (indicatori[a]![campo] ?? -1),
+  );
   return [...ordinate.slice(0, 5), ...ordinate.slice(-5)];
 }
 

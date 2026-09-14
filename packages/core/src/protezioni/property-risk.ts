@@ -211,6 +211,27 @@ function quota(valore: number): string {
   return `${String(arrotondato).replace('.', ',')} %`;
 }
 
+/**
+ * Le due quote idrauliche come ISPRA le pubblica: la media comprende l'elevata, e una quota che
+ * ISPRA non pubblica si dice invece di stamparla come numero.
+ */
+function quoteIdrauliche(elevata: number | null, mediaOElevata: number | null): string {
+  // Senza imprese in area media non ce ne sono nemmeno in area elevata, che vi è compresa.
+  if (mediaOElevata === 0 && (elevata === null || elevata === 0)) {
+    return 'senza imprese in area media o elevata';
+  }
+  if (elevata !== null && mediaOElevata !== null) {
+    return `con ${quota(elevata)} delle imprese in area elevata e ${quota(mediaOElevata)} in area media o elevata`;
+  }
+  if (mediaOElevata !== null) {
+    return `con ${quota(mediaOElevata)} delle imprese in area media o elevata; la quota della sola elevata non è pubblicata`;
+  }
+  if (elevata !== null) {
+    return `con ${quota(elevata)} delle imprese in area elevata; la quota in area media non è pubblicata`;
+  }
+  return 'senza quote di imprese pubblicate';
+}
+
 interface Pericoli {
   readonly voce: VoceDiCalcolo;
   /** In centesimi di punto; `null` se la voce non si calcola. */
@@ -245,8 +266,7 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
           breve: `alluvione ${PUNTEGGIO_LIVELLO_ISPRA[livelloAlluvione]}`,
           testo:
             `Alluvione ${PUNTEGGIO_LIVELLO_ISPRA[livelloAlluvione]}: pericolosità idraulica ${livelloAlluvione} ` +
-            `nel comune secondo ISPRA, con ${quota(ind.impIdrA)} delle imprese in area elevata e ` +
-            `${quota(ind.impIdrM)} in area media.`,
+            `nel comune secondo ISPRA, ${quoteIdrauliche(ind.impIdrA, ind.impIdrM)}.`,
         };
   const terremoto =
     zona === null
@@ -257,7 +277,7 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
           testo: `Terremoto ${PUNTEGGIO_ZONA_SISMICA[zona]}: zona sismica ${zona}.`,
         };
   const frana =
-    ind === null || livelloFrane === null
+    ind === null || livelloFrane === null || ind.impFrnA === null
       ? null
       : {
           punti: PUNTEGGIO_LIVELLO_ISPRA[livelloFrane],
@@ -274,13 +294,17 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
   const didascalie: DidascaliePericoli = {
     terremoto: zona === null ? 'comune non classificato' : `zona sismica ${zona}`,
     alluvione:
-      livelloAlluvione === null
+      ind === null
         ? 'comune fuori dall’archivio ISPRA'
-        : `pericolosità idraulica ${livelloAlluvione} nel comune`,
+        : livelloAlluvione === null
+          ? 'quote ISPRA non pubblicate'
+          : `pericolosità idraulica ${livelloAlluvione} nel comune`,
     frana:
-      livelloFrane === null
+      ind === null
         ? 'comune fuori dall’archivio ISPRA'
-        : `pericolosità da frana ${livelloFrane} nel comune`,
+        : livelloFrane === null
+          ? 'quota ISPRA non pubblicata'
+          : `pericolosità da frana ${livelloFrane} nel comune`,
   };
   const punteggiDisponibili = {
     terremoto: terremoto?.punti ?? null,
@@ -296,6 +320,12 @@ function vocePericoli(u: UbicazionePerProperty): Pericoli {
     */
     const mancanti = [
       ...(ind === null ? ['alluvione e frana: il comune non è nell’archivio ISPRA IdroGEO'] : []),
+      ...(ind !== null && alluvione === null
+        ? ['alluvione: ISPRA non pubblica per questo comune le quote che servono a stabilire il livello']
+        : []),
+      ...(ind !== null && frana === null
+        ? ['frana: ISPRA non pubblica per questo comune la quota di imprese in area da frana']
+        : []),
       ...(zona === null ? ['terremoto: il comune non è nella classificazione sismica'] : []),
     ].join('; ');
     const presenti = [alluvione, terremoto, frana]

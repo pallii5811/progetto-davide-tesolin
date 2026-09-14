@@ -31,17 +31,27 @@ import type { ExposureLevel } from './geo.js';
  * accanto al numero invece di lasciar credere che l'abbia già fatta.
  */
 
-/** I sei numeri per comune, tutti percentuali, come li dà IdroGEO. */
+/**
+ * I sei numeri per comune, tutti percentuali, come li dà IdroGEO.
+ *
+ * `null` dove IdroGEO non pubblica il dato: lo segnala con −1, e al 14/09/2026 manca la quota di
+ * imprese in pericolosità idraulica elevata in 311 comuni su 7.899.
+ *
+ * LA QUOTA MEDIA COMPRENDE L'ELEVATA. Le aree a pericolosità media sono lo scenario meno frequente
+ * e più esteso, e contengono quelle a pericolosità elevata: la quota «media» conta anche le imprese
+ * in area elevata. Misurato sull'archivio il 14/09/2026: in nessun comune l'elevata supera la
+ * media, né per il territorio né per le imprese, e in 180 comuni la somma delle due supera il 100 %.
+ */
 export interface IndicatoriIdrogeo {
-  /** Territorio in pericolosità idraulica elevata (P3) e media (P2). */
-  readonly idrA: number;
-  readonly idrM: number;
-  /** Imprese in pericolosità idraulica elevata e media. */
-  readonly impIdrA: number;
-  readonly impIdrM: number;
+  /** Territorio in pericolosità idraulica elevata (P3) e media o elevata (P2). */
+  readonly idrA: number | null;
+  readonly idrM: number | null;
+  /** Imprese in pericolosità idraulica elevata, e media o elevata. */
+  readonly impIdrA: number | null;
+  readonly impIdrM: number | null;
   /** Territorio e imprese in pericolosità da frana elevata e molto elevata (P3+P4). */
-  readonly frnA: number;
-  readonly impFrnA: number;
+  readonly frnA: number | null;
+  readonly impFrnA: number | null;
 }
 
 /**
@@ -63,12 +73,33 @@ const SOGLIE = {
   mediaCumulata: 15,
 } as const;
 
-export function livelloIdraulico(ind: IndicatoriIdrogeo): ExposureLevel {
+export function livelloIdraulico(ind: IndicatoriIdrogeo): ExposureLevel | null {
+  /*
+    La quota «cumulata» è la quota media, NON la somma delle due.
+
+    Qui c'era impIdrA + impIdrM, cioè le imprese in area elevata contate due volte, perché la quota
+    media le comprende già. Su 7.899 comuni la somma spingeva 46 comuni da media ad alta e 6 da
+    bassa a media: a Ozegna il 12,5 % in elevata e il 29,9 % in media davano 42,4 %, «alta».
+
+    E un dato mancante non è un numero. Con la quota elevata non pubblicata il livello si decide
+    solo quando è certo: sopra il 40 % di media è alta comunque, sotto il 3 % di media anche
+    l'elevata — che vi è compresa — sta sotto il 3 %, ed è bassa. Negli altri casi non si sa, e
+    il livello è null.
+  */
   const elevata = ind.impIdrA;
-  const cumulata = ind.impIdrA + ind.impIdrM;
-  if (elevata >= SOGLIE.altaElevata || cumulata >= SOGLIE.altaCumulata) return 'alta';
-  if (elevata >= SOGLIE.mediaElevata || cumulata >= SOGLIE.mediaCumulata) return 'media';
-  return 'bassa';
+  const mediaOElevata = ind.impIdrM;
+  if (elevata !== null && mediaOElevata !== null) {
+    if (elevata >= SOGLIE.altaElevata || mediaOElevata >= SOGLIE.altaCumulata) return 'alta';
+    if (elevata >= SOGLIE.mediaElevata || mediaOElevata >= SOGLIE.mediaCumulata) return 'media';
+    return 'bassa';
+  }
+  if (mediaOElevata !== null) {
+    if (mediaOElevata >= SOGLIE.altaCumulata) return 'alta';
+    if (mediaOElevata < SOGLIE.mediaElevata) return 'bassa';
+    return null;
+  }
+  if (elevata !== null && elevata >= SOGLIE.altaElevata) return 'alta';
+  return null;
 }
 
 /**
@@ -79,7 +110,9 @@ export function livelloIdraulico(ind: IndicatoriIdrogeo): ExposureLevel {
  * una frana non ci si entra per caso, e una impresa su venti in area a pericolosità elevata
  * è già una popolazione a rischio, non un caso limite.
  */
-export function livelloFrana(ind: IndicatoriIdrogeo): ExposureLevel {
+export function livelloFrana(ind: IndicatoriIdrogeo): ExposureLevel | null {
+  // Una quota non pubblicata non è «bassa»: non si sa.
+  if (ind.impFrnA === null) return null;
   if (ind.impFrnA >= 10) return 'alta';
   if (ind.impFrnA >= 2) return 'media';
   return 'bassa';
@@ -109,17 +142,34 @@ function percento(valore: number): string {
 export function frasiIdrogeo(ind: IndicatoriIdrogeo, comune: string): readonly string[] {
   const frasi: string[] = [];
 
+  /*
+    La quota media comprende l'elevata: si dice «media o elevata», perché è quello che conta. E
+    se la media è zero lo è anche l'elevata, pubblicata o no: in 132 comuni ISPRA non pubblica
+    l'elevata e la media è 0 %, e lì «ISPRA non pubblica la quota della sola elevata» sarebbe
+    un'avvertenza su un numero che si conosce già.
+  */
+  const nessunaIdraulica = ind.impIdrM === 0 && (ind.impIdrA === 0 || ind.impIdrA === null);
   frasi.push(
-    ind.impIdrA === 0 && ind.impIdrM === 0
+    nessunaIdraulica
       ? `Alluvioni: nessuna impresa di ${comune} risulta in area a pericolosità idraulica mappata.`
-      : `Alluvioni: ${percento(ind.impIdrA)} delle imprese di ${comune} è in area a pericolosità ` +
-          `elevata, ${percento(ind.impIdrM)} in area a pericolosità media.`,
+      : ind.impIdrM === null
+        ? ind.impIdrA === null
+          ? `Alluvioni: ISPRA non pubblica la quota di imprese di ${comune} in area a pericolosità idraulica.`
+          : `Alluvioni: ${percento(ind.impIdrA)} delle imprese di ${comune} è in area a pericolosità ` +
+            'elevata; ISPRA non pubblica la quota in area media o elevata.'
+        : ind.impIdrA === null
+          ? `Alluvioni: ${percento(ind.impIdrM)} delle imprese di ${comune} è in area a pericolosità ` +
+            'media o elevata; ISPRA non pubblica la quota della sola elevata.'
+          : `Alluvioni: ${percento(ind.impIdrA)} delle imprese di ${comune} è in area a pericolosità ` +
+            `elevata, ${percento(ind.impIdrM)} in area a pericolosità media o elevata.`,
   );
 
   frasi.push(
     ind.impFrnA === 0
       ? `Frane: nessuna impresa di ${comune} risulta in area a pericolosità da frana elevata.`
-      : `Frane: ${percento(ind.impFrnA)} delle imprese di ${comune} è in area a pericolosità da ` +
+      : ind.impFrnA === null
+        ? `Frane: ISPRA non pubblica la quota di imprese di ${comune} in area a pericolosità da frana.`
+        : `Frane: ${percento(ind.impFrnA)} delle imprese di ${comune} è in area a pericolosità da ` +
           `frana elevata o molto elevata.`,
   );
 

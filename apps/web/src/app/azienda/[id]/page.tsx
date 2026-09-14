@@ -270,14 +270,14 @@ export default async function PaginaAzienda({
                         {u.indicatoriIdrogeo !== null && (
                           <span className="mt-0.5 block text-xs text-testo-debole">
                             {/*
-                              Le due quote, non una. La classe somma le imprese in pericolosità
-                              elevata e media (idrogeo.ts), e la riga stampava solo la prima: su
-                              GALENO S.R.L. Cremona risultava «alta» con l'8,1 % e Palazzolo
-                              «media» con il 9,2 %. Giusto, e illeggibile — Cremona ha il 37,7 % di
-                              imprese in pericolosità media, Palazzolo il 9,6 %.
+                              Le due quote, non una: la classe guarda anche la quota media, e la
+                              riga stampava solo l'elevata. Su GALENO S.R.L. Cremona risultava
+                              «alta» con l'8,1 % e Palazzolo «media» con il 9,2 %: giusto, e
+                              illeggibile. La quota media comprende l'elevata (idrogeo.ts), quindi
+                              si scrive «media o elevata».
                             */}
                             imprese in pericolosità elevata{' '}
-                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)}, media{' '}
+                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)}, media o elevata{' '}
                             {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaMedia)}
                           </span>
                         )}
@@ -1501,8 +1501,12 @@ function numeroIt(valore: number, decimali: number): string {
  * pubblica cosi' — mentre la parola che gli sta accanto («alta», «media», «bassa») e' una
  * convenzione di questo prodotto. Chi non condivide la soglia si fa l'idea sul numero, e il
  * numero deve arrivargli intero.
+ *
+ * Dove ISPRA non pubblica la quota — la segnala con −1, e il motore porta null — si scrive
+ * «non pubblicata»: un numero mancante stampato come numero sarebbe un dato inventato.
  */
-function percentualeIt(valore: number): string {
+function percentualeIt(valore: number | null): string {
+  if (valore === null) return 'non pubblicata';
   return `${numeroIt(Math.round(valore * 10) / 10, valore % 1 === 0 ? 0 : 1)} %`;
 }
 
