@@ -24,6 +24,7 @@
 # Solo caratteri ASCII in questo file: PowerShell 5.1 legge senza BOM nella codifica di sistema.
 
 $ErrorActionPreference = 'Continue'
+$inizio = Get-Date
 
 $Server = 'root@178.105.18.211'
 $Remota = '/opt/aegis/backups'
@@ -32,7 +33,7 @@ $Conserva = 90
 $OreMassime = 48
 $Ssh = Join-Path $env:WINDIR 'System32\OpenSSH\ssh.exe'
 $Scp = Join-Path $env:WINDIR 'System32\OpenSSH\scp.exe'
-$Opzioni = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20')
+$Opzioni = '-o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
 $Registro = Join-Path $Locale 'copia.log'
 $Allarme = Join-Path $Locale 'ATTENZIONE-BACKUP-VECCHIO.txt'
 
@@ -40,6 +41,49 @@ function Scrivi([string] $testo) {
   $riga = '{0}  {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $testo
   Add-Content -Path $Registro -Value $riga -Encoding UTF8
   Write-Output $riga
+}
+
+function Durata {
+  return '{0:N1} s' -f ((Get-Date) - $inizio).TotalSeconds
+}
+
+# Un programma esterno con l'ingresso chiuso e un tempo massimo.
+#
+# Il 14/09/2026 l'esecuzione pianificata delle 15:45 e' rimasta appesa quasi 15 minuti e
+# Windows l'ha terminata (esito 0x41306), mentre la stessa copia lanciata a mano finiva in
+# pochi secondi. La causa non e' stata trovata; per questo ogni programma esterno ha qui un
+# limite, e un processo che lo supera si ferma e lo scrive nel registro invece di restare appeso.
+#
+# Process di .NET e non Start-Process: con Start-Process e l'uscita su file il limite non
+# scattava (prova a vuoto dello stesso giorno: limite 5 s, comando da 30 s, finito a comando
+# concluso). L'uscita si legge in parallelo, cosi' un processo che scrive molto non si blocca
+# aspettando che qualcuno la legga.
+function Esegui([string] $programma, [string] $argomenti, [int] $secondi) {
+  $info = New-Object System.Diagnostics.ProcessStartInfo
+  $info.FileName = $programma
+  $info.Arguments = $argomenti
+  $info.UseShellExecute = $false
+  $info.CreateNoWindow = $true
+  $info.RedirectStandardInput = $true
+  $info.RedirectStandardOutput = $true
+  $info.RedirectStandardError = $true
+
+  $processo = [System.Diagnostics.Process]::Start($info)
+  $processo.StandardInput.Close()
+  $lettura = $processo.StandardOutput.ReadToEndAsync()
+  $letturaErrori = $processo.StandardError.ReadToEndAsync()
+
+  if (-not $processo.WaitForExit($secondi * 1000)) {
+    try { $processo.Kill() } catch { }
+    $null = $processo.WaitForExit(5000)
+    return @{ Codice = -1; Righe = @(); Messaggio = "tempo scaduto dopo $secondi secondi" }
+  }
+  $processo.WaitForExit()
+  return @{
+    Codice    = $processo.ExitCode
+    Righe     = @($lettura.Result -split "`r?`n" | Where-Object { $_ -ne '' })
+    Messaggio = $letturaErrori.Result.Trim()
+  }
 }
 
 if (-not (Test-Path $Locale)) {
@@ -54,11 +98,11 @@ if (-not (Test-Path $Locale)) {
 $copiati = 0
 $errore = $null
 
-$elenco = & $Ssh @Opzioni $Server "cd $Remota && sha256sum aegis-*.dump"
-if ($LASTEXITCODE -ne 0) {
-  $errore = "il server non risponde (ssh uscito con $LASTEXITCODE)"
+$elenco = Esegui $Ssh "-n $Opzioni $Server `"cd $Remota && sha256sum aegis-*.dump`"" 120
+if ($elenco.Codice -ne 0) {
+  $errore = "il server non risponde (ssh: codice $($elenco.Codice), $($elenco.Messaggio))"
 } else {
-  foreach ($riga in $elenco) {
+  foreach ($riga in $elenco.Righe) {
     if ($riga -notmatch '^([0-9a-f]{64})\s+\*?(aegis-\d{8}-\d{4}\.dump)$') { continue }
     $impronta = $Matches[1]
     $nome = $Matches[2]
@@ -70,10 +114,10 @@ if ($LASTEXITCODE -ne 0) {
     }
 
     $provvisorio = "$destinazione.parziale"
-    & $Scp @Opzioni -q "${Server}:$Remota/$nome" $provvisorio
-    if ($LASTEXITCODE -ne 0) {
+    $copia = Esegui $Scp "-q $Opzioni `"${Server}:$Remota/$nome`" `"$provvisorio`"" 600
+    if ($copia.Codice -ne 0) {
       Remove-Item $provvisorio -Force -ErrorAction SilentlyContinue
-      $errore = "scp di $nome uscito con $LASTEXITCODE"
+      $errore = "scp di ${nome}: codice $($copia.Codice), $($copia.Messaggio)"
       break
     }
     if ((Get-FileHash -Algorithm SHA256 $provvisorio).Hash.ToLower() -ne $impronta) {
@@ -112,8 +156,8 @@ if ($vecchio) {
 }
 
 if ($null -ne $errore) {
-  Scrivi "ERRORE: $errore"
+  Scrivi "ERRORE dopo $(Durata): $errore"
   exit 1
 }
-Scrivi ("fatto: {0} nuovi, {1} conservati, ultimo {2}" -f $copiati, $tutti.Count, $ultimo.Name)
+Scrivi ("fatto in {0}: {1} nuovi, {2} conservati, ultimo {3}" -f (Durata), $copiati, $tutti.Count, $ultimo.Name)
 exit 0
