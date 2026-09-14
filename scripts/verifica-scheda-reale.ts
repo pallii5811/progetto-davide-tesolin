@@ -276,8 +276,15 @@ riga(
 );
 for (const u of property.ubicazioni) {
   process.stdout.write(
-    `    · ${u.etichetta}: ${u.voci.map((v) => `${v.voce} ${numero(v.punteggio)}`).join(' · ')}\n`,
+    `    · ${u.etichetta}: ${u.voci.map((v) => `${v.voce} ${numero(v.punteggio)}`).join(' · ')}` +
+      ` · totale ${numero(u.punteggio)}\n`,
   );
+  // I pericoli naturali per esteso: da quali classi ISPRA e zona sismica esce il numero.
+  const pericoli = u.voci.find((v) => v.voce === 'Pericoli naturali');
+  if (pericoli !== undefined) process.stdout.write(`      ${pericoli.dettaglio}\n`);
+}
+if (property.motivoNonCalcolabile !== null) {
+  process.stdout.write(`    motivo: ${property.motivoNonCalcolabile}\n`);
 }
 riga(
   'Business Interruption',

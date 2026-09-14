@@ -105,3 +105,26 @@ describe('Sotto, il profilo aziendale e le tre protezioni', () => {
     expect(PROTEZIONI).not.toMatch(/toFixed\(/);
   });
 });
+
+/*
+  Dal 14/09/2026 il Property si calcola: i pericoli naturali vengono dalle classi ufficiali con la
+  scala decisa da Simone, al posto della tabella che nel foglio manca.
+*/
+describe('Il Property con la scala dei pericoli', () => {
+  it('la scala dei punteggi sta nel riquadro, accanto alle formule', () => {
+    expect(PROTEZIONI).toContain(
+      'formule={[property.formula, property.formulaPericoliNaturali, property.scalaPericoliNaturali]}',
+    );
+  });
+
+  it('un punteggio con i decimali si stampa al centesimo, non arrotondato all’intero', () => {
+    // 50% × 7 + 50% × 3,67 = 5,34: stampato «5» il contributo 2,67 non tornerebbe più.
+    expect(PROTEZIONI).toContain("v.punteggio === null ? 'non calcolabile' : punteggioIt(v.punteggio)");
+    expect(PROTEZIONI).not.toMatch(/numeroIt\(v\.punteggio, 0\)/);
+  });
+
+  it('senza Property il riquadro dice il motivo del motore, non più la tabella mancante', () => {
+    expect(PROTEZIONI).toContain('property.motivoNonCalcolabile');
+    expect(PROTEZIONI).not.toContain('Manca nel foglio la tabella');
+  });
+});

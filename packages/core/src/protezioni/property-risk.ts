@@ -1,32 +1,45 @@
 /**
  * Property Risk, come lo definisce il foglio «Veezco_Analisi Rischio.xlsx».
  *
- *   Property Risk = 30% × rischio dell'attività + 20% × tipo di sito + 50% × pericoli naturali
+ *   Property Risk     = 30% × rischio dell'attività + 20% × tipo di sito + 50% × pericoli naturali
+ *   Pericoli naturali = 50% × pericolo massimo + 50% × pericolo medio
  *
  * Tre punteggi da 1 a 7, pesati. I pesi, le tabelle dell'attività e del tipo di sito vengono
  * dal foglio (`tabelle-veezco.ts`), non da qui.
  *
- * IL TERZO PUNTEGGIO NON SI CALCOLA, E NON PER SCELTA. Il foglio rinvia per i pericoli naturali
- * a una tabella «Natural_Hazard_Risk» che converte alluvione, sisma e frana in punteggi da 1 a 7;
- * nel file quella tabella non c'è, c'è solo un esempio scritto a mano (6, 2, 3). Questo prodotto
- * i pericoli li misura in tre livelli — bassa, media, alta — e tradurli in un numero da 1 a 7
- * sarebbe inventare la parte che pesa di più. Finché la tabella non arriva, la voce resta senza
- * punteggio, il totale resta non calcolabile, e la scheda lo dice: il 50% mancante non si
- * ricava ridistribuendo il peso sulle altre due voci.
+ * I PUNTEGGI DEI PERICOLI NON VENGONO DAL FOGLIO, E LO SI DICE. Il foglio rinvia a una tabella
+ * «Natural_Hazard_Risk» che nel file non c'è, e ne indica le fonti: ISPRA e INGV. Al suo posto,
+ * per decisione di Simone del 14/09/2026, le classi ufficiali convertite a gradini uguali:
+ *
+ *   terremoto  zona sismica del comune (Protezione Civile)   4 → 1 · 3 → 3 · 2 → 5 · 1 → 7
+ *   alluvione  ISPRA IdroGEO, dato del comune                bassa → 1 · media → 4 · alta → 7
+ *   frana      ISPRA IdroGEO, dato del comune                bassa → 1 · media → 4 · alta → 7
+ *
+ * L'alluvione è il dato comunale e non la classe ISPRA sul punto della sede: misurata il
+ * 14/09/2026, la lettura sul punto non rispondeva in venti secondi su quattro punti di prova su
+ * sei, delta del Po compreso. Il pericolo medio è la media dei tre, come dice la formula scritta
+ * nel foglio. Se uno dei tre manca — comune fuori dagli archivi — la voce resta non calcolabile,
+ * e con lei il Property dell'ubicazione: nessun pericolo si stima dagli altri due.
+ *
+ * I conti si fanno in centesimi di punto, arrotondando ogni passaggio come viene stampato: il
+ * pericolo medio, i pericoli naturali e ciascun contributo. Chi rifà il conto con i numeri della
+ * scheda trova lo stesso totale, invece di uno che differisce di un centesimo.
  */
 
 import type { TipoUnitaLocale } from '../company/profile.js';
 import type { ExposureLevel } from '../risk/geo.js';
+import { livelloFrana, livelloIdraulico } from '../risk/idrogeo.js';
+import type { IndicatoriIdrogeo } from '../risk/idrogeo.js';
 import { PESI_PROPERTY, RISCHIO_ATTIVITA, RISCHIO_TIPO_DI_SITO } from './tabelle-veezco.js';
 import type { RigaAttivita } from './tabelle-veezco.js';
 
 /** Una riga del calcolo: il punteggio da 1 a 7, il peso del foglio, e quanto porta al totale. */
 export interface VoceDiCalcolo {
   readonly voce: string;
-  /** Da 1 a 7. `null` dove il foglio non permette di calcolarlo: mai uno zero al suo posto. */
+  /** Da 1 a 7. `null` dove non si può calcolare: mai uno zero al suo posto. */
   readonly punteggio: number | null;
   readonly peso: number;
-  /** Punteggio × peso; `null` se manca il punteggio. */
+  /** Punteggio × peso, al centesimo; `null` se manca il punteggio. */
   readonly contributo: number | null;
   /** Da dove viene il punteggio, detto per esteso. */
   readonly dettaglio: string;
@@ -36,9 +49,10 @@ export interface UbicazionePerProperty {
   readonly id: string;
   readonly etichetta: string;
   readonly tipo: TipoUnitaLocale | null;
-  readonly sismica: ExposureLevel | null;
-  readonly idraulica: ExposureLevel | null;
-  readonly frane: ExposureLevel | null;
+  /** Zona sismica ufficiale del comune, da 1 a 4; `null` se il comune non è classificato. */
+  readonly zonaSismica: 1 | 2 | 3 | 4 | null;
+  /** Indicatori ISPRA IdroGEO del comune; `null` se il comune non è nell'archivio. */
+  readonly indicatoriIdrogeo: IndicatoriIdrogeo | null;
 }
 
 export interface PropertyUbicazione {
@@ -52,10 +66,14 @@ export interface PropertyUbicazione {
 export interface PropertyRisk {
   readonly formula: string;
   readonly formulaPericoliNaturali: string;
+  /** Come le classi dei pericoli diventano punteggi: la tabella che nel foglio manca. */
+  readonly scalaPericoliNaturali: string;
   readonly divisioneAteco: string | null;
   readonly titoloDivisione: string | null;
   /** Il punteggio dell'ubicazione più esposta, da 1 a 7. */
   readonly punteggio: number | null;
+  /** Perché il punteggio manca, in una frase; `null` quando c'è. */
+  readonly motivoNonCalcolabile: string | null;
   readonly ubicazioneDiRiferimento: string | null;
   readonly ubicazioni: readonly PropertyUbicazione[];
   readonly note: readonly string[];
@@ -71,6 +89,18 @@ export const FORMULA_PROPERTY =
 /** Alla lettera dal foglio: «50% × max hazard + 50% × average hazard». */
 export const FORMULA_PERICOLI_NATURALI =
   'Pericoli naturali = 50% × pericolo massimo + 50% × pericolo medio';
+
+/** Decisione di Simone del 14/09/2026, al posto della tabella «Natural_Hazard_Risk». */
+export const PUNTEGGIO_ZONA_SISMICA: Readonly<Record<1 | 2 | 3 | 4, number>> = { 4: 1, 3: 3, 2: 5, 1: 7 };
+export const PUNTEGGIO_LIVELLO_ISPRA: Readonly<Record<ExposureLevel, number>> = {
+  bassa: 1,
+  media: 4,
+  alta: 7,
+};
+
+export const SCALA_PERICOLI_NATURALI =
+  'Punteggi dei pericoli: terremoto per zona sismica 4 → 1, 3 → 3, 2 → 5, 1 → 7; ' +
+  'alluvione e frana, pericolosità ISPRA del comune: bassa → 1, media → 4, alta → 7';
 
 /** Le fasce del foglio, in italiano. */
 const FASCIA: Readonly<Record<string, string>> = {
@@ -114,21 +144,149 @@ export function tipoDiSitoDelFoglio(
     : { tipo: riga.tipo, punteggio: riga.punteggio };
 }
 
+/** Divisione intera arrotondata a metà per eccesso, per numeratori non negativi. */
+function arrotonda(numeratore: number, denominatore: number): number {
+  return Math.floor((2 * numeratore + denominatore) / (2 * denominatore));
+}
+
+const pesoInPercento = (peso: number): number => Math.round(peso * 100);
+
 /**
  * La formula dei pericoli naturali, come è scritta nel foglio: metà il pericolo massimo, metà
  * il pericolo medio dei tre.
  *
- * Nell'esempio del foglio (alluvione 6, sisma 2, frana 3) la cella calcola 6 × 50% + 2,5 × 50%:
- * il 2,5 è la media dei due pericoli diversi dal massimo, non dei tre. Qui vale la formula
- * scritta, e la scheda segnala la differenza perché la si chiarisca insieme alla tabella che
- * manca. Oggi non la chiama nessuno: senza quella tabella i tre punteggi non ci sono.
+ * Il medio si arrotonda al centesimo PRIMA di entrare nella formula, perché è quello il numero
+ * che la scheda stampa: con 6, 2 e 3 il medio stampato è 3,67 e i pericoli 50% × 6 + 50% × 3,67
+ * = 4,84, che è il conto di chi legge. Tenere il medio esatto darebbe 4,83, e la scheda
+ * mostrerebbe un risultato che non torna con i suoi stessi numeri.
+ *
+ * Nell'esempio del foglio la cella calcola invece 6 × 50% + 2,5 × 50%: il 2,5 è la media dei due
+ * pericoli diversi dal massimo. Simone ha scelto la formula scritta, la media dei tre.
  */
-export function pericoliNaturali(alluvione: number, sisma: number, frana: number): number {
-  const valori = [alluvione, sisma, frana];
-  return 0.5 * Math.max(...valori) + 0.5 * ((alluvione + sisma + frana) / valori.length);
+export function pericoliNaturali(
+  alluvione: number,
+  terremoto: number,
+  frana: number,
+): { readonly massimo: number; readonly medio: number; readonly punteggio: number } {
+  const massimo = Math.max(alluvione, terremoto, frana);
+  const medioCentesimi = arrotonda((alluvione + terremoto + frana) * 100, 3);
+  const punteggioCentesimi = arrotonda(massimo * 100 * 50 + medioCentesimi * 50, 100);
+  return { massimo, medio: medioCentesimi / 100, punteggio: punteggioCentesimi / 100 };
 }
 
-const livello = (valore: ExposureLevel | null): string => valore ?? 'non determinata';
+/** Con la virgola e senza decimali inutili: «3», «3,67». */
+function numero(valore: number): string {
+  return Number.isInteger(valore) ? String(valore) : valore.toFixed(2).replace('.', ',');
+}
+
+/** Una percentuale come la pubblica ISPRA: un decimale, e nessuno quando è inutile. */
+function quota(valore: number): string {
+  const arrotondato = Math.round(valore * 10) / 10;
+  return `${String(arrotondato).replace('.', ',')} %`;
+}
+
+interface Pericoli {
+  readonly voce: VoceDiCalcolo;
+  /** In centesimi di punto; `null` se la voce non si calcola. */
+  readonly contributoCentesimi: number | null;
+}
+
+function vocePericoli(u: UbicazionePerProperty): Pericoli {
+  const peso = PESI_PROPERTY.pericoliNaturali;
+  const ind = u.indicatoriIdrogeo;
+  const zona = u.zonaSismica;
+
+  const livelloAlluvione = ind === null ? null : livelloIdraulico(ind);
+  const livelloFrane = ind === null ? null : livelloFrana(ind);
+
+  /*
+    Ogni pericolo ha due frasi: quella lunga, che dice da dove esce il punteggio, e quella breve,
+    che basta quando il pericolo compare solo come «disponibile» accanto a uno che manca.
+
+    Le frasi lunghe NON condividono le parole. La prima versione diceva per l'alluvione e per la
+    frana «(ISPRA, comune: bassa, 0 % delle imprese in pericolosità elevata…)» con le stesse
+    parole, e il collaudo dei rilevatori di testo l'ha fermata: sulla stessa riga la stessa cosa
+    detta due volte si legge come una frase fatta con lo stampino. Chi cambia queste frasi faccia
+    girare scripts/rilievi-testo-property.ts, che le compone su ogni comune degli archivi.
+  */
+  const alluvione =
+    ind === null || livelloAlluvione === null
+      ? null
+      : {
+          punti: PUNTEGGIO_LIVELLO_ISPRA[livelloAlluvione],
+          breve: `alluvione ${PUNTEGGIO_LIVELLO_ISPRA[livelloAlluvione]}`,
+          testo:
+            `Alluvione ${PUNTEGGIO_LIVELLO_ISPRA[livelloAlluvione]}: pericolosità idraulica ${livelloAlluvione} ` +
+            `nel comune secondo ISPRA, con ${quota(ind.impIdrA)} delle imprese in area elevata e ` +
+            `${quota(ind.impIdrM)} in area media.`,
+        };
+  const terremoto =
+    zona === null
+      ? null
+      : {
+          punti: PUNTEGGIO_ZONA_SISMICA[zona],
+          breve: `terremoto ${PUNTEGGIO_ZONA_SISMICA[zona]} (zona sismica ${zona})`,
+          testo: `Terremoto ${PUNTEGGIO_ZONA_SISMICA[zona]}: zona sismica ${zona}.`,
+        };
+  const frana =
+    ind === null || livelloFrane === null
+      ? null
+      : {
+          punti: PUNTEGGIO_LIVELLO_ISPRA[livelloFrane],
+          breve: `frana ${PUNTEGGIO_LIVELLO_ISPRA[livelloFrane]}`,
+          testo:
+            `Frana ${PUNTEGGIO_LIVELLO_ISPRA[livelloFrane]}: pericolosità da frana ${livelloFrane}, con ` +
+            `${quota(ind.impFrnA)} delle imprese dove è elevata o molto elevata.`,
+        };
+
+  if (alluvione === null || terremoto === null || frana === null) {
+    /*
+      Frasi separate da un punto, non appese dopo «Non calcolabile:»: due due-punti nella stessa
+      frase — «Non calcolabile: alluvione e frana: il comune…» — sono uno dei difetti che i
+      rilevatori di testo cercano.
+    */
+    const mancanti = [
+      ...(ind === null ? ['alluvione e frana: il comune non è nell’archivio ISPRA IdroGEO'] : []),
+      ...(zona === null ? ['terremoto: il comune non è nella classificazione sismica'] : []),
+    ].join('; ');
+    const presenti = [alluvione, terremoto, frana]
+      .filter((p): p is { punti: number; breve: string; testo: string } => p !== null)
+      .map((p) => p.breve);
+    return {
+      voce: {
+        voce: 'Pericoli naturali',
+        punteggio: null,
+        peso,
+        contributo: null,
+        dettaglio:
+          `Non calcolabile. ${mancanti.charAt(0).toUpperCase()}${mancanti.slice(1)}.` +
+          (presenti.length === 0
+            ? ''
+            : ` ${presenti.length === 1 ? 'Disponibile' : 'Disponibili'}: ${presenti.join(', ')}.`) +
+          ' Nessun pericolo si stima dagli altri.',
+      },
+      contributoCentesimi: null,
+    };
+  }
+
+  const calcolo = pericoliNaturali(alluvione.punti, terremoto.punti, frana.punti);
+  const punteggioCentesimi = Math.round(calcolo.punteggio * 100);
+  const contributoCentesimi = arrotonda(punteggioCentesimi * pesoInPercento(peso), 100);
+
+  return {
+    voce: {
+      voce: 'Pericoli naturali',
+      punteggio: calcolo.punteggio,
+      peso,
+      contributo: contributoCentesimi / 100,
+      dettaglio:
+        `${alluvione.testo} ${terremoto.testo} ${frana.testo} ` +
+        `Massimo ${numero(calcolo.massimo)}, medio ${numero(calcolo.medio)}: ` +
+        `50% × ${numero(calcolo.massimo)} + 50% × ${numero(calcolo.medio)} = ${numero(calcolo.punteggio)}.`,
+    },
+    contributoCentesimi,
+  };
+}
 
 export function calcolaPropertyRisk(
   divisioneAteco: string | null,
@@ -138,8 +296,10 @@ export function calcolaPropertyRisk(
     divisioneAteco === null ? null : (RISCHIO_ATTIVITA[divisioneAteco] ?? null);
   const deposito = RISCHIO_TIPO_DI_SITO.find((r) => r.tipo === 'Deposito')?.punteggio ?? null;
 
+  const contributoAttivitaCentesimi =
+    riga === null ? null : riga.punteggio * pesoInPercento(PESI_PROPERTY.attivita);
   const voceAttivita: VoceDiCalcolo =
-    riga === null
+    riga === null || contributoAttivitaCentesimi === null
       ? {
           voce: 'Attività',
           punteggio: null,
@@ -154,18 +314,20 @@ export function calcolaPropertyRisk(
           voce: `Attività · ATECO ${divisioneAteco ?? ''}`,
           punteggio: riga.punteggio,
           peso: PESI_PROPERTY.attivita,
-          contributo: riga.punteggio * PESI_PROPERTY.attivita,
+          contributo: contributoAttivitaCentesimi / 100,
           dettaglio: `${riga.titolo}, fascia ${FASCIA[riga.fascia] ?? riga.fascia}.`,
         };
 
   const perUbicazione = ubicazioni.map((u): PropertyUbicazione => {
     const sito = tipoDiSitoDelFoglio(u.tipo);
     const punteggioSito = sito !== null ? sito.punteggio : riga !== null ? riga.punteggio : null;
+    const contributoSitoCentesimi =
+      punteggioSito === null ? null : punteggioSito * pesoInPercento(PESI_PROPERTY.tipoDiSito);
     const voceSito: VoceDiCalcolo = {
       voce: 'Tipo di sito',
       punteggio: punteggioSito,
       peso: PESI_PROPERTY.tipoDiSito,
-      contributo: punteggioSito === null ? null : punteggioSito * PESI_PROPERTY.tipoDiSito,
+      contributo: contributoSitoCentesimi === null ? null : contributoSitoCentesimi / 100,
       dettaglio:
         sito !== null
           ? u.tipo === 'magazzino' && deposito !== null
@@ -175,24 +337,17 @@ export function calcolaPropertyRisk(
             ? 'Il registro non indica la destinazione d’uso della sede, e senza l’attività manca anche il ripiego previsto dal foglio.'
             : 'Il registro non indica la destinazione d’uso della sede: il foglio prescrive di usare il punteggio dell’attività.',
     };
-    const vocePericoli: VoceDiCalcolo = {
-      voce: 'Pericoli naturali',
-      punteggio: null,
-      peso: PESI_PROPERTY.pericoliNaturali,
-      contributo: null,
-      dettaglio:
-        `Alluvione ${livello(u.idraulica)}, sisma ${livello(u.sismica)}, frana ${livello(u.frane)}. ` +
-        'Manca nel foglio la tabella che converte questi livelli in punteggio.',
-    };
+    const pericoli = vocePericoli(u);
 
-    const voci = [voceAttivita, voceSito, vocePericoli];
-    let somma = 0;
-    let completa = true;
-    for (const v of voci) {
-      if (v.contributo === null) completa = false;
-      else somma += v.contributo;
-    }
-    return { id: u.id, etichetta: u.etichetta, voci, punteggio: completa ? somma : null };
+    const contributi = [contributoAttivitaCentesimi, contributoSitoCentesimi, pericoli.contributoCentesimi];
+    const completa = contributi.every((c) => c !== null);
+    const somma = contributi.reduce<number>((totale, c) => totale + (c ?? 0), 0);
+    return {
+      id: u.id,
+      etichetta: u.etichetta,
+      voci: [voceAttivita, voceSito, pericoli.voce],
+      punteggio: completa ? somma / 100 : null,
+    };
   });
 
   let riferimento: { etichetta: string; punteggio: number } | null = null;
@@ -203,12 +358,27 @@ export function calcolaPropertyRisk(
     }
   }
 
+  const motivoNonCalcolabile =
+    riferimento !== null
+      ? null
+      : ubicazioni.length === 0
+        ? 'Nessuna ubicazione risulta dai dati disponibili'
+        : riga === null
+          ? 'Senza la divisione ATECO nella tabella del foglio manca il rischio dell’attività'
+          : 'Su nessuna ubicazione sono disponibili tutti e tre i pericoli naturali';
+
   const note = [
-    `Per i pericoli naturali il foglio rinvia alla tabella «Natural_Hazard_Risk», che nel file non è presente. ` +
-      `Senza di essa manca il ${percentuale(PESI_PROPERTY.pericoliNaturali)} del punteggio, e il Property Risk ` +
-      'resta non calcolabile: non viene stimato sulle sole due voci disponibili.',
-    'Nell’esempio del foglio il pericolo medio vale 2,5, cioè la media dei due pericoli diversi dal massimo, ' +
-      'mentre la formula scritta indica il pericolo medio dei tre: da chiarire insieme alla tabella.',
+    'Il foglio rinvia, per i pericoli naturali, alla tabella «Natural_Hazard_Risk», che nel file non è presente, e ' +
+      'ne indica le fonti: ISPRA e INGV. Al suo posto, per decisione del 14/09/2026, i pericoli si leggono dalle ' +
+      `fonti ufficiali e diventano punteggi a gradini uguali. ${SCALA_PERICOLI_NATURALI}.`,
+    'Alluvione e frana sono il dato del comune, non della singola sede: la quota di imprese del comune in area a ' +
+      'pericolosità secondo ISPRA IdroGEO. Dove la decisione pesa, la verifica sull’indirizzo resta necessaria. ' +
+      'Bassa, media e alta seguono le soglie di AEGIS sulla quota di imprese: alluvione alta dal 15% in pericolosità ' +
+      'elevata o dal 40% fra elevata e media, media dal 3% o dal 15%; frana alta dal 10% in pericolosità elevata o ' +
+      'molto elevata, media dal 2%.',
+    'Il pericolo medio è la media dei tre pericoli, come dice la formula scritta nel foglio (l’esempio del foglio usa ' +
+      'invece la media dei due più bassi). Medio, pericoli naturali e contributi sono arrotondati al centesimo, perché ' +
+      'il conto torni con i numeri stampati.',
     'Il rischio dell’attività usa l’ATECO primario dell’impresa per ogni ubicazione, perché il registro non ' +
       'codifica l’attività di ciascuna sede.',
     ...(ubicazioni.length > 1
@@ -220,9 +390,11 @@ export function calcolaPropertyRisk(
   return {
     formula: FORMULA_PROPERTY,
     formulaPericoliNaturali: FORMULA_PERICOLI_NATURALI,
+    scalaPericoliNaturali: SCALA_PERICOLI_NATURALI,
     divisioneAteco,
     titoloDivisione: riga?.titolo ?? null,
     punteggio: riferimento?.punteggio ?? null,
+    motivoNonCalcolabile,
     ubicazioneDiRiferimento: riferimento?.etichetta ?? null,
     ubicazioni: perUbicazione,
     note,

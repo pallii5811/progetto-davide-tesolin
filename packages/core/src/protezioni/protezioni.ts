@@ -8,6 +8,7 @@
 
 import type { CompanyFacts } from '../company/facts.js';
 import type { AnalisiUbicazioni } from '../company/ubicazioni.js';
+import { zonaSismicaDelComune } from '../risk/geo.js';
 import { calcolaBusinessInterruption } from './business-interruption.js';
 import type { BusinessInterruption } from './business-interruption.js';
 import { calcolaCyberRisk } from './cyber-risk.js';
@@ -30,9 +31,17 @@ export function calcolaProtezioni(facts: CompanyFacts, ubicazioni: AnalisiUbicaz
       id: u.id,
       etichetta: u.etichetta,
       tipo: u.tipo,
-      sismica: u.esposizione.sismica,
-      idraulica: u.esposizione.idraulica,
-      frane: u.esposizione.frane ?? null,
+      /*
+        Soltanto dati del comune, e letti qui invece che dall'esposizione già composta.
+
+        L'esposizione dell'ubicazione mescola tre fonti: il comune, la classe ISPRA sul punto
+        quando è accesa, e il ripiego sulla provincia quando il comune non si risolve. Il Property
+        ne vuole una sola, quella decisa il 14/09/2026 — zona sismica e indicatori IdroGEO del
+        comune — e un «alta» ereditato dalla provincia varrebbe 7 senza essere del comune.
+      */
+      zonaSismica: zonaSismicaDelComune(u.indirizzo.comune, u.indirizzo.provincia),
+      indicatoriIdrogeo:
+        u.esposizione.idrogeoComunale === true ? (u.esposizione.indicatoriIdrogeo ?? null) : null,
     })),
   );
 

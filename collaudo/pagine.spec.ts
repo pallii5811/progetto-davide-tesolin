@@ -93,13 +93,13 @@ test.describe('Analisi di un’azienda', () => {
     }
 
     /*
-      Il Property Risk resta non calcolabile e deve dirlo: il foglio rinvia, per i pericoli
-      naturali, a una tabella che nel file non c'è. Un numero in questo riquadro sarebbe
-      inventato sul 50% del punteggio.
+      Il Property Risk dal 14/09/2026 si calcola: i pericoli naturali vengono dalle classi ufficiali
+      (zona sismica, ISPRA IdroGEO del comune) con la scala decisa da Simone al posto della tabella
+      che nel foglio manca. ADRIATICA LOGISTICA, divisione 52 (attività 5): la sede di Ravenna ha
+      alluvione alta 7, zona 3 → 3, frana bassa 1; medio 3,67, pericoli 5,34; 1,50 + 1,00 + 2,67 =
+      5,17. Il numero atteso è calcolato a mano dai dati grezzi, non dal motore.
     */
-    await expect(page.getByTestId('metrica-property-risk').locator('dd').first()).toHaveText(
-      'non calcolabile',
-    );
+    await expect(page.getByTestId('metrica-property-risk').locator('dd').first()).toHaveText('5,17 su 7');
     // L'impresa dimostrativa ha ATECO e bilancio: gli altri due riquadri portano un numero.
     await expect(page.getByTestId('metrica-business-interruption').locator('dd').first()).toHaveText(/\d/);
     /*

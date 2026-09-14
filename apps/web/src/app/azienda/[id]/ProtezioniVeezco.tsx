@@ -22,6 +22,16 @@ function numeroIt(valore: number, decimali: number): string {
   }).format(valore);
 }
 
+/**
+ * Un punteggio da 1 a 7 come lo stampa il motore: intero quando lo è, altrimenti al centesimo.
+ *
+ * I pericoli naturali escono con i decimali (50% × 7 + 50% × 3,67 = 5,34): stampati senza, la
+ * voce direbbe 5 e il contributo 2,67, e il conto non tornerebbe più.
+ */
+function punteggioIt(valore: number): string {
+  return Number.isInteger(valore) ? numeroIt(valore, 0) : numeroIt(valore, 2);
+}
+
 /** Al centesimo: la perdita giornaliera e gli scenari devono tornare fra loro a colpo d'occhio. */
 function euroAlCentesimo(importo: MoneyDto): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(importo.euro);
@@ -43,9 +53,6 @@ export function RiquadriProtezioni({ protezioni }: { protezioni: Protezioni }) {
   }
 
   const { property, businessInterruption: bi, cyber } = protezioni;
-  const pesoPericoli = property.ubicazioni
-    .flatMap((u) => u.voci)
-    .find((v) => v.voce === 'Pericoli naturali')?.peso;
   const trentaGiorni = bi.scenari.find((s) => s.giorni === 30);
 
   return (
@@ -55,9 +62,7 @@ export function RiquadriProtezioni({ protezioni }: { protezioni: Protezioni }) {
         valore={property.punteggio === null ? 'non calcolabile' : suSette(property.punteggio, 2)}
         nota={
           property.punteggio === null
-            ? `Manca nel foglio la tabella dei pericoli naturali${
-                pesoPericoli === undefined ? '' : `, che pesa il ${pesoIt(pesoPericoli)} del punteggio`
-              }`
+            ? (property.motivoNonCalcolabile ?? 'Il dettaglio è nella sezione Property Risk')
             : `Ubicazione più esposta: ${property.ubicazioneDiRiferimento ?? '—'}`
         }
         tono={property.punteggio === null ? 'attenzione' : 'neutro'}
@@ -190,7 +195,7 @@ function TabellaVoci({
                 <span className="mt-0.5 block text-xs leading-snug text-testo-tenue">{v.dettaglio}</span>
               </td>
               <td className="tabular px-4 py-3 text-right">
-                {v.punteggio === null ? 'non calcolabile' : numeroIt(v.punteggio, 0)}
+                {v.punteggio === null ? 'non calcolabile' : punteggioIt(v.punteggio)}
               </td>
               <td className="tabular px-4 py-3 text-right">{pesoIt(v.peso)}</td>
               <td className="tabular px-4 py-3 text-right">
@@ -215,7 +220,7 @@ function CorpoProperty({ protezioni }: { protezioni: ProtezioniDto }) {
   return (
     <>
       <ComeEStatoCalcolato
-        formule={[property.formula, property.formulaPericoliNaturali]}
+        formule={[property.formula, property.formulaPericoliNaturali, property.scalaPericoliNaturali]}
         fonte={protezioni.fonte}
       />
       <div className="space-y-4">

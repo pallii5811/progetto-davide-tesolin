@@ -23,19 +23,32 @@ const outPath = join(radice, 'packages/core/src/risk/data/sismica-comunale.ts');
  * Si prende la cifra più bassa = pericolosità più alta.
  */
 export function livelloDaZona(zonaGrezza: string): 'alta' | 'media' | 'bassa' | null {
+  const peggiore = zonaDaZona(zonaGrezza);
+  if (peggiore === null) return null;
+  if (peggiore <= 2) return 'alta';
+  if (peggiore === 3) return 'media';
+  return 'bassa';
+}
+
+/**
+ * La zona sismica come numero da 1 a 4, per il Property Risk del foglio Veezco.
+ *
+ * Il Property converte la zona in punteggio a gradini uguali (4→1, 3→3, 2→5, 1→7, deciso da
+ * Simone il 14/09/2026), e alta/media/bassa non basta: zona 1 e zona 2 sono entrambe «alta».
+ * Le sottozone (2A, 3S…) valgono la zona madre; una zona composta («2A-3A-3B») vale la più
+ * grave, come per il livello.
+ */
+export function zonaDaZona(zonaGrezza: string): 1 | 2 | 3 | 4 | null {
   const pezzi = zonaGrezza.trim().split(/[-/]/);
   let peggiore: number | null = null;
   for (const pezzo of pezzi) {
     const m = /^(\d)/.exec(pezzo.trim());
     if (m === null) continue;
     const n = Number(m[1]);
+    if (n < 1 || n > 4) continue;
     if (peggiore === null || n < peggiore) peggiore = n;
   }
-  if (peggiore === null) return null;
-  if (peggiore <= 2) return 'alta';
-  if (peggiore === 3) return 'media';
-  if (peggiore === 4) return 'bassa';
-  return null;
+  return peggiore === null ? null : (peggiore as 1 | 2 | 3 | 4);
 }
 
 const grezzo = readFileSync(csvPath, 'utf8').replace(/^\uFEFF/, '');
@@ -50,6 +63,8 @@ if (iSigla < 0 || iComune < 0 || iZona < 0) {
 
 /** Chiave `sigla|comuneNormalizzato` → livello. */
 const mappa: Record<string, 'alta' | 'media' | 'bassa'> = {};
+/** Chiave `sigla|comuneNormalizzato` → zona 1–4: stessa chiave, stessa regola del più grave. */
+const zone: Record<string, 1 | 2 | 3 | 4> = {};
 let saltate = 0;
 
 for (let i = 1; i < righe.length; i++) {
@@ -67,6 +82,11 @@ for (let i = 1; i < righe.length; i++) {
     continue;
   }
   const chiave = `${sigla}|${normalizzaComune(comune)}`;
+  const numeroZona = zonaDaZona(zona);
+  const zonaPrecedente = zone[chiave];
+  if (numeroZona !== null && (zonaPrecedente === undefined || numeroZona < zonaPrecedente)) {
+    zone[chiave] = numeroZona;
+  }
   const precedente = mappa[chiave];
   // A parità di chiave si tiene il peggiore (poco frequente; fusioni/sottozone).
   if (
@@ -84,6 +104,7 @@ const payload = {
   generatoIl: new Date().toISOString().slice(0, 10),
   comuni: Object.keys(mappa).length,
   livelli: mappa,
+  zone,
 };
 
 const corpo =

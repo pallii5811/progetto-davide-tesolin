@@ -59,10 +59,41 @@ describe('Le protezioni Veezco nel DTO', () => {
     expect(protezioni.businessInterruption.formule).toHaveLength(3);
   });
 
-  it('un punteggio che il motore non calcola esce null, non zero', () => {
-    expect(protezioni.property.punteggio).toBeNull();
-    expect(protezioni.businessInterruption.punteggioFisico).toBeNull();
-    const pericoli = protezioni.property.ubicazioni
+  it('il Property calcolato arriva con i decimali, la scala e nessun motivo di assenza', () => {
+    // Azienda dimostrativa ad Adro (BS), divisione 25: 1,80 + 1,20 + 1,17 = 4,17, calcolato a mano.
+    expect(protezioni.property.punteggio).toBe(4.17);
+    expect(protezioni.property.motivoNonCalcolabile).toBeNull();
+    expect(protezioni.property.scalaPericoliNaturali).toContain('zona sismica 4 → 1');
+    expect(protezioni.businessInterruption.punteggioFisico).toBe(4.17);
+  });
+
+  it('un punteggio che il motore non calcola esce null, non zero, con il motivo', () => {
+    // Un comune che non è in nessun archivio: nessun pericolo naturale si legge. Senza unità locali
+    // e senza immobili dichiarati, che nella demo stanno ad Adro e a Erbusco e sarebbero sedi.
+    const demo = demoCompanyProfile();
+    const sede = demo.anagrafica.value.sedeLegale!;
+    const altrove = presentAnalysis(
+      analyzeCompany(
+        {
+          ...demo,
+          anagrafica: {
+            ...demo.anagrafica,
+            value: { ...demo.anagrafica.value, sedeLegale: { ...sede, comune: 'Comune Inesistente' } },
+          },
+          unitaLocali: null,
+          datiDichiarati: { ...demo.datiDichiarati, immobili: [] },
+        },
+        [],
+        DEMO_AS_OF,
+      ),
+    ).protezioni;
+
+    expect(altrove.property.punteggio).toBeNull();
+    expect(altrove.property.motivoNonCalcolabile).toBe(
+      'Su nessuna ubicazione sono disponibili tutti e tre i pericoli naturali',
+    );
+    expect(altrove.businessInterruption.punteggioFisico).toBeNull();
+    const pericoli = altrove.property.ubicazioni
       .flatMap((u) => u.voci)
       .filter((v) => v.voce === 'Pericoli naturali');
     expect(pericoli.length).toBeGreaterThan(0);

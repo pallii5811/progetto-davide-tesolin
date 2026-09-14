@@ -268,9 +268,11 @@ export interface ProtezioniDto {
   property: {
     formula: string;
     formulaPericoliNaturali: string;
+    scalaPericoliNaturali: string;
     divisioneAteco: string | null;
     titoloDivisione: string | null;
     punteggio: number | null;
+    motivoNonCalcolabile: string | null;
     ubicazioneDiRiferimento: string | null;
     ubicazioni: { id: string; etichetta: string; punteggio: number | null; voci: VoceDiCalcoloDto[] }[];
     note: string[];

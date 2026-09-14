@@ -278,6 +278,21 @@ export function sismicaDelComune(comune: string, provincia: string): ExposureLev
   return LIVELLI_COMUNALI[chiave] ?? null;
 }
 
+const ZONE_COMUNALI = sismicaComunale.zone as Readonly<Record<string, 1 | 2 | 3 | 4>>;
+
+/**
+ * La zona sismica ufficiale del comune, da 1 a 4, per il Property Risk.
+ *
+ * Alta, media e bassa non bastano al Property: zona 1 e zona 2 sono entrambe «alta» e valgono
+ * 7 e 5 (decisione di Simone del 14/09/2026). `null` se il comune non è nel dataset, e nessun
+ * ripiego sulla provincia: una zona presa in prestito dal capoluogo peserebbe sul 50% del
+ * punteggio senza essere del comune.
+ */
+export function zonaSismicaDelComune(comune: string, provincia: string): 1 | 2 | 3 | 4 | null {
+  const sigla = provincia.trim().toUpperCase();
+  return ZONE_COMUNALI[`${sigla}|${normalizzaComune(comune)}`] ?? null;
+}
+
 /**
  * Esposizione indicativa per sola sigla provinciale.
  *

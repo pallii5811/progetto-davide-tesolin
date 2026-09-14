@@ -99,27 +99,119 @@ describe('Cyber Risk', () => {
 });
 
 describe('Property Risk', () => {
+  /*
+    I valori attesi di questo blocco sono calcolati a mano dai dati grezzi — CSV della Protezione
+    Civile, indicatori ISPRA IdroGEO, tabelle del foglio — con uno script che non usa il motore,
+    e con la scala decisa da Simone il 14/09/2026. Gli indicatori sono quelli del file per
+    Monticelli Brusati (BS), dove sta la sede di TRANSPECIAL.
+  */
+  const MONTICELLI_BRUSATI = {
+    idrA: 0.358,
+    idrM: 1.46,
+    impIdrA: 0.265,
+    impIdrM: 6.631,
+    frnA: 1.588,
+    impFrnA: 0,
+  };
   const sede: UbicazionePerProperty = {
     id: 'monticellibrusati|fornaci2022',
     etichetta: 'Sede legale — VIA FORNACI 20/22, MONTICELLI BRUSATI (BS)',
     tipo: 'sede-legale',
-    sismica: 'media',
-    idraulica: 'bassa',
-    frane: null,
+    zonaSismica: 3,
+    indicatoriIdrogeo: MONTICELLI_BRUSATI,
   };
 
-  it('TRANSPECIAL: attività 4, sito sul ripiego del foglio, pericoli naturali senza tabella → non calcolabile', () => {
+  it('TRANSPECIAL: attività 4, sito 4, pericoli 2,34 → 1,20 + 0,80 + 1,17 = 3,17', () => {
     const p = calcolaPropertyRisk('49', [sede]);
     const [attivita, sito, pericoli] = p.ubicazioni[0]!.voci;
     expect(attivita?.punteggio).toBe(4);
-    expect(attivita?.contributo).toBeCloseTo(1.2, 9);
+    expect(attivita?.contributo).toBe(1.2);
     expect(sito?.punteggio).toBe(4);
-    expect(sito?.contributo).toBeCloseTo(0.8, 9);
+    expect(sito?.contributo).toBe(0.8);
     expect(sito?.dettaglio).toContain('il foglio prescrive di usare il punteggio dell’attività');
-    expect(pericoli?.punteggio).toBeNull();
-    expect(pericoli?.dettaglio).toContain('frana non determinata');
-    expect(p.punteggio, 'il 50% mancante non si stima sulle altre due voci').toBeNull();
-    expect(p.note.join(' ')).toContain('Natural_Hazard_Risk');
+    // Alluvione bassa → 1, zona 3 → 3, frana bassa → 1: medio 1,67, 50% × 3 + 50% × 1,67 = 2,34.
+    expect(pericoli?.punteggio).toBe(2.34);
+    expect(pericoli?.contributo).toBe(1.17);
+    expect(pericoli?.dettaglio).toContain('Terremoto 3: zona sismica 3.');
+    expect(pericoli?.dettaglio).toContain('50% × 3 + 50% × 1,67 = 2,34');
+    expect(p.punteggio).toBe(3.17);
+    expect(p.motivoNonCalcolabile).toBeNull();
+    expect(p.ubicazioneDiRiferimento).toBe(sede.etichetta);
+  });
+
+  it('la scala dei pericoli è quella decisa: zone a gradini 1-3-5-7, livelli ISPRA 1-4-7', () => {
+    const conZona = (zonaSismica: 1 | 2 | 3 | 4) =>
+      calcolaPropertyRisk('49', [{ ...sede, zonaSismica }]).ubicazioni[0]!.voci[2]!.dettaglio;
+    expect(conZona(4)).toContain('Terremoto 1: zona sismica 4.');
+    expect(conZona(3)).toContain('Terremoto 3: zona sismica 3.');
+    expect(conZona(2)).toContain('Terremoto 5: zona sismica 2.');
+    expect(conZona(1)).toContain('Terremoto 7: zona sismica 1.');
+
+    // Ravenna: imprese 9,904% in pericolosità elevata e 99,767% in media → alluvione alta, 7.
+    const ravenna = { idrA: 30.099, idrM: 99.829, impIdrA: 9.904, impIdrM: 99.767, frnA: 0, impFrnA: 0 };
+    const [, , pericoli] = calcolaPropertyRisk('52', [{ ...sede, indicatoriIdrogeo: ravenna }])
+      .ubicazioni[0]!.voci;
+    expect(pericoli?.dettaglio).toContain(
+      'Alluvione 7: pericolosità idraulica alta nel comune secondo ISPRA',
+    );
+    // 50% × 7 + 50% × 3,67 = 5,34; il contributo 2,67.
+    expect(pericoli?.punteggio).toBe(5.34);
+    expect(pericoli?.contributo).toBe(2.67);
+
+    const frana = { ...MONTICELLI_BRUSATI, impFrnA: 12 };
+    expect(
+      calcolaPropertyRisk('49', [{ ...sede, indicatoriIdrogeo: frana }]).ubicazioni[0]!.voci[2]!.dettaglio,
+    ).toContain('Frana 7: pericolosità da frana alta');
+    expect(
+      calcolaPropertyRisk('49', [{ ...sede, indicatoriIdrogeo: { ...frana, impFrnA: 5 } }]).ubicazioni[0]!
+        .voci[2]!.dettaglio,
+    ).toContain('Frana 4: pericolosità da frana media');
+  });
+
+  it('senza un pericolo la voce non si calcola, e con lei il Property: nessuna stima dagli altri due', () => {
+    const senzaIspra = calcolaPropertyRisk('49', [{ ...sede, indicatoriIdrogeo: null }]);
+    const pericoli = senzaIspra.ubicazioni[0]!.voci[2]!;
+    expect(pericoli.punteggio).toBeNull();
+    expect(pericoli.contributo).toBeNull();
+    expect(pericoli.dettaglio).toContain('Alluvione e frana: il comune non è nell’archivio ISPRA IdroGEO');
+    expect(pericoli.dettaglio).toContain('Disponibile: terremoto 3 (zona sismica 3)');
+    expect(senzaIspra.punteggio).toBeNull();
+    expect(senzaIspra.motivoNonCalcolabile).toBe(
+      'Su nessuna ubicazione sono disponibili tutti e tre i pericoli naturali',
+    );
+
+    const senzaZona = calcolaPropertyRisk('49', [{ ...sede, zonaSismica: null }]);
+    expect(senzaZona.ubicazioni[0]!.voci[2]!.dettaglio).toContain(
+      'Terremoto: il comune non è nella classificazione sismica',
+    );
+    expect(senzaZona.punteggio).toBeNull();
+  });
+
+  it('vale l’ubicazione più esposta, fra quelle calcolabili', () => {
+    const magazzino: UbicazionePerProperty = {
+      ...sede,
+      id: 'm',
+      etichetta: 'Magazzino',
+      tipo: 'magazzino',
+    };
+    const ignota: UbicazionePerProperty = { ...sede, id: 'x', etichetta: 'Ignota', zonaSismica: null };
+    const p = calcolaPropertyRisk('49', [sede, magazzino, ignota]);
+    // Il magazzino vale 5 nel foglio: 1,20 + 1,00 + 1,17 = 3,37, più della sede legale.
+    expect(p.ubicazioni.map((u) => u.punteggio)).toEqual([3.17, 3.37, null]);
+    expect(p.punteggio).toBe(3.37);
+    expect(p.ubicazioneDiRiferimento).toBe('Magazzino');
+  });
+
+  it('la scala sta scritta in chiaro accanto alle formule, e la nota dice perché non viene dal foglio', () => {
+    const p = calcolaPropertyRisk('49', [sede]);
+    expect(p.scalaPericoliNaturali).toBe(
+      'Punteggi dei pericoli: terremoto per zona sismica 4 → 1, 3 → 3, 2 → 5, 1 → 7; ' +
+        'alluvione e frana, pericolosità ISPRA del comune: bassa → 1, media → 4, alta → 7',
+    );
+    const note = p.note.join(' ');
+    expect(note).toContain('Natural_Hazard_Risk');
+    expect(note).toContain('decisione del 14/09/2026');
+    expect(note).toContain('non della singola sede');
   });
 
   it('il tipo di sito viene dal foglio dove il registro lo dice', () => {
@@ -133,13 +225,23 @@ describe('Property Risk', () => {
     expect(tipoDiSitoDelFoglio(null)).toBeNull();
   });
 
-  it('la formula dei pericoli naturali è quella scritta: metà il massimo, metà la media dei tre', () => {
-    expect(pericoliNaturali(6, 2, 3)).toBeCloseTo(0.5 * 6 + 0.5 * (11 / 3), 9);
+  it('la formula dei pericoli naturali è quella scritta, con il medio al centesimo come si stampa', () => {
+    /*
+      Con i numeri dell'esempio del foglio: medio (6 + 2 + 3) ÷ 3 = 3,67, poi 50% × 6 + 50% × 3,67
+      = 4,84. Il medio esatto darebbe 4,83, che non torna con il 3,67 stampato accanto. Con la media
+      dei due più bassi, come nella cella del foglio, sarebbe 4,25: Simone ha scelto la formula scritta.
+    */
+    expect(pericoliNaturali(6, 2, 3)).toEqual({ massimo: 6, medio: 3.67, punteggio: 4.84 });
   });
 
-  it('senza ATECO nessuna voce prende un punteggio', () => {
+  it('senza ATECO attività e sito non prendono un punteggio, e il Property non si calcola', () => {
     const p = calcolaPropertyRisk(null, [sede]);
-    expect(p.ubicazioni[0]!.voci.map((v) => v.punteggio)).toEqual([null, null, null]);
+    // I pericoli naturali non dipendono dall'attività: si calcolano e si mostrano lo stesso.
+    expect(p.ubicazioni[0]!.voci.map((v) => v.punteggio)).toEqual([null, null, 2.34]);
+    expect(p.punteggio).toBeNull();
+    expect(p.motivoNonCalcolabile).toBe(
+      'Senza la divisione ATECO nella tabella del foglio manca il rischio dell’attività',
+    );
   });
 
   it('la formula porta i pesi del foglio', () => {
@@ -208,5 +310,17 @@ describe('Nell’analisi', () => {
     expect(a.protezioni.cyber.punteggio).toBe(3.4);
     expect(a.protezioni.property.ubicazioni).toHaveLength(a.ubicazioni.ubicazioni.length);
     expect(a.protezioni.businessInterruption.perditaGiornaliera).not.toBeNull();
+  });
+
+  it('il Property dell’impresa dimostrativa torna con il conto fatto a mano sui dati grezzi', () => {
+    /*
+      Adro (BS) e il magazzino di Erbusco (BS): zona 3, alluvione e frana basse negli indicatori
+      ISPRA, divisione 25 con attività 6. Sede legale 1,80 + 1,20 + 1,17 = 4,17; magazzino
+      1,80 + 1,00 + 1,17 = 3,97. Vale la più esposta.
+    */
+    const a = analyzeCompany(demoCompanyProfile(), [], DEMO_AS_OF);
+    expect([...a.protezioni.property.ubicazioni.map((u) => u.punteggio)].sort()).toEqual([3.97, 4.17]);
+    expect(a.protezioni.property.punteggio).toBe(4.17);
+    expect(a.protezioni.businessInterruption.punteggioFisico).toBe(4.17);
   });
 });

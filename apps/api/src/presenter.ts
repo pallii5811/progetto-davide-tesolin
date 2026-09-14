@@ -765,9 +765,11 @@ function presentProtezioni(analisi: CompanyAnalysis) {
     property: {
       formula: property.formula,
       formulaPericoliNaturali: property.formulaPericoliNaturali,
+      scalaPericoliNaturali: property.scalaPericoliNaturali,
       divisioneAteco: property.divisioneAteco,
       titoloDivisione: property.titoloDivisione,
       punteggio: property.punteggio,
+      motivoNonCalcolabile: property.motivoNonCalcolabile,
       ubicazioneDiRiferimento: property.ubicazioneDiRiferimento,
       ubicazioni: property.ubicazioni.map((u) => ({
         id: u.id,
