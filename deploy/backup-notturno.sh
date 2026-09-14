@@ -35,8 +35,8 @@
 # incompleto si perderebbe anche ciò che restava. Il confronto si fa dopo, a mente fredda.
 #
 # Cosa NON fa, e va detto: non copia il file fuori dalla macchina. Un disco che muore
-# porta via anche i backup. La copia altrove — un secondo server, uno storage box, un
-# bucket — richiede una destinazione e una credenziale che solo il proprietario può dare;
+# porta via anche i backup. La copia fuori la fa, dal 14/09/2026, il PC di Simone:
+# deploy/copia-backup-sul-pc.ps1, ogni ora, con l'impronta confrontata a quella di qui;
 # deploy/LEGGIMI.md § limiti lo dichiara.
 #
 set -euo pipefail

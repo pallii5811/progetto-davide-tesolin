@@ -185,7 +185,8 @@ journalctl -u aegis-web -n 50 --no-pager
 
 Detto qui perché non venga scoperto dopo.
 
-- **Il backup è notturno ma resta sulla macchina.** Ogni notte alle 03:15
+- **Il backup è notturno, e dal 14/09/2026 ha una copia fuori dalla macchina: sul PC di
+  Simone.** Ogni notte alle 03:15
   `deploy/backup-notturno.sh` (installato in `/etc/cron.d/aegis-backup` da `aggiorna.sh`)
   scrive `pg_dump -Fc` in `/opt/aegis/backups/` come utente `postgres` — le policy di Row
   Level Security valgono anche per il proprietario, e il dump come `aegis` si fermava su
@@ -193,10 +194,12 @@ Detto qui perché non venga scoperto dopo.
   gli dà il nome definitivo solo dopo, e tiene gli ultimi 14; esito in
   `/var/log/aegis-backup.log`. Si controlla così, e il numero deve crescere con i dati:
   `sudo ls -la /opt/aegis/backups/` (02/09: 113.318 byte; 07/09: 132.100). Un disco che
-  muore porta via anche i
-  backup: la copia fuori dalla macchina — secondo server, storage box, bucket — richiede
-  una destinazione e una credenziale che solo il proprietario può dare, e va aggiunta
-  prima di caricarci il portafoglio di un cliente vero.
+  muore porta via anche i backup, e per questo `deploy/copia-backup-sul-pc.ps1` gira ogni
+  ora sul PC di Simone (attività pianificata «AEGIS - copia backup»): scarica in
+  `%USERPROFILE%\Backup-AEGIS` i dump che mancano, li tiene solo se l'impronta SHA-256 è
+  uguale a quella del server, ne conserva 90 e scrive `ATTENZIONE-BACKUP-VECCHIO.txt` se
+  l'ultimo ha più di 48 ore. Limite dichiarato: con il PC spento le copie arrivano alla
+  riaccensione, e il server tiene solo gli ultimi 14 giorni.
 - **Nessun monitoraggio esterno.** Se il servizio cade alle tre di notte, lo si scopre la
   mattina.
 - **Le fonti territoriali, una per una.** La classificazione sismica è un dataset locale
