@@ -15,8 +15,9 @@ export default async function PaginaAccesso({
   const { ritorno } = await searchParams;
 
   // Chi è già dentro non deve vedere la schermata di accesso: sarebbe solo un vicolo cieco.
-  if (!(await autenticazioneRichiesta())) redirect('/');
-  if ((await utenteCorrente()).autenticato) redirect('/');
+  // A «Nuovi clienti» direttamente: «/» rinvia lì, e un rinvio in più è un passaggio che può fermarsi.
+  if (!(await autenticazioneRichiesta())) redirect('/prospect');
+  if ((await utenteCorrente()).autenticato) redirect('/prospect');
 
   return (
     <div className="mx-auto max-w-sm py-12">

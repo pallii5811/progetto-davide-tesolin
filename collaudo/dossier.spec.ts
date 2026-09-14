@@ -27,6 +27,14 @@ test.describe('Dossier: dati raccolti in intervista', () => {
     await dipendenti.fill('47');
 
     await page.getByRole('button', { name: /salva/i }).click();
+    /*
+      Si aspetta la conferma prima di ricaricare. Il clic avvia il salvataggio e torna subito:
+      ricaricando senza aspettare, su una macchina lenta la pagina arrivava prima della scrittura e
+      il campo tornava al valore di prima. Il 14/09/2026 questo collaudo è diventato rosso così,
+      senza nessun difetto nel salvataggio. La conferma è anche una verifica in più: compare solo
+      se il servizio ha risposto che i dati sono stati scritti.
+    */
+    await expect(page.getByText('Dati salvati. L’analisi è stata aggiornata.')).toBeVisible();
 
     // Il ricaricamento è il punto: rilegge dal database, non dallo stato del browser.
     await page.reload();
@@ -41,6 +49,7 @@ test.describe('Dossier: dati raccolti in intervista', () => {
     const dipendenti = page.getByLabel('Dipendenti', { exact: false }).first();
     await dipendenti.fill('180');
     await page.getByRole('button', { name: /salva/i }).click();
+    await expect(page.getByText('Dati salvati. L’analisi è stata aggiornata.')).toBeVisible();
     await page.reload();
 
     // Un dossier che si salva ma non cambia nulla a valle sarebbe un archivio, non uno
@@ -64,6 +73,7 @@ test.describe('Dossier: dati raccolti in intervista', () => {
 
     await page.getByLabel('Dipendenti', { exact: false }).first().fill('47');
     await page.getByRole('button', { name: /salva/i }).click();
+    await expect(page.getByText('Dati salvati. L’analisi è stata aggiornata.')).toBeVisible();
     await page.reload();
 
     expect(await percentuale()).toBeGreaterThanOrEqual(prima);

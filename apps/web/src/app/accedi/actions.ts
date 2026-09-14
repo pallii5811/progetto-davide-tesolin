@@ -68,7 +68,12 @@ export async function accedi(_precedente: EsitoAccesso | null, modulo: FormData)
 
   // Solo percorsi interni: un `ritorno` verso un altro dominio trasformerebbe la pagina
   // di accesso in un trampolino per rinvii verso siti di terzi.
-  redirect(ritorno.startsWith('/') && !ritorno.startsWith('//') ? ritorno : '/');
+  /*
+    Senza pagina di ritorno si va a «Nuovi clienti», direttamente. «/» esiste ancora ma dal
+    13/09/2026 rinvia lì: passarci dentro l'azione di accesso faceva due rinvii di fila, e il
+    14/09/2026 il collaudo dell'uscita è rimasto fermo su «/» per novanta secondi.
+  */
+  redirect(ritorno.startsWith('/') && !ritorno.startsWith('//') ? ritorno : '/prospect');
 }
 
 export async function esci(): Promise<void> {
