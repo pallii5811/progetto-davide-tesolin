@@ -102,34 +102,51 @@ export function ImmaginiUbicazione({
     });
   }
 
+  /*
+    Chiusa finché non serve, e aperta se qualcosa c'è già.
+
+    Su un'impresa con ventitré unità locali questa parte disegnava ventitré riquadri di
+    caricamento uno sotto l'altro, in mezzo all'analisi: Simone, il 18/09/2026, «qua cos'è sta
+    cosa di caricare i file non si capisce». Non è un difetto di spiegazione ma di ingombro —
+    un modulo lungo quanto una pagina, per una cosa facoltativa che quasi sempre si fa dopo il
+    sopralluogo. Il titolo dice cosa c'è dentro e a cosa serve; il resto si apre con un clic.
+  */
   return (
-    <div className="mt-4 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold">Fotografie delle ubicazioni</h3>
-        <p className="mt-0.5 text-xs leading-relaxed text-testo-tenue">
-          Struttura, copertura, vicinanze, ordine del piazzale: quello che un assuntore incendio chiede e
-          che nessun questionario riesce a descrivere. Compaiono nel report, accanto alla propria
-          ubicazione. Massimo {MAX_PER_UBICAZIONE} per ubicazione, {LIMITE_BYTE / (1024 * 1024)} MB
-          ciascuna.
-        </p>
+    <details open={immagini.length > 0} className="mt-4 rounded-lg border border-bordo p-3">
+      <summary className="cursor-pointer text-sm font-semibold">
+        Fotografie delle sedi{' '}
+        <span className="font-normal text-testo-tenue">
+          {immagini.length === 0
+            ? '— facoltative, da aggiungere dopo il sopralluogo'
+            : `— ${immagini.length} caricat${immagini.length === 1 ? 'a' : 'e'}`}
+        </span>
+      </summary>
+
+      <p className="mt-2 text-xs leading-relaxed text-testo-tenue">
+        Struttura, copertura, vicinanze, ordine del piazzale: quello che un assuntore incendio chiede e che
+        nessun questionario riesce a descrivere. Si caricano una sede alla volta e compaiono nel report,
+        accanto alla propria ubicazione. Massimo {MAX_PER_UBICAZIONE} per ubicazione,{' '}
+        {LIMITE_BYTE / (1024 * 1024)} MB ciascuna.
+      </p>
+
+      {errore !== null && <p className="mt-2 text-sm text-critico">{errore}</p>}
+
+      <div className="mt-3 space-y-4">
+        {ubicazioni.map((u) => {
+          const sue = immagini.filter((i) => i.ubicazioneId === u.id);
+          return (
+            <Blocco
+              key={u.id}
+              ubicazione={u}
+              immagini={sue}
+              inCorso={inCorso}
+              onCarica={carica}
+              onRimuovi={rimuovi}
+            />
+          );
+        })}
       </div>
-
-      {errore !== null && <p className="text-sm text-critico">{errore}</p>}
-
-      {ubicazioni.map((u) => {
-        const sue = immagini.filter((i) => i.ubicazioneId === u.id);
-        return (
-          <Blocco
-            key={u.id}
-            ubicazione={u}
-            immagini={sue}
-            inCorso={inCorso}
-            onCarica={carica}
-            onRimuovi={rimuovi}
-          />
-        );
-      })}
-    </div>
+    </details>
   );
 }
 

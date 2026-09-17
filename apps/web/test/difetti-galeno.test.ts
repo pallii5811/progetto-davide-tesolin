@@ -79,8 +79,17 @@ describe('Le ubicazioni: quale riga è quale, e le due quote dell’alluvione', 
   });
 
   it('la scheda stampa le etichette e, per l’alluvione, anche la quota media', () => {
+    /*
+      Dal 18/09/2026 le righe del riquadro incendio passano da `righeDeiComplessi`: i complessi
+      veri restano distesi, i solitari si uniscono per motivo — su un'impresa con ventitré unità
+      locali erano ventitré righe con la stessa frase. Le etichette si compongono sempre da
+      `etichetteDelGruppo`, che è ciò che questo controllo presidia: nessuna riga deve tornare a
+      nominare le ubicazioni per conto proprio.
+    */
     const pagina = leggi('app/azienda/[id]/page.tsx');
-    expect(pagina).toContain('etichetteDelGruppo(c.ubicazioni, ubicazioni.elenco).map(');
+    expect(pagina).toContain('righeDeiComplessi(ubicazioni.complessiIncendio, ubicazioni.elenco)');
+    expect(pagina).toContain('etichette: etichetteDelGruppo(c.ubicazioni, elenco)');
+    expect(pagina).toContain('<ElencoUbicazioni etichette={riga.etichette} />');
     expect(pagina).toContain('u.indicatoriIdrogeo.impreseIdraulicaMedia');
   });
 });

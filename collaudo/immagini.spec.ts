@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { accedi, AZIENDA_DI_PROVA, sorvegliaErrori } from './aiuti.js';
 
 /**
@@ -27,6 +28,24 @@ const PNG_ROSSO = Buffer.from(
 
 const DIDASCALIA = 'Prospetto nord, copertura in pannello sandwich';
 
+/**
+ * Apre la parte delle fotografie, che dal 18/09/2026 è chiusa finché non c'è niente dentro.
+ *
+ * Su un'impresa con ventitré unità locali erano ventitré riquadri di caricamento aperti in mezzo
+ * all'analisi. Il clic si dà solo se è chiusa: darlo sempre la richiuderebbe quando una
+ * fotografia c'è già, ed è proprio il caso del secondo giro di questo collaudo.
+ */
+async function apriLeFotografie(page: Page): Promise<void> {
+  const titolo = page.getByText('Fotografie delle sedi');
+  await expect(titolo).toBeVisible({ timeout: 90_000 });
+
+  const dettagli = page.locator('details').filter({ has: titolo });
+  if (!(await dettagli.evaluate((e) => (e as HTMLDetailsElement).open))) {
+    await titolo.click();
+  }
+  await expect(page.getByPlaceholder('Didascalia — cosa mostra').first()).toBeVisible();
+}
+
 test.describe('Fotografie delle ubicazioni', () => {
   test.beforeEach(async ({ page }) => {
     await accedi(page);
@@ -38,8 +57,7 @@ test.describe('Fotografie delle ubicazioni', () => {
 
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
 
-    const sezione = page.getByText('Fotografie delle ubicazioni');
-    await expect(sezione).toBeVisible({ timeout: 90_000 });
+    await apriLeFotografie(page);
 
     // La prima ubicazione: la didascalia e il campo file sono nel suo blocco.
     await page.getByPlaceholder('Didascalia — cosa mostra').first().fill(DIDASCALIA);
@@ -95,7 +113,7 @@ test.describe('Fotografie delle ubicazioni', () => {
     test.setTimeout(120_000);
 
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
-    await expect(page.getByText('Fotografie delle ubicazioni')).toBeVisible({ timeout: 90_000 });
+    await apriLeFotografie(page);
 
     await page
       .locator('input[type="file"]')

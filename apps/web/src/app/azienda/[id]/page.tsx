@@ -155,40 +155,8 @@ export default async function PaginaAzienda({
       {/* ── Le tre protezioni del foglio Veezco ────────────────────────────── */}
       <RiquadriProtezioni protezioni={analisi.protezioni} />
 
-      {/*
-        Gli indicatori dell'archivio camerale.
-
-        Stanno **prima** delle ubicazioni e dopo il credito perché è lì che se ne ha
-        bisogno: chi ha appena letto il punteggio vuole sapere se i conti dell'archivio
-        raccontano la stessa storia, e le qualifiche — export, SOA, gare — dicono quali
-        coperture cercare prima ancora di guardare dove sta l'azienda.
-
-        La sezione non compare quando il profilo completo non è stato acquistato: venti
-        trattini comunicherebbero «il software non funziona» invece di «questo servizio
-        non è stato chiesto».
-      */}
-      {/*
-        Su quali dati poggia questa analisi, e cosa manca.
-
-        Il prodotto lo sapeva già — `livelloDatiEconomici` e `arricchimentiPossibili` sono
-        nel DTO da sempre — e non lo diceva a nessuna pagina. Chi apre un'impresa vera
-        legge «non determinabile» accanto a quattro capitali senza sapere perché né cosa
-        farci: l'anagrafica estesa porta gli aggregati sintetici ma non lo schema CEE, e da
-        quello dipendono margine di contribuzione, danni indiretti, indici di liquidità e
-        Altman.
-
-        Un vuoto dichiarato con accanto ciò che lo chiude è una vendita; un vuoto muto è un
-        difetto del software — ed è il modo più rapido di far credere che il dato non
-        esista invece che non sia stato chiesto.
-      */}
-      <LivelloDeiDati analisi={analisi} />
-
-      {/* ── Record camerale ──────────────────────────────────────────────── */}
-      <RecordCamerale registro={analisi.registro} fonte={analisi.azienda.fonte} />
-
-      {haIndicatoriArchivio(analisi.indicatoriArchivio) && (
-        <IndicatoriArchivio dati={analisi.indicatoriArchivio} approfondita={approfonditaMostrata} />
-      )}
+      {/* ── Property, Business Interruption e Cyber Risk ──────────────────── */}
+      <SezioniProtezioni protezioni={analisi.protezioni} />
 
       {/* ── Ubicazioni e rischio territoriale ─────────────────────────────── */}
       <Sezione
@@ -208,6 +176,22 @@ export default async function PaginaAzienda({
           </Scheda>
         ) : (
           <>
+            {/*
+              Che cosa sono questi indirizzi, detto prima della tabella.
+
+              Su un'impresa con ventitré unità locali la sezione si apriva con un elenco di vie
+              senza dire di chi fossero né perché fossero lì: Simone, il 18/09/2026, «che
+              indirizzi sono, a cosa si riferiscono». Sono i luoghi che il registro attribuisce
+              a questa impresa, ed è la base su cui il Property Risk sceglie l'ubicazione più
+              esposta — quindi vanno nominati, non elencati.
+            */}
+            <p className="mb-3 max-w-3xl text-sm text-testo-tenue">
+              Gli indirizzi che il Registro Imprese riporta per questa impresa: la sede legale e le unità
+              locali, più quelli rilevati in intervista. Per ciascuno, quanto rischia il territorio del suo{' '}
+              <strong>comune</strong> — terremoto, alluvione e frana, dalle classificazioni ufficiali — e
+              non il singolo edificio: dove la decisione pesa, la verifica sull’indirizzo resta da fare.
+            </p>
+
             {/*
               `overflow-x-auto` e non `overflow-hidden`: misurata a 390 pixel, questa
               tabella arriva a 429 e con `hidden` le ultime colonne venivano **tagliate
@@ -304,26 +288,51 @@ export default async function PaginaAzienda({
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 <Scheda>
                   <h3 className="mb-2 text-sm font-semibold">Un solo incendio, cosa raggiunge</h3>
+                  <p className="mb-2 text-xs text-testo-debole">
+                    Quali ubicazioni un incendio può raggiungere insieme, e quindi con quali capitali si
+                    somma il danno.
+                  </p>
                   <ul className="space-y-2 text-sm text-testo-tenue">
-                    {ubicazioni.complessiIncendio.map((c) => (
-                      <li key={c.ubicazioni.join('|')}>
-                        {/* Un'ubicazione per riga, e il motivo sotto: vedi etichette-ubicazioni.ts. */}
-                        {etichetteDelGruppo(c.ubicazioni, ubicazioni.elenco).map((etichetta) => (
-                          <span key={etichetta} className="block font-medium text-testo">
-                            {etichetta}
-                          </span>
-                        ))}
-                        <span className="block">{c.motivo}</span>
+                    {righeDeiComplessi(ubicazioni.complessiIncendio, ubicazioni.elenco).map((riga) => (
+                      <li key={riga.chiave}>
+                        <ElencoUbicazioni etichette={riga.etichette} />
+                        <span className="block">{riga.motivo}</span>
                       </li>
                     ))}
                   </ul>
                 </Scheda>
                 <Scheda>
                   <h3 className="mb-2 text-sm font-semibold">Un solo sisma o alluvione, cosa raggiunge</h3>
+                  <p className="mb-2 text-xs text-testo-debole">
+                    Un terremoto o un’alluvione prendono il territorio: qui contano i comuni, non la
+                    distanza fra i capannoni.
+                  </p>
                   <ul className="space-y-2 text-sm text-testo-tenue">
-                    {ubicazioni.aggregatiTerritoriali.map((c) => (
-                      <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
-                    ))}
+                    {ubicazioni.aggregatiTerritoriali
+                      .filter((c) => c.ubicazioni.length > 1)
+                      .map((c) => (
+                        <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
+                      ))}
+                    {/*
+                      I comuni con una sola ubicazione stavano uno per riga: su questa impresa
+                      erano sedici righe che dicevano la stessa cosa — «Unica ubicazione nel comune
+                      di X» — e sommergevano le tre che contano, cioè i comuni dove le ubicazioni
+                      sono più d'una. Qui diventano una riga, con i comuni dentro.
+                    */}
+                    {comuniConUnaSolaUbicazione(ubicazioni.aggregatiTerritoriali, ubicazioni.elenco)
+                      .length > 0 && (
+                      <li>
+                        <span className="block font-medium text-testo">Una sola ubicazione nel comune</span>
+                        <span className="block">
+                          Un sisma o un’alluvione la colpisce da sola:{' '}
+                          {comuniConUnaSolaUbicazione(
+                            ubicazioni.aggregatiTerritoriali,
+                            ubicazioni.elenco,
+                          ).join(', ')}
+                          .
+                        </span>
+                      </li>
+                    )}
                   </ul>
                 </Scheda>
               </div>
@@ -354,6 +363,147 @@ export default async function PaginaAzienda({
           </>
         )}
       </Sezione>
+
+      {/* ── Merito creditizio ─────────────────────────────────────────────── */}
+      <Sezione
+        id="credito"
+        titolo="Merito creditizio"
+        /*
+          Il compilatore non protegge questa riga: un template literal accetta `null` e
+          scrive «Score null/100» senza che niente si accorga. Le uniche due occorrenze
+          rimaste di questo difetto — qui e nel fascicolo per il cliente — sono state
+          trovate rileggendo a mano ogni uso dei campi diventati annullabili, non dal
+          typecheck.
+        */
+        sottotitolo={
+          analisi.credito.score === null
+            ? 'Punteggio non determinabile sui dati disponibili'
+            : `Score ${analisi.credito.score}/100 · classe ${analisi.credito.classe}${
+                analisi.credito.altman === null
+                  ? ''
+                  : ` · Altman Z'' ${numeroIt(analisi.credito.altman.z, 2)} (${analisi.credito.altman.zona})`
+              }`
+        }
+      >
+        {analisi.credito.limitazione !== null && (
+          <div className="mb-4">
+            <Avviso tono="critico" titolo="Punteggio limitato dall’alto">
+              {analisi.credito.limitazione}
+            </Avviso>
+          </div>
+        )}
+
+        <div className="mb-4 space-y-2">
+          {analisi.credito.fattori.map((fattore) => (
+            <Scheda key={fattore.chiave}>
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-sm font-medium">{fattore.etichetta}</p>
+                <p className="tabular text-sm text-testo-tenue">
+                  peso {(fattore.peso * 100).toFixed(0)}% ·{' '}
+                  <span className="font-semibold text-testo">
+                    {/*
+                      «n.d.» accanto a «peso 20%» somiglia a un guasto. Questo fattore non è
+                      mancante: è **non calcolabile** con i dati che l'impresa ha depositato,
+                      e la riga sotto dice quale dato serve. Un punteggio che non c'è va
+                      nominato per quello che è.
+                    */}
+                    {fattore.punteggio === null ? 'non valutabile' : `${Math.round(fattore.punteggio)}/100`}
+                  </span>
+                </p>
+              </div>
+
+              {/*
+                Il colore della barra dice il punteggio, non il marchio.
+
+                Era `bg-marchio` sempre: «Liquidità 57/100» e «Eventi negativi 97/100»
+                uscivano dello stesso identico blu, e il colore non portava alcuna
+                informazione — contro il principio scritto in cima al foglio di stile,
+                dove si dice che il colore serve solo dove informa.
+
+                Sette barre tutte uguali si leggono una per una; sette barre che virano
+                dal verde all'arancione si leggono di sguardo, ed è quello che serve a chi
+                apre venti schede al giorno. La lunghezza resta l'informazione principale:
+                il colore la raddoppia, non la sostituisce, così chi non distingue i colori
+                non perde nulla.
+              */}
+              {fattore.punteggio !== null && (
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bordo">
+                  <div
+                    className={`h-full rounded-full ${coloreDelPunteggio(fattore.punteggio)}`}
+                    style={{ width: `${Math.round(fattore.punteggio)}%` }}
+                  />
+                </div>
+              )}
+
+              <p className="mt-2 text-sm text-testo-tenue">{fattore.motivazione}</p>
+              {fattore.dettagli.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-xs text-testo-debole">
+                  {fattore.dettagli.map((dettaglio) => (
+                    <li key={dettaglio}>· {dettaglio}</li>
+                  ))}
+                </ul>
+              )}
+            </Scheda>
+          ))}
+        </div>
+
+        <Scheda>
+          <p className="text-sm font-medium">Fido commerciale consigliato</p>
+          {/* La spiegazione sotto dice già perché non c'è: qui basta non stampare una
+              cifra. «0 €» in questo punto verrebbe letto come «non concedere credito». */}
+          <p className="tabular mt-1 text-2xl font-semibold">
+            {analisi.credito.fido.importo?.formattato ?? 'Non determinabile'}
+          </p>
+          <Spiegazione dati={analisi.credito.fido.spiegazione} aperta />
+        </Scheda>
+      </Sezione>
+
+      {/* ── Eventi negativi ───────────────────────────────────────────────── */}
+      <EventiNegativi eventi={analisi.eventiNegativi} />
+
+      {/*
+        Su quali dati poggia questa analisi, e cosa manca.
+
+        Chiude la parte di analisi, e non la apre: è la nota che dice quali voci restano
+        non determinabili e come si chiudono. In cima alla pagina rubava lo spazio ai
+        numeri; qui la legge chi ha appena visto un «non determinabile» e vuole sapere
+        perché.
+
+        Il prodotto lo sapeva già — `livelloDatiEconomici` e `arricchimentiPossibili` sono
+        nel DTO da sempre — e non lo diceva a nessuna pagina. Chi apre un'impresa vera
+        legge «non determinabile» accanto a quattro capitali senza sapere perché né cosa
+        farci: l'anagrafica estesa porta gli aggregati sintetici ma non lo schema CEE, e da
+        quello dipendono margine di contribuzione, danni indiretti, indici di liquidità e
+        Altman.
+
+        Un vuoto dichiarato con accanto ciò che lo chiude è una vendita; un vuoto muto è un
+        difetto del software — ed è il modo più rapido di far credere che il dato non
+        esista invece che non sia stato chiesto.
+      */}
+      <LivelloDeiDati analisi={analisi} />
+
+      {/*
+        Da qui in giù il profilo dell'impresa, non l'analisi.
+
+        Fino al 18/09/2026 il record camerale apriva la pagina: chi la mostrava a un cliente
+        cominciava da forma giuridica, numero REA e capitale sociale — dati che il cliente ha già —
+        e arrivava ai rischi dopo due schermate. Simone l'ha voluto al contrario: prima quello che
+        l'analisi produce, poi i dati da cui è stata prodotta.
+      */}
+      <div id="profilo" className="mt-12 border-t border-bordo pt-8">
+        <h2 className="text-lg font-semibold tracking-tight">Profilo dell&apos;impresa</h2>
+        <p className="mt-1 max-w-3xl text-sm text-testo-debole">
+          I dati del Registro Imprese su cui poggia l&apos;analisi qui sopra: il record camerale, gli
+          indicatori dell&apos;archivio, l&apos;assetto proprietario e il bilancio.
+        </p>
+      </div>
+
+      {/* ── Record camerale ──────────────────────────────────────────────── */}
+      <RecordCamerale registro={analisi.registro} fonte={analisi.azienda.fonte} />
+
+      {haIndicatoriArchivio(analisi.indicatoriArchivio) && (
+        <IndicatoriArchivio dati={analisi.indicatoriArchivio} approfondita={approfonditaMostrata} />
+      )}
 
       {/* ── Assetto proprietario e gruppo ─────────────────────────────────── */}
       <Sezione
@@ -703,106 +853,6 @@ export default async function PaginaAzienda({
         )}
       </Sezione>
 
-      {/* ── Property, Business Interruption e Cyber Risk ──────────────────── */}
-      <SezioniProtezioni protezioni={analisi.protezioni} />
-
-      {/* ── Merito creditizio ─────────────────────────────────────────────── */}
-      <Sezione
-        id="credito"
-        titolo="Merito creditizio"
-        /*
-          Il compilatore non protegge questa riga: un template literal accetta `null` e
-          scrive «Score null/100» senza che niente si accorga. Le uniche due occorrenze
-          rimaste di questo difetto — qui e nel fascicolo per il cliente — sono state
-          trovate rileggendo a mano ogni uso dei campi diventati annullabili, non dal
-          typecheck.
-        */
-        sottotitolo={
-          analisi.credito.score === null
-            ? 'Punteggio non determinabile sui dati disponibili'
-            : `Score ${analisi.credito.score}/100 · classe ${analisi.credito.classe}${
-                analisi.credito.altman === null
-                  ? ''
-                  : ` · Altman Z'' ${numeroIt(analisi.credito.altman.z, 2)} (${analisi.credito.altman.zona})`
-              }`
-        }
-      >
-        {analisi.credito.limitazione !== null && (
-          <div className="mb-4">
-            <Avviso tono="critico" titolo="Punteggio limitato dall’alto">
-              {analisi.credito.limitazione}
-            </Avviso>
-          </div>
-        )}
-
-        <div className="mb-4 space-y-2">
-          {analisi.credito.fattori.map((fattore) => (
-            <Scheda key={fattore.chiave}>
-              <div className="flex items-baseline justify-between gap-4">
-                <p className="text-sm font-medium">{fattore.etichetta}</p>
-                <p className="tabular text-sm text-testo-tenue">
-                  peso {(fattore.peso * 100).toFixed(0)}% ·{' '}
-                  <span className="font-semibold text-testo">
-                    {/*
-                      «n.d.» accanto a «peso 20%» somiglia a un guasto. Questo fattore non è
-                      mancante: è **non calcolabile** con i dati che l'impresa ha depositato,
-                      e la riga sotto dice quale dato serve. Un punteggio che non c'è va
-                      nominato per quello che è.
-                    */}
-                    {fattore.punteggio === null ? 'non valutabile' : `${Math.round(fattore.punteggio)}/100`}
-                  </span>
-                </p>
-              </div>
-
-              {/*
-                Il colore della barra dice il punteggio, non il marchio.
-
-                Era `bg-marchio` sempre: «Liquidità 57/100» e «Eventi negativi 97/100»
-                uscivano dello stesso identico blu, e il colore non portava alcuna
-                informazione — contro il principio scritto in cima al foglio di stile,
-                dove si dice che il colore serve solo dove informa.
-
-                Sette barre tutte uguali si leggono una per una; sette barre che virano
-                dal verde all'arancione si leggono di sguardo, ed è quello che serve a chi
-                apre venti schede al giorno. La lunghezza resta l'informazione principale:
-                il colore la raddoppia, non la sostituisce, così chi non distingue i colori
-                non perde nulla.
-              */}
-              {fattore.punteggio !== null && (
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bordo">
-                  <div
-                    className={`h-full rounded-full ${coloreDelPunteggio(fattore.punteggio)}`}
-                    style={{ width: `${Math.round(fattore.punteggio)}%` }}
-                  />
-                </div>
-              )}
-
-              <p className="mt-2 text-sm text-testo-tenue">{fattore.motivazione}</p>
-              {fattore.dettagli.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-xs text-testo-debole">
-                  {fattore.dettagli.map((dettaglio) => (
-                    <li key={dettaglio}>· {dettaglio}</li>
-                  ))}
-                </ul>
-              )}
-            </Scheda>
-          ))}
-        </div>
-
-        <Scheda>
-          <p className="text-sm font-medium">Fido commerciale consigliato</p>
-          {/* La spiegazione sotto dice già perché non c'è: qui basta non stampare una
-              cifra. «0 €» in questo punto verrebbe letto come «non concedere credito». */}
-          <p className="tabular mt-1 text-2xl font-semibold">
-            {analisi.credito.fido.importo?.formattato ?? 'Non determinabile'}
-          </p>
-          <Spiegazione dati={analisi.credito.fido.spiegazione} aperta />
-        </Scheda>
-      </Sezione>
-
-      {/* ── Eventi negativi ───────────────────────────────────────────────── */}
-      <EventiNegativi eventi={analisi.eventiNegativi} />
-
       {/* ── Bilancio ──────────────────────────────────────────────────────── */}
       {analisi.bilancio !== null && (
         <Sezione
@@ -854,6 +904,88 @@ export default async function PaginaAzienda({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+type ElencoUbicazioniDto = AnalisiDto['ubicazioni']['elenco'];
+type Complesso = { readonly ubicazioni: string[]; readonly motivo: string };
+
+/**
+ * Le righe del riquadro «un solo incendio»: i complessi veri distesi, i solitari raggruppati.
+ *
+ * Un'impresa con ventitré unità locali senza coordinate produceva ventitré righe con lo stesso
+ * identico motivo — «l'ubicazione è contata come complesso a sé per ipotesi prudenziale» — e chi
+ * leggeva non trovava più le due o tre righe che dicono qualcosa, cioè i capannoni che un
+ * incendio può prendere insieme. Quelli restano uno per riga; i solitari si uniscono per motivo,
+ * perché è il motivo l'informazione, non l'elenco.
+ */
+function righeDeiComplessi(
+  complessi: readonly Complesso[],
+  elenco: ElencoUbicazioniDto,
+): { chiave: string; etichette: readonly string[]; motivo: string }[] {
+  const insieme = complessi
+    .filter((c) => c.ubicazioni.length > 1)
+    .map((c) => ({
+      chiave: c.ubicazioni.join('|'),
+      etichette: etichetteDelGruppo(c.ubicazioni, elenco),
+      motivo: c.motivo,
+    }));
+
+  const soli = new Map<string, string[]>();
+  for (const c of complessi.filter((x) => x.ubicazioni.length === 1)) {
+    soli.set(c.motivo, [...(soli.get(c.motivo) ?? []), ...etichetteDelGruppo(c.ubicazioni, elenco)]);
+  }
+
+  return [
+    ...insieme,
+    ...[...soli].map(([motivo, etichette]) => ({ chiave: `soli:${motivo}`, etichette, motivo })),
+  ];
+}
+
+/**
+ * I comuni dove l'impresa ha una sola ubicazione, in ordine e senza ripetizioni.
+ *
+ * Si ricavano dalle ubicazioni, non dal testo del motivo: il motivo è una frase, e leggere un
+ * nome di comune dentro una frase significa riscriverlo il giorno che la frase cambia.
+ */
+function comuniConUnaSolaUbicazione(
+  aggregati: readonly Complesso[],
+  elenco: ElencoUbicazioniDto,
+): string[] {
+  const comuni: string[] = [];
+  for (const a of aggregati) {
+    if (a.ubicazioni.length !== 1) continue;
+    const comune = elenco.find((u) => u.id === a.ubicazioni[0])?.comune;
+    if (comune !== undefined && !comuni.includes(comune)) comuni.push(comune);
+  }
+  return comuni;
+}
+
+/**
+ * Le ubicazioni di una riga: fino a tre per esteso, oltre si contano e si aprono a richiesta.
+ *
+ * Diciannove indirizzi uno sotto l'altro non si leggono: si saltano, e con loro si salta la
+ * frase che spiegava perché stanno lì. Il numero invece si legge, e chi ha bisogno dell'elenco
+ * lo apre.
+ */
+function ElencoUbicazioni({ etichette }: { etichette: readonly string[] }) {
+  if (etichette.length <= 3) {
+    return (
+      <>
+        {etichette.map((etichetta) => (
+          <span key={etichetta} className="block font-medium text-testo">
+            {etichetta}
+          </span>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <details>
+      <summary className="cursor-pointer font-medium text-testo">{etichette.length} ubicazioni</summary>
+      <span className="mt-1 block text-xs">{etichette.join(' · ')}</span>
+    </details>
+  );
+}
 
 /** Navigazione fra le sezioni: la pagina è lunga, e scorrere alla cieca è un difetto. */
 /**
@@ -1183,27 +1315,26 @@ function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
   /*
     L'ordine del menu è l'ordine della pagina.
 
-    «Record camerale» stava in fondo all'elenco e viene disegnato per **primo**: chi
+    Dal 18/09/2026 la pagina comincia dall'analisi — i tre rischi, le ubicazioni, il merito
+    creditizio — e finisce con il profilo dell'impresa: il menu segue, e chi lo legge vede
+    l'ordine del lavoro invece dell'ordine degli archivi.
+
+    Prima «Record camerale» stava in fondo all'elenco e veniva disegnato per **primo**: chi
     cliccava l'ultima voce del menu veniva riportato in cima. È lo stesso difetto che il
     commento qui sopra dice di aver corretto — un collegamento che non porta dove
     promette — in una forma più subdola, perché la pagina si muove davvero.
-
-    E la condizione era `analisi.registro != null`, mentre la sezione si disegna solo se
-    almeno un campo è valorizzato: su un registro con tutti i campi vuoti il collegamento
-    esisteva e non portava da nessuna parte. Ora entrambi chiedono la stessa cosa alla
-    stessa funzione.
   */
   const sezioni = [
-    { id: 'record-camerale', testo: 'Record camerale', presente: haRecordCamerale(analisi.registro) },
-    { id: 'ubicazioni', testo: 'Ubicazioni', presente: analisi.ubicazioni.elenco.length > 0 },
-    { id: 'assetto', testo: 'Assetto e gruppo', presente: true },
     // Sempre presenti: `SezioniProtezioni` disegna le tre sezioni anche senza il calcolo.
     { id: 'property-risk', testo: 'Property Risk', presente: true },
     { id: 'business-interruption', testo: 'Business Interruption', presente: true },
     { id: 'cyber-risk', testo: 'Cyber Risk', presente: true },
+    { id: 'ubicazioni', testo: 'Ubicazioni', presente: analisi.ubicazioni.elenco.length > 0 },
     { id: 'credito', testo: 'Merito creditizio', presente: true },
     { id: 'eventi-negativi', testo: 'Eventi negativi', presente: analisi.eventiNegativi !== null },
-    { id: 'bilancio', testo: 'Bilancio', presente: analisi.bilancio !== null },
+    // Il profilo dell'impresa sta tutto sotto un divisore: una voce sola ci porta, e le sue
+    // sezioni restano raggiungibili dai loro indirizzi (#record-camerale, #assetto, #bilancio).
+    { id: 'profilo', testo: 'Profilo dell’impresa', presente: true },
   ].filter((s) => s.presente);
 
   return (
