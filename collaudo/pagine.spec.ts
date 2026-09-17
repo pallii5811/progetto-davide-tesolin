@@ -15,8 +15,8 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
   });
 
   const pagine = [
-    { percorso: '/prospect', atteso: /Ricerca di nuovi clienti/i },
-    { percorso: '/portafoglio', atteso: /Portafoglio/i },
+    { percorso: '/prospect', atteso: /Trova nuove aziende/ },
+    { percorso: '/portafoglio', atteso: /Le aziende già analizzate/ },
     { percorso: '/impostazioni', atteso: /Cambia password/i },
     { percorso: '/impostazioni/utenti', atteso: /Utenti dello studio/i },
   ];
@@ -34,7 +34,7 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
       che i dati **non sono veri**, e indicare il rimedio che chi legge può davvero
       compiere.
     */
-    // Dal 13/09/2026 l'avviso sta in «Nuovi clienti»: la pagina «Ricerca» non c'è più.
+    // Dal 13/09/2026 l'avviso sta in «Ricerca Clienti»: la pagina «Ricerca» non c'è più.
     await page.goto('/prospect');
 
     // Il titolo esatto dell'avviso, non una ricerca a tentoni: «modalità dimostrativa»

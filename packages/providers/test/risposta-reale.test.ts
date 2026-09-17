@@ -567,7 +567,7 @@ describe('Prospezione: il conteggio è gratuito', () => {
     expect(chiamate[0]).not.toContain('province=');
   });
 
-  it('con la città fissata la diagnosi dello zero non propone mai di toglierla', async () => {
+  it('la diagnosi dello zero toglie anche la città, che dal 17/09/2026 è facoltativa', async () => {
     const chiamate: string[] = [];
     const fetchImpl = ((url: string): Promise<Response> => {
       const indirizzo = String(url);
@@ -585,13 +585,35 @@ describe('Prospezione: il conteggio è gratuito', () => {
     const esito = await p.cercaProspect({ comune: 'B157', addettiMin: 500 }, { soloConteggio: true });
 
     expect(esito.totale).toBe(0);
-    // Un solo filtro facoltativo basta a diagnosticare: togliendolo resta la città.
+    // Togliendo i dipendenti se ne trovano 42; togliendo la città resta lo zero, e non si propone.
     expect(esito.diagnosiZero).toEqual([
-      { filtro: 'minEmployees', etichetta: 'min dipendenti', totaleSenza: 42 },
+      { filtro: 'minEmployees', etichetta: 'dipendenti min.', totaleSenza: 42 },
     ]);
-    // E nessun conteggio, nemmeno quelli della diagnosi, esce dalla città.
-    expect(chiamate.length).toBeGreaterThan(2);
-    expect(chiamate.every((u) => u.includes('townCode=B157'))).toBe(true);
+    // La città è stata tolta una volta, per vedere cosa si troverebbe in tutta Italia.
+    const senzaCitta = chiamate.filter((u) => !u.includes('townCode='));
+    expect(senzaCitta).toHaveLength(1);
+    expect(senzaCitta[0]).toContain('minEmployees=500');
+  });
+
+  it('con un solo filtro non c’è niente da diagnosticare, nemmeno se è la città', async () => {
+    const chiamate: string[] = [];
+    const fetchImpl = ((url: string): Promise<Response> => {
+      chiamate.push(String(url));
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [], count: 0, success: true, message: '', error: null }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+    const p = new OpenApiProvider({ token: 't', fetchImpl, ledger: new MemoryCostLedger() });
+
+    const esito = await p.cercaProspect({ comune: 'B157', soloAttive: true }, { soloConteggio: true });
+
+    expect(esito.totale).toBe(0);
+    expect(esito.diagnosiZero).toEqual([]);
+    // Il conteggio e il preventivo, nient'altro.
+    expect(chiamate).toHaveLength(2);
   });
 });
 

@@ -319,33 +319,33 @@ export class OpenApiProvider implements CompanyDataProvider {
   async #diagnosticaZero(
     filtri: Record<string, unknown>,
   ): Promise<readonly { filtro: string; etichetta: string; totaleSenza: number }[]> {
+    // Con le parole del modulo (17/09/2026): chi legge «senza dipendenti min.» deve ritrovare
+    // lo stesso nome sul campo che sta per svuotare.
     const ETICHETTE: Record<string, string> = {
-      companyName: 'denominazione',
+      companyName: 'ragione sociale',
       province: 'provincia',
+      townCode: 'città',
       atecoCode: 'codice ATECO',
-      minEmployees: 'min dipendenti',
-      maxEmployees: 'max dipendenti',
-      minTurnover: 'fatturato da',
-      maxTurnover: 'fatturato a',
+      minEmployees: 'dipendenti min.',
+      maxEmployees: 'dipendenti max.',
+      minTurnover: 'fatturato min.',
+      maxTurnover: 'fatturato max.',
       legalFormCode: 'forma giuridica',
-      shareHolderTaxCode: 'codice fiscale del socio',
+      shareHolderTaxCode: 'codice fiscale socio',
     };
     /*
-      La città non compare fra le etichette, di proposito: non si toglie mai.
+      La città si toglie come gli altri filtri.
 
-      È l'unico filtro obbligatorio della ricerca, e «senza città → 180.000 aziende» direbbe
-      quante imprese ci sono in tutta Italia, cioè un consiglio che chi cerca non può seguire.
-      Per la stessa ragione con la città fissata basta UN filtro facoltativo per avere
-      qualcosa da diagnosticare: togliendolo resta la città, e il numero dice quanto quel
-      filtro stava stringendo.
+      Fino al 17/09/2026 era obbligatoria e restava fissa: «senza città → 180.000 aziende»
+      sarebbe stato un consiglio che chi cerca non poteva seguire. Da quella data è facoltativa
+      («Questo non obbligatorio», AEGIS - cambi.pptx), e allargare la ricerca all'Italia è una
+      strada che chi cerca può prendere davvero.
     */
-    const conCitta = filtri['townCode'] !== undefined && filtri['townCode'] !== '';
-
     const attivi = Object.keys(filtri).filter(
       (k) => k in ETICHETTE && filtri[k] !== undefined && filtri[k] !== '',
     );
-    // Senza città, con un filtro solo non c'è nulla da diagnosticare: è quello, e si vede.
-    if (attivi.length < (conCitta ? 1 : 2)) return [];
+    // Con un filtro solo non c'è nulla da diagnosticare: è quello, e si vede.
+    if (attivi.length < 2) return [];
 
     const esiti = await Promise.all(
       attivi.map(async (chiave) => {

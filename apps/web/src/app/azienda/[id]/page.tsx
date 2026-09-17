@@ -15,7 +15,6 @@ import { personeDaVerificare } from './persone-da-verificare';
 import { componentiDelGiorno, formattaGiorno, formattaGiornoEsteso } from '@aegis/core/tempo';
 import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
-import { RitornoAllElenco } from '../../prospect/UltimoElenco';
 import { livelloTerritoriale } from './esposizione-territoriale';
 import type { AnalisiDto, IndicatoriArchivioDto, CollegamentoSocietario } from '@/lib/api';
 import {
@@ -1318,16 +1317,16 @@ function Intestazione({
       {/*
         Due vie di ritorno, e la prima è quella che serve più spesso.
 
-        Chi vaglia cinque prospect uno dopo l'altro torna all'elenco cinque volte: finora
-        poteva farlo solo col tasto «indietro» del browser, e chi passava dal menu si
-        ritrovava davanti al modulo di ricerca vuoto — con la sensazione di aver perso
-        l'elenco appena pagato.
-
-        Il collegamento compare solo se un elenco esiste davvero: chi è arrivato qui
-        cercando un'azienda per nome non ha nessun elenco a cui tornare.
+        Chi vaglia cinque prospect uno dopo l'altro torna all'elenco cinque volte. Fino al
+        17/09/2026 il ritorno riapriva l'ultimo elenco comprato, che l'archivio conservava
+        ventiquattro ore; da quella data le aziende di ogni elenco stanno nel CRM per sempre,
+        e il ritorno porta lì. Ogni azienda analizzata è nel CRM, quindi il collegamento c'è
+        sempre.
       */}
       <div className="flex flex-wrap items-center gap-4">
-        <RitornoAllElenco />
+        <Link href="/portafoglio" className="text-xs text-marchio hover:underline">
+          ← Torna al CRM
+        </Link>
         <Link href="/prospect" className="text-xs text-marchio hover:underline">
           ← Nuova ricerca
         </Link>

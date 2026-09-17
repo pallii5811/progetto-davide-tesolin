@@ -30,7 +30,7 @@ test.describe('Percorso completo dell’intermediario', () => {
     test.setTimeout(180_000);
 
     // ── 1. Trova l'impresa ────────────────────────────────────────────────
-    // La ricerca per partita IVA è una sezione di «Nuovi clienti» dal 13/09/2026.
+    // La ricerca per partita IVA è una sezione di «Ricerca Clienti» dal 13/09/2026.
     await page.goto('/prospect');
     await page.getByPlaceholder('11 cifre').fill(AZIENDA);
     await page.getByRole('button', { name: 'Cerca' }).click();
@@ -93,11 +93,11 @@ test.describe('Percorso completo dell’intermediario', () => {
       expect(testo, `il report non deve affermare «${frase}» senza averlo verificato`).not.toContain(frase);
     }
 
-    // ── 7. Il portafoglio l'ha registrata ─────────────────────────────────
+    // ── 7. Il CRM l'ha registrata ─────────────────────────────────────────
     await page.goto('/portafoglio');
-    // Il portafoglio disegna la stessa riga due volte — tabella per schermo largo, schede
-    // per telefono — e una delle due è nascosta dal foglio di stile. Si verifica che il
-    // nome ci sia, non quale delle due copie sia visibile.
+    // Il CRM disegna la stessa riga due volte — tabella per schermo largo, schede per
+    // telefono — e una delle due è nascosta dal foglio di stile. Si verifica che il nome ci
+    // sia, non quale delle due copie sia visibile.
     await expect(page.locator('body')).toContainText(/MECCANICA BRESCIANA/i);
   });
 });
@@ -140,14 +140,14 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     await accedi(page);
   });
 
-  test('trova per insiemi, compra l’elenco, analizza, esporta e sorveglia', async ({ page }) => {
+  test('trova per insiemi, compra l’elenco, analizza ed esporta dal CRM', async ({ page }) => {
     test.setTimeout(180_000);
 
     // ── 1. Descrive l'insieme che cerca ───────────────────────────────────
     await page.goto('/prospect');
     await page.getByRole('combobox', { name: 'Città' }).fill('Adro');
     await page.getByRole('option', { name: 'Adro (BS)' }).click();
-    await page.getByRole('button', { name: /Quante sono/i }).click();
+    await page.getByRole('button', { name: /Conta Aziende/i }).click();
     await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toBeVisible();
 
     /*
@@ -192,7 +192,7 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
       await expect(page.locator(`#${id}`).getByText('Come è stato calcolato'), id).toBeVisible();
     }
 
-    // ── 4. Il portafoglio si esporta, e il file non accusa nessuno ────────
+    // ── 4. Il CRM si esporta, e il file non accusa nessuno ───────────────
     await page.goto('/portafoglio');
     const scaricamento = page.waitForEvent('download');
     await page

@@ -11,7 +11,7 @@ import { SelettoreComune } from './SelettoreComune';
 import { BottoneElenco } from './BottoneElenco';
 import { ModuloRicerca } from './ModuloRicerca';
 import { SchedaRisultato } from './SchedaRisultato';
-import { ConfrontoConElencoComprato, RicordaElenco, UltimoElenco } from './UltimoElenco';
+import { ConfrontoConElencoComprato, RicordaElenco } from './UltimoElenco';
 import { centesimiPerRiga } from '@/lib/prezzo-prospect';
 
 export const dynamic = 'force-dynamic';
@@ -35,15 +35,16 @@ export const dynamic = 'force-dynamic';
 const CENTESIMI_PER_AZIENDA = 5;
 
 /**
- * Ricerca di nuovi clienti, e ricerca di un'azienda per partita IVA.
+ * Ricerca Clienti: trovare aziende nuove per insiemi, e cercarne una per partita IVA.
  *
  * È la pagina che porta clienti **nuovi** invece di analizzare quelli che si hanno già:
- * si descrive un insieme — una città, e se serve un settore, una dimensione — e si scopre
- * chi lo popola.
+ * si descrive un insieme — una città, un settore, una dimensione — e si scopre chi lo
+ * popola.
  *
- * Dal 13/09/2026, su richiesta di Simone: la città è l'unico filtro obbligatorio e prende
- * il posto della provincia; ogni altro filtro è facoltativo. E la ricerca per partita IVA,
- * che aveva una pagina sua, sta qui in fondo come sezione a parte.
+ * Dal 13/09/2026 la città ha preso il posto della provincia, e la ricerca per partita IVA,
+ * che aveva una pagina sua, sta qui in fondo come sezione a parte. Dal 17/09/2026
+ * («AEGIS - cambi.pptx») la città non è più obbligatoria: basta un filtro qualunque fra
+ * quelli che descrivono un'impresa. E la sezione in fondo cerca soltanto per partita IVA.
  *
  * Ciò che rende usabile la ricerca è il conteggio gratuito: il numero di aziende
  * corrispondenti si ottiene senza scaricare nulla e senza spendere, e l'elenco si acquista
@@ -89,50 +90,65 @@ export default async function PaginaProspect({
   };
 
   /*
-    La città decide se si cerca.
+    Quando si cerca.
 
-    Prima bastava un filtro qualunque, e poiché forma giuridica e quante aziende arrivano
-    già compilate, la pagina appena aperta contava tutte le S.r.l. d'Italia. Ora senza una
-    città valida non parte nessuna chiamata; con la città, anche da sola, sì — gli altri
-    filtri restringono solo se ci sono.
+    Fino al 17/09/2026 decideva la città, obbligatoria. Ora è facoltativa come gli altri
+    filtri, e decide la domanda che la città copriva: l'utente ha descritto un'impresa?
+    Forma giuridica e numero di aziende arrivano già compilati a chi apre la pagina, e da
+    soli conterebbero tutte le S.r.l. d'Italia: non bastano (vedi `haDescrittoUnImpresa`).
+
+    Una città scritta ma non riconosciuta ferma la ricerca: cercare in tutta Italia al posto
+    della città che l'utente crede di aver scelto sarebbe un elenco pagato sul posto sbagliato.
   */
   const comuneScelto = comunePerCodiceCatastale(criteri.comune);
+  const cittaNonRiconosciuta = criteri.comune !== '' && comuneScelto === null;
   // `scarica` è l'unica azione che spende: senza, la pagina si limita a contare.
   const scarica = parametri['scarica'] === '1';
 
   /*
     Ha descritto un'impresa, o ha solo aperto la pagina?
 
-    Forma giuridica e quante aziende arrivano già compilate a chi non ha scritto niente:
+    Forma giuridica e numero di aziende arrivano già compilati a chi non ha scritto niente:
     da soli quei due campi non sono una ricerca — non si cerca «una S.r.l.».
 
-    La distinzione serve perché a schermo ci sono due richiami diversi allo stesso
-    elenco già comprato, e ciascuno risponde a una domanda che l'altro non pone:
-    «dov'è finito l'elenco che ho pagato?» sul modulo vuoto, «sto per ricomprarlo?»
-    quando i filtri ci sono. Senza distinguerli comparivano **entrambi**, uno sotto
-    l'altro, con la stessa frase — e il secondo diceva «filtri quasi uguali»
-    confrontandosi con un modulo in cui non c'era scritto niente.
+    Serve due volte: decide se si cerca, e se ha senso il confronto con l'elenco già
+    comprato, che su un modulo in cui non c'è scritto niente direbbe «filtri quasi uguali»
+    confrontandosi col vuoto.
   */
   const SOLO_PREDEFINITI: readonly string[] = ['formaGiuridicaCodice', 'limite'];
   const haDescrittoUnImpresa = Object.entries(criteri).some(
     ([campo, valore]) => !SOLO_PREDEFINITI.includes(campo) && valore.trim() !== '',
   );
+  /*
+    «Conta Aziende» premuto a campi vuoti.
+
+    Il modulo manda sempre anche forma giuridica e numero di aziende, che chi apre la
+    pagina dal menu non ha nell'indirizzo: è così che i due casi si distinguono, e solo il
+    primo merita di sentirsi dire cosa manca.
+  */
+  const moduloInviatoVuoto =
+    !haDescrittoUnImpresa &&
+    (parametri['limite'] !== undefined || parametri['formaGiuridicaCodice'] !== undefined);
   // I filtri facoltativi davvero messi: senza, uno zero non ha niente da diagnosticare.
   const haFiltriFacoltativi = Object.entries(criteri).some(
     ([campo, valore]) => campo !== 'comune' && campo !== 'limite' && valore.trim() !== '',
   );
 
-  // La ricerca di un'azienda già nota, nella sezione in fondo.
-  const denominazioneCercata = (parametri['q'] ?? '').trim();
+  /*
+    La ricerca di un'azienda già nota, nella sezione in fondo: solo per partita IVA.
+
+    Cercava anche per ragione sociale fino al 17/09/2026 («Secondo me per ragione sociale va
+    tolto, solo PIVA», AEGIS - cambi.pptx): un vecchio indirizzo con `q` non cerca più niente.
+  */
   const partitaIvaCercata = (parametri['piva'] ?? '').trim();
-  const cercaUnAzienda = denominazioneCercata !== '' || partitaIvaCercata !== '';
+  const cercaUnAzienda = partitaIvaCercata !== '';
 
   const stato = await statoServizio().catch(() => null);
 
   let risultato: RisultatoProspezione | null = null;
   let errore: string | null = null;
 
-  if (comuneScelto !== null) {
+  if (haDescrittoUnImpresa && !cittaNonRiconosciuta) {
     try {
       risultato = await cercaProspect(criteri, { soloConteggio: !scarica });
     } catch (e) {
@@ -145,10 +161,7 @@ export default async function PaginaProspect({
 
   if (cercaUnAzienda) {
     try {
-      risultatiAzienda = await cercaAziende({
-        ...(denominazioneCercata === '' ? {} : { denominazione: denominazioneCercata }),
-        ...(partitaIvaCercata === '' ? {} : { partitaIva: partitaIvaCercata }),
-      });
+      risultatiAzienda = await cercaAziende({ partitaIva: partitaIvaCercata });
     } catch (e) {
       erroreAzienda = e instanceof Error ? e.message : 'Errore imprevisto';
     }
@@ -157,20 +170,14 @@ export default async function PaginaProspect({
   return (
     <>
       {/*
-        Il richiamo sta sul modulo vuoto, dove è l'unica cosa che dice dov'è finito
-        l'elenco pagato. Appena l'utente scrive un criterio il compito passa al confronto
-        qui sotto, che dice la stessa cosa **e** in che cosa la ricerca di adesso
-        differisce da quella già comprata: due richiami affiancati sarebbero la stessa
-        frase due volte.
+        Qui c'era il richiamo «Hai già scaricato un elenco… resta in archivio per ventiquattro
+        ore», tolto il 17/09/2026 («Togli totalmente questo banner non serve»): le aziende di
+        un elenco comprato vanno nel CRM, e ci restano per sempre.
       */}
-      {!haDescrittoUnImpresa && <UltimoElenco />}
-
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Ricerca di nuovi clienti</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Trova nuove aziende</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-testo-tenue">
-          Scegli la città e scopri quante imprese ci sono. Settore, dimensione e gli altri filtri sono
-          facoltativi: se li metti, la ricerca si restringe. Contare non costa nulla: si paga solo
-          l&apos;elenco, e solo quando lo chiedi.
+          Cerca le imprese che corrispondono ai tuoi criteri.
         </p>
       </div>
 
@@ -185,7 +192,7 @@ export default async function PaginaProspect({
           {process.env.NODE_ENV === 'production' ? (
             <Avviso tono="critico" titolo="Servizio momentaneamente non disponibile">
               Non è al momento possibile interrogare gli archivi. I dati già acquisiti restano consultabili
-              dal portafoglio. Se la situazione persiste, segnalarlo all&apos;assistenza.
+              dal CRM. Se la situazione persiste, segnalarlo all&apos;assistenza.
             </Avviso>
           ) : (
             <Avviso tono="critico" titolo="Servizio API non raggiungibile">
@@ -231,33 +238,13 @@ export default async function PaginaProspect({
         </div>
       )}
 
-      {stato !== null && stato.datiReali && (
-        <div className="mb-6">
-          <Avviso tono="attenzione" titolo="Dati reali — ogni analisi consuma credito">
-            Ogni analisi interroga gli archivi camerali e consuma credito:{' '}
-            <strong>
-              {(stato.costoAnalisiCentesimi / 100).toFixed(2).replace('.', ',')} € per analisi
-            </strong>
-            , {(stato.costoAnalisiApprofonditaCentesimi / 100).toFixed(2).replace('.', ',')} € se
-            approfondita. Le aziende già in portafoglio non vengono riacquistate, e la ricerca di nuovi
-            clienti conta le aziende senza costo prima di scaricarne l&apos;elenco.
-            {process.env.NODE_ENV !== 'production' && (
-              <>
-                {' '}
-                Per provare senza spendere: <code className="font-mono">npm run dev:api:demo</code>.
-              </>
-            )}
-          </Avviso>
-        </div>
-      )}
-
+      {/*
+        Qui c'era l'avviso «Dati reali — ogni analisi consuma credito», tolto il 17/09/2026
+        («Togli Completamente», AEGIS - cambi.pptx). Il costo dell'elenco resta scritto accanto
+        al numero di aziende, prima del pulsante che spende.
+      */}
       <Scheda className="mb-6">
         <form method="get" id="ricerca-prospect" className="space-y-4">
-          <p className="text-xs text-testo-tenue">
-            Solo la <strong className="font-medium text-testo">città</strong> è obbligatoria: tutti gli
-            altri filtri sono facoltativi.
-          </p>
-
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <SelettoreComune codiceIniziale={criteri.comune} />
             <Campo
@@ -265,18 +252,18 @@ export default async function PaginaProspect({
               etichetta="Codice ATECO"
               valore={criteri.ateco}
               segnaposto="2562"
-              nota="Senza punti. Il confronto è esatto: 25 e 2562 sono due insiemi diversi."
+              nota="Inserisci il codice senza punti"
             />
             <Campo
               nome="addettiMin"
-              etichetta="Min dipendenti"
+              etichetta="Dipendenti min."
               valore={criteri.addettiMin}
               segnaposto="20"
               numerico
             />
             <Campo
               nome="addettiMax"
-              etichetta="Max dipendenti"
+              etichetta="Dipendenti max."
               valore={criteri.addettiMax}
               segnaposto="250"
               numerico
@@ -286,21 +273,21 @@ export default async function PaginaProspect({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Campo
               nome="fatturatoMinEuro"
-              etichetta="Fatturato da (€)"
+              etichetta="Fatturato min."
               valore={criteri.fatturatoMinEuro}
               segnaposto="2000000"
               numerico
             />
             <Campo
               nome="fatturatoMaxEuro"
-              etichetta="Fatturato a (€)"
+              etichetta="Fatturato max."
               valore={criteri.fatturatoMaxEuro}
               segnaposto="50000000"
               numerico
             />
             <Campo
               nome="denominazione"
-              etichetta="Denominazione contiene"
+              etichetta="Ragione Sociale"
               valore={criteri.denominazione}
               segnaposto="parte della ragione sociale"
             />
@@ -315,11 +302,11 @@ export default async function PaginaProspect({
             */}
             <Campo
               nome="socioCodiceFiscale"
-              etichetta="Codice fiscale del socio"
+              etichetta="Codice Fiscale Socio"
               valore={criteri.socioCodiceFiscale}
               segnaposto="RSSGNN70A01A944X"
               maiuscolo
-              nota="Le società partecipate dalla stessa persona, nella città scelta."
+              nota="Trova le società partecipate dalla stessa persona."
             />
 
             {/*
@@ -350,7 +337,7 @@ export default async function PaginaProspect({
                 <option value="">Tutte le forme</option>
               </select>
               <span className="mt-1 block text-xs text-testo-tenue">
-                Le ditte individuali non depositano bilanci: su di esse l&apos;analisi resta a metà.
+                Per le ditte individuali alcuni dati finanziari potrebbero non essere disponibili.
               </span>
             </label>
 
@@ -385,7 +372,7 @@ export default async function PaginaProspect({
               inCorso="Conteggio in corso…"
               className="rounded border border-bordo-forte px-5 py-2 text-sm font-medium transition hover:border-marchio"
             >
-              Quante sono? <span className="text-testo-debole">gratis</span>
+              Conta Aziende <span className="text-testo-debole">non consuma crediti</span>
             </BottoneInvioGet>
 
             {/*
@@ -406,25 +393,33 @@ export default async function PaginaProspect({
               cambia finché il servizio non risponde, e un secondo clic è un secondo
               acquisto. Il pulsante di accesso, che non costa niente, si disabilitava già.
             */}
-            <BottoneElenco etichetta="Dammi l’elenco" />
+            <BottoneElenco etichetta="Crea Elenco" />
           </div>
         </form>
       </Scheda>
 
       {/*
-        Filtri senza città: arriva da un indirizzo scritto a mano o da un collegamento di
-        prima del 13/09/2026, quando si cercava per provincia. Il modulo non lo permette —
-        il campo della città blocca l'invio — ma l'indirizzo sì, e una pagina che non dice
-        niente sembrerebbe una ricerca finita a vuoto.
+        Due casi in cui la ricerca non parte, e la pagina deve dire perché: una pagina che non
+        dice niente sembrerebbe una ricerca finita a vuoto.
+
+        La città non riconosciuta arriva da un indirizzo scritto a mano: il modulo non la lascia
+        inviare, perché il campo si dichiara non valido finché il comune non è scelto
+        dall'elenco. Il modulo vuoto è «Conta Aziende» premuto senza nessun filtro.
       */}
-      {haDescrittoUnImpresa && comuneScelto === null && (
+      {cittaNonRiconosciuta && (
         <div className="mb-6">
-          <Avviso
-            tono="attenzione"
-            titolo={criteri.comune === '' ? 'Manca la città' : 'Città non riconosciuta'}
-          >
-            La città è l&apos;unico filtro obbligatorio: sceglila dall&apos;elenco dei comuni e ripeti la
-            ricerca. Finché manca non parte nessuna richiesta, e non si spende niente.
+          <Avviso tono="attenzione" titolo="Città non riconosciuta">
+            Scegli la città dall&apos;elenco dei comuni e ripeti la ricerca, oppure lasciala vuota per
+            cercare in tutta Italia. Finché non è riconosciuta non parte nessuna richiesta, e non si spende
+            niente.
+          </Avviso>
+        </div>
+      )}
+      {moduloInviatoVuoto && (
+        <div className="mb-6">
+          <Avviso tono="attenzione" titolo="Nessun filtro indicato">
+            Indica almeno un criterio: città, codice ATECO, dipendenti, fatturato, ragione sociale o codice
+            fiscale del socio. Senza, la ricerca conterebbe tutte le imprese d&apos;Italia, e non parte.
           </Avviso>
         </div>
       )}
@@ -447,8 +442,8 @@ export default async function PaginaProspect({
                 Due filtri sensati possono avere un'intersezione vuota senza che nessuno dei
                 due sia sbagliato, e da fuori quel caso è identico a un guasto. Qui il
                 servizio ha già ricontato togliendone uno per volta — gratis, in `dryRun` —
-                e dice quale riaprirebbe la ricerca e con quante imprese. La città non si
-                toglie mai: è obbligatoria.
+                e dice quale riaprirebbe la ricerca e con quante imprese. Dal 17/09/2026
+                anche la città, che non è più obbligatoria.
               */}
               {risultato.diagnosiZero !== undefined && risultato.diagnosiZero.length > 0 ? (
                 <div className="space-y-2">
@@ -523,7 +518,7 @@ export default async function PaginaProspect({
                 </p>
               </div>
               <p className="text-sm text-testo-tenue">
-                L&apos;elenco si chiede con <strong>Dammi l&apos;elenco</strong>, qui sopra.
+                L&apos;elenco si chiede con <strong>Crea Elenco</strong>, qui sopra.
               </p>
             </div>
           )}
@@ -543,8 +538,9 @@ export default async function PaginaProspect({
           <p className="mb-3 text-sm text-testo-tenue">
             {risultato.aziende.length}{' '}
             {risultato.aziende.length === 1 ? 'azienda scaricata' : 'aziende scaricate'} ·{' '}
-            {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi. Analizzarne una
-            consuma credito a parte, come qualunque altra analisi.
+            {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi.{' '}
+            {risultato.aziende.length === 1 ? 'È salvata' : 'Sono salvate'} nel CRM. Analizzarne una consuma
+            credito a parte, come qualunque altra analisi.
           </p>
           <div className="overflow-hidden rounded-lg border border-bordo">
             <table className="w-full text-sm">
@@ -586,9 +582,9 @@ export default async function PaginaProspect({
         La ricerca di un'azienda che si conosce già, come sezione a parte.
 
         Aveva una pagina sua, «Ricerca», tolta il 13/09/2026 su richiesta di Simone: la si
-        trova qui, sotto la ricerca di nuovi clienti e separata da essa. Sono due moduli
-        distinti con parametri distinti — `q` e `piva` qui, i filtri là — quindi usarne uno
-        non compra niente per conto dell'altro.
+        trova qui, sotto la ricerca per insiemi e separata da essa. Sono due moduli distinti
+        con parametri distinti — `piva` qui, i filtri là — quindi usarne uno non compra niente
+        per conto dell'altro. Dal 17/09/2026 si cerca solo per partita IVA.
       */}
       <section
         id="ricerca-azienda"
@@ -596,19 +592,14 @@ export default async function PaginaProspect({
         className="mt-12 border-t border-bordo pt-8"
       >
         <h2 id="titolo-ricerca-azienda" className="text-lg font-semibold tracking-tight">
-          Cerca un&apos;azienda per partita IVA
+          Cerca una singola azienda
         </h2>
         <p className="mb-4 mt-1 max-w-2xl text-sm leading-relaxed text-testo-tenue">
-          Se l&apos;azienda la conosci già: dalla partita IVA, o dalla ragione sociale, al profilo camerale
-          e da lì all&apos;analisi completa.
+          Cerca per Partita IVA.
         </p>
 
         <Scheda className="mb-6">
-          <ModuloRicerca
-            denominazione={denominazioneCercata}
-            partitaIva={partitaIvaCercata}
-            aPagamento={stato?.datiReali === true}
-          />
+          <ModuloRicerca partitaIva={partitaIvaCercata} aPagamento={stato?.datiReali === true} />
 
           {/*
             Gli esempi hanno senso solo quando sono utilizzabili: sui dati reali quelle tre
@@ -631,7 +622,7 @@ export default async function PaginaProspect({
         )}
 
         {risultatiAzienda !== null && risultatiAzienda.risultati.length === 0 && (
-          <p className="text-sm text-testo-tenue">Nessuna azienda trovata con questi criteri.</p>
+          <p className="text-sm text-testo-tenue">Nessuna azienda trovata con questa partita IVA.</p>
         )}
 
         {/*
@@ -671,7 +662,7 @@ export default async function PaginaProspect({
         )}
 
         {/*
-          La ricerca per denominazione usa l'elenco camerale, che non porta il settore.
+          Un'azienda ritrovata nell'archivio può non portare il settore.
           Dirlo solo quando manca davvero: una nota che compare sempre non viene più letta.
         */}
         {risultatiAzienda !== null && risultatiAzienda.risultati.some((a) => a.ateco === null) && (
@@ -680,6 +671,16 @@ export default async function PaginaProspect({
           </p>
         )}
       </section>
+
+      {/*
+        La dichiarazione in fondo alla pagina, con le parole di Simone (17/09/2026, AEGIS -
+        cambi.pptx, slide 2).
+      */}
+      <p className="mt-12 border-t border-bordo pt-4 text-xs leading-relaxed text-testo-debole">
+        Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono
+        consulenza finanziaria né garanzia di solvibilità. Le eventuali proposte assicurative sono soggette
+        alla valutazione dell’intermediario secondo la normativa IVASS applicabile.
+      </p>
     </>
   );
 }

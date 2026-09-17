@@ -40,7 +40,7 @@ export function SelettoreLotto({
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-        Quante aziende vuoi
+        Numero di aziende
       </span>
       <input
         type="number"

@@ -3,15 +3,16 @@ import { redirect } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 
 /**
- * La pagina «Ricerca» non esiste più: «/» rinvia a «Nuovi clienti».
+ * La pagina «Ricerca» non esiste più: «/» rinvia a «Ricerca Clienti».
  *
  * Tolta su richiesta di Simone del 13/09/2026. La ricerca per partita IVA vive dentro
- * «Nuovi clienti», come sezione a parte. L'indirizzo resta, perché a «/» portano ancora
+ * «Ricerca Clienti», come sezione a parte. L'indirizzo resta, perché a «/» portano ancora
  * l'accesso, i segnalibri e i collegamenti già scritti.
  *
- * Si portano con sé soltanto `q` e `piva`, i due parametri della ricerca per nome e per
- * partita IVA. Non tutti: «Nuovi clienti» ha un parametro che SPENDE (`scarica=1`), e un
- * rinvio che inoltrasse qualunque cosa trasformerebbe un collegamento a «/» in un acquisto.
+ * Si porta con sé soltanto `piva`, il parametro della ricerca per partita IVA: quella per
+ * nome (`q`) è stata tolta il 17/09/2026. Non tutti: «Ricerca Clienti» ha un parametro che
+ * SPENDE (`scarica=1`), e un rinvio che inoltrasse qualunque cosa trasformerebbe un
+ * collegamento a «/» in un acquisto.
  */
 export default async function Radice({
   searchParams,
@@ -20,7 +21,7 @@ export default async function Radice({
 }) {
   const parametri = await searchParams;
   const inoltrati = new URLSearchParams();
-  for (const chiave of ['q', 'piva']) {
+  for (const chiave of ['piva']) {
     const valore = parametri[chiave];
     if (typeof valore === 'string' && valore.trim() !== '') inoltrati.set(chiave, valore.trim());
   }

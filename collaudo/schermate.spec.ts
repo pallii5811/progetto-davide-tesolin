@@ -15,7 +15,7 @@ import { accedi, AZIENDA_DI_PROVA } from './aiuti.js';
 
 const PAGINE: { nome: string; percorso: string }[] = [
   // La pagina «Ricerca» non c'è più dal 13/09/2026: la ricerca per partita IVA è una sezione
-  // di «Nuovi clienti», che si fotografa vuota, con un conteggio e con una ricerca fatta.
+  // di «Ricerca Clienti», che si fotografa vuota, con un conteggio e con una ricerca fatta.
   { nome: '01-nuovi-clienti', percorso: '/prospect' },
   { nome: '01b-nuovi-clienti-conteggio', percorso: '/prospect?comune=A060' },
   { nome: '01c-nuovi-clienti-partita-iva', percorso: '/prospect?piva=03158460174#ricerca-azienda' },

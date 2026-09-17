@@ -1420,20 +1420,38 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(400).send({ errore: 'Filtri non validi', dettagli: parsed.error.issues });
     }
 
-    const { soloConteggio, ...criteri } = parsed.data;
+    const { soloConteggio, comune, ...altri } = parsed.data;
+    // Una città lasciata vuota non è un filtro: al fornitore non arriva niente.
+    const criteri: typeof altri & { comune?: string } =
+      comune === undefined || comune === '' ? altri : { ...altri, comune };
     /*
-      La città è obbligatoria, e tutto il resto no.
+      Basta un filtro che descriva un'impresa, e la città è uno di questi.
 
-      Richiesta di Simone del 13/09/2026: si cerca in una città, e gli altri filtri si
-      mettono solo se servono. Il controllo sta anche qui e non solo nel modulo, perché
-      questa rotta spende: senza città la ricerca coprirebbe l'Italia intera, e con un
-      codice che non è un comune il fornitore risponderebbe zero — un «nessuna azienda»
-      che è in realtà un errore di chi chiama.
+      Richiesta di Simone del 13/09/2026: la città obbligatoria. Dal 17/09/2026 è facoltativa
+      come gli altri («Questo non obbligatorio», AEGIS - cambi.pptx). Il controllo sta anche
+      qui e non solo nel modulo, perché questa rotta spende: senza nessun filtro la ricerca
+      coprirebbe l'Italia intera — forma giuridica e numero di aziende non descrivono
+      un'impresa. E una città scritta deve essere un comune: con un codice che non lo è il
+      fornitore risponderebbe zero, un «nessuna azienda» che è in realtà un errore di chi
+      chiama.
     */
-    if (criteri.comune === undefined || criteri.comune === '') {
-      return reply.status(400).send({ errore: 'Indicare la città: è l’unico filtro obbligatorio' });
+    const descrittivi = [
+      criteri.comune,
+      criteri.denominazione,
+      criteri.ateco,
+      criteri.addettiMin,
+      criteri.addettiMax,
+      criteri.fatturatoMinEuro,
+      criteri.fatturatoMaxEuro,
+      criteri.socioCodiceFiscale,
+    ];
+    if (!descrittivi.some((valore) => valore !== undefined && String(valore).trim() !== '')) {
+      return reply.status(400).send({
+        errore:
+          'Indicare almeno un filtro: città, codice ATECO, dipendenti, fatturato, ragione sociale o codice fiscale del socio',
+      });
     }
-    if (comunePerCodiceCatastale(criteri.comune) === null) {
+    if (criteri.comune !== undefined && comunePerCodiceCatastale(criteri.comune) === null) {
       return reply
         .status(400)
         .send({ errore: 'Città non riconosciuta: sceglierla dall’elenco dei comuni italiani' });
@@ -2887,8 +2905,8 @@ const numeroFacoltativo = z
 
 const prospezioneSchema = z.object({
   denominazione: z.string().trim().max(120).optional(),
-  // Codice catastale del comune, es. B157: obbligatorio, e verificato nella rotta contro
-  // l'elenco ISTAT perché il messaggio dica cosa manca invece di «filtri non validi».
+  // Codice catastale del comune, es. B157: facoltativo dal 17/09/2026, e verificato nella rotta
+  // contro l'elenco ISTAT perché il messaggio dica cosa non va invece di «filtri non validi».
   comune: z.string().trim().max(4).toUpperCase().optional(),
   ateco: z.string().trim().max(12).optional(),
   addettiMin: numeroFacoltativo,

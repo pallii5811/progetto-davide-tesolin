@@ -4,11 +4,13 @@ import type { CriteriProspezione } from '@aegis/providers';
 import { buildServer } from '../src/server.js';
 
 /**
- * Ricerca di nuovi clienti: la città è obbligatoria, tutto il resto è facoltativo.
+ * Ricerca clienti: la città è facoltativa, ma un filtro ci vuole.
  *
- * Richiesta di Simone del 13/09/2026. La rotta spende, quindi la regola sta anche qui e
- * non solo nel modulo: senza città la ricerca coprirebbe l'Italia intera, con un codice
- * inesistente il fornitore risponderebbe zero e sembrerebbe una città senza aziende.
+ * Il 13/09/2026 Simone ha chiesto la città obbligatoria; il 17/09/2026 l'ha resa facoltativa
+ * («Questo non obbligatorio», AEGIS - cambi.pptx). La rotta spende, quindi la regola sta
+ * anche qui e non solo nel modulo: senza nessun filtro la ricerca coprirebbe l'Italia intera,
+ * e con un codice inesistente il fornitore risponderebbe zero e sembrerebbe una città senza
+ * aziende.
  */
 class ProviderCheRegistra extends MockCompanyProvider {
   readonly criteriRicevuti: CriteriProspezione[] = [];
@@ -32,22 +34,22 @@ function avvia() {
   return { provider, get };
 }
 
-describe('Nuovi clienti: la città', () => {
-  it('senza città la ricerca non parte, e il messaggio dice cosa manca', async () => {
+describe('Ricerca clienti: almeno un filtro', () => {
+  it('senza nessun filtro la ricerca non parte, e il messaggio dice cosa manca', async () => {
     const { provider, get } = avvia();
 
     for (const url of [
       '/api/prospect?soloConteggio=1',
-      '/api/prospect?ateco=2562&addettiMin=10&soloConteggio=1',
-      // La provincia non sostituisce più la città.
+      // Forma giuridica e numero di aziende arrivano già compilati: da soli non descrivono un'impresa.
+      '/api/prospect?formaGiuridicaCodice=SR&limite=5&soloConteggio=1',
+      // La provincia non è un filtro di questa rotta dal 13/09/2026: non basta.
       '/api/prospect?provincia=BS&soloConteggio=1',
+      // Una città lasciata vuota non è un filtro.
       '/api/prospect?comune=&soloConteggio=1',
     ]) {
       const { status, body } = await get(url);
       expect(status, url).toBe(400);
-      // «Indicare la città», non un generico «filtri non validi» o «città non riconosciuta»:
-      // chi legge deve sapere che manca, non che è sbagliata.
-      expect(String(body['errore']), url).toMatch(/Indicare la città/);
+      expect(String(body['errore']), url).toMatch(/Indicare almeno un filtro/);
     }
     // Nessuna chiamata al fornitore: è quella che costa.
     expect(provider.criteriRicevuti).toEqual([]);
@@ -56,11 +58,26 @@ describe('Nuovi clienti: la città', () => {
   it('un codice che non è un comune italiano viene rifiutato prima del fornitore', async () => {
     const { provider, get } = avvia();
 
-    const { status, body } = await get('/api/prospect?comune=Z999&soloConteggio=1');
+    const { status, body } = await get('/api/prospect?comune=Z999&ateco=2562&soloConteggio=1');
 
     expect(status).toBe(400);
     expect(String(body['errore'])).toMatch(/Città non riconosciuta/);
     expect(provider.criteriRicevuti).toEqual([]);
+  });
+});
+
+describe('Ricerca clienti: la città', () => {
+  it('senza città la ricerca parte con gli altri filtri, e al fornitore la città non arriva', async () => {
+    const { provider, get } = avvia();
+
+    const { status, body } = await get('/api/prospect?comune=&ateco=2562&soloConteggio=1');
+
+    expect(status).toBe(200);
+    // La meccanica bresciana dimostrativa: in tutta Italia, non in una città.
+    expect(body['totale']).toBe(1);
+    expect(provider.criteriRicevuti).toHaveLength(1);
+    expect(provider.criteriRicevuti[0]?.ateco).toBe('2562');
+    expect(provider.criteriRicevuti[0]).not.toHaveProperty('comune');
   });
 
   it('con la sola città la ricerca parte, e il comune arriva al fornitore come codice catastale', async () => {

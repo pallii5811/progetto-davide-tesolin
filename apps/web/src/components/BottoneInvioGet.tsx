@@ -7,8 +7,8 @@ import { Rotella } from './Rotella';
 /**
  * Il pulsante di un `<form method="get">`, che mostra l'attesa e non si lascia ripremere.
  *
- * Nato dentro «Dammi l'elenco» (vedi `prospect/BottoneElenco.tsx`, dove è raccontato il
- * difetto che l'ha reso necessario) e portato qui quando è servito anche a «Quante sono?»:
+ * Nato dentro il pulsante dell'elenco (vedi `prospect/BottoneElenco.tsx`, dove è raccontato
+ * il difetto che l'ha reso necessario) e portato qui quando è servito anche al conteggio:
  * due copie della stessa sottigliezza sarebbero diventate due comportamenti diversi alla
  * prima correzione fatta su una sola.
  *

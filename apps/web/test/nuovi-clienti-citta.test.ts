@@ -4,16 +4,17 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Nuovi clienti per città, e niente più pagina «Ricerca».
+ * Ricerca Clienti: città facoltativa, testi del documento, niente più pagina «Ricerca».
  *
- * Richiesta di Simone del 13/09/2026: la città al posto della provincia, con tutti i comuni
- * e la ricerca per nome; tutti gli altri filtri facoltativi; «Min dipendenti» e «Max
- * dipendenti» al posto di «Addetti da/a»; la pagina «Ricerca» tolta, e la ricerca per
- * partita IVA come sezione a parte di «Nuovi clienti».
+ * Richiesta di Simone del 13/09/2026: la città al posto della provincia, con tutti i comuni e
+ * la ricerca per nome; la pagina «Ricerca» tolta, e la ricerca per partita IVA come sezione a
+ * parte. Cambi del 17/09/2026 («AEGIS - cambi.pptx», slide 1 e 2): la città non è più
+ * obbligatoria, i testi e i pulsanti cambiano nome, spariscono il richiamo dell'elenco di
+ * ventiquattro ore e l'avviso «Dati reali», e la ricerca singola è solo per partita IVA.
  *
  * Il comportamento lo provano i collaudi nel browser (`collaudo/prospect.spec.ts`); qui si
- * presidiano i punti che, tornando indietro per sbaglio, riaprirebbero una spesa o una
- * pagina che non esiste più — e che un collaudo nel browser vedrebbe solo girando.
+ * presidiano i punti che, tornando indietro per sbaglio, riaprirebbero una spesa, un testo
+ * tolto o una pagina che non esiste più — e che un collaudo nel browser vedrebbe solo girando.
  */
 
 const SORGENTI = fileURLToPath(new URL('../src/', import.meta.url));
@@ -23,7 +24,10 @@ function leggi(percorso: string): string {
 }
 
 function senzaCommenti(testo: string): string {
-  return testo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  return testo
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
 }
 
 function fileTsx(cartella = SORGENTI, raccolti: string[] = []): string[] {
@@ -35,7 +39,7 @@ function fileTsx(cartella = SORGENTI, raccolti: string[] = []): string[] {
   return raccolti;
 }
 
-describe('Nuovi clienti: la città', () => {
+describe('Ricerca Clienti: la città', () => {
   const pagina = senzaCommenti(leggi('app/prospect/page.tsx'));
   const selettore = senzaCommenti(leggi('app/prospect/SelettoreComune.tsx'));
 
@@ -45,17 +49,20 @@ describe('Nuovi clienti: la città', () => {
     expect(pagina).not.toMatch(/etichetta="Provincia"/);
   });
 
-  it('senza una città valida non parte nessuna ricerca a pagamento né conteggio', () => {
-    // La chiamata al servizio sta dentro il controllo sulla città, e in nessun altro posto.
+  it('la ricerca parte solo se è descritta un’impresa e la città, se c’è, è riconosciuta', () => {
     const chiamata = pagina.indexOf('await cercaProspect(');
     expect(chiamata).toBeGreaterThan(-1);
     expect(pagina.indexOf('await cercaProspect(', chiamata + 1), 'una seconda chiamata').toBe(-1);
-    const guardia = pagina.lastIndexOf('if (comuneScelto !== null) {', chiamata);
-    expect(guardia, 'la ricerca non è protetta dal controllo sulla città').toBeGreaterThan(-1);
+    const guardia = pagina.lastIndexOf('if (haDescrittoUnImpresa && !cittaNonRiconosciuta) {', chiamata);
+    expect(guardia, 'la ricerca non è protetta dai due controlli').toBeGreaterThan(-1);
     expect(pagina.slice(guardia, chiamata)).not.toContain('}');
+    // Forma giuridica e numero di aziende arrivano già compilati: non descrivono un'impresa.
+    expect(pagina).toContain(
+      "const SOLO_PREDEFINITI: readonly string[] = ['formaGiuridicaCodice', 'limite'];",
+    );
   });
 
-  it('al modulo arriva il codice catastale in un campo nascosto, e il testo scritto no', () => {
+  it('la città non è obbligatoria, ma un testo scritto e non scelto non parte', () => {
     expect(selettore).toMatch(
       /<input type="hidden" name="comune" value=\{scelto\?\.codiceCatastale \?\? ''\} \/>/,
     );
@@ -65,21 +72,106 @@ describe('Nuovi clienti: la città', () => {
       selettore.indexOf('role="combobox"') + 200,
     );
     expect(campoVisibile).not.toMatch(/\bname=/);
-    // Finché la città non è scelta il campo non è valido, e il browser non invia il modulo.
-    expect(selettore).toContain('setCustomValidity(');
-    expect(selettore).toMatch(/\brequired\b/);
+    expect(selettore).not.toMatch(/\brequired\b/);
+    expect(selettore).not.toMatch(/Obbligatoria/);
+    // Vuoto è valido; scritto ma non scelto no, e il browser non invia il modulo.
+    expect(selettore).toContain(
+      "scelto !== null || testo.trim() === '' ? '' : 'Scegli la città dall’elenco dei comuni.'",
+    );
+  });
+});
+
+describe('Ricerca Clienti: i testi del documento del 17/09/2026', () => {
+  const pagina = senzaCommenti(leggi('app/prospect/page.tsx'));
+
+  it('titolo, descrizione ed etichette', () => {
+    expect(pagina).toContain('Trova nuove aziende');
+    expect(pagina).toContain('Cerca le imprese che corrispondono ai tuoi criteri.');
+    for (const etichetta of [
+      'Dipendenti min.',
+      'Dipendenti max.',
+      'Fatturato min.',
+      'Fatturato max.',
+      'Ragione Sociale',
+      'Codice Fiscale Socio',
+    ]) {
+      expect(pagina, etichetta).toContain(`etichetta="${etichetta}"`);
+    }
+    expect(senzaCommenti(leggi('app/prospect/SelettoreLotto.tsx'))).toContain('Numero di aziende');
+    expect(pagina).toContain('nota="Inserisci il codice senza punti"');
+    expect(pagina).toContain('nota="Trova le società partecipate dalla stessa persona."');
+    expect(pagina).toContain(
+      'Per le ditte individuali alcuni dati finanziari potrebbero non essere disponibili.',
+    );
   });
 
-  it('i dipendenti si chiamano «Min dipendenti» e «Max dipendenti»', () => {
-    expect(pagina).toContain('etichetta="Min dipendenti"');
-    expect(pagina).toContain('etichetta="Max dipendenti"');
-    expect(pagina).not.toMatch(/Addetti da|Addetti a"/);
+  it('i pulsanti si chiamano «Conta Aziende» e «Crea Elenco»', () => {
+    expect(pagina).toContain(
+      'Conta Aziende <span className="text-testo-debole">non consuma crediti</span>',
+    );
+    expect(pagina).toContain('<BottoneElenco etichetta="Crea Elenco" />');
+    for (const vecchio of ['Quante sono?', 'Dammi l’elenco', "Dammi l'elenco", 'Dammi l&apos;elenco']) {
+      expect(pagina, vecchio).not.toContain(vecchio);
+    }
+  });
 
+  it('i testi tolti non ci sono più', () => {
+    for (const tolto of [
+      'Ricerca di nuovi clienti',
+      'Dati reali — ogni analisi consuma credito',
+      'è obbligatoria',
+      'Min dipendenti',
+      'Fatturato da (€)',
+      'Denominazione contiene',
+      'nella città scelta',
+      '<UltimoElenco',
+    ]) {
+      expect(pagina, tolto).not.toContain(tolto);
+    }
+    // Il richiamo di ventiquattro ore non esiste più come componente.
+    expect(leggi('app/prospect/UltimoElenco.tsx')).not.toMatch(/export function UltimoElenco\b/);
+  });
+
+  it('la dichiarazione in fondo alla pagina, con le sue parole', () => {
+    expect(pagina).toContain(
+      'Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono',
+    );
+    expect(pagina).toContain('secondo la normativa IVASS applicabile.');
+    // In fondo: dopo la sezione della ricerca singola.
+    expect(pagina.indexOf('normativa IVASS applicabile')).toBeGreaterThan(
+      pagina.indexOf('id="ricerca-azienda"'),
+    );
+  });
+
+  it('il confronto con l’elenco già comprato usa gli stessi nomi dei campi', () => {
     const ultimoElenco = leggi('app/prospect/UltimoElenco.tsx');
-    expect(ultimoElenco).toContain("addettiMin: 'min dipendenti'");
-    expect(ultimoElenco).toContain("addettiMax: 'max dipendenti'");
+    expect(ultimoElenco).toContain("addettiMin: 'dipendenti min.'");
+    expect(ultimoElenco).toContain("addettiMax: 'dipendenti max.'");
     expect(ultimoElenco).toContain("comune: 'città'");
+    expect(ultimoElenco).toContain("limite: 'numero di aziende'");
     expect(ultimoElenco).not.toContain("provincia: 'provincia'");
+    // Non promette più che rifarlo sia gratis: lo era solo per ventiquattro ore.
+    expect(senzaCommenti(ultimoElenco)).not.toMatch(/non consuma credito|ventiquattro/);
+  });
+});
+
+describe('La ricerca di una singola azienda, solo per partita IVA', () => {
+  it('la sezione sta in Ricerca Clienti, con il suo titolo', () => {
+    const pagina = senzaCommenti(leggi('app/prospect/page.tsx'));
+    expect(pagina).toContain('id="ricerca-azienda"');
+    expect(pagina).toContain('Cerca una singola azienda');
+    expect(pagina).toContain('Cerca per Partita IVA.');
+    expect(pagina).toContain('<ModuloRicerca');
+    expect(pagina.indexOf('id="ricerca-azienda"')).toBeLessThan(pagina.indexOf('<ModuloRicerca'));
+    expect(pagina).not.toMatch(/parametri\['q'\]/);
+  });
+
+  it('il modulo non ha più il campo della ragione sociale', () => {
+    const modulo = senzaCommenti(leggi('app/prospect/ModuloRicerca.tsx'));
+    expect(modulo).not.toMatch(/name="q"|Denominazione|Ragione sociale/);
+    expect(modulo).toContain('name="piva"');
+    expect(modulo).toContain('router.push(`/prospect?${parametri.toString()}`, { scroll: false })');
+    expect(modulo).not.toMatch(/router\.push\(`\/\?/);
   });
 });
 
@@ -91,24 +183,13 @@ describe('La pagina «Ricerca» non c’è più', () => {
     expect(menu).toContain("{ href: '/prospect', testo: 'Ricerca Clienti' }");
   });
 
-  it('«/» rinvia a Nuovi clienti portando con sé solo i parametri della ricerca per partita IVA', () => {
+  it('«/» rinvia a Ricerca Clienti portando con sé solo la partita IVA', () => {
     const radice = senzaCommenti(leggi('app/page.tsx'));
     expect(radice).toMatch(/redirect\(/);
-    expect(radice).toContain("for (const chiave of ['q', 'piva'])");
+    expect(radice).toContain("for (const chiave of ['piva'])");
     // Il parametro che spende non deve mai attraversare il rinvio.
     expect(radice).not.toContain('scarica');
     expect(radice).not.toMatch(/<form|ModuloRicerca|cercaAziende/);
-  });
-
-  it('la ricerca per partita IVA è una sezione di Nuovi clienti, e il suo modulo resta lì', () => {
-    const pagina = senzaCommenti(leggi('app/prospect/page.tsx'));
-    expect(pagina).toContain('id="ricerca-azienda"');
-    expect(pagina).toContain('<ModuloRicerca');
-    expect(pagina.indexOf('id="ricerca-azienda"')).toBeLessThan(pagina.indexOf('<ModuloRicerca'));
-
-    const modulo = senzaCommenti(leggi('app/prospect/ModuloRicerca.tsx'));
-    expect(modulo).toContain('router.push(`/prospect?${parametri.toString()}`, { scroll: false })');
-    expect(modulo).not.toMatch(/router\.push\(`\/\?/);
   });
 
   it('nessun collegamento dell’interfaccia porta più a «/»', () => {

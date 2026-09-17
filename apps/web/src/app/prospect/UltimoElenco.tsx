@@ -12,22 +12,19 @@ interface ElencoRicordato {
 }
 
 /**
- * L'elenco pagato non si perde più premendo «indietro».
+ * L'ultimo elenco comprato, ricordato sul dispositivo.
  *
- * Il caso è successo davvero: cinquanta centesimi di aziende scaricate, un clic su
- * «Analizza», il tasto indietro del browser — e la schermata di ricerca vuota, senza più
- * traccia di ciò che era stato comprato. La sensazione, legittima, è di aver buttato i
- * soldi.
+ * Serve a una domanda sola, prima di spendere: «questo elenco l'ho già comprato?». È
+ * successo, ed è costato venticinque centesimi per niente (vedi `ConfrontoConElencoComprato`).
  *
- * Tecnicamente non erano persi: l'archivio conserva l'elenco per ventiquattro ore e
- * rifare la stessa ricerca non costa nulla. Ma «non è perso, devi solo ricomporre a
- * memoria gli stessi sette filtri» non è una risposta accettabile — e nessuno la
- * conosceva comunque.
+ * Fino al 17/09/2026 serviva anche a ritrovare l'elenco pagato — il richiamo «Hai già
+ * scaricato un elenco… resta in archivio per ventiquattro ore» in testa alla pagina, e «Torna
+ * all'elenco» sulla scheda. Da quella data le aziende di ogni elenco comprato vanno nel CRM e
+ * ci restano per sempre («Questo deve andare nel CRM per sempre non per 24 ore. Togli
+ * totalmente questo banner», AEGIS - cambi.pptx): il richiamo è tolto, e si ritrovano lì.
  *
- * Qui la ricerca che ha prodotto un acquisto viene ricordata sul dispositivo, e le pagine
- * che possono riportarci offrono di riaprirla. Sul dispositivo e non sul server perché è
- * una comodità di chi sta lavorando, non un dato dello studio: non ha ragione di finire
- * in un archivio condiviso né di sopravvivere all'utente che l'ha fatta.
+ * Sul dispositivo e non sul server perché è una comodità di chi sta lavorando, non un dato
+ * dello studio: il dato dello studio sono le aziende, e quelle stanno nel CRM.
  */
 export function RicordaElenco({ query, quante }: { query: string; quante: number }) {
   useEffect(() => {
@@ -45,8 +42,8 @@ export function RicordaElenco({ query, quante }: { query: string; quante: number
  * Legge l'elenco ricordato, o `null` se non ce n'è uno leggibile.
  *
  * In un posto solo: due copie di questa lettura divergerebbero, e il giorno in cui
- * cambiasse la forma del dato una delle due pagine smetterebbe di ritrovare l'elenco
- * senza che nessuno se ne accorga.
+ * cambiasse la forma del dato il confronto smetterebbe di ritrovare l'elenco senza che
+ * nessuno se ne accorga.
  */
 function useElencoRicordato(): ElencoRicordato | null {
   const [ultimo, setUltimo] = useState<ElencoRicordato | null>(null);
@@ -57,23 +54,23 @@ function useElencoRicordato(): ElencoRicordato | null {
       if (grezzo === null) return;
       const letto: unknown = JSON.parse(grezzo);
       if (
-        typeof letto === 'object' &&
-        letto !== null &&
-        typeof (letto as { query?: unknown }).query === 'string' &&
-        typeof (letto as { quante?: unknown }).quante === 'number' &&
-        /*
-          Un elenco ricordato senza una città valida non si offre di riaprirlo.
-
-          Fino al 13/09/2026 la ricerca era per provincia; da allora la città è obbligatoria
-          e la pagina non cerca senza. Un elenco comprato prima, riaperto, mostrerebbe un
-          modulo senza città e nessun risultato: un «Riaprilo» che non riapre niente è
-          peggio di nessun collegamento. L'archivio lo conserva comunque ventiquattro ore.
-        */
-        comunePerCodiceCatastale(new URLSearchParams((letto as { query: string }).query).get('comune')) !==
-          null
+        typeof letto !== 'object' ||
+        letto === null ||
+        typeof (letto as { query?: unknown }).query !== 'string' ||
+        typeof (letto as { quante?: unknown }).quante !== 'number'
       ) {
-        setUltimo(letto as ElencoRicordato);
+        return;
       }
+      const parametri = new URLSearchParams((letto as { query: string }).query);
+      const comune = parametri.get('comune') ?? '';
+      /*
+        Un elenco di prima del 13/09/2026 si cercava per provincia, un parametro che la pagina
+        non legge più: confrontarlo con i filtri di adesso direbbe «filtri quasi uguali» su due
+        ricerche diverse. E una città che non è un comune non è un confronto possibile.
+      */
+      if (parametri.has('provincia')) return;
+      if (comune !== '' && comunePerCodiceCatastale(comune) === null) return;
+      setUltimo(letto as ElencoRicordato);
     } catch {
       // Contenuto illeggibile: si fa come se non ci fosse.
     }
@@ -82,38 +79,18 @@ function useElencoRicordato(): ElencoRicordato | null {
   return ultimo;
 }
 
-export function UltimoElenco() {
-  const ultimo = useElencoRicordato();
-  if (ultimo === null) return null;
-
-  return (
-    <div className="mb-6 rounded-lg border border-bordo bg-superficie p-4">
-      <p className="text-sm">
-        <strong>Hai già scaricato un elenco</strong> di {ultimo.quante}{' '}
-        {ultimo.quante === 1 ? 'azienda' : 'aziende'}.{' '}
-        <Link href={`/prospect?${ultimo.query}`} className="text-marchio underline">
-          Riaprilo
-        </Link>{' '}
-        <span className="text-testo-tenue">
-          — resta in archivio per ventiquattro ore e riaprirlo non consuma credito.
-        </span>
-      </p>
-    </div>
-  );
-}
-
-/** Come si chiamano i filtri quando bisogna dirli a una persona. */
+/** Come si chiamano i filtri quando bisogna dirli a una persona: come le etichette del modulo. */
 const ETICHETTE: Readonly<Record<string, string>> = {
   comune: 'città',
-  denominazione: 'denominazione',
+  denominazione: 'ragione sociale',
   ateco: 'codice ATECO',
-  addettiMin: 'min dipendenti',
-  addettiMax: 'max dipendenti',
-  fatturatoMinEuro: 'fatturato da',
-  fatturatoMaxEuro: 'fatturato a',
-  socioCodiceFiscale: 'codice fiscale del socio',
+  addettiMin: 'dipendenti min.',
+  addettiMax: 'dipendenti max.',
+  fatturatoMinEuro: 'fatturato min.',
+  fatturatoMaxEuro: 'fatturato max.',
+  socioCodiceFiscale: 'codice fiscale socio',
   formaGiuridicaCodice: 'forma giuridica',
-  limite: 'quante aziende',
+  limite: 'numero di aziende',
 };
 
 /** La città si dice col nome e la sigla, non col codice catastale che viaggia nell'indirizzo. */
@@ -134,10 +111,11 @@ function valoreLeggibile(chiave: string, valore: string): string {
  *
  * Il prodotto aveva ragione e la persona pure: nessuno dei due poteva sapere dell'altro,
  * perché a schermo non c'era **niente** che dicesse quali filtri avevano prodotto
- * l'elenco già in archivio. La differenza era una cifra su sette campi.
+ * l'elenco già comprato. La differenza era una cifra su sette campi.
  *
- * Qui quella differenza si vede prima di premere, con accanto il fatto che conta: riaprire
- * l'elenco che si ha già non consuma credito.
+ * Qui quella differenza si vede prima di premere, con accanto il fatto che conta: le aziende
+ * di quell'elenco sono già nel CRM. Non si promette più che rifarlo sia gratuito: lo era solo
+ * per le ventiquattro ore in cui la risposta resta in archivio.
  */
 export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Record<string, string>> }) {
   const ultimo = useElencoRicordato();
@@ -158,19 +136,19 @@ export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Reco
     }
   }
 
-  const riapri = (
-    <Link href={`/prospect?${ultimo.query}`} className="text-marchio underline">
-      Riaprilo
+  const crm = (
+    <Link href="/portafoglio" className="text-marchio underline">
+      Aprile nel CRM
     </Link>
   );
+  const aziende = `${ultimo.quante} ${ultimo.quante === 1 ? 'azienda' : 'aziende'}`;
 
   if (differenze.length === 0) {
     return (
       <div className="mb-4 rounded-lg border border-rilevante/30 bg-rilevante-fondo p-3 text-sm">
-        <strong>Questo elenco l&apos;hai già comprato.</strong> {riapri}{' '}
-        <span className="text-testo-tenue">
-          — è lo stesso, e riaprirlo non consuma credito. Premere «Dammi l&apos;elenco» lo ricomprerebbe.
-        </span>
+        <strong>Questo elenco l&apos;hai già comprato.</strong>{' '}
+        {ultimo.quante === 1 ? 'La sua azienda è' : `Le sue ${aziende} sono`} nel CRM: {crm}.{' '}
+        <span className="text-testo-tenue">Non serve crearlo di nuovo.</span>
       </div>
     );
   }
@@ -178,11 +156,8 @@ export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Reco
   return (
     <div className="mb-4 rounded-lg border border-bordo bg-superficie p-3 text-sm">
       <p>
-        <strong>
-          Hai già un elenco di {ultimo.quante} {ultimo.quante === 1 ? 'azienda' : 'aziende'}
-        </strong>{' '}
-        con filtri quasi uguali. {riapri}{' '}
-        <span className="text-testo-tenue">— riaprirlo non consuma credito.</span>
+        <strong>Hai già comprato un elenco di {aziende}</strong> con filtri quasi uguali, e{' '}
+        {ultimo.quante === 1 ? 'la sua azienda è' : 'le sue aziende sono'} nel CRM: {crm}.
       </p>
       <ul className="mt-2 space-y-0.5 text-testo-tenue">
         {differenze.map((d) => (
@@ -193,37 +168,5 @@ export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Reco
         ))}
       </ul>
     </div>
-  );
-}
-
-/**
- * Il ritorno all'elenco, dalla scheda di un'azienda.
- *
- * Chi vaglia cinque prospect uno dopo l'altro fa cinque volte lo stesso viaggio, e finora
- * l'unica via di ritorno era il tasto «indietro» del browser: chi usava il menu si
- * ritrovava davanti al modulo di ricerca vuoto, con la sensazione di aver perso l'elenco
- * appena pagato. Non l'aveva perso — ma doveva ricomporre i filtri a memoria per
- * riottenerlo, che è quasi la stessa cosa.
- *
- * Riaprire non consuma credito: la stessa ricerca resta in archivio ventiquattro ore.
- * Vale la pena dirlo nel collegamento, perché la domanda «e se mi rifà pagare?» è la
- * ragione per cui uno non ci clicca.
- *
- * Non compare se non c'è nessun elenco ricordato: chi è arrivato qui dalla ricerca per
- * nome non ha un elenco a cui tornare, e un collegamento che riporta altrove è peggio di
- * un collegamento assente.
- */
-export function RitornoAllElenco() {
-  const ultimo = useElencoRicordato();
-  if (ultimo === null) return null;
-
-  return (
-    <Link
-      href={`/prospect?${ultimo.query}`}
-      className="text-xs text-marchio hover:underline"
-      title="Riaprire l’elenco non consuma credito: resta in archivio per ventiquattro ore."
-    >
-      ← Torna all’elenco ({ultimo.quante} {ultimo.quante === 1 ? 'azienda' : 'aziende'})
-    </Link>
   );
 }

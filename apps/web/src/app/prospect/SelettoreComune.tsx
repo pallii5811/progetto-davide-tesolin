@@ -18,17 +18,19 @@ function conPuntiDelleMigliaia(numero: number): string {
 }
 
 /**
- * La città della ricerca di nuovi clienti: tutti i comuni italiani, cercando per nome.
+ * La città della ricerca clienti: tutti i comuni italiani, cercando per nome.
  *
- * Al posto della provincia, su richiesta di Simone del 13/09/2026, ed è l'unico filtro
- * obbligatorio. Si scrive e si sceglie dall'elenco ISTAT; al modulo arriva il **codice
- * catastale** in un campo nascosto, perché è con quello che il fornitore filtra e perché
- * un nome non basta a identificare un comune — Livo è in provincia di Como e di Trento.
+ * Al posto della provincia, su richiesta di Simone del 13/09/2026. Era obbligatoria; dal
+ * 17/09/2026 è facoltativa («Questo non obbligatorio», AEGIS - cambi.pptx). Si scrive e si
+ * sceglie dall'elenco ISTAT; al modulo arriva il **codice catastale** in un campo nascosto,
+ * perché è con quello che il fornitore filtra e perché un nome non basta a identificare un
+ * comune — Livo è in provincia di Como e di Trento.
  *
  * Il campo visibile non ha nome e non viene inviato: se l'invio partisse con un testo
- * scritto a metà, il servizio cercherebbe una città che nessuno ha scelto. Finché la città
- * non è scelta il campo si dichiara non valido, e il browser **non invia il modulo**: né
- * «Quante sono?» né «Dammi l'elenco», che spende.
+ * scritto a metà, il servizio cercherebbe in tutta Italia al posto della città che l'utente
+ * crede di aver scelto. Vuoto va bene; scritto ma non scelto no: il campo si dichiara non
+ * valido, e il browser **non invia il modulo** — né «Conta Aziende» né «Crea Elenco», che
+ * spende.
  *
  * Un nome che appartiene a un solo comune — «brescia», «forli» — vale come scelta anche
  * senza toccare l'elenco; un nome condiviso no, perché indovinare la provincia sarebbe un
@@ -52,11 +54,7 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
 
   useEffect(() => {
     campo.current?.setCustomValidity(
-      scelto !== null
-        ? ''
-        : testo.trim() === ''
-          ? 'Scegli la città: è l’unico filtro obbligatorio.'
-          : 'Scegli la città dall’elenco dei comuni.',
+      scelto !== null || testo.trim() === '' ? '' : 'Scegli la città dall’elenco dei comuni.',
     );
   }, [scelto, testo]);
 
@@ -79,7 +77,6 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
         id={idCampo}
         type="text"
         role="combobox"
-        required
         aria-autocomplete="list"
         aria-expanded={mostraElenco}
         aria-controls={idElenco}
@@ -171,8 +168,8 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
 
       <span id={idNota} className="mt-1 block text-xs text-testo-debole">
         {scelto === null
-          ? `Obbligatoria: scegli fra i ${conPuntiDelleMigliaia(COMUNI_ITALIANI.length)} comuni italiani.`
-          : `Obbligatoria · codice catastale ${scelto.codiceCatastale}`}
+          ? `Scegli fra i ${conPuntiDelleMigliaia(COMUNI_ITALIANI.length)} comuni italiani.`
+          : `Codice catastale ${scelto.codiceCatastale}`}
       </span>
     </div>
   );

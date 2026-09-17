@@ -5,7 +5,8 @@ import { BottoneInvioGet } from '@/components/BottoneInvioGet';
 /**
  * Il pulsante che spende, e che dopo il primo clic non spende una seconda volta.
  *
- * IL DIFETTO. «Dammi l'elenco» era un `submit` dentro un modulo che naviga: finché il
+ * IL DIFETTO. «Crea Elenco» (fino al 17/09/2026 «Dammi l'elenco») era un `submit` dentro un
+ * modulo che naviga: finché il
  * server non risponde la pagina resta identica, nessuna attesa è visibile, e il pulsante si
  * lascia premere ancora. Un secondo clic è un secondo acquisto — a cinque centesimi per
  * azienda, un lotto da venticinque costa 1,25 € e chi non vede succedere niente clicca di
@@ -19,7 +20,7 @@ import { BottoneInvioGet } from '@/components/BottoneInvioGet';
  * PERCHÉ IL DISABILITARE È DIFFERITO, e questa riga è costata una prova rossa.
  *
  * Disabilitare il pulsante che sta inviando fa ANNULLARE l'invio al browser: il collaudo ha
- * cliccato «Dammi l'elenco» e non è arrivata nessuna tabella, perché la navigazione non è
+ * cliccato il pulsante dell'elenco e non è arrivata nessuna tabella, perché la navigazione non è
  * mai partita. Spostare l'ascolto da `onClick` all'evento `submit` non basta — l'evento
  * scatta prima che il browser cominci davvero — quindi lo spegnimento si rimanda al giro
  * successivo del ciclo di eventi, quando la richiesta è già in volo.
@@ -29,7 +30,7 @@ import { BottoneInvioGet } from '@/components/BottoneInvioGet';
  */
 export function BottoneElenco({ etichetta }: { etichetta: string }) {
   // La logica dello spegnimento differito sta in BottoneInvioGet, dove la usa anche
-  // «Quante sono?»: due copie della stessa sottigliezza divergerebbero alla prima correzione.
+  // «Conta Aziende»: due copie della stessa sottigliezza divergerebbero alla prima correzione.
   return (
     <BottoneInvioGet
       name="scarica"
