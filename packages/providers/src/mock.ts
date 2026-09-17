@@ -26,6 +26,21 @@ import type {
 interface Variante {
   readonly denominazione: string;
   readonly partitaIva: string;
+  /**
+   * Telefono, PEC e sito dell'azienda dimostrativa.
+   *
+   * Assenti, restano vuoti: NON si ereditano dal profilo di base. Fino al 17/09/2026 si
+   * ereditavano, e nel CRM tre aziende su quattro mostravano la PEC e il sito di MECCANICA
+   * BRESCIANA — un dato falso che sembrava un difetto della lettura dei contatti.
+   *
+   * I domini sono .example, riservati dalla RFC 2606: non esistono e nessuno può registrarli,
+   * quindi un contatto dimostrativo non può finire addosso a un'impresa vera.
+   */
+  readonly contatti?: {
+    readonly telefono: string;
+    readonly pec: string;
+    readonly sitoWeb: string;
+  };
   readonly comune: string;
   readonly provincia: string;
   /** Codice catastale del comune: la ricerca di nuovi clienti filtra per questo. */
@@ -70,6 +85,11 @@ const VARIANTI: readonly Variante[] = [
   {
     denominazione: 'COSTRUZIONI IRPINE S.R.L.',
     partitaIva: '02657870644',
+    contatti: {
+      telefono: '+39 0825 000000',
+      pec: 'costruzioniirpine@pec.example',
+      sitoWeb: 'https://www.costruzioniirpine.example',
+    },
     comune: 'Avellino',
     provincia: 'AV',
     codiceCatastale: 'A509',
@@ -81,6 +101,11 @@ const VARIANTI: readonly Variante[] = [
   {
     denominazione: 'ADRIATICA LOGISTICA S.R.L.',
     partitaIva: '02413390390',
+    contatti: {
+      telefono: '+39 0544 000000',
+      pec: 'adriaticalogistica@pec.example',
+      sitoWeb: 'https://www.adriaticalogistica.example',
+    },
     comune: 'Ravenna',
     provincia: 'RA',
     codiceCatastale: 'H199',
@@ -278,8 +303,10 @@ export class MockCompanyProvider implements CompanyDataProvider {
       di ripiego, e la modalità dimostrativa è dichiarata in testa a ogni pagina: nessuno
       può scambiarli per dati reali.
     */
+    // Un'azienda inventata sul momento non ha contatti: quelli della prima variante sono suoi.
+    const { contatti: _contatti, ...ripiego } = VARIANTI[0]!;
     const variante: Variante = nota ?? {
-      ...VARIANTI[0]!,
+      ...ripiego,
       partitaIva: normalizzato,
       denominazione: `AZIENDA DIMOSTRATIVA ${normalizzato}`,
     };
@@ -334,6 +361,10 @@ function applicaVariante(base: CompanyProfile, variante: Variante): CompanyProfi
         atecoPrimario: parseAtecoOrThrow(variante.ateco),
         atecoPrimarioDescrizione: variante.atecoDescrizione,
         numeroAddetti: scala(base.anagrafica.value.numeroAddetti ?? 30),
+        // I contatti sono di questa azienda, o non ci sono: mai quelli del profilo di base.
+        telefono: variante.contatti?.telefono ?? null,
+        pec: variante.contatti?.pec ?? null,
+        sitoWeb: variante.contatti?.sitoWeb ?? null,
         // Il codice catastale segue il comune: ereditato dal profilo di base, le aziende di
         // Avellino e Ravenna mostravano quello di Adro accanto a una sede in un'altra città.
         codiceCatastale: variante.codiceCatastale,

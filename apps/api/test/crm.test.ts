@@ -22,6 +22,7 @@ interface VoceDto {
   comune: string | null;
   telefono: string | null;
   pec: string | null;
+  sitoWeb: string | null;
   stato: string;
   nota: string | null;
   analizzataIl: string | null;
@@ -195,11 +196,24 @@ describe('CRM su database', () => {
     });
     expect(analisi.statusCode).toBe(200);
 
-    const adriatica = (await leggi()).find((a) => a.identificativo === ADRIATICA);
+    /*
+      I contatti sono quelli DI QUESTA azienda.
+
+      Con due aziende nel CRM, una query che prendesse l'ultimo snapshot dell'archivio invece di
+      quello dell'azienda darebbe le stesse righe piene e passerebbe un controllo generico. Finché
+      le aziende dimostrative si ereditavano i contatti fra loro, questa differenza non era
+      nemmeno osservabile.
+    */
+    const aziende = await leggi();
+    const adriatica = aziende.find((a) => a.identificativo === ADRIATICA);
     expect(adriatica?.analizzataIl).not.toBeNull();
     expect(adriatica?.daElencoIl).toBeNull();
-    expect(adriatica?.pec).toMatch(/@/);
-    expect(adriatica?.telefono).not.toBeNull();
+    expect(adriatica?.pec).toBe('adriaticalogistica@pec.example');
+    expect(adriatica?.telefono).toBe('+39 0544 000000');
+    expect(adriatica?.sitoWeb).toBe('https://www.adriaticalogistica.example');
+
+    const meccanica = aziende.find((a) => a.identificativo === MECCANICA);
+    expect(meccanica?.pec).not.toBe(adriatica?.pec);
   });
 
   it('un altro studio non vede il CRM, e non può cambiarne una riga', async () => {
