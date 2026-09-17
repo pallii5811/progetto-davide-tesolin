@@ -62,7 +62,6 @@ describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
       '/',
       '/portafoglio',
       '/prospect',
-      '/monitoraggio',
       '/azienda/03158460174',
       '/impostazioni/costi',
     ]) {

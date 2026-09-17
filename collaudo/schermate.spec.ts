@@ -23,8 +23,6 @@ const PAGINE: { nome: string; percorso: string }[] = [
   { nome: '03-analisi', percorso: `/azienda/${AZIENDA_DI_PROVA}` },
   { nome: '04-intervista', percorso: `/azienda/${AZIENDA_DI_PROVA}/dati` },
   { nome: '05-report', percorso: `/azienda/${AZIENDA_DI_PROVA}/report` },
-  { nome: '06-monitoraggio', percorso: '/monitoraggio' },
-  { nome: '07-catalogo', percorso: '/catalogo' },
   { nome: '08-impostazioni', percorso: '/impostazioni' },
   { nome: '09-utenti', percorso: '/impostazioni/utenti' },
 ];
@@ -34,7 +32,7 @@ test.describe('@visuale schermate', () => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await accedi(page);
-    await popolaMonitoraggio(page);
+    await popolaCrm(page);
 
     for (const { nome, percorso } of PAGINE) {
       await page.goto(percorso);
@@ -49,7 +47,7 @@ test.describe('@visuale schermate', () => {
     // davanti al cliente, e non sempre ha un portatile aperto.
     await page.setViewportSize({ width: 390, height: 844 });
     await accedi(page);
-    await popolaMonitoraggio(page);
+    await popolaCrm(page);
 
     for (const { nome, percorso } of PAGINE) {
       await page.goto(percorso);
@@ -108,18 +106,12 @@ test.describe('@visuale schermate', () => {
 });
 
 /**
- * Una schermata di monitoraggio vuota non mostra nulla di ciò che va guardato: prima si
- * analizza un'azienda e si esegue il monitoraggio, così le immagini rappresentano la
- * piattaforma al lavoro e non appena installata.
+ * Un CRM vuoto non mostra nulla di ciò che va guardato: prima si analizza un'azienda, così
+ * le immagini rappresentano la piattaforma al lavoro e non appena installata.
+ *
+ * Eseguiva anche il monitoraggio, tolto il 17/09/2026 («AEGIS - cambi.pptx»).
  */
-async function popolaMonitoraggio(page: Page): Promise<void> {
+async function popolaCrm(page: Page): Promise<void> {
   await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
   await page.waitForLoadState('networkidle');
-
-  await page.goto('/monitoraggio');
-  const aggiorna = page.getByRole('button', { name: /aggiorna monitoraggio/i });
-  if ((await aggiorna.count()) > 0) {
-    await aggiorna.click();
-    await page.waitForLoadState('networkidle');
-  }
 }

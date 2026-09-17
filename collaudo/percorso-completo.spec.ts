@@ -209,9 +209,5 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
       csv.toLowerCase(),
       'un file che esce dalla piattaforma non deve dichiarare inadempienze non verificate',
     ).not.toContain('da sanare');
-
-    // ── 5. Il monitoraggio gira, e dichiara di non consumare credito ──────
-    await page.goto('/monitoraggio');
-    await expect(page.getByText(/Non consuma credito dati/i)).toBeVisible();
   });
 });

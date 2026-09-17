@@ -8,7 +8,7 @@ import { Rotella } from './Rotella';
  * Il pulsante che invia un modulo con un'azione, e mostra che l'invio è in corso.
  *
  * `useFormStatus` legge il modulo che lo contiene, quindi funziona anche dentro una pagina
- * che gira sul server — «Esci» nell'intestazione, «Segna gestito» nel monitoraggio — senza
+ * che gira sul server — «Esci» nell'intestazione, per esempio — senza
  * trasformare la pagina intera in un componente di client.
  *
  * Durante l'invio il pulsante è spento: il secondo clic non parte. E `aria-busy` più il

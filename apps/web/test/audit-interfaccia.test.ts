@@ -306,7 +306,7 @@ describe('75 · la navigazione dice dove ci si trova', () => {
     expect(eAttiva('/portafoglio', '/')).toBe(false);
     expect(eAttiva('/', '/')).toBe(true);
     expect(eAttiva('/portafoglio', '/portafoglio')).toBe(true);
-    expect(eAttiva('/portafoglio/importa', '/portafoglio')).toBe(true);
+    expect(eAttiva('/portafoglio/esporta', '/portafoglio')).toBe(true);
     // `/prospect` non è dentro `/pros`: il confronto è per segmento, non per lettere.
     expect(eAttiva('/prospetto', '/prospect')).toBe(false);
     expect(eAttiva(null, '/')).toBe(false);
@@ -801,42 +801,14 @@ describe('63 · il prezzo per riga si ricava dal totale del fornitore', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 72 · «Servizio non raggiungibile» quando il denaro è già stato speso
-// ─────────────────────────────────────────────────────────────────────────────
+/*
+  72 · «Servizio non raggiungibile» quando il denaro è già stato speso.
 
-describe('72 · un’importazione interrotta non si dichiara mai avvenuta', () => {
-  it('solo un rifiuto di connessione prova che nulla è partito', async () => {
-    const { nullaEPartito } = await import('../src/lib/errore-rete.js');
-
-    const rifiutata = new TypeError('fetch failed');
-    (rifiutata as { cause?: unknown }).cause = Object.assign(new Error('connect ECONNREFUSED'), {
-      code: 'ECONNREFUSED',
-    });
-    expect(nullaEPartito(rifiutata)).toBe(true);
-
-    const cadutaAMeta = new TypeError('fetch failed');
-    (cadutaAMeta as { cause?: unknown }).cause = Object.assign(new Error('socket hang up'), {
-      code: 'ECONNRESET',
-    });
-    expect(
-      nullaEPartito(cadutaAMeta),
-      'la connessione è caduta dopo la partenza: le aziende possono essere state acquisite e pagate',
-    ).toBe(false);
-
-    expect(nullaEPartito(new TypeError('fetch failed'))).toBe(false);
-    expect(nullaEPartito('qualcosa')).toBe(false);
-  });
-
-  it('l’azione che spende usa la distinzione', () => {
-    const azioni = leggi('app/portafoglio/importa/actions.ts');
-    const esegui = azioni.slice(azioni.indexOf('export async function eseguiImportazione'));
-    expect(
-      esegui,
-      'il ramo di errore diceva «Servizio non raggiungibile» anche quando il denaro era già stato speso',
-    ).toMatch(/nullaEPartito/);
-  });
-});
+  Riguardava l'importazione dell'elenco clienti, tolta il 17/09/2026 («AEGIS - cambi.pptx»)
+  insieme alla distinzione fra richiesta partita e mai partita, che solo lei usava. Se
+  un'altra azione che spende tornasse a passare da una server action, quella distinzione va
+  rimessa: è nella storia del repository, in apps/web/src/lib/errore-rete.ts.
+*/
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colore: conversione oklch → sRGB, per misurare invece di stimare

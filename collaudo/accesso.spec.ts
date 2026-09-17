@@ -4,7 +4,7 @@ import { AMMINISTRATORE } from './ambiente.js';
 
 test.describe('Accesso e protezione delle pagine', () => {
   test('senza sessione ogni pagina riservata rinvia all’accesso', async ({ page }) => {
-    for (const percorso of ['/', '/portafoglio', '/catalogo', '/impostazioni', '/impostazioni/utenti']) {
+    for (const percorso of ['/', '/portafoglio', '/prospect', '/impostazioni', '/impostazioni/utenti']) {
       const risposta = await page.goto(percorso);
 
       // Non basta guardare dove si finisce: si verifica che il rinvio sia un vero 307,

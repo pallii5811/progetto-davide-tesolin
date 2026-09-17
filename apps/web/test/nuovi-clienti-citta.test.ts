@@ -88,7 +88,7 @@ describe('La pagina «Ricerca» non c’è più', () => {
     const menu = senzaCommenti(leggi('app/NavigazionePrincipale.tsx'));
     expect(menu).not.toMatch(/href: '\/'/);
     expect(menu).not.toContain("testo: 'Ricerca'");
-    expect(menu).toContain("{ href: '/prospect', testo: 'Nuovi clienti' }");
+    expect(menu).toContain("{ href: '/prospect', testo: 'Ricerca Clienti' }");
   });
 
   it('«/» rinvia a Nuovi clienti portando con sé solo i parametri della ricerca per partita IVA', () => {

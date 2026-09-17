@@ -1218,58 +1218,6 @@ export interface VocePortafoglio {
   analizzataIl: string;
 }
 
-export interface EventoMonitoraggioDto {
-  id: string;
-  identificativoAzienda: string;
-  denominazioneAzienda: string;
-  tipo: string;
-  titolo: string;
-  descrizione: string;
-  rilevanza: number;
-  azioneSuggerita: string | null;
-  valorePrecedente: unknown;
-  valoreNuovo: unknown;
-  rilevatoIl: string;
-  gestitoIl: string | null;
-}
-
-export async function leggiMonitoraggio(
-  tutti = false,
-): Promise<{ eventi: EventoMonitoraggioDto[]; daGestire: number }> {
-  return chiama(`/api/monitoraggio${tutti ? '?tutti=1' : ''}`);
-}
-
-export interface RischioCatalogo {
-  id: string;
-  etichetta: string;
-  categoria: string;
-  descrizione: string;
-  probabilitaBase: number;
-  impattoBase: number;
-  coperture: string[];
-  assicurabile: boolean;
-  riferimenti: string[];
-}
-
-export interface CoperturaCatalogo {
-  id: string;
-  etichetta: string;
-  categoria: string;
-  descrizione: string;
-  obbligoDiLegge: boolean;
-  motivazioneTipo: string;
-  insidie: string[];
-  riferimenti: string[];
-}
-
-export async function leggiCatalogoRischi(): Promise<{ rischi: RischioCatalogo[] }> {
-  return chiama('/api/catalogo/rischi');
-}
-
-export async function leggiCatalogoCoperture(): Promise<{ coperture: CoperturaCatalogo[] }> {
-  return chiama('/api/catalogo/coperture');
-}
-
 export type RuoloUtente = 'amministratore' | 'broker' | 'assistente' | 'sola-lettura';
 
 export interface UtenteElencoDto {

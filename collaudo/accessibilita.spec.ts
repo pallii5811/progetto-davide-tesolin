@@ -21,9 +21,7 @@ const PAGINE: readonly (readonly [string, string])[] = [
   // 13/09/2026 quella ricerca è una sezione di «Nuovi clienti», non più una pagina.
   ['nuovi clienti, conteggio in una città', '/prospect?comune=A060'],
   ['nuovi clienti, ricerca per partita IVA', '/prospect?piva=03158460174'],
-  ['portafoglio', '/portafoglio'],
-  ['monitoraggio', '/monitoraggio'],
-  ['catalogo rischi', '/catalogo'],
+  ['CRM', '/portafoglio'],
   ['impostazioni', '/impostazioni'],
   ['compagnie', '/impostazioni/compagnie'],
   ['studi sulla piattaforma', '/impostazioni/studi'],

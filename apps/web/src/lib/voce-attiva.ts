@@ -10,8 +10,8 @@
  *
  * Con un confronto per prefisso «Ricerca» risulterebbe aperta ovunque, perché ogni
  * percorso comincia per `/`: le voci correnti sarebbero due, che è peggio di nessuna.
- * Per le altre il prefisso serve — `/portafoglio/importa` sta sotto il portafoglio — ma
- * si confronta **per segmento**: `startsWith('/prospect')` accenderebbe «Nuovi clienti»
+ * Per le altre il prefisso serve — `/portafoglio/esporta` sta sotto il CRM — ma si
+ * confronta **per segmento**: `startsWith('/prospect')` accenderebbe «Ricerca Clienti»
  * anche su un ipotetico `/prospetto`.
  */
 export function eAttiva(percorso: string | null, href: string): boolean {

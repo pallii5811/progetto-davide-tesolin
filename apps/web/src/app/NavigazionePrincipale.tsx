@@ -23,21 +23,23 @@ import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
  * generico «corrente».
  */
 /*
-  «Ricerca» non c'è più: tolta su richiesta di Simone del 13/09/2026. La ricerca per partita
-  IVA vive dentro «Nuovi clienti», come sezione a parte, e «/» rinvia lì.
+  Due voci, dal 17/09/2026 («AEGIS - cambi.pptx»).
+
+  «Ricerca» non c'è più dal 13/09/2026: la ricerca per partita IVA vive dentro «Ricerca
+  Clienti», come sezione a parte, e «/» rinvia lì. «Nuovi clienti» si chiama «Ricerca
+  Clienti», «Portafoglio» si chiama «CRM», e Monitoraggio e Catalogo rischi sono stati tolti:
+  i loro indirizzi rinviano al CRM (next.config.mjs), così un segnalibro non finisce su un 404.
 */
 const VOCI: readonly { readonly href: string; readonly testo: string }[] = [
-  { href: '/prospect', testo: 'Nuovi clienti' },
-  { href: '/portafoglio', testo: 'Portafoglio' },
-  { href: '/monitoraggio', testo: 'Monitoraggio' },
-  { href: '/catalogo', testo: 'Catalogo rischi' },
+  { href: '/prospect', testo: 'Ricerca Clienti' },
+  { href: '/portafoglio', testo: 'CRM' },
 ];
 
 export function NavigazionePrincipale() {
   const percorso = usePathname();
 
   return (
-    // `flex-wrap`: a 390 pixel le cinque voci non stanno su una riga, e senza andavano
+    // `flex-wrap`: a 390 pixel le voci del menu non stavano su una riga, e senza andavano
     // fuori schermo trascinandosi dietro l'intera pagina.
     <nav aria-label="Principale" className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-testo-tenue">
       {VOCI.map((voce) => {

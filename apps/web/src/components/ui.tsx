@@ -246,16 +246,16 @@ export function Avviso({
  * che è il modo più veloce di far sentire incapace chi paga.
  *
  * La pagina iniziale faceva già questa distinzione, con il commento che la spiega. Tre
- * pagine — catalogo, elenco utenti, monitoraggio — no: dicevano la frase da sviluppatore a
- * chiunque, anche in esercizio. Qui la distinzione sta in un posto solo, così la prossima
+ * pagine — catalogo, elenco utenti, monitoraggio, le prime due tolte il 17/09/2026 — no:
+ * dicevano la frase da sviluppatore a chiunque, anche in esercizio. Qui la distinzione sta in un posto solo, così la prossima
  * schermata che ne ha bisogno non deve ricordarsene.
  */
 export function ServizioNonRaggiungibile({ cosa, titolo }: { cosa: string; titolo: string }) {
   if (process.env.NODE_ENV === 'production') {
     return (
       <Avviso tono="critico" titolo={titolo}>
-        Non è stato possibile leggere {cosa}. I dati già acquisiti restano consultabili dal portafoglio. Se
-        la situazione persiste, segnalarlo all’assistenza.
+        Non è stato possibile leggere {cosa}. I dati già acquisiti restano consultabili dal CRM. Se la
+        situazione persiste, segnalarlo all’assistenza.
       </Avviso>
     );
   }

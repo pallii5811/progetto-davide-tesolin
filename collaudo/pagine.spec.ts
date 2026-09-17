@@ -17,7 +17,6 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
   const pagine = [
     { percorso: '/prospect', atteso: /Ricerca di nuovi clienti/i },
     { percorso: '/portafoglio', atteso: /Portafoglio/i },
-    { percorso: '/catalogo', atteso: /Cataloghi di riferimento/i },
     { percorso: '/impostazioni', atteso: /Cambia password/i },
     { percorso: '/impostazioni/utenti', atteso: /Utenti dello studio/i },
   ];
@@ -66,12 +65,23 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
     });
   }
 
-  test('il catalogo elenca davvero i rischi, non una pagina vuota', async ({ page }) => {
-    await page.goto('/catalogo');
+  /*
+    Monitoraggio, Catalogo rischi e Importa elenco clienti sono stati tolti il 17/09/2026
+    («AEGIS - cambi.pptx»). I loro indirizzi portano al CRM: un segnalibro vecchio non deve
+    finire su una pagina inesistente, e non deve riaprire una pagina tolta.
+  */
+  for (const tolta of ['/monitoraggio', '/catalogo', '/portafoglio/importa']) {
+    test(`${tolta} non esiste più e porta al CRM`, async ({ page }) => {
+      const risposta = await page.goto(tolta);
+      expect(risposta?.status(), tolta).toBeLessThan(400);
+      await expect(page).toHaveURL(/\/portafoglio$/);
+    });
+  }
 
-    // Un catalogo vuoto passerebbe il controllo sul titolo: qui si guarda il contenuto.
-    await expect(page.getByText(/\d+ rischi · ISO 31000/)).toBeVisible();
-    await expect(page.getByText(/\d+ garanzie/)).toBeVisible();
+  test('il menu ha due voci: Ricerca Clienti e CRM', async ({ page }) => {
+    await page.goto('/prospect');
+    const menu = page.getByRole('navigation', { name: 'Principale' });
+    await expect(menu.getByRole('link')).toHaveText(['Ricerca Clienti', 'CRM']);
   });
 });
 
