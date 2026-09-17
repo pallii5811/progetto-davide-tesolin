@@ -13,15 +13,19 @@ import {
   COVERAGE_CATALOG,
   Money,
   RISK_CATALOG,
+  STATI_CRM,
   analyzeCompany,
+  applicaFiltroCrm,
   applicaFiltroPortafoglio,
   componiEsito,
+  esportaCrmCsv,
   esportaPortafoglioCsv,
   nomeFileEsportazione,
+  nomeFileEsportazioneCrm,
   parsePartitaIva,
   valutaCompletezza,
 } from '@aegis/core';
-import type { CompanyProfile, DatiDichiarati, PolizzaInEssere } from '@aegis/core';
+import type { CompanyProfile, DatiDichiarati, PolizzaInEssere, VoceCrm } from '@aegis/core';
 import { comunePerCodiceCatastale } from '@aegis/core/comuni';
 import {
   MemoryCache,
@@ -104,8 +108,14 @@ import {
   trovaAziendaPerChiave,
   verifichePerAzienda,
 } from '@aegis/db';
-import { MemoryDossierStore, MemoryImmaginiStore, MemoryPortafoglioStore, normalizza } from './store.js';
-import type { DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
+import {
+  MemoryCrmStore,
+  MemoryDossierStore,
+  MemoryImmaginiStore,
+  MemoryPortafoglioStore,
+  normalizza,
+} from './store.js';
+import type { CrmStore, DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
 import type { Persistenza } from './persistenza.js';
 
 export interface BuildServerOptions {
@@ -254,6 +264,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   // attiva, invece, ogni rotta è protetta e ogni dato è legato a un intermediario.
   const storeInMemoria = options.store ?? new MemoryDossierStore();
   const portafoglioInMemoria = options.portafoglio ?? new MemoryPortafoglioStore();
+  const crmInMemoria = new MemoryCrmStore(portafoglioInMemoria);
   const immaginiInMemoria = new MemoryImmaginiStore();
   const autenticazioneRichiesta = persistenza !== undefined;
 
@@ -489,6 +500,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   ): {
     dossier: DossierStore;
     portafoglio: PortafoglioStore;
+    crm: CrmStore;
     immagini: ImmaginiStore;
     tenant: ContestoTenant | null;
   } => {
@@ -496,6 +508,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return {
         dossier: storeInMemoria,
         portafoglio: portafoglioInMemoria,
+        crm: crmInMemoria,
         immagini: immaginiInMemoria,
         tenant: null,
       };
@@ -510,6 +523,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     return {
       dossier: tenant.dossier,
       portafoglio: tenant.portafoglio,
+      crm: tenant.crm,
       immagini: tenant.immagini,
       tenant,
     };
@@ -1477,7 +1491,39 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     // renderebbe invisibile a chi controlla il credito residuo.
     await registraSpese(request, eventi);
 
-    return { ...risultato, provider: provider.name };
+    /*
+      Le aziende di un elenco comprato vanno nel CRM, e ci restano (17/09/2026: «Questo deve
+      andare nel CRM per sempre non per 24 ore»). Solo quelle con la partita IVA: è la chiave
+      con cui l'archivio riconosce un'azienda, e un identificativo opaco del fornitore non lo è.
+
+      Un salvataggio che non riesce non toglie l'elenco a chi l'ha appena pagato: lo si
+      mostra comunque, e si dichiara che nel CRM non è entrato invece di lasciarlo credere.
+    */
+    if (soloConteggio) return { ...risultato, provider: provider.name };
+
+    let salvateNelCrm = true;
+    try {
+      await contestoDi(request).crm.salvaDaElenco(
+        risultato.aziende.flatMap((azienda) =>
+          azienda.partitaIva === null
+            ? []
+            : [
+                {
+                  partitaIva: azienda.partitaIva,
+                  denominazione: azienda.denominazione,
+                  comune: azienda.comune,
+                  provincia: azienda.provincia,
+                  ateco: azienda.ateco,
+                },
+              ],
+        ),
+      );
+    } catch (errore) {
+      request.log.error({ errore }, 'elenco comprato non salvato nel CRM');
+      salvateNelCrm = false;
+    }
+
+    return { ...risultato, provider: provider.name, salvateNelCrm };
   });
 
   // ── Profilo grezzo ─────────────────────────────────────────────────────────
@@ -1908,6 +1954,57 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       .header(
         'Content-Disposition',
         `attachment; filename="${nomeFileEsportazione(new Date(), request.query.filtro)}"`,
+      )
+      .send(csv);
+  });
+
+  // ── CRM ────────────────────────────────────────────────────────────────────
+  /*
+    Il CRM (17/09/2026, «AEGIS - cambi.pptx»): «Questa pagina deve essere un CRM non un
+    tracker assicurativo». Le aziende analizzate e quelle degli elenchi comprati, con lo stato
+    commerciale e la nota dell'intermediario, in ordine di priorità di intervento. Le rotte del
+    portafoglio assicurativo restano, per chi le chiama: l'interfaccia usa queste.
+  */
+  const crmDto = (voce: VoceCrm) => ({
+    ...voce,
+    analizzataIl: voce.analizzataIl?.toISOString() ?? null,
+    daElencoIl: voce.daElencoIl?.toISOString() ?? null,
+    statoAggiornatoIl: voce.statoAggiornatoIl?.toISOString() ?? null,
+    aggiuntaIl: voce.aggiuntaIl.toISOString(),
+  });
+
+  app.get('/api/crm', async (request) => {
+    const voci = await contestoDi(request).crm.elenco();
+    return {
+      aziende: voci.map(crmDto),
+      conteggi: Object.fromEntries(
+        STATI_CRM.map((stato) => [stato, voci.filter((v) => v.stato === stato).length]),
+      ),
+    };
+  });
+
+  app.patch<{ Params: { id: string } }>('/api/crm/:id', async (request, reply) => {
+    const parsed = modificheCrmSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Modifica non valida', dettagli: parsed.error.issues });
+    }
+    if (parsed.data.stato === undefined && parsed.data.nota === undefined) {
+      return reply.status(400).send({ errore: 'Nessuna modifica: indicare lo stato o la nota' });
+    }
+    const trovata = await contestoDi(request).crm.aggiorna(request.params.id, parsed.data);
+    if (!trovata) return reply.status(404).send({ errore: 'Azienda non presente nel CRM' });
+    return { ok: true };
+  });
+
+  // Lo stesso formato del file del portafoglio, con le colonne del CRM e il filtro per stato.
+  app.get<{ Querystring: { filtro?: string } }>('/api/crm/esporta', async (request, reply) => {
+    const voci = await contestoDi(request).crm.elenco();
+    const csv = esportaCrmCsv(applicaFiltroCrm(voci, request.query.filtro));
+    return reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header(
+        'Content-Disposition',
+        `attachment; filename="${nomeFileEsportazioneCrm(new Date(), request.query.filtro)}"`,
       )
       .send(csv);
   });
@@ -2902,6 +2999,21 @@ const RUOLI = ['amministratore', 'broker', 'assistente', 'sola-lettura'] as cons
 const numeroFacoltativo = z
   .preprocess((v) => (v === '' || v === undefined ? undefined : v), z.coerce.number().int().min(0))
   .optional();
+
+/**
+ * Ciò che l'intermediario cambia nel CRM. Una nota vuota è «nessuna nota», non un testo vuoto:
+ * nel file esportato una cella vuota e una nota cancellata devono essere la stessa cosa.
+ */
+const modificheCrmSchema = z.object({
+  stato: z.enum(STATI_CRM).optional(),
+  nota: z
+    .string()
+    .trim()
+    .max(2000)
+    .transform((testo) => (testo === '' ? null : testo))
+    .nullable()
+    .optional(),
+});
 
 const prospezioneSchema = z.object({
   denominazione: z.string().trim().max(120).optional(),

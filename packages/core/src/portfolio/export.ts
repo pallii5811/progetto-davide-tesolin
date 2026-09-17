@@ -214,3 +214,15 @@ export function nomeFileEsportazione(quando: Date, filtro?: string): string {
   if (filtro !== undefined && filtro !== '') parti.splice(1, 0, filtro.replace(/[^a-z0-9]/gi, ''));
   return `${parti.join('-')}.csv`;
 }
+
+/*
+  Gli stessi mattoni per il file del CRM (17/09/2026): un file per Excel italiano si scrive in
+  un modo solo, e due copie di queste regole divergerebbero alla prima correzione.
+*/
+export {
+  BOM as BOM_CSV,
+  FINE_RIGA as FINE_RIGA_CSV,
+  SEPARATORE as SEPARATORE_CSV,
+  cella as cellaCsv,
+  data as dataCsv,
+};

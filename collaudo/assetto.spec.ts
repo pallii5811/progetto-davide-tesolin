@@ -66,7 +66,7 @@ test.describe('Assetto proprietario e gruppo', () => {
     await expect(page.locator('#assetto')).toContainText(/Da chiedere al cliente/i);
   });
 
-  test('collega le aziende del portafoglio che hanno lo stesso socio', async ({ page }) => {
+  test('collega le aziende analizzate che hanno lo stesso socio', async ({ page }) => {
     // Due analisi distinte: il collegamento nasce dal confronto fra le due compagini
     // salvate, quindi prima devono esistere entrambe.
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
@@ -76,7 +76,8 @@ test.describe('Assetto proprietario e gruppo', () => {
     await expect(page.locator('#assetto')).toBeVisible();
 
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
-    const collegamenti = page.getByText('Collegamenti nel tuo portafoglio');
+    // «Collegamenti nel tuo portafoglio» fino al 17/09/2026, quando il Portafoglio è diventato il CRM.
+    const collegamenti = page.getByText('Collegamenti con le aziende analizzate');
     await expect(collegamenti).toBeVisible();
 
     // Il collegamento deve essere **percorribile**, ed è l'indirizzo a dirlo: è il gesto

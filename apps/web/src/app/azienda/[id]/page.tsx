@@ -651,14 +651,15 @@ export default async function PaginaAzienda({
         */}
         {collegamenti.length > 0 && (
           <Scheda className="mt-4">
-            <h3 className="mb-2 text-sm font-semibold">Collegamenti nel tuo portafoglio</h3>
+            <h3 className="mb-2 text-sm font-semibold">Collegamenti con le aziende analizzate</h3>
             <ul className="space-y-3">
               {collegamenti.map((collegamento) => (
                 <li key={collegamento.socioCodiceFiscale}>
                   <p className="text-sm font-medium">{collegamento.socioDenominazione}</p>
                   <p className="text-xs text-testo-debole">
                     partecipa anche in {collegamento.aziende.length}{' '}
-                    {collegamento.aziende.length === 1 ? 'azienda' : 'aziende'} già in portafoglio
+                    {collegamento.aziende.length === 1 ? 'azienda analizzata' : 'aziende analizzate'} nel
+                    CRM
                   </p>
                   <ul className="mt-1 space-y-0.5">
                     {collegamento.aziende.map((altra) => (

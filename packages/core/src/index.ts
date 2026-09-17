@@ -63,6 +63,7 @@ export * from './protezioni/protezioni.js';
 // ── Portafoglio ──────────────────────────────────────────────────────────────
 export * from './portfolio/import.js';
 export * from './portfolio/export.js';
+export * from './portfolio/crm.js';
 
 // ── Monitoraggio ─────────────────────────────────────────────────────────────
 export * from './monitoring/events.js';

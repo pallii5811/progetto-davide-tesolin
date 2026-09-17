@@ -1024,6 +1024,154 @@ export async function elencoPortafoglio(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CRM
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una riga del CRM come la legge il database; la forma di dominio la dà `@aegis/core`. */
+export interface RigaCrm {
+  readonly partitaIva: string | null;
+  readonly denominazione: string;
+  readonly comune: string | null;
+  readonly provincia: string | null;
+  readonly atecoPrimario: string | null;
+  readonly telefono: string | null;
+  readonly pec: string | null;
+  readonly sitoWeb: string | null;
+  readonly statoCrm: string;
+  readonly notaCrm: string | null;
+  readonly scoreCredito: number | null;
+  readonly classeCredito: string | null;
+  readonly analizzataIl: Date | null;
+  readonly daElencoIl: Date | null;
+  readonly crmAggiornatoIl: Date | null;
+  readonly aggiuntaIl: Date;
+}
+
+/** Un istante letto da una query grezza: stringa su postgres.js, `Date` su PGlite. */
+function istante(valore: string | Date | null): Date | null {
+  return valore === null ? null : new Date(valore);
+}
+
+/**
+ * Il CRM: le aziende analizzate e quelle arrivate da un elenco comprato.
+ *
+ * I contatti — telefono, PEC, sito — e il comune si leggono dal record camerale congelato
+ * con l'ultima analisi, non da colonne copiate: la scheda e il CRM dicono la stessa cosa
+ * perché leggono lo stesso dato. Per le aziende mai analizzate i contatti non ci sono, e il
+ * comune viene dall'elenco.
+ */
+export async function elencoCrm(db: Database, tenantId: string): Promise<readonly RigaCrm[]> {
+  interface RigaGrezza {
+    partita_iva: string | null;
+    denominazione: string;
+    provincia: string | null;
+    comune: string | null;
+    comune_sede: string | null;
+    ateco_primario: string | null;
+    stato_crm: string;
+    nota_crm: string | null;
+    crm_aggiornato_il: string | Date | null;
+    da_elenco_il: string | Date | null;
+    creata_il: string | Date;
+    score_credito: number | null;
+    classe_credito: string | null;
+    analizzata_il: string | Date | null;
+    telefono: string | null;
+    pec: string | null;
+    sito_web: string | null;
+  }
+
+  const risultato: unknown = await db.execute(sql`
+    SELECT
+      a.partita_iva, a.denominazione, a.provincia, a.comune, a.ateco_primario,
+      a.stato_crm, a.nota_crm, a.crm_aggiornato_il, a.da_elenco_il, a.creata_il,
+      n.score_credito, n.classe_credito, n.creata_il AS analizzata_il,
+      s.profilo -> 'anagrafica' -> 'value' ->> 'telefono' AS telefono,
+      s.profilo -> 'anagrafica' -> 'value' ->> 'pec' AS pec,
+      s.profilo -> 'anagrafica' -> 'value' ->> 'sitoWeb' AS sito_web,
+      s.profilo -> 'anagrafica' -> 'value' -> 'sedeLegale' ->> 'comune' AS comune_sede
+    FROM aziende a
+    LEFT JOIN LATERAL (
+      SELECT score_credito, classe_credito, creata_il, snapshot_id
+      FROM analisi
+      WHERE analisi.azienda_id = a.id
+      ORDER BY creata_il DESC
+      LIMIT 1
+    ) n ON true
+    LEFT JOIN snapshot_azienda s ON s.id = n.snapshot_id
+    WHERE a.tenant_id = ${tenantId}
+      AND (n.creata_il IS NOT NULL OR a.da_elenco_il IS NOT NULL)
+  `);
+
+  return righeDi<RigaGrezza>(risultato).map((r) => ({
+    partitaIva: r.partita_iva,
+    denominazione: r.denominazione,
+    comune: r.comune_sede ?? r.comune,
+    provincia: r.provincia,
+    atecoPrimario: r.ateco_primario,
+    telefono: r.telefono,
+    pec: r.pec,
+    sitoWeb: r.sito_web,
+    statoCrm: r.stato_crm,
+    notaCrm: r.nota_crm,
+    scoreCredito: r.score_credito,
+    classeCredito: r.classe_credito,
+    analizzataIl: istante(r.analizzata_il),
+    daElencoIl: istante(r.da_elenco_il),
+    crmAggiornatoIl: istante(r.crm_aggiornato_il),
+    aggiuntaIl: new Date(r.creata_il),
+  }));
+}
+
+/**
+ * Cambia lo stato o la nota di un'azienda dello studio.
+ *
+ * Un campo assente non si tocca: chi cambia lo stato non cancella la nota. Restituisce l'id
+ * dell'azienda aggiornata, o `null` se lo studio non la conosce.
+ */
+export async function aggiornaCrm(
+  db: Database,
+  tenantId: string,
+  partitaIva: string,
+  modifiche: { readonly stato?: string | undefined; readonly nota?: string | null | undefined },
+): Promise<string | null> {
+  const aggiornamento: Record<string, unknown> = { crmAggiornatoIl: new Date() };
+  if (modifiche.stato !== undefined) aggiornamento['statoCrm'] = modifiche.stato;
+  if (modifiche.nota !== undefined) aggiornamento['notaCrm'] = modifiche.nota;
+
+  const aggiornate = await db
+    .update(schema.aziende)
+    .set(aggiornamento)
+    .where(and(eq(schema.aziende.tenantId, tenantId), eq(schema.aziende.partitaIva, partitaIva)))
+    .returning({ id: schema.aziende.id });
+
+  return aggiornate[0]?.id ?? null;
+}
+
+/**
+ * Mette nel CRM un'azienda di un elenco comprato, e ce la lascia.
+ *
+ * Se lo studio la conosce già — analizzata, o arrivata da un elenco precedente — non si
+ * toccano stato, nota e data del primo arrivo: comprare di nuovo un elenco non rimette
+ * «da contattare» un cliente. Il comune si scrive solo se mancava.
+ */
+export async function segnaAziendaDaElenco(
+  db: Database,
+  tenantId: string,
+  dati: DatiAzienda & { readonly comune: string | null },
+): Promise<string> {
+  const id = await assicuraAzienda(db, tenantId, dati);
+  await db
+    .update(schema.aziende)
+    .set({
+      comune: sql`COALESCE(${schema.aziende.comune}, ${dati.comune})`,
+      daElencoIl: sql`COALESCE(${schema.aziende.daElencoIl}, now())`,
+    })
+    .where(and(eq(schema.aziende.tenantId, tenantId), eq(schema.aziende.id, id)));
+  return id;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Audit e costi
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -10,9 +10,19 @@
  * dimenticato di mostrare a un broker il portafoglio di un concorrente.
  */
 
-import { DATI_DICHIARATI_VUOTI, Money, statoSorvegliato, valutaCompletezza } from '@aegis/core';
-import type { CompanyAnalysis, CoverageId, DatiDichiarati, PolizzaInEssere } from '@aegis/core';
 import {
+  DATI_DICHIARATI_VUOTI,
+  Money,
+  isStatoCrm,
+  perPrioritaDiIntervento,
+  statoSorvegliato,
+  valutaCompletezza,
+} from '@aegis/core';
+import type { CompanyAnalysis, CoverageId, DatiDichiarati, PolizzaInEssere, VoceCrm } from '@aegis/core';
+import {
+  aggiornaCrm,
+  elencoCrm,
+  segnaAziendaDaElenco,
   assicuraAzienda,
   assicuraTenantPredefinito,
   cancellaImmagine,
@@ -39,6 +49,7 @@ import {
 } from '@aegis/db';
 import type { Connessione, DatiStudio, Database, ModificheStudio, RigaPolizza } from '@aegis/db';
 import type {
+  CrmStore,
   DossierAzienda,
   DossierStore,
   ImmagineUbicazione,
@@ -70,6 +81,8 @@ export interface ContestoTenant {
   readonly utenteId: string | null;
   readonly dossier: DossierStore;
   readonly portafoglio: PortafoglioStore;
+  /** Le aziende dello studio con stato e nota: la pagina «CRM» (17/09/2026). */
+  readonly crm: CrmStore;
   /** Le fotografie delle ubicazioni: si leggono solo quando si compone il report. */
   readonly immagini: ImmaginiStore;
   /** Chi ha redatto i documenti: intesta il report e adempie al Reg. IVASS 40/2018. */
@@ -221,6 +234,11 @@ function creaContesto(db: Database, tenantId: string, utenteId: string | null): 
       elenco: () => dentro((c) => c.portafoglio.elenco()),
       collegamenti: (id) => dentro((c) => c.portafoglio.collegamenti(id)),
     },
+    crm: {
+      elenco: () => dentro((c) => c.crm.elenco()),
+      aggiorna: (id, modifiche) => dentro((c) => c.crm.aggiorna(id, modifiche)),
+      salvaDaElenco: (aziende) => dentro((c) => c.crm.salvaDaElenco(aziende)),
+    },
     studio: {
       leggi: () => dentro((c) => c.studio.leggi()),
       aggiorna: (dati) => dentro((c) => c.studio.aggiorna(dati)),
@@ -351,6 +369,74 @@ function creaContestoSu(db: Database, tenantId: string, utenteId: string | null)
     },
   };
 
+  const crm: CrmStore = {
+    async elenco(): Promise<readonly VoceCrm[]> {
+      const righe = await elencoCrm(db, tenantId);
+      return righe
+        .map((r): VoceCrm => ({
+          identificativo: r.partitaIva ?? r.denominazione,
+          denominazione: r.denominazione,
+          partitaIva: r.partitaIva,
+          comune: r.comune,
+          provincia: r.provincia,
+          atecoDescrizione: r.atecoPrimario,
+          telefono: r.telefono,
+          pec: r.pec,
+          sitoWeb: r.sitoWeb,
+          // Il vincolo della migrazione 0013 lo garantisce; qui si ricade sul valore
+          // iniziale invece di mostrare una parola che il menu non conosce.
+          stato: isStatoCrm(r.statoCrm) ? r.statoCrm : 'da-contattare',
+          nota: r.notaCrm,
+          scoreCredito: r.scoreCredito,
+          classeCredito: r.classeCredito,
+          analizzataIl: r.analizzataIl,
+          daElencoIl: r.daElencoIl,
+          statoAggiornatoIl: r.crmAggiornatoIl,
+          aggiuntaIl: r.aggiuntaIl,
+        }))
+        .sort(perPrioritaDiIntervento);
+    },
+
+    async aggiorna(identificativo, modifiche): Promise<boolean> {
+      const aziendaId = await aggiornaCrm(db, tenantId, normalizza(identificativo), modifiche);
+      if (aziendaId === null) return false;
+      // Il testo della nota non entra nel registro, che è append-only: ci entra il fatto.
+      await registraAudit(db, {
+        tenantId,
+        utenteId,
+        azione: 'crm.aggiornato',
+        entita: 'azienda',
+        entitaId: aziendaId,
+        dettagli: { stato: modifiche.stato ?? null, notaModificata: modifiche.nota !== undefined },
+      });
+      return true;
+    },
+
+    async salvaDaElenco(aziende): Promise<void> {
+      for (const azienda of aziende) {
+        const chiave = normalizza(azienda.partitaIva);
+        await segnaAziendaDaElenco(db, tenantId, {
+          partitaIva: chiave,
+          codiceFiscale: null,
+          denominazione: azienda.denominazione,
+          providerId: chiave,
+          provincia: azienda.provincia,
+          atecoPrimario: azienda.ateco,
+          comune: azienda.comune,
+        });
+      }
+      if (aziende.length > 0) {
+        await registraAudit(db, {
+          tenantId,
+          utenteId,
+          azione: 'crm.elenco-salvato',
+          entita: 'azienda',
+          dettagli: { aziende: aziende.length },
+        });
+      }
+    },
+  };
+
   const studio = {
     leggi: () => leggiStudio(db, tenantId),
     aggiorna: (dati: ModificheStudio) => aggiornaStudio(db, tenantId, dati),
@@ -445,6 +531,7 @@ function creaContestoSu(db: Database, tenantId: string, utenteId: string | null)
     utenteId,
     dossier,
     portafoglio,
+    crm,
     studio,
     immagini,
 

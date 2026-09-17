@@ -271,7 +271,12 @@ const DDL: readonly string[] = [
     ateco_primario text,
     is_cliente boolean NOT NULL DEFAULT false,
     creata_il timestamptz NOT NULL DEFAULT now(),
-    aggiornata_il timestamptz NOT NULL DEFAULT now()
+    aggiornata_il timestamptz NOT NULL DEFAULT now(),
+    comune text,
+    stato_crm text NOT NULL DEFAULT 'da-contattare',
+    nota_crm text,
+    crm_aggiornato_il timestamptz,
+    da_elenco_il timestamptz
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS aziende_piva_per_tenant ON aziende (tenant_id, partita_iva)`,
   `CREATE INDEX IF NOT EXISTS aziende_per_denominazione ON aziende (tenant_id, denominazione)`,

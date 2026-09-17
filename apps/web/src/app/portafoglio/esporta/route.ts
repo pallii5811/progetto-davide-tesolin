@@ -1,7 +1,10 @@
 import { chiamaApiConSessione } from '@/lib/chiamata-server';
 
 /**
- * Scaricamento del portafoglio in CSV.
+ * Scaricamento del CRM in CSV.
+ *
+ * Dal 17/09/2026 la pagina è il CRM, e il file ne segue le colonne e il filtro per stato:
+ * si chiede a `/api/crm/esporta`, non più al portafoglio assicurativo.
  *
  * Un gestore di rotta e non una Server Action: le azioni restituiscono dati a React, non
  * un file al browser. Qui serve una risposta con il proprio tipo e il proprio nome, che il
@@ -17,8 +20,8 @@ export async function GET(richiesta: Request): Promise<Response> {
   const filtro = new URL(richiesta.url).searchParams.get('filtro');
   const percorso =
     filtro === null || filtro === ''
-      ? '/api/portafoglio/esporta'
-      : `/api/portafoglio/esporta?filtro=${encodeURIComponent(filtro)}`;
+      ? '/api/crm/esporta'
+      : `/api/crm/esporta?filtro=${encodeURIComponent(filtro)}`;
 
   const risposta = await chiamaApiConSessione(percorso, { metodo: 'GET' });
 
@@ -26,8 +29,8 @@ export async function GET(richiesta: Request): Promise<Response> {
     /*
       Un errore va restituito come testo leggibile, non come un CSV vuoto.
 
-      Un file scaricato con zero righe è la peggiore delle risposte: sembra un portafoglio
-      vuoto, e chi lo apre conclude che ha perso i clienti invece che la sessione.
+      Un file scaricato con zero righe è la peggiore delle risposte: sembra un CRM vuoto, e
+      chi lo apre conclude che ha perso i clienti invece che la sessione.
     */
     const messaggio =
       risposta.status === 401
@@ -57,7 +60,7 @@ export async function GET(richiesta: Request): Promise<Response> {
     headers: {
       'Content-Type': risposta.headers.get('content-type') ?? 'text/csv; charset=utf-8',
       'Content-Disposition':
-        risposta.headers.get('content-disposition') ?? 'attachment; filename="portafoglio.csv"',
+        risposta.headers.get('content-disposition') ?? 'attachment; filename="crm.csv"',
       'Cache-Control': 'no-store',
     },
   });

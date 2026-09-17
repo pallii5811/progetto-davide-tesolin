@@ -10,8 +10,8 @@
  * una regola di dominio è un test che nessuno eseguirà.
  */
 
-import { DATI_DICHIARATI_VUOTI } from '@aegis/core';
-import type { DatiDichiarati, PolizzaInEssere } from '@aegis/core';
+import { DATI_DICHIARATI_VUOTI, perPrioritaDiIntervento } from '@aegis/core';
+import type { DatiDichiarati, PolizzaInEssere, StatoCrm, VoceCrm } from '@aegis/core';
 
 export interface DossierAzienda {
   readonly identificativo: string;
@@ -137,6 +137,37 @@ export interface PortafoglioStore {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CRM
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Ciò che l'intermediario cambia a mano: un campo assente non si tocca. */
+export interface ModificheCrm {
+  readonly stato?: StatoCrm | undefined;
+  readonly nota?: string | null | undefined;
+}
+
+/** Un'azienda di un elenco comprato, come arriva dal fornitore. */
+export interface AziendaDaElenco {
+  readonly partitaIva: string;
+  readonly denominazione: string;
+  readonly comune: string | null;
+  readonly provincia: string | null;
+  readonly ateco: string | null;
+}
+
+/**
+ * Il CRM dello studio (17/09/2026, «AEGIS - cambi.pptx»): le aziende analizzate e quelle degli
+ * elenchi comprati, con stato e nota, in ordine di priorità di intervento.
+ */
+export interface CrmStore {
+  elenco(): Promise<readonly VoceCrm[]>;
+  /** `false` se lo studio non conosce l'azienda. */
+  aggiorna(identificativo: string, modifiche: ModificheCrm): Promise<boolean>;
+  /** Le aziende di un elenco comprato entrano nel CRM e ci restano. */
+  salvaDaElenco(aziende: readonly AziendaDaElenco[]): Promise<void>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Implementazioni in memoria (test e modalità dimostrativa senza database)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -226,6 +257,80 @@ export class MemoryPortafoglioStore implements PortafoglioStore {
 
   collegamenti(): Promise<readonly CollegamentoSocietarioDto[]> {
     return Promise.resolve([]);
+  }
+}
+
+/**
+ * Il CRM senza database: le aziende analizzate le legge dal portafoglio in memoria, quelle
+ * degli elenchi e le modifiche le tiene per conto suo. Senza contatti, che stanno nel record
+ * camerale congelato e in memoria non c'è.
+ */
+export class MemoryCrmStore implements CrmStore {
+  readonly #daElenco = new Map<string, { readonly azienda: AziendaDaElenco; readonly quando: Date }>();
+  readonly #modifiche = new Map<string, { stato: StatoCrm; nota: string | null; quando: Date }>();
+  readonly #aggiunte = new Map<string, Date>();
+  readonly #portafoglio: PortafoglioStore;
+
+  constructor(portafoglio: PortafoglioStore) {
+    this.#portafoglio = portafoglio;
+  }
+
+  async elenco(): Promise<readonly VoceCrm[]> {
+    const analizzate = await this.#portafoglio.elenco();
+    const chiavi = new Set([
+      ...analizzate.map((v) => normalizza(v.identificativo)),
+      ...this.#daElenco.keys(),
+    ]);
+
+    const voci = [...chiavi].map((chiave): VoceCrm => {
+      const analisi = analizzate.find((v) => normalizza(v.identificativo) === chiave);
+      const elenco = this.#daElenco.get(chiave);
+      const modifica = this.#modifiche.get(chiave);
+      if (!this.#aggiunte.has(chiave)) {
+        this.#aggiunte.set(chiave, elenco?.quando ?? analisi?.analizzataIl ?? new Date());
+      }
+      return {
+        identificativo: chiave,
+        denominazione: analisi?.denominazione ?? elenco?.azienda.denominazione ?? chiave,
+        partitaIva: analisi?.partitaIva ?? elenco?.azienda.partitaIva ?? null,
+        comune: elenco?.azienda.comune ?? null,
+        provincia: analisi?.provincia ?? elenco?.azienda.provincia ?? null,
+        atecoDescrizione: analisi?.atecoDescrizione ?? elenco?.azienda.ateco ?? null,
+        telefono: null,
+        pec: null,
+        sitoWeb: null,
+        stato: modifica?.stato ?? 'da-contattare',
+        nota: modifica?.nota ?? null,
+        scoreCredito: analisi?.scoreCredito ?? null,
+        classeCredito: analisi?.classeCredito ?? null,
+        analizzataIl: analisi?.analizzataIl ?? null,
+        daElencoIl: elenco?.quando ?? null,
+        statoAggiornatoIl: modifica?.quando ?? null,
+        aggiuntaIl: this.#aggiunte.get(chiave) ?? new Date(),
+      };
+    });
+    return voci.sort(perPrioritaDiIntervento);
+  }
+
+  async aggiorna(identificativo: string, modifiche: ModificheCrm): Promise<boolean> {
+    const chiave = normalizza(identificativo);
+    const voce = (await this.elenco()).find((v) => v.identificativo === chiave);
+    if (voce === undefined) return false;
+    this.#modifiche.set(chiave, {
+      stato: modifiche.stato ?? voce.stato,
+      nota: modifiche.nota === undefined ? voce.nota : modifiche.nota,
+      quando: new Date(),
+    });
+    return true;
+  }
+
+  salvaDaElenco(aziende: readonly AziendaDaElenco[]): Promise<void> {
+    for (const azienda of aziende) {
+      const chiave = normalizza(azienda.partitaIva);
+      // Il primo arrivo resta: ricomprare lo stesso elenco non cambia la data.
+      if (!this.#daElenco.has(chiave)) this.#daElenco.set(chiave, { azienda, quando: new Date() });
+    }
+    return Promise.resolve();
   }
 }
 

@@ -132,15 +132,15 @@ describe('Ricerca Clienti: i testi del documento del 17/09/2026', () => {
     expect(leggi('app/prospect/UltimoElenco.tsx')).not.toMatch(/export function UltimoElenco\b/);
   });
 
-  it('la dichiarazione in fondo alla pagina, con le sue parole', () => {
-    expect(pagina).toContain(
-      'Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono',
+  it('la dichiarazione in fondo a ogni pagina ha le parole del documento, e una volta sola', () => {
+    const testoDi = (sorgente: string) => senzaCommenti(sorgente).replace(/\s+/g, ' ');
+    const layout = testoDi(leggi('app/layout.tsx'));
+    expect(layout).toContain(
+      'Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono consulenza finanziaria né garanzia di solvibilità. Le eventuali proposte assicurative sono soggette alla valutazione dell’intermediario secondo la normativa IVASS applicabile.',
     );
-    expect(pagina).toContain('secondo la normativa IVASS applicabile.');
-    // In fondo: dopo la sezione della ricerca singola.
-    expect(pagina.indexOf('normativa IVASS applicabile')).toBeGreaterThan(
-      pagina.indexOf('id="ricerca-azienda"'),
-    );
+    expect(layout).not.toContain('Le valutazioni prodotte');
+    // Nel piè di pagina comune, non una seconda volta dentro la pagina.
+    expect(pagina).not.toContain('elaborazioni statistiche');
   });
 
   it('il confronto con l’elenco già comprato usa gli stessi nomi dei campi', () => {

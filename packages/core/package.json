@@ -22,6 +22,10 @@
     "./comuni": {
       "types": "./dist/shared/comuni.d.ts",
       "default": "./dist/shared/comuni.js"
+    },
+    "./crm": {
+      "types": "./dist/portfolio/crm.d.ts",
+      "default": "./dist/portfolio/crm.js"
     }
   },
   "files": [

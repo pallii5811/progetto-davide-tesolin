@@ -29,7 +29,7 @@ export default async function PaginaAccesso({
       <div className="rounded-lg border border-bordo bg-superficie p-6">
         <h1 className="mb-1 text-lg font-semibold">Accesso</h1>
         <p className="mb-5 text-sm text-testo-tenue">
-          Il portafoglio e i dati di intervista sono riservati al suo studio.
+          Il CRM e i dati di intervista sono riservati al suo studio.
         </p>
 
         <ModuloAccesso azione={accedi} ritorno={ritorno ?? ''} />

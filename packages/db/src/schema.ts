@@ -228,6 +228,19 @@ export const aziende = pgTable(
     isCliente: boolean('is_cliente').notNull().default(false),
     creataIl: timestamp('creata_il', { withTimezone: true }).notNull().defaultNow(),
     aggiornataIl: timestamp('aggiornata_il', { withTimezone: true }).notNull().defaultNow(),
+    /*
+      Il CRM (17/09/2026, «AEGIS - cambi.pptx»): lo stato commerciale e la nota sono il lavoro
+      dell'intermediario, non un calcolo. Stanno sull'azienda perché valgono per l'azienda,
+      analizzata o no, e l'azienda è già isolata per studio.
+    */
+    /** Il comune della sede, per le aziende arrivate da un elenco e mai analizzate. */
+    comune: text('comune'),
+    /** Uno di STATI_CRM (`@aegis/core`); il vincolo sta nella migrazione 0013. */
+    statoCrm: text('stato_crm').notNull().default('da-contattare'),
+    notaCrm: text('nota_crm'),
+    crmAggiornatoIl: timestamp('crm_aggiornato_il', { withTimezone: true }),
+    /** Quando è arrivata da un elenco comprato: da quel momento resta nel CRM. */
+    daElencoIl: timestamp('da_elenco_il', { withTimezone: true }),
   },
   (t) => [
     // Stessa azienda in tenant diversi è normale: due broker possono seguirla entrambi.

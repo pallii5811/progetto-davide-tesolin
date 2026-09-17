@@ -539,8 +539,16 @@ export default async function PaginaProspect({
             {risultato.aziende.length}{' '}
             {risultato.aziende.length === 1 ? 'azienda scaricata' : 'aziende scaricate'} ·{' '}
             {(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} € spesi.{' '}
-            {risultato.aziende.length === 1 ? 'È salvata' : 'Sono salvate'} nel CRM. Analizzarne una consuma
-            credito a parte, come qualunque altra analisi.
+            {/*
+              Il CRM si nomina solo se il salvataggio è riuscito: l'API lo dichiara, e un «sono
+              salvate» scritto a prescindere sarebbe una promessa su un dato che forse non c'è.
+            */}
+            {risultato.salvateNelCrm === false
+              ? 'Il salvataggio nel CRM non è riuscito: l’elenco resta visibile qui, e comprandolo di nuovo entrerà nel CRM.'
+              : risultato.aziende.length === 1
+                ? 'È salvata nel CRM.'
+                : 'Sono salvate nel CRM.'}{' '}
+            Analizzarne una consuma credito a parte, come qualunque altra analisi.
           </p>
           <div className="overflow-hidden rounded-lg border border-bordo">
             <table className="w-full text-sm">
@@ -671,16 +679,11 @@ export default async function PaginaProspect({
           </p>
         )}
       </section>
-
       {/*
-        La dichiarazione in fondo alla pagina, con le parole di Simone (17/09/2026, AEGIS -
-        cambi.pptx, slide 2).
+        La dichiarazione IVASS della slide 2 non sta qui: è il piè di pagina comune a tutte le
+        pagine (layout.tsx), riscritto con le parole di Simone. Qui era stata aggiunta una seconda
+        volta, e sotto c'era già la prima.
       */}
-      <p className="mt-12 border-t border-bordo pt-4 text-xs leading-relaxed text-testo-debole">
-        Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono
-        consulenza finanziaria né garanzia di solvibilità. Le eventuali proposte assicurative sono soggette
-        alla valutazione dell’intermediario secondo la normativa IVASS applicabile.
-      </p>
     </>
   );
 }

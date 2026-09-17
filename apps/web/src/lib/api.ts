@@ -5,6 +5,7 @@
  * l'analisi non transita per il browser e nessun token finisce nel bundle.
  */
 
+import type { StatoCrm } from '@aegis/core/crm';
 import { NOME_COOKIE_SESSIONE } from './cookie-sessione';
 import { intestazioneChiaveFrontend } from './chiave-frontend';
 
@@ -1064,7 +1065,7 @@ export async function statoFornitura(): Promise<StatoFornitura> {
 }
 
 export interface CriteriProspezione {
-  /** Codice catastale della città, es. `B157`: l'unico filtro obbligatorio. */
+  /** Codice catastale della città, es. `B157`; vuoto se non scelta (facoltativa dal 17/09/2026). */
   comune: string;
   denominazione?: string;
   ateco?: string;
@@ -1086,6 +1087,8 @@ export interface RisultatoProspezione {
   provider: string;
   /** Quando il totale è zero: quali filtri lo stanno azzerando, e cosa si troverebbe senza. */
   diagnosiZero?: { filtro: string; etichetta: string; totaleSenza: number }[];
+  /** Solo sugli elenchi comprati: se le aziende sono entrate nel CRM (17/09/2026). */
+  salvateNelCrm?: boolean;
 }
 
 /**
@@ -1198,24 +1201,30 @@ export async function leggiDossier(identificativo: string): Promise<DossierDto> 
   return chiama(`/api/aziende/${encodeURIComponent(identificativo)}/dossier`);
 }
 
-export interface VocePortafoglio {
+/**
+ * Un'azienda del CRM (17/09/2026, «AEGIS - cambi.pptx»): analizzata o arrivata da un elenco
+ * comprato, con lo stato e la nota dell'intermediario. Nessun dato assicurativo.
+ */
+export interface VoceCrmDto {
   identificativo: string;
   denominazione: string;
   partitaIva: string | null;
+  comune: string | null;
   provincia: string | null;
   atecoDescrizione: string | null;
-  /** `null` per le imprese il cui merito non è determinabile: in un elenco, zero ordina in cima. */
+  /** Dal record camerale dell'ultima analisi: `null` per le aziende mai analizzate. */
+  telefono: string | null;
+  pec: string | null;
+  sitoWeb: string | null;
+  stato: StatoCrm;
+  nota: string | null;
+  /** `null` per le imprese il cui merito non è determinabile, o mai analizzate. */
   scoreCredito: number | null;
-  classeCredito: string;
-  statoCatNat: string;
-  catNatConforme: boolean;
-  coperturaAssente: number;
-  coperturaDaQuantificare: number;
-  rischiCritici: number;
-  esposizioneNonAssicurata: MoneyDto;
-  completezza: number;
-  azionePrioritaria: string | null;
-  analizzataIl: string;
+  classeCredito: string | null;
+  analizzataIl: string | null;
+  daElencoIl: string | null;
+  statoAggiornatoIl: string | null;
+  aggiuntaIl: string;
 }
 
 export type RuoloUtente = 'amministratore' | 'broker' | 'assistente' | 'sola-lettura';
@@ -1237,16 +1246,12 @@ export async function leggiUtenti(): Promise<{ utenti: UtenteElencoDto[] }> {
   return chiama('/api/utenti');
 }
 
-export async function leggiPortafoglio(): Promise<{
-  aziende: VocePortafoglio[];
-  riepilogo: {
-    totale: number;
-    nonConformiCatNat: number;
-    esposizioneComplessivaEuro: number;
-    coperturaAssenteTotale: number;
-  };
+/** Il CRM, già in ordine di priorità di intervento, con quante aziende ci sono per stato. */
+export async function leggiCrm(): Promise<{
+  aziende: VoceCrmDto[];
+  conteggi: Record<StatoCrm, number>;
 }> {
-  return chiama('/api/portafoglio');
+  return chiama('/api/crm');
 }
 
 /**

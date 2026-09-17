@@ -68,11 +68,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
 
+        {/*
+          Con le parole di Simone del 17/09/2026 («AEGIS - cambi.pptx», slide 2), al posto di «Le
+          valutazioni prodotte… ai sensi del Reg. IVASS 40/2018». Il report per il cliente ha la
+          sua informativa, con gli articoli del Regolamento: questa riga non si stampa.
+        */}
         <footer className="no-print mt-16 border-t border-bordo py-6">
           <p className="mx-auto max-w-7xl px-6 text-xs text-testo-debole">
-            Le valutazioni prodotte sono elaborazioni statistiche a supporto della consulenza, non
-            costituiscono consulenza finanziaria né garanzia di solvibilità. Ogni proposta assicurativa
-            resta soggetta alla valutazione dell&apos;intermediario ai sensi del Reg. IVASS 40/2018.
+            Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono
+            consulenza finanziaria né garanzia di solvibilità. Le eventuali proposte assicurative sono
+            soggette alla valutazione dell’intermediario secondo la normativa IVASS applicabile.
           </p>
         </footer>
       </body>

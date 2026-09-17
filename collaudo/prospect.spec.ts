@@ -18,6 +18,19 @@ import { accedi, sorvegliaErrori } from './aiuti.js';
  * ventiquattro ore né avviso «Dati reali»; l'elenco comprato va nel CRM; la ricerca singola è
  * solo per partita IVA; in fondo alla pagina c'è la dichiarazione IVASS.
  */
+/**
+ * Il campo che si chiama esattamente `nome`, anche quando la sua etichetta contiene una nota.
+ *
+ * getByLabel non confronta il nome accessibile ma il testo dell'etichetta, cioè i suoi nodi di
+ * testo uniti senza spazi: nome e nota arrivano attaccati, «Codice ATECOInserisci il codice
+ * senza punti», «Numero di aziendeCosto dell'elenco: …». Dopo il nome quindi c'è la fine
+ * dell'etichetta o la maiuscola con cui comincia la nota; un nome allungato o cambiato
+ * («Codice ATECO (6 cifre)», «Numero aziende») non combacia.
+ */
+function nomeDelCampo(nome: string): RegExp {
+  return new RegExp('^' + nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:$|(?=[A-ZÀ-Ý]))');
+}
+
 test.describe('Ricerca Clienti', () => {
   test.beforeEach(async ({ page }) => {
     await accedi(page);
@@ -208,7 +221,7 @@ test.describe('Ricerca Clienti', () => {
       'Forma giuridica',
       'Numero di aziende',
     ]) {
-      await expect(page.getByLabel(etichetta, { exact: true }), etichetta).toBeVisible();
+      await expect(page.getByLabel(nomeDelCampo(etichetta)), etichetta).toBeVisible();
     }
     await expect(page.getByText('Inserisci il codice senza punti', { exact: true })).toBeVisible();
     await expect(
@@ -275,7 +288,8 @@ test.describe('Ricerca Clienti', () => {
     */
     await page.goto('/prospect');
 
-    const quante = page.getByLabel('Numero di aziende', { exact: true });
+    // L'etichetta comprende il costo scritto sotto il campo: si confronta il nome, all'inizio.
+    const quante = page.getByLabel(nomeDelCampo('Numero di aziende'));
     await expect(quante).toHaveValue('5');
     await expect(page.getByText(/0,25 €/)).toBeVisible();
 
@@ -315,10 +329,16 @@ test.describe('Ricerca Clienti', () => {
     await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toHaveCount(0);
   });
 
-  test('in fondo alla pagina c’è la dichiarazione, con le parole del documento', async ({ page }) => {
+  test('in fondo alla pagina c’è la dichiarazione, con le parole del documento, una volta sola', async ({
+    page,
+  }) => {
     await page.goto('/prospect');
 
-    const dichiarazione = page.getByText(/Le valutazioni fornite sono elaborazioni statistiche/);
+    // Nel piè di pagina comune: la versione precedente, «Le valutazioni prodotte…», non c'è più.
+    await expect(page.getByText(/elaborazioni statistiche/)).toHaveCount(1);
+    const dichiarazione = page
+      .getByRole('contentinfo')
+      .getByText(/Le valutazioni fornite sono elaborazioni statistiche/);
     await expect(dichiarazione).toBeVisible();
     await expect(dichiarazione).toHaveText(
       'Le valutazioni fornite sono elaborazioni statistiche a supporto dell’analisi e non costituiscono consulenza finanziaria né garanzia di solvibilità. Le eventuali proposte assicurative sono soggette alla valutazione dell’intermediario secondo la normativa IVASS applicabile.',

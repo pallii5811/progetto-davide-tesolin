@@ -26,8 +26,8 @@ export default async function PaginaStudi() {
     <>
       <h2 className="mb-1 text-lg font-semibold tracking-tight">Studi sulla piattaforma</h2>
       <p className="mb-6 max-w-3xl text-sm leading-relaxed text-testo-tenue">
-        Ogni studio lavora isolato dagli altri: portafoglio, clienti e analisi non attraversano il confine,
-        in nessuna direzione. Qui si aprono e si sospendono gli accessi, non si guarda dentro.
+        Ogni studio lavora isolato dagli altri: CRM, clienti e analisi non attraversano il confine, in
+        nessuna direzione. Qui si aprono e si sospendono gli accessi, non si guarda dentro.
       </p>
     </>
   );

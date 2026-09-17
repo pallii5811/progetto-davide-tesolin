@@ -2,123 +2,130 @@ import { expect, test } from '@playwright/test';
 import { accedi, AZIENDA_DI_PROVA } from './aiuti.js';
 
 /**
- * Il portafoglio è la schermata di lavoro quotidiano: «non è un cruscotto da guardare,
- * è una lista di telefonate da fare». Se le colonne che dicono *cosa fare* restano vuote,
- * la pagina smentisce la propria promessa.
+ * Il CRM, che fino al 17/09/2026 era il Portafoglio.
+ *
+ * «Questa pagina deve essere un CRM non un tracker assicurativo. Non abbiamo la maggior parte
+ * dei dati per poter dire cosa è coperto e cosa no» («AEGIS - cambi.pptx», slide 3). Qui si
+ * prova nel browser ciò che la sostituisce: stato e nota che si salvano e restano, i filtri per
+ * stato, i contatti, il file esportato, e la pagina usabile su un telefono.
  */
-test.describe('Portafoglio', () => {
+test.describe('CRM', () => {
   test.beforeEach(async ({ page }) => {
     await accedi(page);
-    // Un'analisi vera, così il portafoglio ha qualcosa da mostrare.
+    // Un'analisi vera, così il CRM ha qualcosa da mostrare.
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
   });
 
-  test('mostra la prossima azione, non un trattino', async ({ page }) => {
+  test('si chiama CRM, e non mostra dati assicurativi', async ({ page }) => {
     await page.goto('/portafoglio');
 
-    const riga = page.locator('tbody tr').first();
-    const azione = riga.locator('td').nth(4);
+    await expect(page.getByRole('heading', { name: 'CRM', exact: true })).toBeVisible();
+    await expect(page.getByText(/ordinate per priorità di intervento/)).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Principale' }).getByRole('link', { name: 'CRM' }),
+    ).toHaveAttribute('aria-current', 'page');
 
-    // Con dodici coperture assenti e l'obbligo CAT NAT scaduto, qualcosa da fare c'è
-    // per forza: leggendo il risultato congelato dell'analisi, non ricalcolandolo.
-    await expect(azione).not.toHaveText('—');
-    expect((await azione.innerText()).length).toBeGreaterThan(10);
+    for (const tolto of [
+      /CAT NAT/i,
+      /Coperture da attivare/i,
+      /Esposizione complessiva/i,
+      /Esposizione non assicurata/i,
+      /Prossima azione/i,
+      /non censita/i,
+      /Importa elenco clienti/i,
+    ]) {
+      await expect(page.getByText(tolto), String(tolto)).toHaveCount(0);
+    }
   });
 
-  test('mostra la percentuale di intervista effettivamente raggiunta', async ({ page }) => {
-    await page.goto(`/azienda/${AZIENDA_DI_PROVA}/dati`);
-    await page.getByLabel('Dipendenti', { exact: false }).first().fill('62');
-    await page.getByRole('button', { name: /salva/i }).click();
+  test('stato e nota si salvano, restano dopo il ricaricamento, e i filtri li contano', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/portafoglio');
+
+    const riga = page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i });
+    const nota = `Richiamare lunedì ${Date.now()}`;
+    await riga.getByLabel(/^Stato di /).selectOption('in-trattativa');
+    await riga.getByLabel(/^Nota su /).fill(nota);
+    await riga.getByRole('button', { name: 'Salva' }).click();
+    await expect(riga.getByRole('status')).toHaveText('Salvato.');
+
     await page.reload();
+    const dopo = page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i });
+    await expect(dopo.getByLabel(/^Stato di /)).toHaveValue('in-trattativa');
+    await expect(dopo.getByLabel(/^Nota su /)).toHaveValue(nota);
 
-    await page.goto('/portafoglio');
+    // Il filtro per stato mostra la riga, e un altro stato no.
+    await page.getByRole('link', { name: /^In trattativa \(\d+\)$/ }).click();
+    await expect(page).toHaveURL(/filtro=in-trattativa/);
+    await expect(page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i })).toHaveCount(1);
 
-    // Restava fissa a 0% perché la lettura da database non chiedeva il dato: il broker
-    // compilava l'intervista e il portafoglio continuava a dirgli che non l'aveva fatta.
-    const testo = await page.locator('tbody tr').first().innerText();
-    const percentuale = Number(/Dati di intervista (\d+)%/.exec(testo)?.[1] ?? '0');
-    expect(percentuale).toBeGreaterThan(0);
+    await page.goto('/portafoglio?filtro=non-interessata');
+    await expect(page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i })).toHaveCount(0);
   });
 
-  test('su schermo stretto resta usabile: stato, esposizione e comando visibili', async ({ page }) => {
+  test('un’azienda analizzata porta i contatti e si apre senza rifare l’analisi', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/portafoglio');
+
+    const riga = page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i });
+    await expect(riga.getByRole('link', { name: /@/ })).toHaveAttribute('href', /^mailto:/);
+    await expect(riga.getByText(/analizzata il \d{2}\/\d{2}\/\d{4}/)).toBeVisible();
+    await expect(riga.getByRole('link', { name: 'Apri' })).toBeVisible();
+  });
+
+  test('su schermo stretto resta usabile: stato, nota e comando visibili', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/portafoglio');
 
-    const scheda = page.locator('ul > li').first();
-
-    /*
-      Raggiungibile senza cercarla: la lista di lavoro non deve stare sotto una schermata
-      intera di numeri riassuntivi.
-
-      Si misura DI QUANTO manca, invece di affidarsi a `toBeInViewport`. Quello dice
-      «rapporto 0» e si ferma lì: chi legge il verbale sa che la scheda è fuori e non sa
-      se per cinque pixel o per trecento — cioè non sa se togliere una riga o rifare la
-      testata. La differenza conta soprattutto qui, dove il difetto non si riproduce sulla
-      macchina di sviluppo: dipende da quanto è largo il font, e su Linux le note delle
-      metriche vanno a capo dove qui stanno su una riga.
-    */
-    const altezzaSchermo = 844;
-    const inizioScheda = await scheda.evaluate((el) => el.getBoundingClientRect().top);
-    expect(
-      inizioScheda,
-      `la prima scheda del portafoglio comincia a ${Math.round(inizioScheda)}px, ` +
-        `oltre i ${altezzaSchermo}px dello schermo: manca di ${Math.round(inizioScheda - altezzaSchermo)}px. ` +
-        'Sopra di lei ci sono la testata, la navigazione e i quattro riquadri di sintesi.',
-    ).toBeLessThan(altezzaSchermo);
-
-    // La tabella con scorrimento orizzontale lasciava fuori schermo proprio queste tre
-    // cose, senza alcun indizio che ci fosse dell'altro.
-    // «non censita» e non «inadempiente»: senza le polizze in essere il portafoglio non
-    // può accertare un'inadempienza a un obbligo di legge, e non deve scriverla accanto al
-    // nome di un cliente.
-    await expect(scheda.getByText(/non censita|conforme|in-scadenza/)).toBeVisible();
-
-    const esposizione = scheda.locator('dd').filter({ hasText: /€/ }).first();
-    await expect(esposizione).toBeVisible();
-
-    await expect(scheda.getByRole('link', { name: 'Apri' })).toBeVisible();
+    const scheda = page
+      .locator('ul > li')
+      .filter({ hasText: /MECCANICA BRESCIANA/i })
+      .first();
+    await expect(scheda.getByLabel(/^Stato di /)).toBeVisible();
+    await expect(scheda.getByLabel(/^Nota su /)).toBeVisible();
+    await expect(scheda.getByRole('link', { name: /^(Apri|Analizza)$/ })).toBeVisible();
   });
 
-  test('l’elenco si scarica in CSV, e scarica quello che si sta guardando', async ({ page }) => {
+  test('l’elenco si scarica in CSV, con le colonne del CRM', async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto('/portafoglio');
 
     /*
       Lo scaricamento attraversa tre confini che le prove unitarie non toccano: il gestore
       di rotta di Next, la chiamata all'API con il cookie di sessione, e le intestazioni con
-      cui il browser decide se salvare o mostrare a schermo. Se una sola sbaglia, il broker
-      ottiene una pagina di punti e virgola invece di un file — e conclude che non funziona.
+      cui il browser decide se salvare o mostrare a schermo.
     */
     const [scaricamento] = await Promise.all([
       page.waitForEvent('download', { timeout: 90_000 }),
       page.getByRole('link', { name: 'Esporta in CSV' }).click(),
     ]);
 
-    expect(scaricamento.suggestedFilename()).toMatch(/^portafoglio-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(scaricamento.suggestedFilename()).toMatch(/^crm-\d{4}-\d{2}-\d{2}\.csv$/);
 
     const percorso = await scaricamento.path();
     const { readFileSync } = await import('node:fs');
     const contenuto = readFileSync(percorso, 'utf8');
 
-    // Il BOM e il punto e virgola sono ciò che rende il file apribile in Italia: senza,
-    // Excel mostra una colonna sola con gli accenti rotti.
     expect(contenuto.startsWith('﻿')).toBe(true);
-    expect(contenuto).toContain('Denominazione";"Partita IVA');
+    expect(contenuto).toContain(
+      '"Denominazione";"Partita IVA";"Comune";"Provincia";"Settore";"Stato";"Nota"',
+    );
+    expect(contenuto).not.toMatch(/CAT NAT|Coperture da attivare|Esposizione non assicurata/);
     expect(contenuto.trimEnd().split('\r\n').length).toBeGreaterThan(1);
   });
 
-  test('il file segue il filtro attivo, e lo dichiara nel nome', async ({ page }) => {
+  test('il file segue il filtro per stato, e lo dichiara nel nome', async ({ page }) => {
     test.setTimeout(120_000);
-    await page.goto('/portafoglio?filtro=catnat');
+    await page.goto('/portafoglio?filtro=da-contattare');
 
     const [scaricamento] = await Promise.all([
       page.waitForEvent('download', { timeout: 90_000 }),
       page.getByRole('link', { name: 'Esporta in CSV' }).click(),
     ]);
 
-    // Scaricare tutto mentre a schermo c'è un sottoinsieme è la sorpresa che si scopre
-    // davanti al cliente, non prima.
-    expect(scaricamento.suggestedFilename()).toContain('portafoglio-catnat-');
+    expect(scaricamento.suggestedFilename()).toContain('crm-da-contattare-');
   });
 });
 
