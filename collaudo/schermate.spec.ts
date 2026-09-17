@@ -20,6 +20,8 @@ const PAGINE: { nome: string; percorso: string }[] = [
   { nome: '01b-nuovi-clienti-conteggio', percorso: '/prospect?comune=A060' },
   { nome: '01c-nuovi-clienti-partita-iva', percorso: '/prospect?piva=03158460174#ricerca-azienda' },
   { nome: '02-portafoglio', percorso: '/portafoglio' },
+  // Dichiarata «in arrivo» dal 18/09/2026: si fotografa perché è una pagina che il cliente vede.
+  { nome: '02b-monitoraggio', percorso: '/monitoraggio' },
   { nome: '03-analisi', percorso: `/azienda/${AZIENDA_DI_PROVA}` },
   { nome: '04-intervista', percorso: `/azienda/${AZIENDA_DI_PROVA}/dati` },
   { nome: '05-report', percorso: `/azienda/${AZIENDA_DI_PROVA}/report` },

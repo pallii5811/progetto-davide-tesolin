@@ -17,6 +17,7 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
   const pagine = [
     { percorso: '/prospect', atteso: /Trova nuove aziende/ },
     { percorso: '/portafoglio', atteso: /Le aziende già analizzate/ },
+    { percorso: '/monitoraggio', atteso: /nessuna azienda è sorvegliata in questo momento/i },
     { percorso: '/impostazioni', atteso: /Cambia password/i },
     { percorso: '/impostazioni/utenti', atteso: /Utenti dello studio/i },
   ];
@@ -66,11 +67,12 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
   }
 
   /*
-    Monitoraggio, Catalogo rischi e Importa elenco clienti sono stati tolti il 17/09/2026
-    («AEGIS - cambi.pptx»). I loro indirizzi portano al CRM: un segnalibro vecchio non deve
-    finire su una pagina inesistente, e non deve riaprire una pagina tolta.
+    Catalogo rischi e Importa elenco clienti sono stati tolti il 17/09/2026 («AEGIS -
+    cambi.pptx»). I loro indirizzi portano al CRM: un segnalibro vecchio non deve finire su una
+    pagina inesistente, e non deve riaprire una pagina tolta. Monitoraggio invece è tornato il
+    18/09/2026 come pagina «in arrivo», e il suo indirizzo non rinvia più.
   */
-  for (const tolta of ['/monitoraggio', '/catalogo', '/portafoglio/importa']) {
+  for (const tolta of ['/catalogo', '/portafoglio/importa']) {
     test(`${tolta} non esiste più e porta al CRM`, async ({ page }) => {
       const risposta = await page.goto(tolta);
       expect(risposta?.status(), tolta).toBeLessThan(400);
@@ -78,10 +80,31 @@ test.describe('Le pagine si aprono e mostrano qualcosa', () => {
     });
   }
 
-  test('il menu ha due voci: Ricerca Clienti e CRM', async ({ page }) => {
+  test('il menu ha tre voci, e Monitoraggio dichiara di essere in arrivo', async ({ page }) => {
     await page.goto('/prospect');
     const menu = page.getByRole('navigation', { name: 'Principale' });
-    await expect(menu.getByRole('link')).toHaveText(['Ricerca Clienti', 'CRM']);
+    await expect(menu.getByRole('link')).toHaveText([
+      'Ricerca Clienti',
+      'CRM',
+      /^Monitoraggio\s+in arrivo$/,
+    ]);
+  });
+
+  /*
+    La pagina in lavorazione non deve sembrare una pagina che funziona.
+
+    Un elenco vuoto si legge come «nessun allarme», che davanti a un cliente è una
+    rassicurazione falsa; un esempio inventato si legge come un allarme vero. Qui si verifica
+    che non ci sia né l'uno né l'altro: nessuna tabella, e la dichiarazione per esteso.
+  */
+  test('Monitoraggio dice che non è attivo e non mostra dati', async ({ page }) => {
+    await page.goto('/monitoraggio');
+
+    await expect(page.getByRole('heading', { name: 'Monitoraggio', level: 1 })).toBeVisible();
+    await expect(page.getByText('In arrivo', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Non è attivo/)).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Vai al CRM' })).toBeVisible();
   });
 });
 

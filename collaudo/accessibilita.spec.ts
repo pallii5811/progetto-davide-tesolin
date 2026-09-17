@@ -24,6 +24,7 @@ const PAGINE: readonly (readonly [string, string])[] = [
   // Senza nessun filtro: l'avviso che dice cosa manca (17/09/2026).
   ['ricerca clienti, modulo inviato vuoto', '/prospect?formaGiuridicaCodice=SR&limite=5'],
   ['CRM', '/portafoglio'],
+  ['monitoraggio in arrivo', '/monitoraggio'],
   ['impostazioni', '/impostazioni'],
   ['compagnie', '/impostazioni/compagnie'],
   ['studi sulla piattaforma', '/impostazioni/studi'],

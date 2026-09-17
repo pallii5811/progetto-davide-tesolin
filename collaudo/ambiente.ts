@@ -7,9 +7,19 @@ const RADICE = fileURLToPath(new URL('..', import.meta.url));
 /**
  * Porte diverse da quelle di sviluppo: il collaudo non deve interferire con un servizio
  * che qualcuno sta usando, né trovarne uno già avviato e credere di averlo lanciato lui.
+ *
+ * Si possono spostare con PORTA_WEB_COLLAUDO e PORTA_API_COLLAUDO. Il 17/09/2026 un altro
+ * progetto aperto sulla stessa macchina teneva la 3100, e l'intera suite non partiva —
+ * «is already used» — invece di girare su una porta libera: un collaudo che dipende da cosa
+ * fanno gli altri programmi del computer smette di essere una prova del software.
  */
-export const PORTA_API = 3101;
-export const PORTA_WEB = 3100;
+const porta = (nome: string, predefinita: number): number => {
+  const valore = Number(process.env[nome]);
+  return Number.isInteger(valore) && valore > 0 && valore < 65_536 ? valore : predefinita;
+};
+
+export const PORTA_API = porta('PORTA_API_COLLAUDO', 3101);
+export const PORTA_WEB = porta('PORTA_WEB_COLLAUDO', 3100);
 
 export const INDIRIZZO_API = `http://127.0.0.1:${PORTA_API}`;
 export const INDIRIZZO_WEB = `http://127.0.0.1:${PORTA_WEB}`;

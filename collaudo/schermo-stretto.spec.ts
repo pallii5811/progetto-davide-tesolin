@@ -19,6 +19,7 @@ const PAGINE: readonly { readonly percorso: string; readonly nome: string }[] = 
   { percorso: '/prospect', nome: 'ricerca clienti' },
   { percorso: '/prospect?piva=03158460174', nome: 'ricerca clienti, ricerca per partita IVA' },
   { percorso: '/portafoglio', nome: 'CRM' },
+  { percorso: '/monitoraggio', nome: 'monitoraggio in arrivo' },
   { percorso: '/impostazioni', nome: 'impostazioni' },
   { percorso: '/impostazioni/costi', nome: 'consumi dei dati' },
   // Le più pesanti: tabelle di indici, righe di capitali, elenchi di rischi, moduli.

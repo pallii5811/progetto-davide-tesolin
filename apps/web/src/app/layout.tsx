@@ -8,7 +8,7 @@ import { BottoneInvio } from '@/components/BottoneInvio';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AEGIS · Credit & Insurance Risk Intelligence',
+  title: 'Riskadvisor · Credit & Insurance Risk Intelligence',
   description:
     'Analisi integrata del merito creditizio e dei rischi assicurativi d’impresa per intermediari.',
 };
@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="no-print border-b border-bordo bg-superficie">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
             <Link href="/prospect" className="flex items-baseline gap-2.5">
-              <span className="text-lg font-bold tracking-tight text-marchio">AEGIS</span>
+              <span className="text-lg font-bold tracking-tight text-marchio">Riskadvisor</span>
               <span className="hidden text-xs text-testo-debole sm:inline">
                 Credit &amp; Insurance Risk Intelligence
               </span>
