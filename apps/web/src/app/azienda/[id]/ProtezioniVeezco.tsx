@@ -1,19 +1,22 @@
-import type { AnalisiDto, MoneyDto, ProtezioniDto, VoceDiCalcoloDto } from '@/lib/api';
+import type { AnalisiDto, MoneyDto, ProtezioniDto } from '@/lib/api';
 import { Metrica, Sezione } from '@/components/ui';
+import { Cerchio } from './Cerchio';
 import { PopupProperty } from './PopupProperty';
+import { PropertyPerSede } from './PropertyPerSede';
 
 /**
  * Property Risk, Business Interruption e Cyber Risk: i tre riquadri in testa alla scheda e le
  * tre sezioni che li spiegano.
  *
  * Il calcolo è del motore, con le formule e le tabelle del foglio «Veezco_Analisi Rischio.xlsx».
- * Qui non si calcola niente: si stampa il risultato, voce per voce, con il suo peso.
+ * Qui non si calcola niente: si mostra il risultato.
  *
- * Le formule non si stampano più. Fino al 18/09/2026 ogni sezione si apriva con un riquadro blu,
- * «Come è stato calcolato», con le formule in carattere da codice; Simone, guardando la scheda da
- * mostrare a un cliente: «tutte ste formule in blu devi toglierle». Il conto resta rifacibile
- * dalle tabelle — punteggio, peso e contributo di ogni voce — e le formule restano nel motore
- * (`packages/core/src/protezioni`), che continua a restituirle con l'analisi.
+ * Dal 18/09/2026 ogni rischio è un cerchio da 1 a 7, come nella slide di Luca che Simone ha
+ * portato: il Property sede per sede, con rischio incendio, calamità naturali e punteggio
+ * complessivo; la Business Interruption con il suo cerchio accanto agli scenari di fermo; il
+ * Cyber con il totale e le quattro voci. Prima c'erano le formule in chiaro, poi tabelle di voci,
+ * pesi e contributi con una frase per voce: esatte, e scritte per chi verifica un calcolo invece
+ * che per chi decide una copertura. Le formule restano nel motore (`packages/core/src/protezioni`).
  */
 
 type Protezioni = AnalisiDto['protezioni'];
@@ -28,22 +31,10 @@ function numeroIt(valore: number, decimali: number): string {
   }).format(valore);
 }
 
-/**
- * Un punteggio da 1 a 7 come lo stampa il motore: intero quando lo è, altrimenti al centesimo.
- *
- * I pericoli naturali escono con i decimali (50% × 7 + 50% × 3,67 = 5,34): stampati senza, la
- * voce direbbe 5 e il contributo 2,67, e il conto non tornerebbe più.
- */
-function punteggioIt(valore: number): string {
-  return Number.isInteger(valore) ? numeroIt(valore, 0) : numeroIt(valore, 2);
-}
-
 /** Al centesimo: la perdita giornaliera e gli scenari devono tornare fra loro a colpo d'occhio. */
 function euroAlCentesimo(importo: MoneyDto): string {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(importo.euro);
 }
-
-const pesoIt = (peso: number): string => `${Math.round(peso * 100)}%`;
 
 const suSette = (punteggio: number, decimali: number): string => `${numeroIt(punteggio, decimali)} su 7`;
 
@@ -113,7 +104,14 @@ export function RiquadriProtezioni({ protezioni }: { protezioni: Protezioni }) {
   );
 }
 
-export function SezioniProtezioni({ protezioni }: { protezioni: Protezioni }) {
+export function SezioniProtezioni({
+  protezioni,
+  children,
+}: {
+  protezioni: Protezioni;
+  /** Le ubicazioni e il loro rischio territoriale: stanno dentro il Property Risk, sotto i cerchi. */
+  children?: React.ReactNode;
+}) {
   /*
     Le tre sezioni ci sono sempre, anche senza il calcolo: il menu delle sezioni punta a questi
     tre identificativi, e un collegamento che non porta da nessuna parte è il difetto che quel
@@ -124,19 +122,20 @@ export function SezioniProtezioni({ protezioni }: { protezioni: Protezioni }) {
       <Sezione
         id="property-risk"
         titolo="Property Risk"
-        sottotitolo="Tutela i beni dell’impresa da incendio ed eventi naturali"
+        sottotitolo="Incendio e calamità naturali, sede per sede"
         azione={
           protezioni === undefined ? undefined : (
             <PopupProperty property={protezioni.property} innesco="pulsante" />
           )
         }
       >
-        {protezioni === undefined ? <NonDisponibile /> : <CorpoProperty protezioni={protezioni} />}
+        {protezioni === undefined ? <NonDisponibile /> : <PropertyPerSede property={protezioni.property} />}
+        {children}
       </Sezione>
       <Sezione
         id="business-interruption"
         titolo="Business Interruption"
-        sottotitolo="Tutela la continuità aziendale in caso di interruzione temporanea"
+        sottotitolo="Quanto costa un fermo dell’attività"
       >
         {protezioni === undefined ? (
           <NonDisponibile />
@@ -144,11 +143,7 @@ export function SezioniProtezioni({ protezioni }: { protezioni: Protezioni }) {
           <CorpoBusinessInterruption protezioni={protezioni} />
         )}
       </Sezione>
-      <Sezione
-        id="cyber-risk"
-        titolo="Cyber Risk"
-        sottotitolo="Protegge i sistemi aziendali dai danni informatici"
-      >
+      <Sezione id="cyber-risk" titolo="Cyber Risk" sottotitolo="Esposizione ai danni informatici">
         {protezioni === undefined ? <NonDisponibile /> : <CorpoCyber protezioni={protezioni} />}
       </Sezione>
     </>
@@ -159,83 +154,13 @@ function NonDisponibile() {
   return <p className="text-sm text-testo-tenue">{NON_DISPONIBILE}</p>;
 }
 
-function Note({ note }: { note: readonly string[] }) {
-  if (note.length === 0) return null;
+/** Il riquadro di un cerchio: titolo sopra, cerchio al centro, il resto sotto. */
+function Riquadro({ titolo, children }: { titolo: string; children: React.ReactNode }) {
   return (
-    <ul className="mt-3 space-y-1 text-xs leading-relaxed text-testo-debole">
-      {note.map((n) => (
-        <li key={n}>{n}</li>
-      ))}
-    </ul>
-  );
-}
-
-function TabellaVoci({
-  voci,
-  etichettaTotale,
-  totale,
-}: {
-  voci: readonly VoceDiCalcoloDto[];
-  etichettaTotale: string;
-  totale: string;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-bordo">
-      <table className="w-full text-sm">
-        <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
-          <tr>
-            <th className="px-4 py-2.5 font-medium">Voce</th>
-            <th className="px-4 py-2.5 text-right font-medium">Punteggio 1–7</th>
-            <th className="px-4 py-2.5 text-right font-medium">Peso</th>
-            <th className="px-4 py-2.5 text-right font-medium">Contributo</th>
-          </tr>
-        </thead>
-        <tbody>
-          {voci.map((v) => (
-            <tr key={v.voce} className="border-t border-bordo bg-superficie align-top">
-              <td className="px-4 py-3">
-                <span className="font-medium">{v.voce}</span>
-                <span className="mt-0.5 block text-xs leading-snug text-testo-tenue">{v.dettaglio}</span>
-              </td>
-              <td className="tabular px-4 py-3 text-right">
-                {v.punteggio === null ? 'non calcolabile' : punteggioIt(v.punteggio)}
-              </td>
-              <td className="tabular px-4 py-3 text-right">{pesoIt(v.peso)}</td>
-              <td className="tabular px-4 py-3 text-right">
-                {v.contributo === null ? '—' : numeroIt(v.contributo, 2)}
-              </td>
-            </tr>
-          ))}
-          <tr className="border-t-2 border-bordo-forte bg-fondo font-semibold">
-            <td className="px-4 py-3" colSpan={3}>
-              {etichettaTotale}
-            </td>
-            <td className="tabular px-4 py-3 text-right">{totale}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div className="flex flex-col items-center rounded-xl border border-bordo bg-superficie p-5">
+      <h3 className="mb-3 text-sm font-semibold">{titolo}</h3>
+      {children}
     </div>
-  );
-}
-
-function CorpoProperty({ protezioni }: { protezioni: ProtezioniDto }) {
-  const { property } = protezioni;
-  return (
-    <>
-      <div className="space-y-4">
-        {property.ubicazioni.map((u) => (
-          <div key={u.id}>
-            <p className="mb-2 text-sm font-medium">{u.etichetta}</p>
-            <TabellaVoci
-              voci={u.voci}
-              etichettaTotale="Property Risk dell’ubicazione"
-              totale={u.punteggio === null ? 'non calcolabile' : suSette(u.punteggio, 2)}
-            />
-          </div>
-        ))}
-      </div>
-      <Note note={property.note} />
-    </>
   );
 }
 
@@ -248,75 +173,85 @@ function CorpoBusinessInterruption({ protezioni }: { protezioni: ProtezioniDto }
         ? 'Margine di contribuzione annuo'
         : 'Base annua';
 
-  const righe: { voce: string; calcolo: string; importo: string; testid?: string }[] = [
+  const righe: { voce: string; importo: string; testid?: string; evidenziata?: boolean }[] = [
     {
       voce: etichettaBase,
-      calcolo: 'dato annuo dell’impresa',
       importo: bi.baseAnnua === null ? 'da rilevare' : euroAlCentesimo(bi.baseAnnua),
     },
     {
       voce: 'Perdita giornaliera',
-      calcolo: 'base annua ÷ 365',
       importo: bi.perditaGiornaliera === null ? 'da rilevare' : euroAlCentesimo(bi.perditaGiornaliera),
       testid: 'bi-perdita-giornaliera',
+      evidenziata: true,
     },
     ...bi.scenari.map((s) => ({
       voce: `Fermo di ${s.giorni} giorni`,
-      calcolo: `perdita giornaliera × ${s.giorni}`,
       importo: euroAlCentesimo(s.perdita),
       testid: `bi-scenario-${s.giorni}`,
     })),
-    {
-      voce: 'Punteggio fisico',
-      calcolo: 'uguale al Property Risk',
-      importo: bi.punteggioFisico === null ? 'non calcolabile' : suSette(bi.punteggioFisico, 2),
-    },
   ];
 
   return (
-    <>
-      <div className="overflow-x-auto rounded-lg border border-bordo">
+    <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
+      <Riquadro titolo="Rischio interruzione">
+        <Cerchio valore={bi.punteggioFisico} etichetta="Rischio interruzione" grande />
+      </Riquadro>
+      <div className="overflow-x-auto rounded-xl border border-bordo">
         <table className="w-full text-sm">
-          <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Voce</th>
-              <th className="px-4 py-2.5 font-medium">Calcolo</th>
-              <th className="px-4 py-2.5 text-right font-medium">Importo</th>
-            </tr>
-          </thead>
           <tbody>
             {righe.map((r) => (
-              <tr key={r.voce} data-testid={r.testid} className="border-t border-bordo bg-superficie">
-                <td className="px-4 py-3 font-medium">{r.voce}</td>
-                <td className="px-4 py-3 text-testo-tenue">{r.calcolo}</td>
-                <td className="tabular px-4 py-3 text-right font-medium">{r.importo}</td>
+              <tr
+                key={r.voce}
+                data-testid={r.testid}
+                className="border-t border-bordo bg-superficie first:border-t-0"
+              >
+                <td className="px-5 py-3.5 text-testo-tenue">{r.voce}</td>
+                <td
+                  className={`tabular px-5 py-3.5 text-right ${
+                    r.evidenziata === true ? 'text-base font-semibold' : 'font-medium'
+                  }`}
+                >
+                  {r.importo}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <Note note={bi.note} />
-    </>
+    </div>
   );
 }
 
 function CorpoCyber({ protezioni }: { protezioni: ProtezioniDto }) {
   const { cyber } = protezioni;
+
+  if (cyber.punteggio === null || cyber.divisioneAteco === null) {
+    return (
+      <p className="text-sm text-testo-tenue">{cyber.note[0] ?? 'Divisione ATECO non disponibile.'}</p>
+    );
+  }
+
   return (
-    <>
-      {cyber.punteggio !== null && cyber.divisioneAteco !== null && (
-        <>
-          <p className="mb-2 text-sm font-medium">
-            Divisione ATECO {cyber.divisioneAteco} · {cyber.titoloDivisione}
-          </p>
-          <TabellaVoci
-            voci={cyber.voci}
-            etichettaTotale="Cyber Risk, arrotondato a un decimale"
-            totale={suSette(cyber.punteggio, 1)}
-          />
-        </>
-      )}
-      <Note note={cyber.note} />
-    </>
+    <div className="grid gap-4 md:grid-cols-[16rem_1fr]">
+      <Riquadro titolo="Cyber Risk">
+        <Cerchio valore={cyber.punteggio} etichetta="Cyber Risk" grande decimali={1} />
+        <p className="mt-3 text-center text-sm text-testo-tenue">
+          ATECO {cyber.divisioneAteco} · {cyber.titoloDivisione}
+        </p>
+      </Riquadro>
+      {/* Le quattro voci del foglio, ciascuna con il suo cerchio: il nome basta, la frase che la
+          spiegava stava sotto ogni voce e non aggiungeva niente a chi deve decidere. */}
+      <ul className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {cyber.voci.map((v) => (
+          <li
+            key={v.voce}
+            className="flex flex-col items-center rounded-xl border border-bordo bg-superficie p-4 text-center"
+          >
+            <Cerchio valore={v.punteggio} etichetta={v.voce} />
+            <p className="mt-2 text-sm font-medium leading-snug">{v.voce}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

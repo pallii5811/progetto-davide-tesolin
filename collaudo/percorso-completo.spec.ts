@@ -53,13 +53,7 @@ test.describe('Percorso completo dell’intermediario', () => {
     await expect(page.getByRole('heading', { name: /MECCANICA BRESCIANA/i })).toBeVisible();
 
     // ── 3. Le sezioni che compongono il valore ────────────────────────────
-    for (const sezione of [
-      /Property Risk/,
-      /Business Interruption/,
-      /Cyber Risk/,
-      /Merito creditizio/i,
-      /Record camerale/i,
-    ]) {
+    for (const sezione of [/Property Risk/, /Business Interruption/, /Cyber Risk/, /Record camerale/i]) {
       await expect(page.getByText(sezione).first()).toBeVisible();
     }
 
@@ -188,9 +182,9 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     // ── 3. Analizza la prima, e le tre protezioni ci sono ─────────────────
     await page.getByRole('link', { name: 'Analizza' }).first().click();
     await expect(page.getByTestId('metrica-property-risk')).toBeVisible();
-    // Ciascuna con la sua tabella: dal 18/09/2026 le sezioni non si aprono più con le formule.
+    // Ciascuna con il suo cerchio da 1 a 7: dal 18/09/2026 niente formule e niente tabelle di voci.
     for (const id of ['property-risk', 'business-interruption', 'cyber-risk']) {
-      await expect(page.locator(`#${id}`).getByRole('table').first(), id).toBeVisible();
+      await expect(page.locator(`#${id}`).getByRole('img').first(), id).toBeVisible();
     }
 
     // ── 4. Il CRM si esporta, e il file non accusa nessuno ───────────────

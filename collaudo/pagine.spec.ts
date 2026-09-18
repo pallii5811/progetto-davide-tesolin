@@ -145,28 +145,35 @@ test.describe('Analisi di un’azienda', () => {
   });
 
   /*
-    Le formule in blu tolte il 18/09/2026, su richiesta di Simone: la scheda si mostra al cliente,
-    e un riquadro di formule in carattere da codice in testa a ogni sezione si leggeva come un
-    foglio di lavoro. Il risultato resta, e resta rifacibile: la tabella delle voci con punteggio,
-    peso e contributo.
+    Dal 18/09/2026, su richiesta di Simone e sulla slide di Luca: ogni rischio è un cerchio da 1 a
+    7, senza formule né tabelle di voci. I numeri attesi sono quelli già provati sopra per i
+    riquadri in testa — ADRIATICA LOGISTICA, sede di Ravenna: attività 5, pericoli naturali 5,34,
+    Property 5,17; Cyber 5,1 — e il cerchio li deve dire uguali, con la virgola.
   */
-  test('le protezioni mostrano il risultato senza i riquadri di formule', async ({ page }) => {
+  test('le protezioni sono cerchi da 1 a 7, senza formule', async ({ page }) => {
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
 
-    for (const [id, formula, tabella] of [
-      ['property-risk', /Property Risk = 30% × rischio dell’attività/, /Property Risk dell’ubicazione/],
-      [
-        'business-interruption',
-        /Perdita giornaliera = margine di contribuzione annuo ÷ 365/,
-        /Perdita giornaliera/,
-      ],
-      ['cyber-risk', /Cyber Risk = arrotondato a un decimale/, /Cyber Risk, arrotondato a un decimale/],
-    ] as const) {
-      const sezione = page.locator(`#${id}`);
-      await expect(sezione.getByText(tabella).first(), id).toBeVisible();
-      await expect(sezione.getByText('Come è stato calcolato'), id).toHaveCount(0);
-      await expect(sezione.getByText(formula), id).toHaveCount(0);
+    const property = page.locator('#property-risk');
+    for (const nome of [
+      'Rischio incendio: 5 su 7',
+      'Calamità naturali: 5,34 su 7',
+      'Overall Risk Score: 5,17 su 7',
+    ]) {
+      await expect(property.getByRole('img', { name: nome }), nome).toBeVisible();
     }
+    await expect(
+      page.locator('#business-interruption').getByRole('img', { name: 'Rischio interruzione: 5,17 su 7' }),
+    ).toBeVisible();
+    await expect(
+      page.locator('#cyber-risk').getByRole('img', { name: 'Cyber Risk: 5,1 su 7' }),
+    ).toBeVisible();
+
+    for (const id of ['property-risk', 'business-interruption', 'cyber-risk']) {
+      await expect(page.locator(`#${id}`).getByText('Come è stato calcolato'), id).toHaveCount(0);
+    }
+    // Merito creditizio e fido consigliato non stanno più nella scheda.
+    await expect(page.getByRole('heading', { name: 'Merito creditizio' })).toHaveCount(0);
+    await expect(page.getByText('Fido commerciale consigliato')).toHaveCount(0);
   });
 
   test('gli scenari di fermo tornano con la perdita giornaliera stampata', async ({ page }) => {
@@ -230,16 +237,19 @@ test.describe('La scheda porta le protezioni e il profilo, non l’analisi di pr
   });
 
   test('il profilo aziendale resta intero', async ({ page }) => {
-    for (const id of ['record-camerale', 'ubicazioni', 'assetto', 'credito']) {
+    // Il merito creditizio non c'è più dal 18/09/2026: la scheda serve all'assicuratore.
+    for (const id of ['record-camerale', 'ubicazioni', 'assetto']) {
       await expect(page.locator(`#${id}`), id).toHaveCount(1);
     }
+    await expect(page.locator('#credito')).toHaveCount(0);
   });
 
   test('il Cyber Risk dell’impresa dimostrativa è quello del foglio per la divisione 52', async ({
     page,
   }) => {
     const sezione = page.locator('#cyber-risk');
-    await expect(sezione.getByText(/Divisione ATECO 52/)).toBeVisible();
-    await expect(sezione.getByText('5,1 su 7')).toBeVisible();
+    await expect(sezione.getByText(/ATECO 52/)).toBeVisible();
+    // Dal 18/09/2026 un cerchio: il numero sta nel cerchio, e il cerchio lo dice per intero.
+    await expect(sezione.getByRole('img', { name: 'Cyber Risk: 5,1 su 7' })).toBeVisible();
   });
 });

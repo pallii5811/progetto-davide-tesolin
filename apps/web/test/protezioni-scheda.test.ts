@@ -18,6 +18,8 @@ const senzaCommenti = (sorgente: string): string =>
 
 const PAGINA = senzaCommenti(leggi('app/azienda/[id]/page.tsx'));
 const PROTEZIONI = senzaCommenti(leggi('app/azienda/[id]/ProtezioniVeezco.tsx'));
+const PER_SEDE = senzaCommenti(leggi('app/azienda/[id]/PropertyPerSede.tsx'));
+const CERCHIO = senzaCommenti(leggi('app/azienda/[id]/Cerchio.tsx'));
 
 describe('In testa le tre protezioni', () => {
   it('i tre riquadri prendono il posto di score, fido, patrimonio ed esposizione', () => {
@@ -63,15 +65,44 @@ describe('Sotto, il profilo aziendale e le tre protezioni', () => {
     for (const componente of ['VoceGap', 'VoceRischio', 'MatriceRischi']) {
       expect(PAGINA, componente).not.toContain(componente);
     }
-    expect(PAGINA).toContain('<SezioniProtezioni protezioni={analisi.protezioni} />');
+    // Dal 18/09/2026 le ubicazioni stanno dentro: il componente si apre e si chiude.
+    expect(PAGINA).toContain('<SezioniProtezioni protezioni={analisi.protezioni}>');
   });
 
   it('il profilo aziendale resta', () => {
     expect(PAGINA).toContain('<RecordCamerale');
-    for (const id of ['record-camerale', 'ubicazioni', 'assetto', 'credito', 'bilancio']) {
+    for (const id of ['record-camerale', 'ubicazioni', 'assetto', 'bilancio']) {
       expect(PAGINA, id).toContain(`id="${id}"`);
     }
     expect(PAGINA).toContain('<EventiNegativi');
+  });
+
+  /*
+    Merito creditizio e fido consigliato tolti dalla scheda il 18/09/2026, su richiesta di Simone:
+    la scheda serve all'assicuratore. Il motore li calcola ancora — il report li usa — ma qui non
+    si disegnano, e nemmeno la nota sugli aggregati di bilancio che parlava di Altman e di score.
+  */
+  it('merito creditizio, fido e nota sui dati non si disegnano', () => {
+    for (const tolto of [
+      'id="credito"',
+      "id: 'credito'",
+      'Merito creditizio',
+      'Fido commerciale consigliato',
+      'LivelloDeiDati',
+      'Analisi condotta sugli aggregati sintetici',
+    ]) {
+      expect(PAGINA, tolto).not.toContain(tolto);
+    }
+  });
+
+  it('le ubicazioni stanno dentro il Property Risk', () => {
+    const apertura = PAGINA.indexOf('<SezioniProtezioni protezioni={analisi.protezioni}>');
+    const ubicazioni = PAGINA.indexOf('id="ubicazioni"');
+    const chiusura = PAGINA.indexOf('</SezioniProtezioni>');
+    expect(apertura).toBeGreaterThan(-1);
+    expect(ubicazioni).toBeGreaterThan(apertura);
+    expect(chiusura).toBeGreaterThan(ubicazioni);
+    expect(PAGINA).not.toContain("id: 'ubicazioni'");
   });
 
   it('il menu punta alle tre sezioni, e le tre sezioni esistono anche senza il calcolo', () => {
@@ -83,26 +114,27 @@ describe('Sotto, il profilo aziendale e le tre protezioni', () => {
   });
 
   /*
-    Fino al 18/09/2026 ogni sezione si apriva con un riquadro blu di formule, e questo controllo
-    pretendeva che ci fosse. Simone, sulla scheda da mostrare a un cliente: «tutte ste formule in
-    blu devi toglierle». Ora pretende il contrario, e che il risultato — la tabella delle voci —
-    resti: tolte le formule, il conto si rifà dalle tabelle.
+    Il 18/09/2026, in due passi: prima via le formule in blu, poi le tabelle di voci, pesi e
+    contributi con una frase per voce. Al loro posto un cerchio da 1 a 7 per ogni rischio, come
+    nella slide di Luca. Qui si pretende che le formule e le note del motore non tornino, e che ogni
+    protezione abbia il suo cerchio.
   */
-  it('le formule non si stampano, le tabelle delle voci restano', () => {
+  it('niente formule né note: ogni protezione ha il suo cerchio', () => {
     expect(PROTEZIONI).not.toContain('Come è stato calcolato');
     expect(PROTEZIONI).not.toContain('ComeEStatoCalcolato');
     expect(PROTEZIONI).not.toMatch(/property\.formula|formulaPericoliNaturali|bi\.formule|cyber\.formula/);
-    for (const corpo of [
-      'function CorpoProperty',
-      'function CorpoBusinessInterruption',
-      'function CorpoCyber',
-    ]) {
+    expect(PROTEZIONI).not.toMatch(/<Note\b|\.note\}/);
+    expect(PROTEZIONI).toContain('<PropertyPerSede property={protezioni.property} />');
+    for (const corpo of ['function CorpoBusinessInterruption', 'function CorpoCyber']) {
       const inizio = PROTEZIONI.indexOf(corpo);
       expect(inizio, corpo).toBeGreaterThan(-1);
-      expect(
-        PROTEZIONI.slice(inizio).search(/<TabellaVoci|<table/),
-        `${corpo}: la tabella non c’è`,
-      ).toBeGreaterThan(-1);
+      expect(PROTEZIONI.indexOf('<Cerchio', inizio), `${corpo}: il cerchio non c’è`).toBeGreaterThan(
+        inizio,
+      );
+    }
+    // Il Property di una sede: incendio, calamità naturali e punteggio complessivo.
+    for (const etichetta of ['Rischio incendio', 'Calamità naturali', 'Overall Risk Score']) {
+      expect(PER_SEDE, etichetta).toContain(`etichetta="${etichetta}"`);
     }
   });
 
@@ -116,26 +148,19 @@ describe('Sotto, il profilo aziendale e le tre protezioni', () => {
   scala decisa da Simone, al posto della tabella che nel foglio manca.
 */
 describe('Il Property con la scala dei pericoli', () => {
-  /*
-    La scala stava nel riquadro blu delle formule, tolto il 18/09/2026. Resta scritta nella prima
-    nota del Property, che il motore compone con SCALA_PERICOLI_NATURALI (property-risk.ts): chi
-    legge «alluvione 7» sotto la tabella trova lì perché vale 7.
-  */
-  it('la scala dei punteggi resta nelle note del Property', () => {
-    expect(PROTEZIONI).toContain('<Note note={property.note} />');
-    const motore = readFileSync(
-      resolve(SORGENTI, '../../../packages/core/src/protezioni/property-risk.ts'),
-      'utf8',
-    );
-    expect(motore).toMatch(
-      /fonti ufficiali e diventano punteggi a gradini uguali\. \$\{SCALA_PERICOLI_NATURALI\}/,
-    );
+  it('ogni pericolo naturale ha il suo numero accanto al cerchio', () => {
+    for (const pericolo of ['sede.punteggi.alluvione', 'sede.punteggi.terremoto', 'sede.punteggi.frana']) {
+      expect(PER_SEDE, pericolo).toContain(pericolo);
+    }
   });
 
   it('un punteggio con i decimali si stampa al centesimo, non arrotondato all’intero', () => {
-    // 50% × 7 + 50% × 3,67 = 5,34: stampato «5» il contributo 2,67 non tornerebbe più.
-    expect(PROTEZIONI).toContain("v.punteggio === null ? 'non calcolabile' : punteggioIt(v.punteggio)");
-    expect(PROTEZIONI).not.toMatch(/numeroIt\(v\.punteggio, 0\)/);
+    // 50% × 7 + 50% × 3,67 = 5,34: stampato «5» il cerchio direbbe un rischio che non è quello.
+    expect(CERCHIO).toContain('decimali ?? (Number.isInteger(valore) ? 0 : 2)');
+    // Il Cyber esce dal motore a un decimale: il cerchio lo scrive come il riquadro in testa.
+    expect(PROTEZIONI).toContain('etichetta="Cyber Risk" grande decimali={1}');
+    // Senza punteggio il cerchio non si riempie: un settimo pieno direbbe «rischio minimo».
+    expect(CERCHIO).toContain('{limitato !== null && (');
   });
 
   it('senza Property il riquadro dice il motivo del motore, non più la tabella mancante', () => {

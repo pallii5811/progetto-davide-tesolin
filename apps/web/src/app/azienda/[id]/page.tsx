@@ -17,15 +17,7 @@ import { traduciDescrizioneArchivioMaiuscola } from '@/lib/traduzioni-archivio';
 import { acquistiNellIndirizzo } from '@/lib/acquisti-indirizzo';
 import { livelloTerritoriale } from './esposizione-territoriale';
 import type { AnalisiDto, IndicatoriArchivioDto, CollegamentoSocietario } from '@/lib/api';
-import {
-  Avviso,
-  BadgeConfidenza,
-  BadgeRischio,
-  BadgeStato,
-  Scheda,
-  Sezione,
-  Spiegazione,
-} from '@/components/ui';
+import { Avviso, BadgeConfidenza, BadgeRischio, BadgeStato, Scheda, Sezione } from '@/components/ui';
 import { etichettaAddetti } from '@/lib/etichetta-addetti';
 import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import { etichettaPiuEsposta } from '@/lib/ubicazione-piu-esposta';
@@ -144,8 +136,7 @@ export default async function PaginaAzienda({
           <Avviso tono="informativo" titolo="Accertamento protesti in corso">
             La verifica di protesti, pregiudizievoli e procedure concorsuali è stata avviata ed è già stata
             pagata: si completa in circa un minuto. <strong>Ricaricare questa pagina</strong> per includerla
-            — il ricaricamento non consuma credito. Fino ad allora il fattore vale il 20% dello score e
-            resta non valutabile.
+            — il ricaricamento non consuma credito.
           </Avviso>
         </div>
       )}
@@ -155,332 +146,212 @@ export default async function PaginaAzienda({
       {/* ── Le tre protezioni del foglio Veezco ────────────────────────────── */}
       <RiquadriProtezioni protezioni={analisi.protezioni} />
 
-      {/* ── Property, Business Interruption e Cyber Risk ──────────────────── */}
-      <SezioniProtezioni protezioni={analisi.protezioni} />
-
-      {/* ── Ubicazioni e rischio territoriale ─────────────────────────────── */}
-      <Sezione
-        id="ubicazioni"
-        titolo="Ubicazioni e rischio territoriale"
-        sottotitolo={`${ubicazioni.elenco.length} ${
-          ubicazioni.elenco.length === 1 ? 'ubicazione' : 'ubicazioni'
-        } · ${ubicazioni.comuni.length} ${ubicazioni.comuni.length === 1 ? 'comune' : 'comuni'}${
-          ubicazioni.distanzaMassimaKm === null
-            ? ''
-            : ` · fino a ${ubicazioni.distanzaMassimaKm} km di distanza`
-        }`}
-      >
-        {ubicazioni.elenco.length === 0 ? (
-          <Scheda>
-            <p className="text-sm text-testo-tenue">Nessuna ubicazione risulta dai dati disponibili.</p>
-          </Scheda>
-        ) : (
-          <>
-            {/*
-              Che cosa sono questi indirizzi, detto prima della tabella.
-
-              Su un'impresa con ventitré unità locali la sezione si apriva con un elenco di vie
-              senza dire di chi fossero né perché fossero lì: Simone, il 18/09/2026, «che
-              indirizzi sono, a cosa si riferiscono». Sono i luoghi che il registro attribuisce
-              a questa impresa, ed è la base su cui il Property Risk sceglie l'ubicazione più
-              esposta — quindi vanno nominati, non elencati.
+      {/* ── Property (con le ubicazioni), Business Interruption e Cyber Risk ── */}
+      {/*
+        Le ubicazioni stanno dentro il Property Risk, sotto i cerchi: Simone, il 18/09/2026, «questa
+        parte delle ubicazioni mettila nella parte property risk». Sono la stessa domanda — dove sta
+        l'impresa e quanto rischia lì — e in due sezioni si leggevano come due analisi diverse.
+      */}
+      <SezioniProtezioni protezioni={analisi.protezioni}>
+        <div id="ubicazioni" className="mt-10 scroll-mt-16">
+          <h3 className="text-base font-semibold tracking-tight">Ubicazioni e rischio territoriale</h3>
+          <p className="mb-4 mt-0.5 text-sm text-testo-debole">
+            {`${ubicazioni.elenco.length} ${
+              ubicazioni.elenco.length === 1 ? 'ubicazione' : 'ubicazioni'
+            } · ${ubicazioni.comuni.length} ${ubicazioni.comuni.length === 1 ? 'comune' : 'comuni'}${
+              ubicazioni.distanzaMassimaKm === null
+                ? ''
+                : ` · fino a ${ubicazioni.distanzaMassimaKm} km di distanza`
+            }`}
+          </p>
+          {ubicazioni.elenco.length === 0 ? (
+            <Scheda>
+              <p className="text-sm text-testo-tenue">Nessuna ubicazione risulta dai dati disponibili.</p>
+            </Scheda>
+          ) : (
+            <>
+              {/*
+              Che cosa sono questi indirizzi, in una riga: Simone, il 18/09/2026, «che indirizzi
+              sono, a cosa si riferiscono».
             */}
-            <p className="mb-3 max-w-3xl text-sm text-testo-tenue">
-              Gli indirizzi che il Registro Imprese riporta per questa impresa: la sede legale e le unità
-              locali, più quelli rilevati in intervista. Per ciascuno, quanto rischia il territorio del suo{' '}
-              <strong>comune</strong> — terremoto, alluvione e frana, dalle classificazioni ufficiali — e
-              non il singolo edificio: dove la decisione pesa, la verifica sull’indirizzo resta da fare.
-            </p>
+              <p className="mb-3 text-sm text-testo-tenue">
+                Sede legale e unità locali dal Registro Imprese. Il rischio è quello del comune in cui si
+                trovano.
+              </p>
 
-            {/*
+              {/*
               `overflow-x-auto` e non `overflow-hidden`: misurata a 390 pixel, questa
               tabella arriva a 429 e con `hidden` le ultime colonne venivano **tagliate
               via senza alcun indizio** — che è il caso peggiore fra i due, perché chi
               guarda conclude che il dato non ci sia. Le due proprietà arrotondano gli
               angoli allo stesso modo; solo una lascia arrivare a ciò che è fuori.
             */}
-            <div className="overflow-x-auto rounded-lg border border-bordo">
-              <table className="w-full text-sm">
-                <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
-                  <tr>
-                    <th className="px-4 py-2.5 font-medium">Ubicazione</th>
-                    <th className="px-4 py-2.5 font-medium">Superficie</th>
-                    <th className="px-4 py-2.5 font-medium">Sisma</th>
-                    <th className="px-4 py-2.5 font-medium">Acqua</th>
-                    <th className="px-4 py-2.5 font-medium">Frane</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ubicazioni.elenco.map((u) => (
-                    <tr key={u.id} className="border-t border-bordo bg-superficie align-top">
-                      <td className="px-4 py-3">
-                        <span className="font-medium">
-                          {u.via}
-                          {u.civico === null ? '' : ` ${u.civico}`}
-                        </span>
-                        <span className="block text-xs text-testo-tenue">
-                          {u.cap} {u.comune} ({u.provincia})
-                          {u.origini.includes('sede-legale') && ' · sede legale'}
-                          {u.origini.includes('unita-locale') && ' · unità locale'}
-                          {u.origini.includes('immobile-rilevato') && ' · rilevato in intervista'}
-                          {/*
+              <div className="overflow-x-auto rounded-lg border border-bordo">
+                <table className="w-full text-sm">
+                  <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
+                    <tr>
+                      <th className="px-4 py-2.5 font-medium">Ubicazione</th>
+                      <th className="px-4 py-2.5 font-medium">Superficie</th>
+                      <th className="px-4 py-2.5 font-medium">Sisma</th>
+                      <th className="px-4 py-2.5 font-medium">Acqua</th>
+                      <th className="px-4 py-2.5 font-medium">Frane</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ubicazioni.elenco.map((u) => (
+                      <tr key={u.id} className="border-t border-bordo bg-superficie align-top">
+                        <td className="px-4 py-3">
+                          <span className="font-medium">
+                            {u.via}
+                            {u.civico === null ? '' : ` ${u.civico}`}
+                          </span>
+                          <span className="block text-xs text-testo-tenue">
+                            {u.cap} {u.comune} ({u.provincia})
+                            {u.origini.includes('sede-legale') && ' · sede legale'}
+                            {u.origini.includes('unita-locale') && ' · unità locale'}
+                            {u.origini.includes('immobile-rilevato') && ' · rilevato in intervista'}
+                            {/*
                             Senza coordinate l'ubicazione non entra nel calcolo della
                             contiguità: dirlo evita che l'assenza passi per una misura.
                           */}
-                          {!u.haCoordinate && ' · senza coordinate'}
-                        </span>
-                        {etichettaPiuEsposta(u.piuEsposta, quantePiuEsposte, ubicazioni.elenco.length) !==
-                          null && (
-                          <span className="mt-1 inline-block rounded bg-attenzione/15 px-1.5 py-0.5 text-xs font-medium text-attenzione">
-                            {/*
+                            {!u.haCoordinate && ' · senza coordinate'}
+                          </span>
+                          {etichettaPiuEsposta(u.piuEsposta, quantePiuEsposte, ubicazioni.elenco.length) !==
+                            null && (
+                            <span className="mt-1 inline-block rounded bg-attenzione/15 px-1.5 py-0.5 text-xs font-medium text-attenzione">
+                              {/*
                               Al plurale quando il primo posto è pari, e non è pignoleria di lingua:
                               «la più esposta» su una di cinque ubicazioni identiche dice che le altre
                               quattro lo sono meno, e l’intermediario sceglie dove andare a fare il
                               sopralluogo su un’informazione falsa.
                             */}
-                            {etichettaPiuEsposta(u.piuEsposta, quantePiuEsposte, ubicazioni.elenco.length)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="tabular px-4 py-3 text-testo-tenue">
-                        {u.superficieMq === null ? 'da rilevare' : `${u.superficieMq} m²`}
-                      </td>
-                      <td className="px-4 py-3">
-                        <BadgeEsposizione valore={u.sismica} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <BadgeEsposizione valore={u.idraulica} />
-                        {u.indicatoriIdrogeo !== null && (
-                          <span className="mt-0.5 block text-xs text-testo-debole">
-                            {/*
+                              {etichettaPiuEsposta(
+                                u.piuEsposta,
+                                quantePiuEsposte,
+                                ubicazioni.elenco.length,
+                              )}
+                            </span>
+                          )}
+                        </td>
+                        <td className="tabular px-4 py-3 text-testo-tenue">
+                          {u.superficieMq === null ? 'da rilevare' : `${u.superficieMq} m²`}
+                        </td>
+                        <td className="px-4 py-3">
+                          <BadgeEsposizione valore={u.sismica} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <BadgeEsposizione valore={u.idraulica} />
+                          {u.indicatoriIdrogeo !== null && (
+                            <span className="mt-0.5 block text-xs text-testo-debole">
+                              {/*
                               Le due quote, non una: la classe guarda anche la quota media, e la
                               riga stampava solo l'elevata. Su GALENO S.R.L. Cremona risultava
                               «alta» con l'8,1 % e Palazzolo «media» con il 9,2 %: giusto, e
                               illeggibile. La quota media comprende l'elevata (idrogeo.ts), quindi
                               si scrive «media o elevata».
                             */}
-                            imprese in pericolosità elevata{' '}
-                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)}, media o elevata{' '}
-                            {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaMedia)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <BadgeEsposizione valore={u.frane} />
-                        {u.indicatoriIdrogeo !== null && (
-                          <span className="mt-0.5 block text-xs text-testo-debole">
-                            {percentualeIt(u.indicatoriIdrogeo.impreseFranaElevata)} delle imprese
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                              imprese in pericolosità elevata{' '}
+                              {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaElevata)}, media o elevata{' '}
+                              {percentualeIt(u.indicatoriIdrogeo.impreseIdraulicaMedia)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <BadgeEsposizione valore={u.frane} />
+                          {u.indicatoriIdrogeo !== null && (
+                            <span className="mt-0.5 block text-xs text-testo-debole">
+                              {percentualeIt(u.indicatoriIdrogeo.impreseFranaElevata)} delle imprese
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {/*
+              {/*
               Due aggregazioni distinte perché due eventi diversi colpiscono in modo
               diverso: l'incendio si propaga per contiguità, il sisma prende il territorio.
               È la differenza fra sommare i capitali e non sommarli.
             */}
-            {ubicazioni.elenco.length > 1 && (
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                <Scheda>
-                  <h3 className="mb-2 text-sm font-semibold">Un solo incendio, cosa raggiunge</h3>
-                  <p className="mb-2 text-xs text-testo-debole">
-                    Quali ubicazioni un incendio può raggiungere insieme, e quindi con quali capitali si
-                    somma il danno.
-                  </p>
-                  <ul className="space-y-2 text-sm text-testo-tenue">
-                    {righeDeiComplessi(ubicazioni.complessiIncendio, ubicazioni.elenco).map((riga) => (
-                      <li key={riga.chiave}>
-                        <ElencoUbicazioni etichette={riga.etichette} />
-                        <span className="block">{riga.motivo}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Scheda>
-                <Scheda>
-                  <h3 className="mb-2 text-sm font-semibold">Un solo sisma o alluvione, cosa raggiunge</h3>
-                  <p className="mb-2 text-xs text-testo-debole">
-                    Un terremoto o un’alluvione prendono il territorio: qui contano i comuni, non la
-                    distanza fra i capannoni.
-                  </p>
-                  <ul className="space-y-2 text-sm text-testo-tenue">
-                    {ubicazioni.aggregatiTerritoriali
-                      .filter((c) => c.ubicazioni.length > 1)
-                      .map((c) => (
-                        <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
+              {ubicazioni.elenco.length > 1 && (
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <Scheda>
+                    <h3 className="mb-2 text-sm font-semibold">Cumulo incendio</h3>
+                    <ul className="space-y-2 text-sm text-testo-tenue">
+                      {righeDeiComplessi(ubicazioni.complessiIncendio, ubicazioni.elenco).map((riga) => (
+                        <li key={riga.chiave}>
+                          <ElencoUbicazioni etichette={riga.etichette} />
+                          <span className="block">{riga.motivo}</span>
+                        </li>
                       ))}
-                    {/*
+                    </ul>
+                  </Scheda>
+                  <Scheda>
+                    <h3 className="mb-2 text-sm font-semibold">Cumulo terremoto e alluvione</h3>
+                    <ul className="space-y-2 text-sm text-testo-tenue">
+                      {ubicazioni.aggregatiTerritoriali
+                        .filter((c) => c.ubicazioni.length > 1)
+                        .map((c) => (
+                          <li key={c.ubicazioni.join('|')}>{c.motivo}</li>
+                        ))}
+                      {/*
                       I comuni con una sola ubicazione stavano uno per riga: su questa impresa
                       erano sedici righe che dicevano la stessa cosa — «Unica ubicazione nel comune
                       di X» — e sommergevano le tre che contano, cioè i comuni dove le ubicazioni
                       sono più d'una. Qui diventano una riga, con i comuni dentro.
                     */}
-                    {comuniConUnaSolaUbicazione(ubicazioni.aggregatiTerritoriali, ubicazioni.elenco)
-                      .length > 0 && (
-                      <li>
-                        <span className="block font-medium text-testo">Una sola ubicazione nel comune</span>
-                        <span className="block">
-                          Un sisma o un’alluvione la colpisce da sola:{' '}
-                          {comuniConUnaSolaUbicazione(
-                            ubicazioni.aggregatiTerritoriali,
-                            ubicazioni.elenco,
-                          ).join(', ')}
-                          .
-                        </span>
-                      </li>
-                    )}
-                  </ul>
-                </Scheda>
-              </div>
-            )}
-
-            {ubicazioni.domande.length > 0 && (
-              <Scheda className="mt-4">
-                <h3 className="mb-2 text-sm font-semibold">Da chiedere al cliente</h3>
-                <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-testo-tenue">
-                  {ubicazioni.domande.map((d) => (
-                    <li key={d}>{d}</li>
-                  ))}
-                </ul>
-              </Scheda>
-            )}
-
-            <ImmaginiUbicazione
-              identificativo={id}
-              ubicazioni={ubicazioni.elenco.map((u) => ({ id: u.id, etichetta: u.etichetta }))}
-              immagini={immagini}
-            />
-
-            <ul className="mt-3 space-y-1 text-xs text-testo-debole">
-              {ubicazioni.note.map((n) => (
-                <li key={n}>{n}</li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Sezione>
-
-      {/* ── Merito creditizio ─────────────────────────────────────────────── */}
-      <Sezione
-        id="credito"
-        titolo="Merito creditizio"
-        /*
-          Il compilatore non protegge questa riga: un template literal accetta `null` e
-          scrive «Score null/100» senza che niente si accorga. Le uniche due occorrenze
-          rimaste di questo difetto — qui e nel fascicolo per il cliente — sono state
-          trovate rileggendo a mano ogni uso dei campi diventati annullabili, non dal
-          typecheck.
-        */
-        sottotitolo={
-          analisi.credito.score === null
-            ? 'Punteggio non determinabile sui dati disponibili'
-            : `Score ${analisi.credito.score}/100 · classe ${analisi.credito.classe}${
-                analisi.credito.altman === null
-                  ? ''
-                  : ` · Altman Z'' ${numeroIt(analisi.credito.altman.z, 2)} (${analisi.credito.altman.zona})`
-              }`
-        }
-      >
-        {analisi.credito.limitazione !== null && (
-          <div className="mb-4">
-            <Avviso tono="critico" titolo="Punteggio limitato dall’alto">
-              {analisi.credito.limitazione}
-            </Avviso>
-          </div>
-        )}
-
-        <div className="mb-4 space-y-2">
-          {analisi.credito.fattori.map((fattore) => (
-            <Scheda key={fattore.chiave}>
-              <div className="flex items-baseline justify-between gap-4">
-                <p className="text-sm font-medium">{fattore.etichetta}</p>
-                <p className="tabular text-sm text-testo-tenue">
-                  peso {(fattore.peso * 100).toFixed(0)}% ·{' '}
-                  <span className="font-semibold text-testo">
-                    {/*
-                      «n.d.» accanto a «peso 20%» somiglia a un guasto. Questo fattore non è
-                      mancante: è **non calcolabile** con i dati che l'impresa ha depositato,
-                      e la riga sotto dice quale dato serve. Un punteggio che non c'è va
-                      nominato per quello che è.
-                    */}
-                    {fattore.punteggio === null ? 'non valutabile' : `${Math.round(fattore.punteggio)}/100`}
-                  </span>
-                </p>
-              </div>
-
-              {/*
-                Il colore della barra dice il punteggio, non il marchio.
-
-                Era `bg-marchio` sempre: «Liquidità 57/100» e «Eventi negativi 97/100»
-                uscivano dello stesso identico blu, e il colore non portava alcuna
-                informazione — contro il principio scritto in cima al foglio di stile,
-                dove si dice che il colore serve solo dove informa.
-
-                Sette barre tutte uguali si leggono una per una; sette barre che virano
-                dal verde all'arancione si leggono di sguardo, ed è quello che serve a chi
-                apre venti schede al giorno. La lunghezza resta l'informazione principale:
-                il colore la raddoppia, non la sostituisce, così chi non distingue i colori
-                non perde nulla.
-              */}
-              {fattore.punteggio !== null && (
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bordo">
-                  <div
-                    className={`h-full rounded-full ${coloreDelPunteggio(fattore.punteggio)}`}
-                    style={{ width: `${Math.round(fattore.punteggio)}%` }}
-                  />
+                      {comuniConUnaSolaUbicazione(ubicazioni.aggregatiTerritoriali, ubicazioni.elenco)
+                        .length > 0 && (
+                        <li>
+                          <span className="block font-medium text-testo">
+                            Una sola ubicazione nel comune
+                          </span>
+                          <span className="block">
+                            Un sisma o un’alluvione la colpisce da sola:{' '}
+                            {comuniConUnaSolaUbicazione(
+                              ubicazioni.aggregatiTerritoriali,
+                              ubicazioni.elenco,
+                            ).join(', ')}
+                            .
+                          </span>
+                        </li>
+                      )}
+                    </ul>
+                  </Scheda>
                 </div>
               )}
 
-              <p className="mt-2 text-sm text-testo-tenue">{fattore.motivazione}</p>
-              {fattore.dettagli.length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-xs text-testo-debole">
-                  {fattore.dettagli.map((dettaglio) => (
-                    <li key={dettaglio}>· {dettaglio}</li>
-                  ))}
-                </ul>
+              {ubicazioni.domande.length > 0 && (
+                <Scheda className="mt-4">
+                  <h3 className="mb-2 text-sm font-semibold">Da chiedere al cliente</h3>
+                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-testo-tenue">
+                    {ubicazioni.domande.map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                  </ul>
+                </Scheda>
               )}
-            </Scheda>
-          ))}
-        </div>
 
-        <Scheda>
-          <p className="text-sm font-medium">Fido commerciale consigliato</p>
-          {/* La spiegazione sotto dice già perché non c'è: qui basta non stampare una
-              cifra. «0 €» in questo punto verrebbe letto come «non concedere credito». */}
-          <p className="tabular mt-1 text-2xl font-semibold">
-            {analisi.credito.fido.importo?.formattato ?? 'Non determinabile'}
-          </p>
-          <Spiegazione dati={analisi.credito.fido.spiegazione} aperta />
-        </Scheda>
-      </Sezione>
+              <ImmaginiUbicazione
+                identificativo={id}
+                ubicazioni={ubicazioni.elenco.map((u) => ({ id: u.id, etichetta: u.etichetta }))}
+                immagini={immagini}
+              />
+
+              <ul className="mt-3 space-y-1 text-xs text-testo-debole">
+                {ubicazioni.note.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </SezioniProtezioni>
 
       {/* ── Eventi negativi ───────────────────────────────────────────────── */}
       <EventiNegativi eventi={analisi.eventiNegativi} />
-
-      {/*
-        Su quali dati poggia questa analisi, e cosa manca.
-
-        Chiude la parte di analisi, e non la apre: è la nota che dice quali voci restano
-        non determinabili e come si chiudono. In cima alla pagina rubava lo spazio ai
-        numeri; qui la legge chi ha appena visto un «non determinabile» e vuole sapere
-        perché.
-
-        Il prodotto lo sapeva già — `livelloDatiEconomici` e `arricchimentiPossibili` sono
-        nel DTO da sempre — e non lo diceva a nessuna pagina. Chi apre un'impresa vera
-        legge «non determinabile» accanto a quattro capitali senza sapere perché né cosa
-        farci: l'anagrafica estesa porta gli aggregati sintetici ma non lo schema CEE, e da
-        quello dipendono margine di contribuzione, danni indiretti, indici di liquidità e
-        Altman.
-
-        Un vuoto dichiarato con accanto ciò che lo chiude è una vendita; un vuoto muto è un
-        difetto del software — ed è il modo più rapido di far credere che il dato non
-        esista invece che non sia stato chiesto.
-      */}
-      <LivelloDeiDati analisi={analisi} />
 
       {/*
         Da qui in giù il profilo dell'impresa, non l'analisi.
@@ -1138,75 +1009,6 @@ function dataBreve(iso: string | null | undefined): string | null {
 }
 
 /**
- * Su quale livello di dati economici l'analisi ha lavorato, e cosa manca.
- *
- * Non compare quando i dati sono completi: una riga che dice «va tutto bene» occupa
- * spazio in una pagina già lunga e insegna a saltare gli avvisi. Compare quando c'è
- * qualcosa da sapere — ed è quasi sempre, perché lo schema CEE dettagliato è un servizio
- * a parte che nessuno compra per abitudine.
- */
-function LivelloDeiDati({ analisi }: { analisi: AnalisiDto }) {
-  if (analisi.livelloDatiEconomici === 'completo') return null;
-  if (analisi.arricchimentiPossibili.length === 0 && analisi.livelloDatiEconomici === 'sintetico') {
-    return null;
-  }
-
-  const assente = analisi.livelloDatiEconomici === 'assente';
-
-  return (
-    <div className="mb-8">
-      <Scheda className="border-attenzione/40 bg-attenzione-fondo/40">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-sm font-semibold">
-            {assente
-              ? 'Analisi condotta senza dati di bilancio'
-              : 'Analisi condotta sugli aggregati sintetici del registro'}
-          </h2>
-          <span className="text-xs text-testo-tenue">
-            {assente
-              ? 'nessun esercizio depositato è stato letto'
-              : 'fatturato, patrimonio netto, totale attivo, costo del personale'}
-          </span>
-        </div>
-
-        <p className="mt-2 text-sm leading-relaxed text-testo-tenue">
-          {assente
-            ? 'Senza almeno un esercizio, i capitali che si calcolano dal bilancio restano non determinabili e il merito creditizio poggia sui soli fatti anagrafici. Non è una stima prudente: è l’assenza del dato, dichiarata.'
-            : 'Gli aggregati sintetici bastano a dimensionare alcuni capitali, non tutti. Le voci che richiedono lo schema CEE dettagliato — art. 2424 e 2425 c.c. — restano non determinabili, e sotto è scritto quali.'}
-        </p>
-
-        {analisi.arricchimentiPossibili.length > 0 && (
-          <div className="mt-3 space-y-2.5">
-            {analisi.arricchimentiPossibili.map((a) => (
-              <div key={a.dato} className="border-l-2 border-attenzione/50 pl-3">
-                <p className="text-sm font-medium">{a.dato}</p>
-                <ul className="mt-0.5 space-y-0.5 text-xs leading-relaxed text-testo-tenue">
-                  {a.sbloccherebbe.map((s) => (
-                    <li key={s}>· {s}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/*
-          La via che non costa nulla, detta per prima.
-
-          Il bilancio depositato l'imprenditore ce l'ha già: le voci che mancano si
-          leggono dal suo PDF in due minuti, e valgono più di qualunque acquisto. Dirlo
-          qui evita che un vuoto venga letto come «serve comprare».
-        */}
-        <p className="mt-3 border-t border-bordo pt-2.5 text-xs leading-relaxed text-testo-debole">
-          Il bilancio depositato è già in mano all’impresa: le voci mancanti si rilevano in intervista dal
-          documento che il cliente porta, senza alcun acquisto.
-        </p>
-      </Scheda>
-    </div>
-  );
-}
-
-/**
  * Le voci del record camerale, in un posto solo.
  *
  * Serve a due chiamanti — il menu delle sezioni e la sezione stessa — perché prima
@@ -1264,22 +1066,6 @@ const haRecordCamerale = (registro: AnalisiDto['registro'] | null | undefined): 
   vociDelRecordCamerale(registro).length > 0;
 
 /**
- * Il colore di una barra di punteggio, sulla scala di gravità già in uso.
- *
- * Le stesse cinque tinte dei rischi, lette al contrario: qui cento è buono. Riusare la
- * scala esistente invece di inventarne una seconda è ciò che tiene coerente il
- * vocabolario visivo — in una scheda dove convivono punteggi di merito e livelli di
- * rischio, due scale di colore diverse per la stessa idea di «grave» si contraddicono.
- */
-function coloreDelPunteggio(punteggio: number): string {
-  if (punteggio >= 80) return 'bg-basso';
-  if (punteggio >= 65) return 'bg-moderato';
-  if (punteggio >= 50) return 'bg-rilevante';
-  if (punteggio >= 30) return 'bg-alto';
-  return 'bg-critico';
-}
-
-/**
  * L'età, calcolata oggi.
  *
  * Il fornitore manda anche un campo `age`, ma è fermo all'istante in cui il record è
@@ -1329,8 +1115,6 @@ function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
     { id: 'property-risk', testo: 'Property Risk', presente: true },
     { id: 'business-interruption', testo: 'Business Interruption', presente: true },
     { id: 'cyber-risk', testo: 'Cyber Risk', presente: true },
-    { id: 'ubicazioni', testo: 'Ubicazioni', presente: analisi.ubicazioni.elenco.length > 0 },
-    { id: 'credito', testo: 'Merito creditizio', presente: true },
     { id: 'eventi-negativi', testo: 'Eventi negativi', presente: analisi.eventiNegativi !== null },
     // Il profilo dell'impresa sta tutto sotto un divisore: una voce sola ci porta, e le sue
     // sezioni restano raggiungibili dai loro indirizzi (#record-camerale, #assetto, #bilancio).
