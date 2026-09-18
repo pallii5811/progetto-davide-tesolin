@@ -144,20 +144,28 @@ test.describe('Analisi di un’azienda', () => {
     expect(sorveglianza.errori).toEqual([]);
   });
 
-  test('ogni protezione dice in testa come è stata calcolata, con la formula in chiaro', async ({
-    page,
-  }) => {
+  /*
+    Le formule in blu tolte il 18/09/2026, su richiesta di Simone: la scheda si mostra al cliente,
+    e un riquadro di formule in carattere da codice in testa a ogni sezione si leggeva come un
+    foglio di lavoro. Il risultato resta, e resta rifacibile: la tabella delle voci con punteggio,
+    peso e contributo.
+  */
+  test('le protezioni mostrano il risultato senza i riquadri di formule', async ({ page }) => {
     await page.goto(`/azienda/${AZIENDA_DI_PROVA}`);
 
-    for (const [id, formula] of [
-      ['property-risk', /Property Risk = 30% × rischio dell’attività/],
-      ['business-interruption', /Perdita giornaliera = margine di contribuzione annuo ÷ 365/],
-      ['cyber-risk', /Cyber Risk = arrotondato a un decimale/],
+    for (const [id, formula, tabella] of [
+      ['property-risk', /Property Risk = 30% × rischio dell’attività/, /Property Risk dell’ubicazione/],
+      [
+        'business-interruption',
+        /Perdita giornaliera = margine di contribuzione annuo ÷ 365/,
+        /Perdita giornaliera/,
+      ],
+      ['cyber-risk', /Cyber Risk = arrotondato a un decimale/, /Cyber Risk, arrotondato a un decimale/],
     ] as const) {
       const sezione = page.locator(`#${id}`);
-      await expect(sezione.getByText('Come è stato calcolato'), id).toBeVisible();
-      // Visibile senza aprire nulla: la formula sta sopra il risultato, non in un blocco chiuso.
-      await expect(sezione.getByText(formula), id).toBeVisible();
+      await expect(sezione.getByText(tabella).first(), id).toBeVisible();
+      await expect(sezione.getByText('Come è stato calcolato'), id).toHaveCount(0);
+      await expect(sezione.getByText(formula), id).toHaveCount(0);
     }
   });
 

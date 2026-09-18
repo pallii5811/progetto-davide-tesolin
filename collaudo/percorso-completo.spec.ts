@@ -188,8 +188,9 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
     // ── 3. Analizza la prima, e le tre protezioni ci sono ─────────────────
     await page.getByRole('link', { name: 'Analizza' }).first().click();
     await expect(page.getByTestId('metrica-property-risk')).toBeVisible();
+    // Ciascuna con la sua tabella: dal 18/09/2026 le sezioni non si aprono più con le formule.
     for (const id of ['property-risk', 'business-interruption', 'cyber-risk']) {
-      await expect(page.locator(`#${id}`).getByText('Come è stato calcolato'), id).toBeVisible();
+      await expect(page.locator(`#${id}`).getByRole('table').first(), id).toBeVisible();
     }
 
     // ── 4. Il CRM si esporta, e il file non accusa nessuno ───────────────

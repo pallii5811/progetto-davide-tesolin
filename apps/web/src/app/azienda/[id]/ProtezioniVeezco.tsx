@@ -7,8 +7,13 @@ import { PopupProperty } from './PopupProperty';
  * tre sezioni che li spiegano.
  *
  * Il calcolo è del motore, con le formule e le tabelle del foglio «Veezco_Analisi Rischio.xlsx».
- * Qui non si calcola niente: si stampa il risultato, e prima del risultato la formula, perché
- * chi legge un punteggio deve poter rifare il conto con i numeri che ha sotto gli occhi.
+ * Qui non si calcola niente: si stampa il risultato, voce per voce, con il suo peso.
+ *
+ * Le formule non si stampano più. Fino al 18/09/2026 ogni sezione si apriva con un riquadro blu,
+ * «Come è stato calcolato», con le formule in carattere da codice; Simone, guardando la scheda da
+ * mostrare a un cliente: «tutte ste formule in blu devi toglierle». Il conto resta rifacibile
+ * dalle tabelle — punteggio, peso e contributo di ogni voce — e le formule restano nel motore
+ * (`packages/core/src/protezioni`), che continua a restituirle con l'analisi.
  */
 
 type Protezioni = AnalisiDto['protezioni'];
@@ -154,22 +159,6 @@ function NonDisponibile() {
   return <p className="text-sm text-testo-tenue">{NON_DISPONIBILE}</p>;
 }
 
-/** La formula in testa alla sezione, in chiaro: non dentro un blocco da aprire. */
-function ComeEStatoCalcolato({ formule, fonte }: { formule: readonly string[]; fonte: string }) {
-  return (
-    <div className="mb-4 rounded-lg border border-marchio/30 bg-marchio-tenue p-4">
-      <p className="text-sm font-semibold">Come è stato calcolato</p>
-      {formule.map((formula) => (
-        <p key={formula} className="mt-1.5 font-mono text-sm leading-relaxed text-testo">
-          {formula}
-        </p>
-      ))}
-      {/* `testo-tenue`, non `testo-debole`: sul fondo azzurro il secondo si ferma a 4,38:1, sotto il 4,5:1 WCAG (misurato da axe). */}
-      <p className="mt-2 text-xs text-testo-tenue">Formule e tabelle del foglio «{fonte}».</p>
-    </div>
-  );
-}
-
 function Note({ note }: { note: readonly string[] }) {
   if (note.length === 0) return null;
   return (
@@ -233,10 +222,6 @@ function CorpoProperty({ protezioni }: { protezioni: ProtezioniDto }) {
   const { property } = protezioni;
   return (
     <>
-      <ComeEStatoCalcolato
-        formule={[property.formula, property.formulaPericoliNaturali, property.scalaPericoliNaturali]}
-        fonte={protezioni.fonte}
-      />
       <div className="space-y-4">
         {property.ubicazioni.map((u) => (
           <div key={u.id}>
@@ -290,7 +275,6 @@ function CorpoBusinessInterruption({ protezioni }: { protezioni: ProtezioniDto }
 
   return (
     <>
-      <ComeEStatoCalcolato formule={bi.formule} fonte={protezioni.fonte} />
       <div className="overflow-x-auto rounded-lg border border-bordo">
         <table className="w-full text-sm">
           <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
@@ -320,7 +304,6 @@ function CorpoCyber({ protezioni }: { protezioni: ProtezioniDto }) {
   const { cyber } = protezioni;
   return (
     <>
-      <ComeEStatoCalcolato formule={[cyber.formula]} fonte={protezioni.fonte} />
       {cyber.punteggio !== null && cyber.divisioneAteco !== null && (
         <>
           <p className="mb-2 text-sm font-medium">

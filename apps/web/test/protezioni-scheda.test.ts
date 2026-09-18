@@ -7,9 +7,9 @@ import { describe, expect, it } from 'vitest';
  * La scheda azienda dal 13/09/2026, richiesta da Simone.
  *
  * In testa Property Risk, Business Interruption e Cyber Risk, calcolati con il foglio
- * «Veezco_Analisi Rischio.xlsx»; subito sotto il profilo aziendale, com'era; al posto
- * dell'analisi assicurativa di prima le tre sezioni con la formula in chiaro. Il report per il
- * cliente non cambia.
+ * «Veezco_Analisi Rischio.xlsx»; al posto dell'analisi assicurativa di prima le tre sezioni con
+ * la tabella delle voci. Dal 18/09/2026 le formule in chiaro non si stampano più, e il profilo
+ * aziendale sta in fondo alla pagina. Il report per il cliente non cambia.
  */
 const SORGENTI = resolve(fileURLToPath(new URL('../../..', import.meta.url)), 'apps/web/src');
 const leggi = (relativo: string): string => readFileSync(resolve(SORGENTI, relativo), 'utf8');
@@ -82,22 +82,27 @@ describe('Sotto, il profilo aziendale e le tre protezioni', () => {
     expect(PAGINA).not.toMatch(/id: '(piano|rischi|somme|danno-massimo|ritenzione|prevenzione)'/);
   });
 
-  it('la formula sta in testa alla sezione e in chiaro, non in un blocco da aprire', () => {
-    expect(PROTEZIONI).toContain('Come è stato calcolato');
-    expect(PROTEZIONI).not.toContain('<details');
+  /*
+    Fino al 18/09/2026 ogni sezione si apriva con un riquadro blu di formule, e questo controllo
+    pretendeva che ci fosse. Simone, sulla scheda da mostrare a un cliente: «tutte ste formule in
+    blu devi toglierle». Ora pretende il contrario, e che il risultato — la tabella delle voci —
+    resti: tolte le formule, il conto si rifà dalle tabelle.
+  */
+  it('le formule non si stampano, le tabelle delle voci restano', () => {
+    expect(PROTEZIONI).not.toContain('Come è stato calcolato');
+    expect(PROTEZIONI).not.toContain('ComeEStatoCalcolato');
+    expect(PROTEZIONI).not.toMatch(/property\.formula|formulaPericoliNaturali|bi\.formule|cyber\.formula/);
     for (const corpo of [
       'function CorpoProperty',
       'function CorpoBusinessInterruption',
       'function CorpoCyber',
     ]) {
       const inizio = PROTEZIONI.indexOf(corpo);
-      const formula = PROTEZIONI.indexOf('<ComeEStatoCalcolato', inizio);
-      const risultato = PROTEZIONI.search(/<TabellaVoci|<table/);
       expect(inizio, corpo).toBeGreaterThan(-1);
-      expect(formula, `${corpo}: la formula non c’è`).toBeGreaterThan(inizio);
-      const risultatoDelCorpo = PROTEZIONI.slice(inizio).search(/<TabellaVoci|<table/) + inizio;
-      expect(risultato).toBeGreaterThan(-1);
-      expect(formula, `${corpo}: la formula viene dopo il risultato`).toBeLessThan(risultatoDelCorpo);
+      expect(
+        PROTEZIONI.slice(inizio).search(/<TabellaVoci|<table/),
+        `${corpo}: la tabella non c’è`,
+      ).toBeGreaterThan(-1);
     }
   });
 
@@ -111,9 +116,19 @@ describe('Sotto, il profilo aziendale e le tre protezioni', () => {
   scala decisa da Simone, al posto della tabella che nel foglio manca.
 */
 describe('Il Property con la scala dei pericoli', () => {
-  it('la scala dei punteggi sta nel riquadro, accanto alle formule', () => {
-    expect(PROTEZIONI).toContain(
-      'formule={[property.formula, property.formulaPericoliNaturali, property.scalaPericoliNaturali]}',
+  /*
+    La scala stava nel riquadro blu delle formule, tolto il 18/09/2026. Resta scritta nella prima
+    nota del Property, che il motore compone con SCALA_PERICOLI_NATURALI (property-risk.ts): chi
+    legge «alluvione 7» sotto la tabella trova lì perché vale 7.
+  */
+  it('la scala dei punteggi resta nelle note del Property', () => {
+    expect(PROTEZIONI).toContain('<Note note={property.note} />');
+    const motore = readFileSync(
+      resolve(SORGENTI, '../../../packages/core/src/protezioni/property-risk.ts'),
+      'utf8',
+    );
+    expect(motore).toMatch(
+      /fonti ufficiali e diventano punteggi a gradini uguali\. \$\{SCALA_PERICOLI_NATURALI\}/,
     );
   });
 
