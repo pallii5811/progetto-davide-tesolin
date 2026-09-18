@@ -70,11 +70,14 @@ export function PropertyPerSede({ property }: { property: Property }) {
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <Riquadro titolo="Rischio incendio">
-          <Cerchio valore={sede.punteggi.attivita} etichetta="Rischio incendio" grande />
-          <dl className="mt-3 w-full space-y-1 text-sm">
-            <Riga nome="Attività" valore={sede.punteggi.attivita} />
-            <Riga nome="Tipo di edificio" valore={sede.punteggi.tipoDiSito} />
-          </dl>
+          <Cerchio
+            valore={rischioIncendio(sede.punteggi.attivita, sede.punteggi.tipoDiSito)}
+            etichetta="Rischio incendio"
+            grande
+          />
+          <p className="mt-3 text-center text-sm text-testo-tenue">
+            Calcolato in base al tipo di attività e al tipo di edificio in analisi
+          </p>
         </Riquadro>
 
         <Riquadro titolo="Calamità naturali">
@@ -93,6 +96,19 @@ export function PropertyPerSede({ property }: { property: Property }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Il rischio incendio: attività e tipo di edificio con i pesi che il foglio dà loro nel Property,
+ * 30% e 20%, cioè 60 e 40 su cento. La frase sotto il cerchio lo dice (slide di Luca, 18/09/2026),
+ * quindi il numero deve tenerne conto davvero. Senza tipo di edificio dal registro il foglio usa
+ * il punteggio dell'attività, e il cerchio dice l'attività. Conto in centesimi: niente decimali
+ * spuri.
+ */
+function rischioIncendio(attivita: number | null, tipoDiSito: number | null): number | null {
+  if (attivita === null) return null;
+  const sito = tipoDiSito ?? attivita;
+  return Math.round(attivita * 60 + sito * 40) / 100;
 }
 
 function Riquadro({

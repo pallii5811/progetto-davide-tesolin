@@ -1,14 +1,7 @@
 import { richiediSessione } from '@/lib/sessione';
 import { IndicatoriArchivio } from './IndicatoriArchivio';
 import Link from 'next/link';
-import {
-  analizzaAzienda,
-  statoServizio,
-  collegamentiDiAzienda,
-  leggiAdeguataVerifica,
-  leggiImmaginiUbicazioni,
-} from '@/lib/api';
-import { ImmaginiUbicazione } from './ImmaginiUbicazione';
+import { analizzaAzienda, statoServizio, collegamentiDiAzienda, leggiAdeguataVerifica } from '@/lib/api';
 import { TitolareEffettivo } from './TitolareEffettivo';
 import { AdeguataVerifica } from './AdeguataVerifica';
 import { personeDaVerificare } from './persone-da-verificare';
@@ -86,14 +79,6 @@ export default async function PaginaAzienda({
   const negativitaMostrata = analisi.livelloMostrato.eventiNegativi;
 
   /*
-    Le fotografie si leggono a parte, dopo l'analisi.
-
-    Sono l'unica cosa in archivio che pesa megabyte, e non entrano in nessun calcolo:
-    tenerle dentro il risultato dell'analisi le farebbe viaggiare a ogni esecuzione e
-    duplicare in ogni congelamento. Un guasto qui non deve far cadere la pagina — senza
-    fotografie l'analisi resta intera.
-  */
-  /*
     L'adeguata verifica: l'elenco di quelle gia' svolte e il costo della prossima.
 
     Si legge sempre, anche quando non c'e' niente: la sezione deve poter dire «nessuna
@@ -104,10 +89,6 @@ export default async function PaginaAzienda({
     verifiche: [],
     costoCentesimi: 0,
   }));
-
-  const immagini = await leggiImmaginiUbicazioni(id)
-    .then((r) => r.immagini)
-    .catch(() => []);
 
   // I collegamenti dipendono dal resto del portafoglio, non da questa azienda: se la
   // rotta non risponde l'analisi resta leggibile, e questa sezione semplicemente manca.
@@ -323,28 +304,12 @@ export default async function PaginaAzienda({
                 </div>
               )}
 
-              {ubicazioni.domande.length > 0 && (
-                <Scheda className="mt-4">
-                  <h3 className="mb-2 text-sm font-semibold">Da chiedere al cliente</h3>
-                  <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-testo-tenue">
-                    {ubicazioni.domande.map((d) => (
-                      <li key={d}>{d}</li>
-                    ))}
-                  </ul>
-                </Scheda>
-              )}
-
-              <ImmaginiUbicazione
-                identificativo={id}
-                ubicazioni={ubicazioni.elenco.map((u) => ({ id: u.id, etichetta: u.etichetta }))}
-                immagini={immagini}
-              />
-
-              <ul className="mt-3 space-y-1 text-xs text-testo-debole">
-                {ubicazioni.note.map((n) => (
-                  <li key={n}>{n}</li>
-                ))}
-              </ul>
+              {/*
+                Qui stavano «Da chiedere al cliente», il caricamento delle fotografie delle sedi e
+                le righe grigie delle fonti. Tolti il 18/09/2026 su richiesta di Simone: la scheda
+                si mostra al cliente, e sono testo che non serve a chi decide la copertura. Le
+                fotografie già caricate restano nel report, che le legge per conto suo.
+              */}
             </>
           )}
         </div>
