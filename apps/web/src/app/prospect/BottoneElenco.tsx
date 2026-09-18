@@ -37,7 +37,7 @@ export function BottoneElenco({ etichetta }: { etichetta: string }) {
       value="1"
       testId="scarica-elenco"
       inCorso="Acquisto in corso…"
-      className="rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-60"
+      className="rounded-full bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-60"
     >
       {etichetta}
     </BottoneInvioGet>

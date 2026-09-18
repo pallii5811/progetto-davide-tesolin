@@ -66,10 +66,7 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
 
   return (
     <div className="relative">
-      <label
-        htmlFor={idCampo}
-        className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole"
-      >
+      <label htmlFor={idCampo} className="mb-1.5 block text-[13px] font-medium text-testo-tenue">
         Città
       </label>
       <input
@@ -124,7 +121,7 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
             setAperto(false);
           }
         }}
-        className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio"
+        className="w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm focus:border-marchio"
       />
       <input type="hidden" name="comune" value={scelto?.codiceCatastale ?? ''} />
 
@@ -133,7 +130,7 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
         role="listbox"
         aria-label="Comuni"
         hidden={!mostraElenco}
-        className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-auto rounded border border-bordo-forte bg-superficie py-1 shadow-lg"
+        className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-auto rounded-xl border border-bordo-forte bg-superficie py-1 shadow-[0_12px_32px_-12px_rgba(16,24,40,0.25)]"
       >
         {proposte.map((comune, indice) => (
           <li
@@ -160,7 +157,7 @@ export function SelettoreComune({ codiceIniziale }: { codiceIniziale: string }) 
       {aperto && testo.trim() !== '' && scelto === null && proposte.length === 0 && (
         <p
           role="status"
-          className="absolute left-0 right-0 z-20 mt-1 rounded border border-bordo-forte bg-superficie px-3 py-2 text-sm"
+          className="absolute left-0 right-0 z-20 mt-1 rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm"
         >
           Nessun comune con questo nome.
         </p>

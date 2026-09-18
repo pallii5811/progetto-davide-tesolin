@@ -37,7 +37,7 @@ export function ModificaCrm({
         <select
           name="stato"
           defaultValue={stato}
-          className="w-full rounded border border-bordo-forte bg-fondo px-2 py-1.5 text-sm focus:border-marchio"
+          className="w-full rounded-xl border border-bordo-forte bg-superficie px-2 py-1.5 text-sm focus:border-marchio"
         >
           {STATI_CRM.map((valore) => (
             <option key={valore} value={valore}>
@@ -54,13 +54,13 @@ export function ModificaCrm({
           rows={2}
           maxLength={2000}
           placeholder="Nota"
-          className="w-full rounded border border-bordo-forte bg-fondo px-2 py-1.5 text-sm focus:border-marchio"
+          className="w-full rounded-xl border border-bordo-forte bg-superficie px-2 py-1.5 text-sm focus:border-marchio"
         />
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <BottoneInvio
           inCorso="Salvataggio…"
-          className="rounded border border-bordo-forte px-3 py-1 text-xs font-medium transition hover:border-marchio"
+          className="rounded-full border border-bordo-forte px-3 py-1 text-xs font-medium transition hover:border-marchio"
         >
           Salva
         </BottoneInvio>

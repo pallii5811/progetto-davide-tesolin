@@ -22,7 +22,7 @@ export default async function LayoutImpostazioni({ children }: { children: React
 
   return (
     <>
-      <h1 className="mb-1.5 text-2xl font-bold tracking-tight">Impostazioni</h1>
+      <h1 className="mb-1.5 text-[26px] font-semibold leading-tight tracking-[-0.03em]">Impostazioni</h1>
       <p className="mb-6 text-sm text-testo-tenue">
         {utente.nome}
         {utente.email !== undefined && <span className="text-testo-debole"> · {utente.email}</span>}

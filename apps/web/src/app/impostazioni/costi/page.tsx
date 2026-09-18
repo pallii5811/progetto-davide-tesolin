@@ -41,7 +41,7 @@ export default async function PaginaCosti() {
   return (
     <>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Consumi dei dati</h1>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">Consumi dei dati</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-testo-tenue">
           Ogni chiamata a pagamento verso l&apos;archivio camerale scrive qui. I conteggi di ricerca non
           compaiono perché non costano nulla.
@@ -74,7 +74,7 @@ export default async function PaginaCosti() {
             </p>
           </Scheda>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-bordo">
+          <div className="overflow-hidden rounded-2xl border border-bordo">
             <table className="w-full text-sm">
               <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
                 <tr>

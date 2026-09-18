@@ -12,7 +12,7 @@ function Bottone() {
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="flex w-full items-center justify-center gap-1.5 rounded bg-azione px-4 py-2.5 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+      className="flex w-full items-center justify-center gap-1.5 rounded-full bg-azione px-4 py-2.5 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
       {pending && <Rotella />}
       {pending ? 'Verifica in corso…' : 'Entra'}
@@ -33,10 +33,7 @@ export function ModuloAccesso({
     <form action={invia} className="space-y-4">
       <input type="hidden" name="ritorno" value={ritorno} />
       <div>
-        <label
-          htmlFor="email"
-          className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole"
-        >
+        <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-testo-tenue">
           Indirizzo di posta
         </label>
         {/*
@@ -51,15 +48,12 @@ export function ModuloAccesso({
           autoComplete="username"
           required
           defaultValue={esito?.email ?? ''}
-          className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio"
+          className="w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio"
         />
       </div>
 
       <div>
-        <label
-          htmlFor="password"
-          className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole"
-        >
+        <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-testo-tenue">
           Password
         </label>
         <input
@@ -68,7 +62,7 @@ export function ModuloAccesso({
           type="password"
           autoComplete="current-password"
           required
-          className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio"
+          className="w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio"
         />
       </div>
 

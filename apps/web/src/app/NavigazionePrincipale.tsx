@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { eAttiva } from '@/lib/voce-attiva';
 import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
+import { IconaCampana, IconaCrm, IconaLente } from './_vetrina/icone';
 
 /**
  * Il menu principale, e quale voce è aperta.
@@ -21,6 +22,12 @@ import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
  * `aria-current="page"` e non `aria-current="true"`: è la voce che porta alla **pagina**
  * aperta, e i lettori di schermo lo annunciano come «pagina corrente» invece che come un
  * generico «corrente».
+ *
+ * Dal redesign del 18/09/2026 le forme sono due, con le stesse voci e lo stesso nome
+ * «Principale»: la barra laterale su schermo largo, le pillole sotto l'intestazione su
+ * telefono. Il layout ne mostra una sola per volta — l'altra è `display: none`, quindi
+ * fuori anche dall'albero di accessibilità — e chi usa un lettore di schermo trova sempre
+ * un menu solo.
  */
 /*
   Tre voci, e la terza dichiara di non essere pronta.
@@ -36,42 +43,73 @@ import { AttesaDelCollegamento } from '@/components/CollegamentoAzione';
   quindi chi usa un lettore di schermo la sente insieme al nome — «Monitoraggio in arrivo» — e
   non scopre solo dopo il clic che la funzione non c'è.
 */
-const VOCI: readonly { readonly href: string; readonly testo: string; readonly inArrivo?: true }[] = [
-  { href: '/prospect', testo: 'Ricerca Clienti' },
-  { href: '/portafoglio', testo: 'CRM' },
-  { href: '/monitoraggio', testo: 'Monitoraggio', inArrivo: true },
+const VOCI: readonly {
+  readonly href: string;
+  readonly testo: string;
+  readonly icona: (p: { className?: string }) => React.ReactNode;
+  readonly inArrivo?: true;
+}[] = [
+  { href: '/prospect', testo: 'Ricerca Clienti', icona: IconaLente },
+  { href: '/portafoglio', testo: 'CRM', icona: IconaCrm },
+  { href: '/monitoraggio', testo: 'Monitoraggio', icona: IconaCampana, inArrivo: true },
 ];
 
-export function NavigazionePrincipale() {
+export function NavigazionePrincipale({ variante = 'laterale' }: { variante?: 'laterale' | 'barra' }) {
   const percorso = usePathname();
+  const laterale = variante === 'laterale';
 
   return (
-    // `flex-wrap`: a 390 pixel le voci del menu non stavano su una riga, e senza andavano
-    // fuori schermo trascinandosi dietro l'intera pagina.
-    <nav aria-label="Principale" className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-testo-tenue">
+    /*
+      Su telefono le voci stanno su una riga sola che scorre di lato, invece di andare a capo:
+      la terza voce su una seconda riga sembrava un altro menu.
+    */
+    <nav
+      aria-label="Principale"
+      className={
+        laterale
+          ? 'flex flex-col gap-0.5'
+          : 'flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      }
+    >
       {VOCI.map((voce) => {
         const attiva = eAttiva(percorso, voce.href);
+        const Icona = voce.icona;
+        /*
+          Il segno visibile non è solo il colore: la voce aperta ha un fondo, un'ombra e il
+          peso del testo, cioè una differenza di forma che si vede anche senza distinguere i
+          colori.
+        */
+        const classi = laterale
+          ? `group flex items-center gap-3 rounded-xl px-3 py-2 text-[14.5px] transition-colors ${
+              attiva
+                ? 'bg-superficie font-medium text-testo shadow-[0_1px_2px_rgba(16,24,40,0.06),0_0_0_1px_var(--color-bordo)]'
+                : 'text-testo-tenue hover:bg-superficie/70 hover:text-testo'
+            }`
+          : `inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[14px] transition-colors ${
+              attiva
+                ? 'bg-azione font-medium text-azione-testo'
+                : 'border border-bordo bg-superficie text-testo-tenue hover:text-testo'
+            }`;
         return (
           <Link
             key={voce.href}
             href={voce.href}
             aria-current={attiva ? 'page' : undefined}
-            /*
-              Il segno visibile non è solo il colore: chi non distingue il grigio dal nero
-              non vedrebbe nulla. Il sottolineato lo rende una differenza di forma.
-            */
-            className={
-              attiva
-                ? 'rounded font-medium text-testo underline decoration-marchio decoration-2 underline-offset-4'
-                : 'rounded hover:text-testo'
-            }
+            className={classi}
           >
-            {voce.testo}
+            {laterale && (
+              <Icona
+                className={`h-[18px] w-[18px] shrink-0 ${attiva ? 'text-marchio' : 'text-testo-debole group-hover:text-testo-tenue'}`}
+              />
+            )}
+            <span>{voce.testo}</span>
             {/* Lo spazio è scritto: senza, il nome e l'etichetta arrivano attaccati a chi legge
                 con un lettore di schermo — «Monitoraggioin arrivo». */}
             {voce.inArrivo === true && ' '}
             {voce.inArrivo === true && (
-              <span className="ml-1.5 rounded-full border border-bordo px-1.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-testo-tenue">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${laterale ? 'ml-auto border border-bordo text-testo-debole' : 'border border-current/30'}`}
+              >
                 in arrivo
               </span>
             )}

@@ -32,8 +32,8 @@ const RUOLI: { valore: RuoloUtente; etichetta: string; cosaPuoFare: string }[] =
 ];
 
 const CAMPO =
-  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio';
-const ETICHETTA = 'mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole';
+  'w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio';
+const ETICHETTA = 'mb-1.5 block text-[13px] font-medium text-testo-tenue';
 
 export function GestioneUtenti({
   utenti,
@@ -84,8 +84,10 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
 
   return (
     <li
-      className={`rounded-lg border p-4 ${
-        utente.attivo ? 'border-bordo bg-superficie' : 'border-bordo bg-fondo opacity-75'
+      className={`rounded-2xl border p-5 ${
+        utente.attivo
+          ? 'border-bordo bg-superficie shadow-[0_1px_2px_rgba(16,24,40,0.04)]'
+          : 'border-bordo bg-fondo opacity-75'
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
@@ -93,17 +95,17 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
           <p className="flex flex-wrap items-center gap-2 font-medium">
             {utente.nome}
             {utente.seStesso && (
-              <span className="rounded border border-marchio/30 bg-marchio-tenue px-1.5 py-0.5 text-xs font-normal text-marchio">
+              <span className="rounded-full border border-marchio/30 bg-marchio-tenue px-2 py-0.5 text-xs font-normal text-marchio">
                 sei tu
               </span>
             )}
             {!utente.attivo && (
-              <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-normal text-critico">
+              <span className="rounded-full border border-critico/40 bg-critico-fondo px-2 py-0.5 text-xs font-normal text-critico">
                 sospeso
               </span>
             )}
             {utente.bloccato && (
-              <span className="rounded border border-rilevante/30 bg-rilevante-fondo px-1.5 py-0.5 text-xs font-normal text-rilevante">
+              <span className="rounded-full border border-rilevante/30 bg-rilevante-fondo px-2 py-0.5 text-xs font-normal text-rilevante">
                 bloccato per tentativi falliti
               </span>
             )}
@@ -196,7 +198,7 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
           <div className="mt-3">
             <Avviso tono="attenzione" titolo="Nuova password — visibile una sola volta">
               <p>{esito.messaggio}</p>
-              <p className="tabular mt-2 select-all rounded border border-bordo-forte bg-fondo px-3 py-2 font-mono text-base">
+              <p className="tabular mt-2 select-all rounded-xl border border-bordo-forte bg-superficie px-3 py-2 font-mono text-base">
                 {esito.passwordIniziale}
               </p>
             </Avviso>
@@ -230,7 +232,7 @@ function Azione({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className={`inline-flex items-center gap-1.5 rounded px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${classi}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition disabled:opacity-50 ${classi}`}
     >
       {pending && <Rotella />}
       {pending ? inCorso : etichetta}
@@ -259,7 +261,7 @@ function ModuloNuovoUtente() {
         <div className="mb-4">
           <Avviso tono="attenzione" titolo="Password iniziale — visibile una sola volta">
             <p>{esito.messaggio}</p>
-            <p className="tabular mt-2 select-all rounded border border-bordo-forte bg-fondo px-3 py-2 font-mono text-base">
+            <p className="tabular mt-2 select-all rounded-xl border border-bordo-forte bg-superficie px-3 py-2 font-mono text-base">
               {esito.passwordIniziale}
             </p>
             <p className="mt-2 text-xs text-testo-tenue">

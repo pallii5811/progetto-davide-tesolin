@@ -134,7 +134,7 @@ export function SelezioneRischi({
   }
 
   return (
-    <div className="no-print mb-4 rounded-lg border border-bordo bg-superficie">
+    <div className="no-print mb-4 rounded-2xl border border-bordo bg-superficie shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-3 p-3">
         <div>
           <button
@@ -164,8 +164,12 @@ export function SelezioneRischi({
             attesi e le norme.
           */}
           <span className="text-xs text-testo-tenue">Dettaglio:</span>
-          <div role="group" aria-label="Livello di dettaglio del report" className="flex">
-            {PROFONDITA.map((p, indice) => (
+          <div
+            role="group"
+            aria-label="Livello di dettaglio del report"
+            className="flex gap-0.5 rounded-full border border-bordo-forte bg-fondo p-0.5"
+          >
+            {PROFONDITA.map((p) => (
               <button
                 key={p.chiave}
                 type="button"
@@ -174,12 +178,10 @@ export function SelezioneRischi({
                 onClick={() => {
                   cambiaProfondita(p.chiave);
                 }}
-                className={`border px-2.5 py-1.5 text-sm transition ${
-                  indice === 0 ? 'rounded-l' : ''
-                } ${indice === PROFONDITA.length - 1 ? 'rounded-r' : ''} ${indice > 0 ? '-ml-px' : ''} ${
+                className={`rounded-full px-3 py-1 text-sm transition ${
                   livello === p.chiave
-                    ? 'relative border-marchio bg-azione text-azione-testo'
-                    : 'border-bordo-forte bg-superficie hover:border-marchio/50'
+                    ? 'bg-azione font-medium text-azione-testo shadow-[0_1px_2px_rgba(16,24,40,0.12)]'
+                    : 'text-testo-tenue hover:bg-superficie hover:text-testo'
                 }`}
               >
                 {p.testo}
@@ -193,7 +195,7 @@ export function SelezioneRischi({
               onClick={() => {
                 applica(new Set());
               }}
-              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50"
+              className="rounded-full border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50"
             >
               Rimetti tutti
             </button>

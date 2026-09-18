@@ -39,9 +39,7 @@ export function SelettoreLotto({
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-        Numero di aziende
-      </span>
+      <span className="mb-1.5 block text-[13px] font-medium text-testo-tenue">Numero di aziende</span>
       <input
         type="number"
         name="limite"
@@ -50,7 +48,7 @@ export function SelettoreLotto({
         step={1}
         value={quante}
         onChange={(e) => setQuante(e.target.value)}
-        className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio"
+        className="tabular w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm focus:border-marchio"
       />
       <span className="mt-1 block text-xs text-testo-tenue">
         {costo === null ? (

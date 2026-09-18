@@ -88,7 +88,7 @@ export default async function PaginaStudi() {
                   <p className="flex flex-wrap items-center gap-2 font-medium">
                     {studio.denominazione}
                     {studio.autoRegistrato && (
-                      <span className="rounded border border-marchio/30 bg-marchio-tenue px-1.5 py-0.5 text-xs font-normal text-marchio">
+                      <span className="rounded-full border border-marchio/30 bg-marchio-tenue px-2 py-0.5 text-xs font-normal text-marchio">
                         registrato da sé
                       </span>
                     )}
@@ -108,15 +108,15 @@ export default async function PaginaStudi() {
                 <td className="tabular px-4 py-3">{studio.utenti}</td>
                 <td className="px-4 py-3">
                   {studio.gestore ? (
-                    <span className="rounded border border-bordo-forte px-1.5 py-0.5 text-xs text-testo-tenue">
+                    <span className="rounded-full border border-bordo-forte px-2 py-0.5 text-xs text-testo-tenue">
                       gestore
                     </span>
                   ) : studio.attivo ? (
-                    <span className="rounded border border-basso/30 bg-basso-fondo px-1.5 py-0.5 text-xs font-medium text-basso">
+                    <span className="rounded-full border border-basso/30 bg-basso-fondo px-2 py-0.5 text-xs font-medium text-basso">
                       attivo
                     </span>
                   ) : (
-                    <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium text-critico">
+                    <span className="rounded-full border border-critico/40 bg-critico-fondo px-2 py-0.5 text-xs font-medium text-critico">
                       sospeso
                     </span>
                   )}
@@ -125,7 +125,7 @@ export default async function PaginaStudi() {
                   {studio.acquistiAbilitati ? (
                     <span className="text-xs text-testo-tenue">attivi</span>
                   ) : (
-                    <span className="rounded border border-attenzione/40 bg-attenzione-fondo px-1.5 py-0.5 text-xs font-medium text-attenzione">
+                    <span className="rounded-full border border-attenzione/40 bg-attenzione-fondo px-2 py-0.5 text-xs font-medium text-attenzione">
                       in attesa
                     </span>
                   )}

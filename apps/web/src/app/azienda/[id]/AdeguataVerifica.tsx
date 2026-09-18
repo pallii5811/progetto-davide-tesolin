@@ -52,7 +52,7 @@ function Bottone({ etichetta, inCorso }: { etichetta: string; inCorso: string })
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="inline-flex items-center gap-1.5 rounded-md bg-accento px-3 py-2 text-sm font-medium text-su-accento disabled:opacity-60"
+      className="inline-flex items-center gap-1.5 rounded-full bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-60"
     >
       {pending && <Rotella />}
       {pending ? inCorso : etichetta}
@@ -75,7 +75,7 @@ function Riscontro({
     .join(', ');
 
   return (
-    <div className={`rounded-md border p-3 ${TONO_FORZA[riscontro.forza]}`}>
+    <div className={`rounded-xl border p-3.5 ${TONO_FORZA[riscontro.forza]}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-sm font-semibold">{c.nomi[0] ?? '(senza nome)'}</p>
         <p className="text-xs text-testo-tenue">
@@ -192,7 +192,7 @@ function VerificaSvolta({ verifica, identificativo }: { verifica: VerificaDto; i
               name="nota"
               rows={2}
               defaultValue={verifica.nota ?? ''}
-              className="w-full rounded-md border border-bordo bg-superficie p-2 text-sm"
+              className="w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio"
             />
           </label>
 

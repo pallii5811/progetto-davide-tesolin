@@ -113,7 +113,9 @@ export default async function PaginaQuestionario({ params }: { params: Promise<{
         <p className="text-xs font-semibold uppercase tracking-widest text-testo-tenue">
           Questionario assicurativo
         </p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">{apertura.denominazione}</h1>
+        <h1 className="mt-2 text-[26px] font-semibold leading-tight tracking-[-0.03em]">
+          {apertura.denominazione}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-testo-tenue">
           Il suo intermediario le chiede di completare queste informazioni: sono i dati che nessun bilancio
           contiene e che servono a dimensionare correttamente le coperture. Può salvare più volte e

@@ -56,16 +56,14 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
 
   return (
     <div>
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-        Logo dello studio
-      </span>
+      <span className="mb-1.5 block text-[13px] font-medium text-testo-tenue">Logo dello studio</span>
 
       {/* Il valore vero viaggia qui: il campo file non fa parte dell'invio. */}
       <input type="hidden" name="logo" value={logo} />
 
       <div className="flex flex-wrap items-center gap-4">
         {logo === '' ? (
-          <div className="flex h-16 w-32 items-center justify-center rounded border border-dashed border-bordo-forte text-xs text-testo-debole">
+          <div className="flex h-16 w-32 items-center justify-center rounded-xl border border-dashed border-bordo-forte text-xs text-testo-debole">
             nessun logo
           </div>
         ) : (
@@ -75,7 +73,7 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
           <img
             src={logo}
             alt="Logo attualmente impostato"
-            className="h-16 w-32 rounded border border-bordo object-contain p-1"
+            className="h-16 w-32 rounded-xl border border-bordo object-contain p-1"
           />
         )}
 
@@ -87,7 +85,7 @@ export function CampoLogo({ iniziale }: { iniziale: string | null }) {
               const file = e.target.files?.[0];
               if (file !== undefined) carica(file);
             }}
-            className="block text-sm text-testo-tenue file:mr-3 file:rounded file:border-0 file:bg-azione file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-azione-testo hover:file:opacity-90"
+            className="block text-sm text-testo-tenue file:mr-3 file:rounded-full file:border-0 file:bg-azione file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-azione-testo hover:file:opacity-90"
           />
           {logo !== '' && (
             <button

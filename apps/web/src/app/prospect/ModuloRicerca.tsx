@@ -54,9 +54,7 @@ export function ModuloRicerca({
       className="grid gap-4 sm:grid-cols-[1fr_auto]"
     >
       <label className="block">
-        <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-          Partita IVA
-        </span>
+        <span className="mb-1.5 block text-[13px] font-medium text-testo-tenue">Partita IVA</span>
         <input
           type="text"
           name="piva"
@@ -65,7 +63,7 @@ export function ModuloRicerca({
           onChange={(e) => setPiva(e.target.value)}
           disabled={inCorso}
           placeholder="11 cifre"
-          className="tabular w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio disabled:opacity-60"
+          className="tabular w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm focus:border-marchio disabled:opacity-60"
         />
       </label>
 
@@ -76,7 +74,7 @@ export function ModuloRicerca({
         // l'animazione, e resterebbe senza alcun segnale che qualcosa sta accadendo.
         aria-busy={inCorso}
         data-testid="pulsante-cerca"
-        className="flex items-center justify-center gap-2 self-end rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex items-center justify-center gap-2 self-end rounded-full bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {inCorso && <Rotella />}
         {inCorso ? 'Interrogazione…' : 'Cerca'}

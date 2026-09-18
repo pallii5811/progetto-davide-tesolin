@@ -180,7 +180,8 @@ describe('La pagina «Ricerca» non c’è più', () => {
     const menu = senzaCommenti(leggi('app/NavigazionePrincipale.tsx'));
     expect(menu).not.toMatch(/href: '\/'/);
     expect(menu).not.toContain("testo: 'Ricerca'");
-    expect(menu).toContain("{ href: '/prospect', testo: 'Ricerca Clienti' }");
+    // Dal redesign ogni voce porta anche la sua icona, dopo il testo.
+    expect(menu).toContain("{ href: '/prospect', testo: 'Ricerca Clienti',");
   });
 
   it('«/» rinvia a Ricerca Clienti portando con sé solo la partita IVA', () => {

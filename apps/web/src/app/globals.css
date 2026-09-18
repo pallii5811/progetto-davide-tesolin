@@ -7,26 +7,37 @@
  * giornata e deve leggere tabelle, non ammirare animazioni. Poche superfici, gerarchia
  * tipografica netta, colore usato solo dove porta informazione — la gravità di un rischio,
  * lo stato di una copertura. Mai come decorazione.
+ *
+ * Il redesign del 18/09/2026 (richiesta di Simone: «qualità visiva incredibile, veloce,
+ * semplice e fluida, senza cambiare il contenuto») porta dentro il prodotto la stessa
+ * materia della vetrina: carta calda al posto del grigio azzurrino, inchiostro quasi nero,
+ * superfici bianche con bordi appena percettibili, il carattere Geist. Chi arriva dal sito
+ * trova lo stesso strumento che ha visto. I valori sono misurati con la stessa funzione dei
+ * collaudi (test/audit-interfaccia.test.ts), non stimati: i rapporti sono scritti accanto.
  */
 
 @theme {
-  --color-fondo: oklch(0.98 0.004 260);
+  /* Carta calda: 17,2:1 con l'inchiostro. Il bianco delle superfici ci si stacca appena. */
+  --color-fondo: oklch(0.982 0.003 85);
   --color-superficie: oklch(1 0 0);
-  --color-bordo: oklch(0.91 0.006 260);
-  --color-bordo-forte: oklch(0.84 0.008 260);
+  --color-bordo: oklch(0.925 0.005 85);
+  --color-bordo-forte: oklch(0.845 0.007 85);
 
-  --color-testo: oklch(0.24 0.014 260);
-  --color-testo-tenue: oklch(0.5 0.012 260);
+  --color-testo: oklch(0.2 0.012 265);
+  /* 7,07:1 sul fondo, 7,44:1 sulla superficie. */
+  --color-testo-tenue: oklch(0.45 0.012 265);
   /*
      0,54 e non 0,62: il valore precedente dava un contrasto di 3,64:1 su fondo bianco,
      sotto il 4,5:1 che le WCAG richiedono per il testo normale. Su uno schermo buono in
      un ufficio ben illuminato non si notava; su un portatile economico alle sette di sera
      quella riga diventava illeggibile. Misurato, non stimato: ora 5,06:1.
+     Col redesign 0,5 sulla carta calda: 5,70:1 sul fondo, 6,00:1 sulla superficie.
   */
-  --color-testo-debole: oklch(0.54 0.01 260);
+  --color-testo-debole: oklch(0.5 0.01 265);
 
-  --color-marchio: oklch(0.42 0.11 254);
-  --color-marchio-tenue: oklch(0.95 0.02 254);
+  /* Il blu della vetrina, un filo più chiaro per i collegamenti: 6,67:1 sul fondo. */
+  --color-marchio: oklch(0.47 0.16 262);
+  --color-marchio-tenue: oklch(0.955 0.025 262);
 
   /*
      Il colore dell'**azione**, distinto da quello del marchio.
@@ -41,7 +52,12 @@
      era illeggibile in modalità scura, e nessuna verifica visiva se n'era accorta perché
      erano tutte in modalità chiara.
   */
-  --color-azione: oklch(0.42 0.11 254);
+  /*
+     Dal redesign l'azione è l'inchiostro, come i pulsanti della vetrina: un pulsante nero a
+     pillola si trova a colpo d'occhio in una pagina piena di numeri, e il blu resta ai
+     collegamenti. Bianco sull'inchiostro: 18,1:1.
+  */
+  --color-azione: oklch(0.2 0.012 265);
   --color-azione-testo: oklch(1 0 0);
 
   /* Scala di gravità: dal basso al critico. */
@@ -115,8 +131,10 @@
   --color-vetrina-petrolio: oklch(0.42 0.08 205);
   --color-vetrina-viola: oklch(0.27 0.09 330);
 
+  /* Geist, servito da Next insieme alle pagine (layout.tsx): nessuna richiesta a terzi. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    var(--font-geist), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, monospace;
 }
 
@@ -143,22 +161,27 @@
  */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-fondo: oklch(0.19 0.012 260);
-    --color-superficie: oklch(0.235 0.014 260);
-    --color-bordo: oklch(0.31 0.014 260);
-    --color-bordo-forte: oklch(0.4 0.016 260);
+    /* Il redesign: un nero morbido, appena freddo, e l'inchiostro chiaro appena caldo. */
+    --color-fondo: oklch(0.165 0.006 265);
+    --color-superficie: oklch(0.205 0.008 265);
+    --color-bordo: oklch(0.29 0.008 265);
+    --color-bordo-forte: oklch(0.38 0.01 265);
 
-    --color-testo: oklch(0.95 0.006 260);
-    --color-testo-tenue: oklch(0.74 0.012 260);
-    /* Sul fondo scuro serve il movimento opposto: 0,6 dava 4,22:1, 0,66 dà 5,36:1. */
-    --color-testo-debole: oklch(0.66 0.012 260);
+    /* 17,2:1 sul fondo. */
+    --color-testo: oklch(0.96 0.004 85);
+    /* 8,64:1 sulla superficie. */
+    --color-testo-tenue: oklch(0.77 0.008 265);
+    /* Sul fondo scuro serve il movimento opposto: 0,6 dava 4,22:1, 0,66 dà 5,36:1.
+       Col redesign 0,69 sulla nuova superficie: 6,46:1. */
+    --color-testo-debole: oklch(0.69 0.008 265);
 
-    --color-marchio: oklch(0.72 0.12 254);
-    --color-marchio-tenue: oklch(0.28 0.05 254);
+    /* 8,02:1 sulla superficie, e 3:1 abbondante per il contorno di focus. */
+    --color-marchio: oklch(0.75 0.13 258);
+    --color-marchio-tenue: oklch(0.27 0.05 262);
 
-    /* Il fondo resta chiaro e il testo diventa scuro: 7,59:1. */
-    --color-azione: oklch(0.72 0.12 254);
-    --color-azione-testo: oklch(0.18 0.014 260);
+    /* Il pulsante si rovescia: fondo chiaro, testo scuro. 16,25:1. */
+    --color-azione: oklch(0.95 0.004 85);
+    --color-azione-testo: oklch(0.18 0.01 265);
 
     /* Sul fondo scuro il testo va schiarito, non scurito: stessi conti, verso opposto. */
     --color-basso: oklch(0.65 0.12 155);
@@ -227,6 +250,62 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .vetrina-animata {
     animation: none !important;
+  }
+}
+
+/*
+ * La scena delle funzioni della vetrina (app/_vetrina/ProdottoScorrevole.tsx): quattro pannelli
+ * uno sopra l'altro, se ne vede uno. Quello che entra sale di poco e si accende, e le sue carte
+ * arrivano una dopo l'altra; quello che esce si spegne più in fretta, così i due non si
+ * sovrappongono a lungo. `visibility` scatta alla fine della dissolvenza: un pannello spento
+ * non resta nel documento visibile, per il mouse né per le misure di contrasto.
+ */
+.vetrina-scena {
+  transition:
+    opacity 450ms ease,
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+.vetrina-scena[data-attivo='no'] {
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease,
+    visibility 0s 280ms;
+}
+.vetrina-scena .vetrina-carte > :not([data-fondo]) {
+  transition:
+    opacity 480ms ease,
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vetrina-scena[data-attivo='no'] .vetrina-carte > :not([data-fondo]) {
+  opacity: 0;
+  transform: translate(22px, 10px);
+}
+.vetrina-scena[data-attivo='si'] .vetrina-carte > :nth-child(1) {
+  transition-delay: 90ms;
+}
+.vetrina-scena[data-attivo='si'] .vetrina-carte > :nth-child(2) {
+  transition-delay: 160ms;
+}
+.vetrina-scena[data-attivo='si'] .vetrina-carte > :nth-child(3) {
+  transition-delay: 230ms;
+}
+.vetrina-scena[data-attivo='si'] .vetrina-carte > :nth-child(4) {
+  transition-delay: 300ms;
+}
+/* Chi ha chiesto meno movimento vede il pannello cambiare, senza niente che scivoli. */
+@media (prefers-reduced-motion: reduce) {
+  .vetrina-scena,
+  .vetrina-scena * {
+    transition: none !important;
+  }
+  .vetrina-scena[data-attivo='no'],
+  .vetrina-scena[data-attivo='no'] .vetrina-carte > * {
+    transform: none;
   }
 }
 

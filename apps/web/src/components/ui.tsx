@@ -29,11 +29,13 @@ export function Sezione({
   return (
     // `scroll-mt` compensa la barra di navigazione appiccicata: senza, l'ancora
     // porta il titolo esattamente sotto la barra e sembra non aver funzionato.
-    <section id={id} className="mb-10 scroll-mt-16">
-      <div className="mb-4 flex items-baseline justify-between gap-4 border-b border-bordo pb-2">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">{titolo}</h2>
-          {sottotitolo !== undefined && <p className="mt-0.5 text-sm text-testo-tenue">{sottotitolo}</p>}
+    <section id={id} className="mb-12 scroll-mt-24">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h2 className="text-[20px] font-semibold leading-tight tracking-[-0.025em]">{titolo}</h2>
+          {sottotitolo !== undefined && (
+            <p className="mt-1 text-[14px] leading-relaxed text-testo-tenue">{sottotitolo}</p>
+          )}
         </div>
         {azione}
       </div>
@@ -43,7 +45,13 @@ export function Sezione({
 }
 
 export function Scheda({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-lg border border-bordo bg-superficie p-4 ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`rounded-2xl border border-bordo bg-superficie p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function Metrica({
@@ -102,11 +110,13 @@ export function Metrica({
         break-words è la rete: un importo che non stia comunque va a capo invece di uscire.
       */}
       <dl data-testid={`metrica-${chiave(etichetta)}`} className="min-w-0">
-        <dt className="text-xs font-medium uppercase tracking-wide text-testo-debole">{etichetta}</dt>
-        <dd className={`tabular mt-1.5 break-words text-xl font-semibold sm:text-2xl ${colore}`}>
+        <dt className="text-[13px] font-medium text-testo-tenue">{etichetta}</dt>
+        <dd
+          className={`tabular mt-2 break-words text-[22px] font-semibold leading-none tracking-[-0.03em] sm:text-[28px] ${colore}`}
+        >
           {valore}
         </dd>
-        {nota !== undefined && <dd className="mt-1 text-xs leading-snug text-testo-tenue">{nota}</dd>}
+        {nota !== undefined && <dd className="mt-2 text-[12.5px] leading-snug text-testo-tenue">{nota}</dd>}
       </dl>
     </Scheda>
   );
@@ -135,7 +145,7 @@ const CLASSI_LIVELLO: Record<LivelloRischio, string> = {
 export function BadgeRischio({ livello, testo }: { livello: LivelloRischio; testo?: string }) {
   return (
     <span
-      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${CLASSI_LIVELLO[livello]}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${CLASSI_LIVELLO[livello]}`}
     >
       {testo ?? livello}
     </span>
@@ -154,7 +164,7 @@ const CLASSI_STATO: Record<StatoGap, string> = {
 export function BadgeStato({ stato, testo }: { stato: StatoGap; testo: string }) {
   return (
     <span
-      className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${CLASSI_STATO[stato]}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${CLASSI_STATO[stato]}`}
     >
       {testo}
     </span>
@@ -178,7 +188,7 @@ export function Spiegazione({ dati, aperta = false }: { dati: ExplanationDto; ap
         <span className="hidden group-open:inline">▾ Nascondi il calcolo</span>
       </summary>
 
-      <div className="mt-2 rounded border border-bordo bg-fondo p-3 text-xs leading-relaxed">
+      <div className="mt-2 rounded-xl border border-bordo bg-fondo p-3.5 text-xs leading-relaxed">
         {dati.formula !== null && (
           <p className="mb-2">
             <span className="text-testo-debole">Formula: </span>
@@ -229,8 +239,8 @@ export function Avviso({
         : 'border-marchio/30 bg-marchio-tenue';
 
   return (
-    <div className={`rounded-lg border p-4 ${classi}`}>
-      <p className="font-semibold">{titolo}</p>
+    <div className={`rounded-2xl border px-5 py-4 ${classi}`}>
+      <p className="font-semibold tracking-[-0.01em]">{titolo}</p>
       <div className="mt-1.5 text-sm leading-relaxed">{children}</div>
     </div>
   );

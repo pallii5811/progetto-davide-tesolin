@@ -294,7 +294,11 @@ describe('75 · la navigazione dice dove ci si trova', () => {
     ).toBe(true);
 
     // Il menu resta montato nel layout: un componente che nessuno rende non segna nulla.
-    expect(leggi('app/layout.tsx')).toMatch(/<NavigazionePrincipale\s*\/>/);
+    // Dal redesign del 18/09/2026 in due forme — barra laterale e pillole su telefono — e
+    // servono entrambe: senza una delle due, su quella larghezza il menu non c'è.
+    const layout = leggi('app/layout.tsx');
+    expect(layout).toMatch(/<NavigazionePrincipale\s+variante="laterale"\s*\/>/);
+    expect(layout).toMatch(/<NavigazionePrincipale\s+variante="barra"\s*\/>/);
     expect(leggi('app/impostazioni/layout.tsx')).toMatch(/SchedaImpostazioni/);
   });
 

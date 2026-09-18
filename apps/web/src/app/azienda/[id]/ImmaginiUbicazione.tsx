@@ -112,7 +112,7 @@ export function ImmaginiUbicazione({
     sopralluogo. Il titolo dice cosa c'è dentro e a cosa serve; il resto si apre con un clic.
   */
   return (
-    <details open={immagini.length > 0} className="mt-4 rounded-lg border border-bordo p-3">
+    <details open={immagini.length > 0} className="mt-4 rounded-2xl border border-bordo p-3">
       <summary className="cursor-pointer text-sm font-semibold">
         Fotografie delle sedi{' '}
         <span className="font-normal text-testo-tenue">
@@ -167,7 +167,7 @@ function Blocco({
   const pieno = immagini.length >= MAX_PER_UBICAZIONE;
 
   return (
-    <div className="rounded-lg border border-bordo bg-superficie p-3">
+    <div className="rounded-2xl border border-bordo bg-superficie p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <p className="text-sm font-medium">{ubicazione.etichetta}</p>
 
       {immagini.length > 0 && (
@@ -178,7 +178,7 @@ function Blocco({
               <img
                 src={i.dati}
                 alt={i.didascalia ?? `Fotografia di ${ubicazione.etichetta}`}
-                className="h-28 w-40 rounded border border-bordo object-cover"
+                className="h-28 w-40 rounded-xl border border-bordo object-cover"
               />
               <p className="mt-1 text-xs leading-snug text-testo-tenue">
                 {i.didascalia ?? <span className="italic">senza didascalia</span>}
@@ -222,7 +222,7 @@ function Blocco({
             maxLength={200}
             placeholder="Didascalia — cosa mostra"
             aria-label={`Didascalia della prossima fotografia di ${ubicazione.etichetta}`}
-            className="min-w-[16rem] flex-1 rounded border border-bordo bg-fondo px-2 py-1.5 text-sm"
+            className="min-w-[16rem] flex-1 rounded-xl border border-bordo bg-fondo px-2 py-1.5 text-sm"
           />
           <input
             type="file"
@@ -239,7 +239,7 @@ function Blocco({
               // senza, il browser non emette un secondo evento per la stessa scelta.
               e.target.value = '';
             }}
-            className="block text-sm text-testo-tenue file:mr-3 file:rounded file:border-0 file:bg-azione file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-azione-testo hover:file:opacity-90 disabled:opacity-50"
+            className="block text-sm text-testo-tenue file:mr-3 file:rounded-full file:border-0 file:bg-azione file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-azione-testo hover:file:opacity-90 disabled:opacity-50"
           />
         </div>
       )}

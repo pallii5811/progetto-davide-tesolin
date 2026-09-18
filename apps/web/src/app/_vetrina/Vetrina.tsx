@@ -22,6 +22,7 @@ import {
   SchemaFlusso,
 } from './illustrazioni';
 import { CollegamentoFreccia, Pulsante, Tessera } from './pezzi';
+import { ProdottoScorrevole } from './ProdottoScorrevole';
 import { SchedaRegistro } from './SchedaRegistro';
 import type { Tono } from './pezzi';
 
@@ -91,42 +92,37 @@ function Fatto({ numero, testo, fonte }: { numero: string; testo: string; fonte:
   );
 }
 
-function Funzione({
-  id,
+/**
+ * Il testo di una funzione: la colonna di sinistra della scena che scorre (ProdottoScorrevole.tsx),
+ * che ci mette accanto il pannello.
+ */
+function TestoFunzione({
   icona,
   tono,
   titolo,
   testo,
   fatto,
-  pannello,
-  invertita = false,
 }: {
-  id: string;
   icona: React.ReactNode;
   tono: Tono;
   titolo: string;
   testo: React.ReactNode;
   fatto: { numero: string; testo: string; fonte: string };
-  pannello: React.ReactNode;
-  invertita?: boolean;
 }) {
   return (
-    <div id={id} className="grid scroll-mt-28 items-center gap-10 py-14 lg:grid-cols-2 lg:gap-16 lg:py-20">
-      <div className={invertita ? 'lg:order-2' : ''}>
-        <Tessera tono={tono} grande>
-          {icona}
-        </Tessera>
-        <Titolo2 className="mt-6">{titolo}</Titolo2>
-        <Paragrafo className="mt-5 max-w-[520px]">{testo}</Paragrafo>
-        <div className="mt-6">
-          <CollegamentoFreccia href="/registrati">Prova su un’azienda vera</CollegamentoFreccia>
-        </div>
-        <div className="max-w-[520px]">
-          <Fatto {...fatto} />
-        </div>
+    <>
+      <Tessera tono={tono} grande>
+        {icona}
+      </Tessera>
+      <Titolo2 className="mt-6">{titolo}</Titolo2>
+      <Paragrafo className="mt-5 max-w-[520px]">{testo}</Paragrafo>
+      <div className="mt-6">
+        <CollegamentoFreccia href="/registrati">Prova su un’azienda vera</CollegamentoFreccia>
       </div>
-      <div className={invertita ? 'lg:order-1' : ''}>{pannello}</div>
-    </div>
+      <div className="max-w-[520px]">
+        <Fatto {...fatto} />
+      </div>
+    </>
   );
 }
 
@@ -228,7 +224,12 @@ export function Vetrina() {
             <a href="#inizio" aria-label="AEGIS, inizio della pagina" className="rounded-lg">
               <Marchio />
             </a>
-            <ul className="hidden items-center gap-8 text-[14.5px] text-vetrina-grigio md:flex">
+            {/*
+              Da 1024 pixel e non da 768: fra le due larghezze le quattro voci non ci stavano e
+              andavano a capo parola per parola («Fonti / dei / dati»). Lì restano marchio,
+              «Accedi» e il pulsante; le sezioni sono tutte nel piè di pagina.
+            */}
+            <ul className="hidden items-center gap-8 whitespace-nowrap text-[14.5px] text-vetrina-grigio lg:flex">
               {[
                 ['#come-funziona', 'Come funziona'],
                 ['#prodotto', 'Prodotto'],
@@ -371,64 +372,87 @@ export function Vetrina() {
           </div>
         </section>
 
-        {/* ── Le funzioni, una per pannello ──────────────────────────────── */}
+        {/* ── Le funzioni: i testi scorrono, il pannello a destra cambia ─── */}
+        {/*
+          Richiesta di Simone del 19/09/2026, come la sezione dei segnali di clay.com: i testi a
+          sinistra restano fermi, il pannello a destra resta sullo schermo e cambia quando arriva
+          il testo successivo. Prima i pannelli si alternavano a destra e a sinistra, uno per riga.
+        */}
         <section id="prodotto" aria-label="Prodotto" className="scroll-mt-28 pb-10">
           <div className={LARGHEZZA}>
-            <Funzione
-              id="territorio"
-              icona={<IconaLuogo className="h-6 w-6" />}
-              tono="blu"
-              titolo="Il territorio di ogni sede, comune per comune."
-              testo="Per ogni ubicazione del Registro Imprese, la quota di imprese del comune in area a pericolosità idraulica e da frana secondo ISPRA, e la zona sismica ufficiale. Senza chiedere niente al cliente."
-              fatto={{
-                numero: '7.899 comuni',
-                testo: 'coperti dagli indicatori ISPRA di pericolosità per alluvioni e frane.',
-                fonte: 'ISPRA IdroGEO · Protezione Civile, classificazione sismica di maggio 2025',
-              }}
-              pannello={<PannelloTerritorio />}
-            />
-            <Funzione
-              id="fermo"
-              icona={<IconaFermo className="h-6 w-6" />}
-              tono="arancio"
-              titolo="Quanto costa un giorno di fermo."
-              testo="Dal margine di contribuzione o dal fatturato, la perdita di una giornata e quella di 7, 30 e 90 giorni di interruzione: la cifra da cui parte ogni conversazione sulla Business Interruption."
-              fatto={{
-                numero: '7 · 30 · 90',
-                testo:
-                  'giorni di fermo, calcolati dal bilancio dell’impresa e non da una media di settore.',
-                fonte: 'Bilanci depositati al Registro Imprese',
-              }}
-              pannello={<PannelloFermo />}
-              invertita
-            />
-            <Funzione
-              id="crm"
-              icona={<IconaArchivio className="h-6 w-6" />}
-              tono="magenta"
-              titolo="Un CRM che non ti fa pagare due volte."
-              testo="Ogni elenco che crei entra nel CRM e ci resta, con uno stato e una nota. Ripeti gli stessi filtri e arrivano le aziende successive: quelle che hai già non escono di nuovo."
-              fatto={{
-                numero: 'Gratis',
-                testo:
-                  'il conteggio delle aziende che corrispondono ai filtri: si paga solo l’elenco che crei.',
-                fonte: 'Ricerca Clienti · tutti i comuni italiani',
-              }}
-              pannello={<PannelloCrm />}
-            />
-            <Funzione
-              id="cyber"
-              icona={<IconaLucchetto className="h-6 w-6" />}
-              tono="petrolio"
-              titolo="Il rischio informatico del settore."
-              testo="Dipendenza digitale, sensibilità dei dati, esposizione alle transazioni, attrattività come bersaglio: quattro voci per ogni settore ATECO, e un punteggio che si spiega da solo."
-              fatto={{
-                numero: '4 voci',
-                testo: 'per ogni divisione ATECO, con il loro peso nel punteggio finale.',
-                fonte: 'Classificazione ATECO 2025',
-              }}
-              pannello={<PannelloCyber />}
-              invertita
+            <ProdottoScorrevole
+              voci={[
+                {
+                  id: 'territorio',
+                  testo: (
+                    <TestoFunzione
+                      icona={<IconaLuogo className="h-6 w-6" />}
+                      tono="blu"
+                      titolo="Il territorio di ogni sede, comune per comune."
+                      testo="Per ogni ubicazione del Registro Imprese, la quota di imprese del comune in area a pericolosità idraulica e da frana secondo ISPRA, e la zona sismica ufficiale. Senza chiedere niente al cliente."
+                      fatto={{
+                        numero: '7.899 comuni',
+                        testo: 'coperti dagli indicatori ISPRA di pericolosità per alluvioni e frane.',
+                        fonte: 'ISPRA IdroGEO · Protezione Civile, classificazione sismica di maggio 2025',
+                      }}
+                    />
+                  ),
+                  pannello: <PannelloTerritorio />,
+                },
+                {
+                  id: 'fermo',
+                  testo: (
+                    <TestoFunzione
+                      icona={<IconaFermo className="h-6 w-6" />}
+                      tono="arancio"
+                      titolo="Quanto costa un giorno di fermo."
+                      testo="Dal margine di contribuzione o dal fatturato, la perdita di una giornata e quella di 7, 30 e 90 giorni di interruzione: la cifra da cui parte ogni conversazione sulla Business Interruption."
+                      fatto={{
+                        numero: '7 · 30 · 90',
+                        testo:
+                          'giorni di fermo, calcolati dal bilancio dell’impresa e non da una media di settore.',
+                        fonte: 'Bilanci depositati al Registro Imprese',
+                      }}
+                    />
+                  ),
+                  pannello: <PannelloFermo />,
+                },
+                {
+                  id: 'crm',
+                  testo: (
+                    <TestoFunzione
+                      icona={<IconaArchivio className="h-6 w-6" />}
+                      tono="magenta"
+                      titolo="Un CRM che non ti fa pagare due volte."
+                      testo="Ogni elenco che crei entra nel CRM e ci resta, con uno stato e una nota. Ripeti gli stessi filtri e arrivano le aziende successive: quelle che hai già non escono di nuovo."
+                      fatto={{
+                        numero: 'Gratis',
+                        testo:
+                          'il conteggio delle aziende che corrispondono ai filtri: si paga solo l’elenco che crei.',
+                        fonte: 'Ricerca Clienti · tutti i comuni italiani',
+                      }}
+                    />
+                  ),
+                  pannello: <PannelloCrm />,
+                },
+                {
+                  id: 'cyber',
+                  testo: (
+                    <TestoFunzione
+                      icona={<IconaLucchetto className="h-6 w-6" />}
+                      tono="petrolio"
+                      titolo="Il rischio informatico del settore."
+                      testo="Dipendenza digitale, sensibilità dei dati, esposizione alle transazioni, attrattività come bersaglio: quattro voci per ogni settore ATECO, e un punteggio che si spiega da solo."
+                      fatto={{
+                        numero: '4 voci',
+                        testo: 'per ogni divisione ATECO, con il loro peso nel punteggio finale.',
+                        fonte: 'Classificazione ATECO 2025',
+                      }}
+                    />
+                  ),
+                  pannello: <PannelloCyber />,
+                },
+              ]}
             />
           </div>
         </section>

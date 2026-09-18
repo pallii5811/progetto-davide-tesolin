@@ -15,7 +15,7 @@ export function BottoneAccesso({ testo, attesa }: { testo: string; attesa: strin
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="flex w-full items-center justify-center gap-1.5 rounded bg-azione px-4 py-2.5 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+      className="flex w-full items-center justify-center gap-1.5 rounded-full bg-azione px-4 py-2.5 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
       {pending && <Rotella />}
       {pending ? attesa : testo}

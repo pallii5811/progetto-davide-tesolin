@@ -145,7 +145,7 @@ export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Reco
 
   if (differenze.length === 0) {
     return (
-      <div className="mb-4 rounded-lg border border-rilevante/30 bg-rilevante-fondo p-3 text-sm">
+      <div className="mb-4 rounded-2xl border border-rilevante/30 bg-rilevante-fondo p-3 text-sm">
         <strong>Questo elenco l&apos;hai già comprato.</strong>{' '}
         {ultimo.quante === 1 ? 'La sua azienda è' : `Le sue ${aziende} sono`} nel CRM: {crm}.{' '}
         <span className="text-testo-tenue">Creandolo di nuovo arrivano le aziende successive.</span>
@@ -154,7 +154,7 @@ export function ConfrontoConElencoComprato({ criteri }: { criteri: Readonly<Reco
   }
 
   return (
-    <div className="mb-4 rounded-lg border border-bordo bg-superficie p-3 text-sm">
+    <div className="mb-4 rounded-2xl border border-bordo bg-superficie p-3 text-sm shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <p>
         <strong>Hai già comprato un elenco di {aziende}</strong> con filtri quasi uguali, e{' '}
         {ultimo.quante === 1 ? 'la sua azienda è' : 'le sue aziende sono'} nel CRM: {crm}.

@@ -41,16 +41,27 @@ export function Pulsante({
       : variante === 'inverso'
         ? 'bg-white text-vetrina-inchiostro hover:bg-white/90'
         : 'border border-vetrina-linea bg-white text-vetrina-inchiostro hover:border-vetrina-inchiostro/30';
+  /*
+    Il testo non va a capo: a 390 pixel «Crea un account» nel menu si spezzava su due righe
+    dentro la pillola. Sul telefono, e solo nel pulsante piccolo, la freccia si toglie e il
+    margine si stringe: senza, il menu non ci stava in larghezza. Sotto i 360 pixel marchio,
+    «Accedi» e pulsante non stanno su una riga in nessun modo, e lì il testo torna ad andare a
+    capo piuttosto che far scorrere la pagina di lato.
+  */
   return (
     <a
       href={href}
-      className={`group inline-flex items-center gap-2 rounded-full font-medium tracking-[-0.01em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vetrina-blu ${
-        grande ? 'h-12 px-6 text-[15.5px]' : 'h-10 px-5 text-[14.5px]'
+      className={`group inline-flex items-center gap-2 rounded-full font-medium tracking-[-0.01em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vetrina-blu min-[360px]:shrink-0 min-[360px]:whitespace-nowrap ${
+        grande
+          ? 'h-12 px-6 text-[15.5px]'
+          : 'h-10 px-4 text-[14.5px] max-[359px]:h-auto max-[359px]:min-h-10 max-[359px]:py-1.5 max-[359px]:leading-tight sm:px-5'
       } ${stile}`}
     >
       {children}
       {variante !== 'chiaro' && (
-        <IconaFreccia className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+        <IconaFreccia
+          className={`h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 ${grande ? '' : 'hidden sm:block'}`}
+        />
       )}
     </a>
   );

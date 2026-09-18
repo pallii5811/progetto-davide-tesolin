@@ -65,7 +65,7 @@ export function CollegamentoQuestionario({
   const scadenza = invito === null ? null : formattaGiornoEsteso(invito.scadeIl);
 
   return (
-    <div className="rounded-lg border border-bordo bg-superficie p-4">
+    <div className="rounded-2xl border border-bordo bg-superficie p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <h2 className="text-sm font-semibold">Far compilare al cliente</h2>
       <p className="mt-1 max-w-2xl text-xs leading-relaxed text-testo-tenue">
         Le scorte, i veicoli, il lavoro in cantiere: dati che solo l&apos;azienda conosce con precisione. Si
@@ -89,7 +89,7 @@ export function CollegamentoQuestionario({
       )}
 
       {indirizzo !== null && (
-        <div className="mt-3 rounded border border-bordo-forte bg-fondo p-3">
+        <div className="mt-3 rounded-xl border border-bordo bg-fondo p-3.5">
           <p className="text-xs font-medium uppercase tracking-wide text-testo-debole">
             Copiare adesso: non verrà mostrato di nuovo
           </p>
@@ -101,7 +101,7 @@ export function CollegamentoQuestionario({
                 setCopiato(true);
               });
             }}
-            className="mt-2 rounded bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90"
+            className="mt-2 rounded-full bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90"
           >
             {copiato ? 'Copiato' : 'Copia collegamento'}
           </button>
@@ -114,7 +114,7 @@ export function CollegamentoQuestionario({
           onClick={genera}
           disabled={inCorso}
           aria-busy={inCorso && premuto === 'genera'}
-          className="inline-flex items-center gap-1.5 rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio/50 disabled:opacity-50"
         >
           {inCorso && premuto === 'genera' && <Rotella />}
           {invito === null ? 'Genera collegamento' : 'Genera un nuovo collegamento'}
@@ -125,7 +125,7 @@ export function CollegamentoQuestionario({
             onClick={revoca}
             disabled={inCorso}
             aria-busy={inCorso && premuto === 'revoca'}
-            className="inline-flex items-center gap-1.5 rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-critico disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-critico disabled:opacity-50"
           >
             {inCorso && premuto === 'revoca' && <Rotella />}
             Revoca

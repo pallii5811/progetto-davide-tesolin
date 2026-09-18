@@ -512,7 +512,7 @@ function Qualifiche({
         <ul className="mt-3 space-y-1.5">
           {attive.map(([nome, , perche]) => (
             <li key={nome} className="text-sm">
-              <span className="mr-2 rounded border border-basso/30 bg-basso-fondo px-1.5 py-0.5 text-xs font-medium text-basso">
+              <span className="mr-2 rounded-full border border-basso/30 bg-basso-fondo px-2 py-0.5 text-xs font-medium text-basso">
                 sì
               </span>
               <span className="font-medium">{nome}</span>

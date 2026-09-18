@@ -16,7 +16,7 @@ export default function Errore({ error, reset }: { error: Error; reset: () => vo
   }, [error]);
 
   return (
-    <div className="rounded-lg border border-critico/40 bg-critico-fondo p-6">
+    <div className="rounded-2xl border border-critico/40 bg-critico-fondo p-6">
       <h1 className="text-lg font-semibold">Qualcosa non ha funzionato</h1>
       {/*
         Qui c'era «verificare che il servizio di analisi sia attivo sulla porta 3001».
@@ -38,19 +38,21 @@ export default function Errore({ error, reset }: { error: Error; reset: () => vo
           : 'Se il problema persiste, verificare che il servizio di analisi risponda all’indirizzo indicato in AEGIS_API_URL.'}
       </p>
       {error.message !== '' && (
-        <p className="mt-3 rounded border border-bordo bg-fondo p-2.5 font-mono text-xs">{error.message}</p>
+        <p className="mt-3 rounded-xl border border-bordo bg-fondo p-2.5 font-mono text-xs">
+          {error.message}
+        </p>
       )}
       <div className="mt-4 flex gap-3">
         <button
           type="button"
           onClick={reset}
-          className="rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
+          className="rounded-full bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90"
         >
           Riprova
         </button>
         <a
           href="/prospect"
-          className="rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio"
+          className="rounded-full border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio"
         >
           Torna alla ricerca
         </a>

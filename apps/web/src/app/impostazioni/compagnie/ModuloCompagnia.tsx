@@ -23,7 +23,10 @@ export function ModuloCompagnia() {
   );
 
   return (
-    <form action={azione} className="rounded-lg border border-bordo bg-superficie p-4">
+    <form
+      action={azione}
+      className="rounded-2xl border border-bordo bg-superficie p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+    >
       <h3 className="mb-3 text-sm font-semibold">Censisci una compagnia</h3>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -56,7 +59,7 @@ export function ModuloCompagnia() {
           type="submit"
           disabled={inCorso}
           aria-busy={inCorso}
-          className="inline-flex items-center gap-1.5 rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
         >
           {inCorso && <Rotella />}
           {inCorso ? 'Salvataggio…' : 'Censisci'}
@@ -87,7 +90,7 @@ function Campo({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
+      <span className="mb-1.5 block text-[13px] font-medium text-testo-tenue">
         {etichetta}
         {obbligatorio && <span className="ml-1 text-critico">*</span>}
       </span>
@@ -96,7 +99,7 @@ function Campo({
         name={nome}
         placeholder={segnaposto}
         inputMode={numerico ? 'decimal' : 'text'}
-        className={`w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio ${
+        className={`w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio ${
           numerico ? 'tabular' : ''
         }`}
       />

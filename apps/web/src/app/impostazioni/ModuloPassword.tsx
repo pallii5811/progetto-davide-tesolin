@@ -6,8 +6,8 @@ import { Rotella } from '@/components/Rotella';
 import { cambiaPasswordAzione } from './actions';
 
 const CAMPO =
-  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio';
-const ETICHETTA = 'mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole';
+  'w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio';
+const ETICHETTA = 'mb-1.5 block text-[13px] font-medium text-testo-tenue';
 
 function Bottone() {
   const { pending } = useFormStatus();
@@ -16,7 +16,7 @@ function Bottone() {
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="inline-flex items-center gap-1.5 rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 rounded-full bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
     >
       {pending && <Rotella />}
       {pending ? 'Aggiornamento…' : 'Aggiorna password'}

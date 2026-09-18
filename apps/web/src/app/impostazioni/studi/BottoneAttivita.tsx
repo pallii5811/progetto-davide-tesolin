@@ -33,7 +33,7 @@ export function BottoneAttivita({
         avvia(() => void cambiaAttivita(id, !attivo));
       }}
       aria-busy={inCorso}
-      className="inline-flex items-center gap-1 rounded border border-bordo-forte px-2.5 py-1 text-xs text-testo-tenue transition hover:text-testo disabled:opacity-50"
+      className="inline-flex items-center gap-1 rounded-full border border-bordo-forte px-2.5 py-1 text-xs text-testo-tenue transition hover:text-testo disabled:opacity-50"
     >
       {inCorso && <Rotella className="h-3 w-3" />}
       {attivo ? 'Sospendi' : 'Riattiva'}

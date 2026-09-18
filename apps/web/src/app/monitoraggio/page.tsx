@@ -21,7 +21,7 @@ export default function PaginaMonitoraggio() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Monitoraggio</h1>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">Monitoraggio</h1>
         <span className="rounded-full border border-bordo-forte px-3 py-1 text-xs font-medium uppercase tracking-wide text-testo-debole">
           In arrivo
         </span>
@@ -31,7 +31,7 @@ export default function PaginaMonitoraggio() {
         qui invece di aspettare la prossima analisi.
       </p>
 
-      <section className="mt-8 max-w-3xl rounded border border-bordo bg-superficie p-6">
+      <section className="mt-8 max-w-3xl rounded-xl border border-bordo bg-superficie p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-testo-debole">Che cosa farà</h2>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed">
           <li>

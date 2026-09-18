@@ -16,6 +16,7 @@ import { CollegamentoAzione } from '@/components/CollegamentoAzione';
 import { etichettaPiuEsposta } from '@/lib/ubicazione-piu-esposta';
 import { etichetteDelGruppo } from '@/lib/etichette-ubicazioni';
 import { RiquadriProtezioni, SezioniProtezioni } from './ProtezioniVeezco';
+import { IndiceSezioni } from './IndiceSezioni';
 
 export const dynamic = 'force-dynamic';
 
@@ -167,7 +168,7 @@ export default async function PaginaAzienda({
               guarda conclude che il dato non ci sia. Le due proprietà arrotondano gli
               angoli allo stesso modo; solo una lascia arrivare a ciò che è fuori.
             */}
-              <div className="overflow-x-auto rounded-lg border border-bordo">
+              <div className="overflow-x-auto rounded-2xl border border-bordo">
                 <table className="w-full text-sm">
                   <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
                     <tr>
@@ -199,7 +200,7 @@ export default async function PaginaAzienda({
                           </span>
                           {etichettaPiuEsposta(u.piuEsposta, quantePiuEsposte, ubicazioni.elenco.length) !==
                             null && (
-                            <span className="mt-1 inline-block rounded bg-attenzione/15 px-1.5 py-0.5 text-xs font-medium text-attenzione">
+                            <span className="mt-1 inline-block rounded-full bg-attenzione/15 px-2 py-0.5 text-xs font-medium text-attenzione">
                               {/*
                               Al plurale quando il primo posto è pari, e non è pignoleria di lingua:
                               «la più esposta» su una di cinque ubicazioni identiche dice che le altre
@@ -496,7 +497,7 @@ export default async function PaginaAzienda({
                         <p className="text-sm font-medium">
                           {c.nominativo}
                           {c.isRappresentanteLegale && (
-                            <span className="ml-2 rounded bg-marchio/10 px-1.5 py-0.5 text-[11px] font-medium text-marchio">
+                            <span className="ml-2 rounded-full bg-marchio/10 px-2 py-0.5 text-[11px] font-medium text-marchio">
                               rappresentanza legale
                             </span>
                           )}
@@ -660,7 +661,7 @@ export default async function PaginaAzienda({
                           <span className="text-testo-tenue"> · {altra.quotaPercentuale}%</span>
                         )}
                         {altra.diControllo && (
-                          <span className="ml-2 rounded bg-marchio/15 px-1.5 py-0.5 text-xs text-marchio">
+                          <span className="ml-2 rounded-full bg-marchio/15 px-2 py-0.5 text-xs text-marchio">
                             controllo
                           </span>
                         )}
@@ -708,7 +709,7 @@ export default async function PaginaAzienda({
           </div>
 
           {/* Stessa ragione della tabella delle ubicazioni: si scorre, non si taglia. */}
-          <div className="mt-3 overflow-x-auto rounded-lg border border-bordo">
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-bordo">
             <table className="w-full text-sm">
               <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
                 <tr>
@@ -841,7 +842,7 @@ function BadgeEsposizione({ valore }: { valore: string }) {
 
   if (livello === null) {
     return (
-      <span className="rounded border border-bordo-forte px-1.5 py-0.5 text-xs text-testo-debole">
+      <span className="rounded-full border border-bordo-forte px-2 py-0.5 text-xs text-testo-debole">
         {valore}
       </span>
     );
@@ -1086,25 +1087,7 @@ function NavigazioneSezioni({ analisi }: { analisi: AnalisiDto }) {
     { id: 'profilo', testo: 'Profilo dell’impresa', presente: true },
   ].filter((s) => s.presente);
 
-  return (
-    <nav
-      aria-label="Sezioni dell’analisi"
-      className="sticky top-0 z-10 -mx-6 mb-6 border-b border-bordo bg-fondo/95 px-6 py-2 backdrop-blur"
-    >
-      <ul className="flex flex-wrap gap-1 text-sm">
-        {sezioni.map((sezione) => (
-          <li key={sezione.id}>
-            <a
-              href={`#${sezione.id}`}
-              className="rounded px-2.5 py-1 text-testo-tenue transition hover:bg-superficie hover:text-testo"
-            >
-              {sezione.testo}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
+  return <IndiceSezioni sezioni={sezioni.map(({ id, testo }) => ({ id, testo }))} />;
 }
 
 /**
@@ -1214,7 +1197,9 @@ function Intestazione({
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-start justify-between gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">{azienda.denominazione}</h1>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">
+          {azienda.denominazione}
+        </h1>
 
         <div className="flex flex-wrap gap-2">
           {/*
@@ -1253,7 +1238,7 @@ function Intestazione({
               href={`/azienda/${identificativo}?negativita=1${approfondita ? '&approfondita=1' : ''}`}
               prefetch={false}
               inAttesa="Verifica di protesti e procedure in corso"
-              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
+              className="rounded-full border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Verifica protesti e procedure{' '}
               {analisi.senzaSpesa.eventiNegativi ? (
@@ -1268,7 +1253,7 @@ function Intestazione({
               href={`/azienda/${identificativo}?approfondita=1${conNegativita ? '&negativita=1' : ''}`}
               prefetch={false}
               inAttesa="Analisi approfondita in corso"
-              className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
+              className="rounded-full border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
             >
               Analisi approfondita{' '}
               {analisi.senzaSpesa.approfondimento ? (
@@ -1280,7 +1265,7 @@ function Intestazione({
           )}
           <CollegamentoAzione
             href={`/azienda/${identificativo}/dati`}
-            className="rounded border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
+            className="rounded-full border border-bordo-forte px-3 py-1.5 text-sm transition hover:border-marchio"
           >
             Dati di intervista{' '}
             <span className="tabular text-testo-debole">
@@ -1300,7 +1285,7 @@ function Intestazione({
           <CollegamentoAzione
             href={`/azienda/${identificativo}/report${acquistiNellIndirizzo(approfondita, conNegativita)}`}
             inAttesa="Preparazione del report in corso"
-            className="rounded bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90"
+            className="rounded-full bg-azione px-3 py-1.5 text-sm font-medium text-azione-testo transition hover:opacity-90"
           >
             Report per il cliente
           </CollegamentoAzione>

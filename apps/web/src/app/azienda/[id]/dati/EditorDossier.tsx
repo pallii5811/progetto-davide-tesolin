@@ -364,8 +364,10 @@ export function EditorDossier({
       </GruppoCampi>
 
       {/* ── Immobili ─────────────────────────────────────────────────────── */}
-      <fieldset className="rounded-lg border border-bordo bg-superficie p-4">
-        <legend className="px-1.5 text-sm font-semibold">Immobili e sedi</legend>
+      <fieldset className="rounded-2xl border border-bordo bg-superficie p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] [&>legend+*]:clear-both">
+        <legend className="float-left mb-2 w-full text-[15px] font-semibold tracking-[-0.01em]">
+          Immobili e sedi
+        </legend>
         <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
           I metri quadri sono il dato che più incide sull&apos;intera analisi: senza, il capitale fabbricati
           resta una stima (dall&apos;impronta a terra rilevata da cartografia o dal valore contabile, già
@@ -374,7 +376,7 @@ export function EditorDossier({
 
         <div className="space-y-4">
           {dati.immobili.map((immobile, indice) => (
-            <div key={indice} className="rounded border border-bordo bg-fondo p-3">
+            <div key={indice} className="rounded-xl border border-bordo bg-fondo p-3">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wide text-testo-debole">
                   Immobile {indice + 1}
@@ -387,7 +389,7 @@ export function EditorDossier({
                       dati.immobili.filter((_, n) => n !== indice),
                     )
                   }
-                  className="rounded px-2 py-1 text-xs text-alto hover:bg-alto-fondo"
+                  className="rounded-full px-2.5 py-1 text-xs text-alto transition hover:bg-alto-fondo"
                 >
                   Rimuovi
                 </button>
@@ -471,7 +473,7 @@ export function EditorDossier({
               },
             ])
           }
-          className="mt-3 rounded border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio"
+          className="mt-3 rounded-xl border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio"
         >
           + Aggiungi immobile
         </button>
@@ -589,8 +591,10 @@ export function EditorDossier({
       </GruppoCampi>
 
       {/* ── Certificazioni ───────────────────────────────────────────────── */}
-      <fieldset className="rounded-lg border border-bordo bg-superficie p-4">
-        <legend className="px-1.5 text-sm font-semibold">Certificazioni di sistema</legend>
+      <fieldset className="rounded-2xl border border-bordo bg-superficie p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] [&>legend+*]:clear-both">
+        <legend className="float-left mb-2 w-full text-[15px] font-semibold tracking-[-0.01em]">
+          Certificazioni di sistema
+        </legend>
         <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
           Ogni certificazione è un controllo documentato: abbassa il rischio residuo e dà argomenti in
           trattativa con la compagnia sul premio.
@@ -625,8 +629,10 @@ export function EditorDossier({
       </fieldset>
 
       {/* ── Polizze ──────────────────────────────────────────────────────── */}
-      <fieldset className="rounded-lg border border-bordo bg-superficie p-4">
-        <legend className="px-1.5 text-sm font-semibold">Polizze in essere</legend>
+      <fieldset className="rounded-2xl border border-bordo bg-superficie p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] [&>legend+*]:clear-both">
+        <legend className="float-left mb-2 w-full text-[15px] font-semibold tracking-[-0.01em]">
+          Polizze in essere
+        </legend>
         <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
           Senza le polizze esistenti la gap analysis può solo dire cosa serve, non cosa manca. I capitali si
           inseriscono in euro.
@@ -634,7 +640,7 @@ export function EditorDossier({
 
         <div className="space-y-4">
           {polizze.map((polizza, indice) => (
-            <div key={polizza.id} className="rounded border border-bordo bg-fondo p-3">
+            <div key={polizza.id} className="rounded-xl border border-bordo bg-fondo p-3">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wide text-testo-debole">
                   Polizza {indice + 1}
@@ -645,7 +651,7 @@ export function EditorDossier({
                     setPolizze(polizze.filter((_, n) => n !== indice));
                     setEsito(null);
                   }}
-                  className="rounded px-2 py-1 text-xs text-alto hover:bg-alto-fondo"
+                  className="rounded-full px-2.5 py-1 text-xs text-alto transition hover:bg-alto-fondo"
                 >
                   Rimuovi
                 </button>
@@ -738,15 +744,15 @@ export function EditorDossier({
             ]);
             setEsito(null);
           }}
-          className="mt-3 rounded border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio"
+          className="mt-3 rounded-xl border border-dashed border-bordo-forte px-3 py-2 text-sm text-testo-tenue transition hover:border-marchio hover:text-marchio"
         >
           + Aggiungi polizza
         </button>
       </fieldset>
 
       {/* ── Barra di salvataggio ─────────────────────────────────────────── */}
-      <div className="fixed inset-x-0 bottom-0 border-t border-bordo bg-superficie/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-3">
+      <div className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-bordo bg-superficie/90 backdrop-blur-md lg:left-[252px]">
+        <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4 px-5 py-3 sm:px-8 lg:px-10">
           <div aria-live="polite" className="min-h-5 text-sm">
             {esito !== null && (
               <span className={esito.ok ? 'text-basso' : 'text-critico'}>{esito.messaggio}</span>
@@ -798,7 +804,7 @@ export function EditorDossier({
                       });
                     });
                   }}
-                  className="inline-flex items-center gap-1.5 rounded border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-bordo-forte px-4 py-2 text-sm transition hover:border-marchio disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {navigando && <Rotella />}
                   Vedi l’analisi
@@ -813,7 +819,7 @@ export function EditorDossier({
               onClick={() => onSalva()}
               disabled={inCorso}
               aria-busy={inCorso}
-              className="inline-flex items-center gap-1.5 rounded bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full bg-azione px-5 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
             >
               {inCorso && <Rotella />}
               {inCorso ? 'Salvataggio…' : 'Salva e ricalcola'}

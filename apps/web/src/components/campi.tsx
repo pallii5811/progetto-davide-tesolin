@@ -27,10 +27,7 @@ function Guscio({
 }) {
   return (
     <div>
-      <label
-        htmlFor={htmlFor}
-        className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole"
-      >
+      <label htmlFor={htmlFor} className="mb-1.5 block text-[13px] font-medium text-testo-tenue">
         {etichetta}
       </label>
       {children}
@@ -40,7 +37,7 @@ function Guscio({
 }
 
 const CLASSI_CAMPO =
-  'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm ' +
+  'w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm ' +
   'transition focus:border-marchio';
 
 export function CampoTesto({
@@ -132,7 +129,12 @@ export function CampoTriStato({
 
   return (
     <Guscio etichetta={etichetta} aiuto={aiuto}>
-      <div role="group" aria-label={etichetta} className="flex gap-1">
+      {/* Un selettore a segmenti: tre scelte che si escludono stanno in una cornice sola. */}
+      <div
+        role="group"
+        aria-label={etichetta}
+        className="flex gap-1 rounded-xl border border-bordo-forte bg-fondo p-1"
+      >
         {opzioni.map((opzione) => {
           const attiva = valore === opzione.valore;
           return (
@@ -141,10 +143,10 @@ export function CampoTriStato({
               type="button"
               aria-pressed={attiva}
               onClick={() => onChange(opzione.valore)}
-              className={`flex-1 rounded border px-3 py-2 text-sm transition ${
+              className={`flex-1 rounded-lg px-3 py-1.5 text-sm transition ${
                 attiva
-                  ? 'border-marchio bg-azione text-azione-testo'
-                  : 'border-bordo-forte bg-fondo hover:border-marchio/50'
+                  ? 'bg-azione font-medium text-azione-testo shadow-[0_1px_2px_rgba(16,24,40,0.12)]'
+                  : 'text-testo-tenue hover:bg-superficie hover:text-testo'
               }`}
             >
               {opzione.testo}
@@ -247,8 +249,10 @@ export function GruppoCampi({
   children: ReactNode;
 }) {
   return (
-    <fieldset className="rounded-lg border border-bordo bg-superficie p-4">
-      <legend className="px-1.5 text-sm font-semibold">{titolo}</legend>
+    <fieldset className="rounded-2xl border border-bordo bg-superficie p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] [&>legend+*]:clear-both">
+      <legend className="float-left mb-2 w-full text-[15px] font-semibold tracking-[-0.01em]">
+        {titolo}
+      </legend>
       {descrizione !== undefined && (
         <p className="mb-3 text-xs leading-relaxed text-testo-tenue">{descrizione}</p>
       )}

@@ -72,7 +72,7 @@ export default async function PaginaCrm({ searchParams }: { searchParams: Promis
   if (crm.aziende.length === 0) {
     return (
       <>
-        <h1 className="mb-1.5 text-2xl font-bold tracking-tight">CRM</h1>
+        <h1 className="mb-1.5 text-[26px] font-semibold leading-tight tracking-[-0.03em]">CRM</h1>
         {descrizione}
         <Scheda className="text-center">
           <p className="text-sm text-testo-tenue">Nessuna azienda nel CRM.</p>
@@ -91,7 +91,7 @@ export default async function PaginaCrm({ searchParams }: { searchParams: Promis
   return (
     <>
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">CRM</h1>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">CRM</h1>
         {/*
           Un collegamento e non un pulsante: è una navigazione verso un file, e come tale
           deve poter essere aperta in una scheda nuova o copiata. Il filtro corrente viaggia
@@ -104,7 +104,7 @@ export default async function PaginaCrm({ searchParams }: { searchParams: Promis
               : `/portafoglio/esporta?filtro=${statoScelto}`
           }
           download
-          className="rounded border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo"
+          className="rounded-full border border-bordo-forte px-3 py-1.5 text-sm text-testo-tenue transition hover:text-testo"
         >
           Esporta in CSV
         </a>
@@ -144,7 +144,10 @@ export default async function PaginaCrm({ searchParams }: { searchParams: Promis
       */}
       <ul className="space-y-2 md:hidden">
         {aziende.map((azienda) => (
-          <li key={azienda.identificativo} className="rounded-lg border border-bordo bg-superficie p-4">
+          <li
+            key={azienda.identificativo}
+            className="rounded-2xl border border-bordo bg-superficie p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+          >
             <div className="flex items-start justify-between gap-3">
               <IdentitaAzienda azienda={azienda} />
               <ApriAzienda azienda={azienda} />
@@ -171,7 +174,7 @@ export default async function PaginaCrm({ searchParams }: { searchParams: Promis
         ))}
       </ul>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-bordo md:block">
+      <div className="hidden overflow-x-auto rounded-2xl border border-bordo md:block">
         <table className="w-full min-w-[56rem] text-sm">
           <caption className="sr-only">Aziende del CRM con contatti, score, stato e nota</caption>
           <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
@@ -322,7 +325,7 @@ function ApriAzienda({ azienda }: { azienda: VoceCrmDto }) {
     <CollegamentoAzione
       href={`/azienda/${azienda.identificativo}`}
       inAttesa={analizzata ? 'Apertura della scheda in corso' : 'Analisi in corso'}
-      className="inline-block rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
+      className="inline-block rounded-full bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
     >
       {analizzata ? 'Apri' : 'Analizza'}
     </CollegamentoAzione>

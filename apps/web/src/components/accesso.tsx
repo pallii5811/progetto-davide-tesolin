@@ -29,7 +29,7 @@ export function CornicePubblica({
         <p className="mt-1 text-sm text-testo-tenue">Il rischio d’impresa, per intermediari assicurativi</p>
       </div>
 
-      <div className="rounded-lg border border-bordo bg-superficie p-6">
+      <div className="rounded-2xl border border-bordo bg-superficie p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
         <h1 className="mb-1 text-lg font-semibold">{titolo}</h1>
         {sottotitolo !== undefined && (
           <p className="mb-5 text-sm leading-relaxed text-testo-tenue">{sottotitolo}</p>
@@ -85,10 +85,7 @@ export function CampoAccesso({
 
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole"
-      >
+      <label htmlFor={id} className="mb-1.5 block text-[13px] font-medium text-testo-tenue">
         {etichetta}
       </label>
       <input
@@ -103,7 +100,7 @@ export function CampoAccesso({
         {...(maiuscolo ? { autoCapitalize: 'characters', spellCheck: false } : {})}
         aria-invalid={errore === undefined ? undefined : true}
         {...(descrizione === '' ? {} : { 'aria-describedby': descrizione })}
-        className={`w-full rounded border bg-fondo px-3 py-2 text-sm transition focus:border-marchio ${
+        className={`w-full rounded-xl border bg-superficie px-3 py-2.5 text-sm transition focus:border-marchio ${
           errore === undefined ? 'border-bordo-forte' : 'border-critico'
         }`}
       />

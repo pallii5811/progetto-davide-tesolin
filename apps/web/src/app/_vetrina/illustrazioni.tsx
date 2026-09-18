@@ -387,7 +387,8 @@ function Pannello({ fondo, children }: { fondo: keyof typeof FONDI; children: Re
           </div>
         ))}
       </div>
-      <div className="absolute inset-x-5 top-8 flex flex-col items-end gap-3 sm:inset-x-auto sm:right-8 sm:w-[340px]">
+      {/* `vetrina-carte`: nella scena che scorre (ProdottoScorrevole.tsx) le carte entrano una alla volta. */}
+      <div className="vetrina-carte absolute inset-x-5 top-8 flex flex-col items-end gap-3 sm:inset-x-auto sm:right-8 sm:w-[340px]">
         {children}
       </div>
     </div>
@@ -509,9 +510,13 @@ export function PannelloCyber() {
   return (
     <div
       aria-hidden="true"
-      className="relative flex min-h-[460px] flex-col justify-between gap-4 overflow-hidden rounded-[32px] border border-vetrina-linea bg-vetrina-petrolio p-5 sm:min-h-[520px] sm:p-8"
+      className="vetrina-carte relative flex min-h-[460px] flex-col justify-between gap-4 overflow-hidden rounded-[32px] border border-vetrina-linea bg-vetrina-petrolio p-5 sm:min-h-[520px] sm:p-8"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(100%_70%_at_20%_0%,rgba(255,255,255,0.25),transparent_60%)]" />
+      {/* La luce resta ferma: nella scena che scorre entrano solo le carte (`data-fondo`). */}
+      <div
+        data-fondo=""
+        className="absolute inset-0 bg-[radial-gradient(100%_70%_at_20%_0%,rgba(255,255,255,0.25),transparent_60%)]"
+      />
       <div className="relative flex items-center gap-4 rounded-2xl border border-vetrina-linea bg-white p-5">
         <Anello valore={5.1} testo="5,1" dimensione={84} />
         <div className="min-w-0 flex-1">

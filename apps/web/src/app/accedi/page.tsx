@@ -60,7 +60,7 @@ export default async function PaginaAccesso({
       {arrivo !== undefined && (
         <p
           role="status"
-          className="mb-4 rounded border border-basso/30 bg-basso-fondo px-3 py-2 text-sm text-basso"
+          className="mb-4 rounded-xl border border-basso/30 bg-basso-fondo px-3.5 py-2.5 text-sm text-basso"
         >
           {arrivo}
         </p>

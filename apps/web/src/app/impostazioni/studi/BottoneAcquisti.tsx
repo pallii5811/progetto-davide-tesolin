@@ -31,7 +31,7 @@ export function BottoneAcquisti({
 
   if (!abilitati && attesaConferma) {
     return (
-      <span className="inline-flex items-center rounded border border-bordo px-2.5 py-1 text-xs text-testo-debole">
+      <span className="inline-flex items-center rounded-full border border-bordo px-2.5 py-1 text-xs text-testo-debole">
         attende la conferma email
       </span>
     );
@@ -50,7 +50,7 @@ export function BottoneAcquisti({
         avvia(() => void cambiaAcquisti(id, !abilitati));
       }}
       aria-busy={inCorso}
-      className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition disabled:opacity-50 ${
         abilitati
           ? 'border border-bordo-forte text-testo-tenue hover:text-testo'
           : 'bg-azione text-azione-testo hover:opacity-90'

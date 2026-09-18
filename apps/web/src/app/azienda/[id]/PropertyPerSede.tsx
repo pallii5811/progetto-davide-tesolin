@@ -45,16 +45,13 @@ export function PropertyPerSede({ property }: { property: Property }) {
   return (
     <div>
       {property.ubicazioni.length > 1 ? (
-        <label
-          htmlFor={idSede}
-          className="block text-xs font-medium uppercase tracking-wide text-testo-debole"
-        >
+        <label htmlFor={idSede} className="block text-[13px] font-medium text-testo-tenue">
           Indirizzo
           <select
             id={idSede}
             value={indice}
             onChange={(evento) => setIndice(Number(evento.target.value))}
-            className="mt-1.5 block w-full rounded-lg border border-bordo-forte bg-superficie px-3 py-2.5 text-sm font-medium normal-case tracking-normal text-testo"
+            className="mt-1.5 block w-full rounded-2xl border border-bordo-forte bg-superficie px-3 py-2.5 text-sm font-medium normal-case tracking-normal text-testo shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
           >
             {property.ubicazioni.map((u, i) => (
               <option key={u.id} value={i}>

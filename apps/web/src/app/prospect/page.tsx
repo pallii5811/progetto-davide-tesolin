@@ -183,7 +183,7 @@ export default async function PaginaProspect({
         un elenco comprato vanno nel CRM, e ci restano per sempre.
       */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Trova nuove aziende</h1>
+        <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em]">Trova nuove aziende</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-testo-tenue">
           Cerca le imprese che corrispondono ai tuoi criteri.
         </p>
@@ -330,13 +330,11 @@ export default async function PaginaProspect({
               risponde zero.
             */}
             <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-                Forma giuridica
-              </span>
+              <span className="mb-1.5 block text-[13px] font-medium text-testo-tenue">Forma giuridica</span>
               <select
                 name="formaGiuridicaCodice"
                 defaultValue={criteri.formaGiuridicaCodice}
-                className="w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio"
+                className="w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm focus:border-marchio"
               >
                 <option value="SR">Solo S.r.l.</option>
                 <option value="SP">Solo S.p.A.</option>
@@ -378,7 +376,7 @@ export default async function PaginaProspect({
           <div className="flex flex-wrap items-center gap-3">
             <BottoneInvioGet
               inCorso="Conteggio in corso…"
-              className="rounded border border-bordo-forte px-5 py-2 text-sm font-medium transition hover:border-marchio"
+              className="rounded-full border border-bordo-forte px-5 py-2 text-sm font-medium transition hover:border-marchio"
             >
               Conta Aziende <span className="text-testo-debole">non consuma crediti</span>
             </BottoneInvioGet>
@@ -601,7 +599,7 @@ export default async function PaginaProspect({
               Nessuna azienda nuova: quelle di questi filtri sono già nel CRM.
             </p>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-bordo">
+            <div className="overflow-hidden rounded-2xl border border-bordo">
               <table className="w-full text-sm">
                 <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
                   <tr>
@@ -624,7 +622,7 @@ export default async function PaginaProspect({
                         <CollegamentoAzione
                           href={`/azienda/${azienda.providerId}`}
                           inAttesa="Analisi in corso"
-                          className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
+                          className="rounded-full bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
                         >
                           Analizza
                         </CollegamentoAzione>
@@ -759,16 +757,14 @@ function Campo({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole">
-        {etichetta}
-      </span>
+      <span className="mb-1.5 block text-[13px] font-medium text-testo-tenue">{etichetta}</span>
       <input
         type="text"
         name={nome}
         defaultValue={valore}
         placeholder={segnaposto}
         inputMode={numerico ? 'numeric' : 'text'}
-        className={`w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm focus:border-marchio ${
+        className={`w-full rounded-xl border border-bordo-forte bg-superficie px-3 py-2 text-sm transition focus:border-marchio ${
           numerico ? 'tabular' : ''
         } ${maiuscolo ? 'uppercase' : ''}`}
       />

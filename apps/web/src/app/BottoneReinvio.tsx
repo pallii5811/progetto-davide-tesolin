@@ -12,7 +12,7 @@ function Pulsante() {
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="inline-flex items-center gap-1.5 rounded border border-marchio/40 px-2.5 py-1 text-xs font-medium text-marchio transition hover:bg-superficie disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 rounded-full border border-marchio/40 px-3 py-1 text-xs font-medium text-marchio transition hover:bg-superficie disabled:opacity-50"
     >
       {pending && <Rotella />}
       {pending ? 'Invio…' : 'Invia di nuovo'}

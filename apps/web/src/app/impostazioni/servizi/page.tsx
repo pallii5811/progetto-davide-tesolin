@@ -129,7 +129,7 @@ function Fornitura({ stato }: { stato: StatoFornitura }) {
   const scarso = residuo !== null && residuo <= soglia;
 
   return (
-    <div className="mb-6 rounded-lg border border-bordo bg-superficie p-4">
+    <div className="mb-6 rounded-2xl border border-bordo bg-superficie p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div>
           <p className="text-xs uppercase tracking-wide text-testo-debole">Credito residuo</p>

@@ -43,7 +43,9 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
         <Link href={`/azienda/${id}`} className="text-xs text-marchio hover:underline">
           ← {analisi.azienda.denominazione}
         </Link>
-        <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Dati di intervista</h1>
+        <h1 className="mt-1.5 text-[26px] font-semibold leading-tight tracking-[-0.03em]">
+          Dati di intervista
+        </h1>
         <p className="mt-1 max-w-3xl text-sm leading-relaxed text-testo-tenue">
           Ciò che il bilancio non può dire. Ogni campo qui migliora una parte precisa dell&apos;analisi:
           l&apos;elenco qui sotto è ordinato per impatto, non per comodità di compilazione.
@@ -92,7 +94,7 @@ export default async function PaginaDati({ params }: { params: Promise<{ id: str
             <ol className="space-y-2">
               {completezza.mancanti.slice(0, 5).map((mancante) => (
                 <li key={mancante.chiave} className="flex gap-3 text-sm">
-                  <span className="tabular mt-0.5 shrink-0 rounded bg-fondo px-1.5 py-0.5 text-xs font-semibold text-testo-tenue">
+                  <span className="tabular mt-0.5 shrink-0 self-start rounded-full border border-bordo bg-fondo px-2 py-0.5 text-xs font-semibold text-testo-tenue">
                     +{mancante.peso}
                   </span>
                   <span>

@@ -19,7 +19,7 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
   const a = azienda.anagrafica;
 
   return (
-    <div className="rounded-lg border border-bordo bg-superficie p-4">
+    <div className="rounded-2xl border border-bordo bg-superficie p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold">{azienda.denominazione}</p>
@@ -46,24 +46,24 @@ export function SchedaRisultato({ azienda }: { azienda: RisultatoRicerca }) {
               «non lo so» non è «cessata».
             */
             <span
-              className="rounded border border-bordo px-1.5 py-0.5 text-xs font-medium text-testo-debole"
+              className="rounded-full border border-bordo px-2 py-0.5 text-xs font-medium text-testo-debole"
               title="Lo stato camerale non è fra i dati in archivio: si rileva con l’analisi."
             >
               stato non rilevato
             </span>
           ) : azienda.statoAttivita === 'attiva' ? (
-            <span className="rounded border border-basso/30 bg-basso-fondo px-1.5 py-0.5 text-xs font-medium text-basso">
+            <span className="rounded-full border border-basso/30 bg-basso-fondo px-2 py-0.5 text-xs font-medium text-basso">
               attiva
             </span>
           ) : (
-            <span className="rounded border border-critico/40 bg-critico-fondo px-1.5 py-0.5 text-xs font-medium capitalize text-critico">
+            <span className="rounded-full border border-critico/40 bg-critico-fondo px-2 py-0.5 text-xs font-medium capitalize text-critico">
               {azienda.statoAttivita.replace('-', ' ')}
             </span>
           )}
           <CollegamentoAzione
             href={`/azienda/${azienda.providerId}`}
             inAttesa="Analisi in corso"
-            className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
+            className="rounded-full bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
           >
             Analizza
           </CollegamentoAzione>

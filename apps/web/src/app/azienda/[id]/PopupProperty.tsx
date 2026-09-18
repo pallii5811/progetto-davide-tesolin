@@ -174,7 +174,7 @@ export function PopupProperty({
           type="button"
           onClick={apri}
           aria-haspopup="dialog"
-          className="shrink-0 rounded border border-bordo-forte px-3 py-1.5 text-xs font-medium transition hover:border-marchio"
+          className="shrink-0 rounded-full border border-bordo-forte px-3 py-1.5 text-xs font-medium transition hover:border-marchio"
         >
           Vedi le lancette
         </button>
@@ -205,7 +205,7 @@ export function PopupProperty({
               type="button"
               onClick={chiudi}
               aria-label="Chiudi"
-              className="rounded px-2 py-1 text-lg leading-none text-testo-tenue hover:text-testo"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-base leading-none text-testo-tenue transition hover:bg-fondo hover:text-testo"
             >
               ✕
             </button>
@@ -218,7 +218,7 @@ export function PopupProperty({
                 id={idSede}
                 value={indice}
                 onChange={(evento) => setIndice(Number(evento.target.value))}
-                className="mt-1 block w-full rounded border border-bordo-forte bg-fondo px-2 py-1.5 text-sm text-testo"
+                className="mt-1 block w-full rounded-xl border border-bordo-forte bg-superficie px-2 py-1.5 text-sm text-testo"
               >
                 {property.ubicazioni.map((u, i) => (
                   <option key={u.id} value={i}>

@@ -16,7 +16,10 @@ export function ModuloStudio() {
   const [esito, azione, inCorso] = useActionState<EsitoApertura | null, FormData>(apriStudio, null);
 
   return (
-    <form action={azione} className="rounded-lg border border-bordo bg-superficie p-4">
+    <form
+      action={azione}
+      className="rounded-2xl border border-bordo bg-superficie p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+    >
       <h3 className="mb-1 text-sm font-semibold">Apri uno studio cliente</h3>
       <p className="mb-3 text-xs leading-relaxed text-testo-tenue">
         Nasce isolato: CRM, clienti e analisi non sono visibili da nessun altro studio, compreso questo.
@@ -33,7 +36,7 @@ export function ModuloStudio() {
           type="submit"
           disabled={inCorso}
           aria-busy={inCorso}
-          className="inline-flex items-center gap-1.5 rounded bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full bg-azione px-4 py-2 text-sm font-medium text-azione-testo transition hover:opacity-90 disabled:opacity-50"
         >
           {inCorso && <Rotella />}
           {inCorso ? 'Apertura…' : 'Apri lo studio'}
@@ -47,7 +50,7 @@ export function ModuloStudio() {
         ritrovarla deve poter sapere in anticipo che non la ritroverà.
       */}
       {esito !== null && esito.ok && esito.passwordIniziale !== undefined && (
-        <div className="mt-4 rounded border border-rilevante/40 bg-rilevante-fondo p-3">
+        <div className="mt-4 rounded-xl border border-rilevante/40 bg-rilevante-fondo p-3.5">
           <p className="text-sm font-medium">{esito.messaggio}</p>
           <dl className="mt-2 space-y-1 text-sm">
             <div className="flex flex-wrap gap-2">
@@ -78,7 +81,7 @@ function Campo({ nome, etichetta, tipo = 'text' }: { nome: string; etichetta: st
         name={nome}
         type={tipo}
         required
-        className="w-full rounded border border-bordo-forte bg-fondo px-2.5 py-1.5 text-sm"
+        className="w-full rounded-xl border border-bordo-forte bg-superficie px-2.5 py-1.5 text-sm"
       />
     </label>
   );
