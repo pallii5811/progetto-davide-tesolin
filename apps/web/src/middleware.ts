@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { INTESTAZIONE_VETRINA } from './lib/vetrina';
 
 /**
  * Guardia di ingresso.
@@ -81,19 +82,34 @@ function origineVisibile(request: NextRequest): string {
 
 export function middleware(request: NextRequest): Response {
   const percorso = request.nextUrl.pathname;
+  const intestazioni = new Headers(request.headers);
+  intestazioni.delete(INTESTAZIONE_VETRINA);
+  const prosegui = (): Response => NextResponse.next({ request: { headers: intestazioni } });
 
   if (PUBBLICI.some((p) => percorso === p || percorso.startsWith(`${p}/`))) {
-    return NextResponse.next();
+    return prosegui();
   }
 
   const sessione = request.cookies.get('aegis_sessione');
   if (sessione !== undefined && sessione.value !== '') {
-    return NextResponse.next();
+    return prosegui();
+  }
+
+  /*
+    «/» senza sessione è la vetrina: la pagina pubblica che presenta AEGIS (richiesta di Simone
+    del 18/09/2026). Prima rinviava all'accesso come ogni altra pagina; ora chi arriva sul
+    dominio vede che cosa fa il prodotto, e l'accesso è il pulsante in alto. Solo la radice, e
+    solo senza cookie: chi ha la sessione prosegue come prima verso Ricerca Clienti.
+  */
+  if (percorso === '/') {
+    intestazioni.set(INTESTAZIONE_VETRINA, '1');
+    return prosegui();
   }
 
   // Si conserva la pagina richiesta: dopo l'accesso l'utente torna dove voleva andare,
-  // invece di ritrovarsi sulla schermata iniziale e dover ricominciare.
-  const ritorno = percorso === '/' ? '' : `?ritorno=${encodeURIComponent(percorso)}`;
+  // invece di ritrovarsi sulla schermata iniziale e dover ricominciare. La radice qui non
+  // arriva più (è la vetrina), quindi ogni rinvio porta il suo ritorno.
+  const ritorno = `?ritorno=${encodeURIComponent(percorso)}`;
 
   return new NextResponse(null, {
     status: 307,

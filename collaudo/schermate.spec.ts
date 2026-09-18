@@ -30,6 +30,27 @@ const PAGINE: { nome: string; percorso: string }[] = [
 ];
 
 test.describe('@visuale schermate', () => {
+  /*
+    La vetrina (18/09/2026) si vede solo SENZA sessione, quindi si fotografa prima dell'accesso.
+    Animazioni ferme: una carta a metà del suo fluttuare non è un difetto da cercare.
+  */
+  test('vetrina, senza accesso', async ({ page }) => {
+    test.setTimeout(240_000);
+    for (const [nome, larghezza, altezza] of [
+      ['largo', 1440, 900],
+      ['stretto', 390, 844],
+    ] as const) {
+      await page.setViewportSize({ width: larghezza, height: altezza });
+      await page.goto('/', { timeout: 180_000 });
+      await page.waitForLoadState('networkidle');
+      await page.screenshot({
+        path: `schermate/${nome}-00-vetrina.png`,
+        fullPage: true,
+        animations: 'disabled',
+      });
+    }
+  });
+
   test('schermo largo', async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });

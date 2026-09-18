@@ -17,13 +17,15 @@
  * verifiche qui sotto ed è ciò che si era provato per primo — ma in esecuzione Next dà il
  * valore di `Location` al costruttore di `URL` e solleva `ERR_INVALID_URL`, e ogni pagina
  * protetta risponde 500. Quella validazione non scatta in ambiente di collaudo. La prova
- * che conta resta sull'istanza avviata: `curl -sS -o /dev/null -w '%{redirect_url}' https://<dominio>/`
- * deve stampare un indirizzo sul dominio pubblico. È scritto anche in `deploy/LEGGIMI.md`.
+ * che conta resta sull'istanza avviata: `curl -sS -o /dev/null -w '%{redirect_url}' https://<dominio>/prospect`
+ * deve stampare un indirizzo sul dominio pubblico (non più la radice, che dal 18/09/2026 senza
+ * sessione è la vetrina). È scritto anche in `deploy/LEGGIMI.md`.
  */
 
 import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import { middleware } from '../src/middleware.js';
+import { INTESTAZIONE_VETRINA } from '../src/lib/vetrina.js';
 
 const PUBBLICO = 'presidio.esempio.it';
 
@@ -47,10 +49,11 @@ const destinazioneDi = (r: Response): string => r.headers.get('location') ?? '';
 
 describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
   it('porta sul dominio pubblico, non su localhost', () => {
-    const risposta = middleware(dietroProxy('/'));
+    // Era «/»: dal 18/09/2026 la radice senza sessione è la vetrina e non rinvia (sotto).
+    const risposta = middleware(dietroProxy('/prospect'));
 
     expect(risposta.status).toBe(307);
-    expect(destinazioneDi(risposta)).toBe(`https://${PUBBLICO}/accedi`);
+    expect(destinazioneDi(risposta)).toBe(`https://${PUBBLICO}/accedi?ritorno=%2Fprospect`);
   });
 
   it('nessuna rotta protetta rinvia verso localhost', () => {
@@ -58,13 +61,7 @@ describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
       Il guasto si manifestava su ogni pagina, non solo sulla radice: chiunque arrivasse da
       un collegamento a una scheda azienda vedeva lo stesso errore di connessione.
     */
-    for (const percorso of [
-      '/',
-      '/portafoglio',
-      '/prospect',
-      '/azienda/03158460174',
-      '/impostazioni/costi',
-    ]) {
+    for (const percorso of ['/portafoglio', '/prospect', '/azienda/03158460174', '/impostazioni/costi']) {
       const destinazione = destinazioneDi(middleware(dietroProxy(percorso)));
       expect(destinazione, `${percorso} rinvia verso localhost`).not.toContain('localhost');
       expect(
@@ -80,8 +77,13 @@ describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
     );
   });
 
-  it('la radice non porta con sé un ritorno inutile', () => {
-    expect(destinazioneDi(middleware(dietroProxy('/')))).toBe(`https://${PUBBLICO}/accedi`);
+  it('una pagina il cui nome comincia come la radice non è la vetrina', () => {
+    // «/» è un confronto esatto: nessun altro percorso eredita l'apertura della radice.
+    for (const percorso of ['/prospect', '/portafoglio', '/monitoraggio', '/azienda/03158460174']) {
+      const risposta = middleware(dietroProxy(percorso));
+      expect(risposta.status, percorso).toBe(307);
+      expect(risposta.headers.get(`x-middleware-request-${INTESTAZIONE_VETRINA}`), percorso).toBeNull();
+    }
   });
 
   it('senza proxy usa l’origine locale, così lo sviluppo non cambia', () => {
@@ -122,5 +124,57 @@ describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
         `${percorso} deve restare accessibile senza sessione`,
       ).toBeNull();
     }
+  });
+});
+
+/*
+  La vetrina (18/09/2026): «/» senza sessione non rinvia più all'accesso, mostra la pagina che
+  presenta AEGIS. Il middleware lo dice alla pagina con un'intestazione di richiesta, che Next
+  trasporta come `x-middleware-request-<nome>`; `x-middleware-override-headers` elenca le
+  intestazioni che la pagina riceverà.
+*/
+describe('La radice senza sessione è la vetrina', () => {
+  const segnale = (r: Response): string | null =>
+    r.headers.get(`x-middleware-request-${INTESTAZIONE_VETRINA}`);
+  const intestazioniPassate = (r: Response): string[] =>
+    (r.headers.get('x-middleware-override-headers') ?? '').split(',').map((s) => s.trim());
+
+  it('senza cookie «/» non rinvia e porta il segnale della vetrina', () => {
+    const risposta = middleware(dietroProxy('/'));
+    expect(risposta.headers.get('location')).toBeNull();
+    expect(risposta.status).toBe(200);
+    expect(segnale(risposta)).toBe('1');
+  });
+
+  it('con il cookie «/» prosegue verso Ricerca Clienti, senza vetrina', () => {
+    const risposta = middleware(dietroProxy('/', { sessione: true }));
+    expect(risposta.headers.get('location')).toBeNull();
+    expect(segnale(risposta)).toBeNull();
+    expect(intestazioniPassate(risposta)).not.toContain(INTESTAZIONE_VETRINA);
+  });
+
+  it('un segnale mandato dal visitatore non arriva a nessuna pagina', () => {
+    /*
+      Con o senza sessione, su qualunque percorso che prosegue: l'intestazione scritta dal
+      client si perde nel middleware. Solo sulla radice senza cookie la riscrive lui.
+    */
+    const falsa = { intestazioni: { [INTESTAZIONE_VETRINA]: '1' } };
+    for (const [percorso, sessione] of [
+      ['/', true],
+      ['/prospect', true],
+      ['/azienda/03158460174', true],
+      ['/accedi', false],
+      ['/questionario/un-token', false],
+    ] as const) {
+      const risposta = middleware(dietroProxy(percorso, { ...falsa, sessione }));
+      expect(risposta.headers.get('location'), percorso).toBeNull();
+      expect(segnale(risposta), percorso).toBeNull();
+      expect(intestazioniPassate(risposta), percorso).not.toContain(INTESTAZIONE_VETRINA);
+    }
+  });
+
+  it('un cookie di sessione vuoto non conta come sessione: si vede la vetrina', () => {
+    const risposta = middleware(dietroProxy('/', { intestazioni: { cookie: 'aegis_sessione=' } }));
+    expect(segnale(risposta)).toBe('1');
   });
 });

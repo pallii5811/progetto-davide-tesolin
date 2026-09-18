@@ -1,11 +1,26 @@
+import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { INTESTAZIONE_VETRINA } from '@/lib/vetrina';
+import { Vetrina } from './_vetrina/Vetrina';
 
 export const dynamic = 'force-dynamic';
 
+export const metadata: Metadata = {
+  title: 'AEGIS · Il rischio d’impresa per intermediari assicurativi',
+  description:
+    'Property Risk, Business Interruption e Cyber Risk delle imprese italiane, dal Registro Imprese e dagli indicatori ISPRA, per intermediari assicurativi.',
+};
+
 /**
- * La pagina «Ricerca» non esiste più: «/» rinvia a «Ricerca Clienti».
+ * La radice ha due facce, e a sceglierla è il middleware.
  *
- * Tolta su richiesta di Simone del 13/09/2026. La ricerca per partita IVA vive dentro
+ * Senza sessione è la **vetrina** (app/_vetrina): la pagina pubblica che presenta AEGIS,
+ * richiesta da Simone il 18/09/2026. Il middleware lo segnala con INTESTAZIONE_VETRINA, che
+ * scrive lui solo e toglie da ogni richiesta in arrivo.
+ *
+ * Con la sessione, come prima: la pagina «Ricerca» non esiste più e «/» rinvia a «Ricerca
+ * Clienti». Tolta su richiesta di Simone del 13/09/2026. La ricerca per partita IVA vive dentro
  * «Ricerca Clienti», come sezione a parte. L'indirizzo resta, perché a «/» portano ancora
  * l'accesso, i segnalibri e i collegamenti già scritti.
  *
@@ -19,6 +34,8 @@ export default async function Radice({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  if ((await headers()).get(INTESTAZIONE_VETRINA) === '1') return <Vetrina />;
+
   const parametri = await searchParams;
   const inoltrati = new URLSearchParams();
   for (const chiave of ['piva']) {

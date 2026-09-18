@@ -4,7 +4,14 @@ import { AMMINISTRATORE } from './ambiente.js';
 
 test.describe('Accesso e protezione delle pagine', () => {
   test('senza sessione ogni pagina riservata rinvia all’accesso', async ({ page }) => {
-    for (const percorso of ['/', '/portafoglio', '/prospect', '/impostazioni', '/impostazioni/utenti']) {
+    // «/» non c'è più: dal 18/09/2026 senza sessione è la vetrina pubblica (vetrina.spec.ts).
+    for (const percorso of [
+      '/portafoglio',
+      '/prospect',
+      '/monitoraggio',
+      '/impostazioni',
+      '/impostazioni/utenti',
+    ]) {
       const risposta = await page.goto(percorso);
 
       // Non basta guardare dove si finisce: si verifica che il rinvio sia un vero 307,

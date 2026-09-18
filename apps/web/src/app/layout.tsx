@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { autenticazioneRichiesta, utenteCorrente } from '@/lib/api';
+import { INTESTAZIONE_VETRINA } from '@/lib/vetrina';
 import type { UtenteCorrente } from '@/lib/api';
 import { esci } from './accedi/actions';
 import { NavigazionePrincipale } from './NavigazionePrincipale';
@@ -14,6 +16,21 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  /*
+    La vetrina (la radice senza sessione, vedi middleware.ts) porta menu, piè di pagina e
+    dichiarazione IVASS suoi: qui riceve solo il documento. E nessuna chiamata all'API: la pagina
+    pubblica deve aprirsi anche se l'API è ferma, e non c'è un utente da chiedere.
+    Dalla vetrina si esce solo con collegamenti a pagina intera (app/_vetrina/pezzi.tsx): il
+    layout non si conserva fra le due facce, e ogni pagina del prodotto lo riceve completo.
+  */
+  if ((await headers()).get(INTESTAZIONE_VETRINA) === '1') {
+    return (
+      <html lang="it" style={{ colorScheme: 'light' }}>
+        <body className="min-h-screen bg-vetrina-carta">{children}</body>
+      </html>
+    );
+  }
+
   // Senza autenticazione attiva (dimostrazione locale) la navigazione resta visibile e
   // non si mostra alcuna identità: non c'è nessuno da mostrare.
   const richiesta = await autenticazioneRichiesta();

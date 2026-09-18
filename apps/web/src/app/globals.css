@@ -96,6 +96,25 @@
   --color-attenzione: oklch(0.5 0.14 75);
   --color-attenzione-fondo: oklch(0.96 0.045 75);
 
+  /*
+     La vetrina, cioè la pagina pubblica di «/» (app/_vetrina). Tavolozza sua e FISSA: non ha
+     una versione scura, perché è una pagina di presentazione con fondi colorati e carte
+     bianche, e ridefinirla per il tema scuro avrebbe voluto dire due pagine da tenere in
+     equilibrio. Fissa, il contrasto misurato in chiaro vale identico in scuro.
+     Contrasti misurati sul fondo carta: inchiostro 18,3:1, grigio 7,4:1, blu 8,3:1, magenta 8,6:1,
+     petrolio 7,7:1. L'arancio fa 4,1:1 e per questo colora solo icone e fondi, mai testo.
+  */
+  --color-vetrina-carta: oklch(0.985 0.004 85);
+  --color-vetrina-velo: oklch(0.965 0.005 85);
+  --color-vetrina-linea: oklch(0.9 0.006 85);
+  --color-vetrina-inchiostro: oklch(0.17 0.01 265);
+  --color-vetrina-grigio: oklch(0.44 0.012 265);
+  --color-vetrina-blu: oklch(0.42 0.15 262);
+  --color-vetrina-arancio: oklch(0.6 0.17 42);
+  --color-vetrina-magenta: oklch(0.43 0.19 340);
+  --color-vetrina-petrolio: oklch(0.42 0.08 205);
+  --color-vetrina-viola: oklch(0.27 0.09 330);
+
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, monospace;
@@ -191,6 +210,31 @@ body {
 /* Numeri incolonnati: in una tabella di importi è la differenza fra leggibile e illeggibile. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Le carte che fluttuano sopra l'illustrazione della vetrina: sei pixel, lente. */
+@keyframes vetrina-galleggia {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Chi ha chiesto al sistema meno movimento non ne riceve: niente fluttuare, niente girare. */
+@media (prefers-reduced-motion: reduce) {
+  .vetrina-animata {
+    animation: none !important;
+  }
+}
+
+/* I salti alle sezioni della vetrina scorrono, ma solo per chi non ha chiesto il contrario. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.vetrina-radice) {
+    scroll-behavior: smooth;
+  }
 }
 
 /*

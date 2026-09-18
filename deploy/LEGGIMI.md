@@ -122,11 +122,13 @@ Prima del browser, una verifica che **nessun collaudo automatico può fare**: ch
 alla schermata di accesso resti sul dominio pubblico.
 
 ```
-curl -sS -o /dev/null -w '%{redirect_url}\n' https://aegis.esempio.it/
+curl -sS -o /dev/null -w '%{redirect_url}\n' https://aegis.esempio.it/prospect
 ```
 
-Deve stampare `https://aegis.esempio.it/accedi`. Se stampa `localhost` o un altro host, il
-prodotto è irraggiungibile: il server risponde, ma dice al browser di andare altrove.
+Deve stampare `https://aegis.esempio.it/accedi?ritorno=%2Fprospect`. Se stampa `localhost` o
+un altro host, il prodotto è irraggiungibile: il server risponde, ma dice al browser di andare
+altrove. (Si prova su `/prospect` e non sulla radice: dal 18/09/2026 `/` senza sessione è la
+vetrina pubblica e non rinvia.)
 
 Perché va provato qui e non nei collaudi: in sviluppo l'host **è** davvero `localhost`,
 quindi il difetto non esiste; e in un collaudo unitario un rinvio relativo — che in

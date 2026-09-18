@@ -70,11 +70,21 @@ echo
 echo "── Il rinvio resta sul dominio pubblico ───────────────────────────────"
 # Il difetto che rendeva il prodotto irraggiungibile: un 307 verso `localhost:3000`.
 # Nessun collaudo unitario può prenderlo — in sviluppo l'host è davvero localhost.
-dove="$(curl -sS -o /dev/null -w '%{redirect_url}' "$SITO/")"
+# Si prova su /prospect: dal 18/09/2026 la radice senza sessione è la vetrina e non rinvia.
+dove="$(curl -sS -o /dev/null -w '%{redirect_url}' "$SITO/prospect")"
 if printf %s "$dove" | grep -q "^https://$DOMINIO/accedi"; then
-  echo "  / -> $dove"
+  echo "  /prospect -> $dove"
 else
-  echo "  / -> ${dove:-(nessun rinvio)}  <<< deve puntare a https://$DOMINIO/accedi"
+  echo "  /prospect -> ${dove:-(nessun rinvio)}  <<< deve puntare a https://$DOMINIO/accedi"
+  guasti=$((guasti+1))
+fi
+
+echo
+echo "── La radice senza sessione è la vetrina ──────────────────────────────"
+if curl -sS "$SITO/" | grep -q "prima della prima telefonata"; then
+  echo "  / -> vetrina"
+else
+  echo "  / <<< senza sessione deve mostrare la vetrina"
   guasti=$((guasti+1))
 fi
 
