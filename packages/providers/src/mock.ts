@@ -166,6 +166,82 @@ const VARIANTI: readonly Variante[] = [
       presenzaDichiarataSenzaDettaglio: [],
     },
   },
+  /*
+    Sei aziende a Bergamo, per gli elenchi (18/09/2026).
+
+    Dal 18/09/2026 un'azienda già nel CRM non esce più negli elenchi, e ricomprare gli stessi
+    filtri porta le successive. Con tre sole aziende dimostrative, che i collaudi analizzano e
+    comprano presto, ogni elenco successivo della stessa corsa tornava vuoto: il collaudo non
+    avrebbe più provato né la tabella né il salvataggio nel CRM. Queste servono a quello, ognuna
+    con un settore suo; due hanno «bergamasch» nel nome, per provare che un secondo acquisto
+    con gli stessi filtri porta la successiva. Nessun contatto: sono inventate.
+  */
+  {
+    denominazione: 'OFFICINE OROBICHE S.R.L.',
+    partitaIva: '04801010168',
+    comune: 'Bergamo',
+    provincia: 'BG',
+    codiceCatastale: 'A794',
+    ateco: '25.11.00',
+    atecoDescrizione: 'Fabbricazione di strutture metalliche e di parti di strutture',
+    moltiplicatore: 0.8,
+    conIntervista: false,
+  },
+  {
+    denominazione: 'TESSITURA SERIANA S.R.L.',
+    partitaIva: '04801020167',
+    comune: 'Bergamo',
+    provincia: 'BG',
+    codiceCatastale: 'A794',
+    ateco: '13.20.00',
+    atecoDescrizione: 'Tessitura',
+    moltiplicatore: 1.1,
+    conIntervista: false,
+  },
+  {
+    denominazione: 'ALIMENTARI BREMBANI S.R.L.',
+    partitaIva: '04801030166',
+    comune: 'Bergamo',
+    provincia: 'BG',
+    codiceCatastale: 'A794',
+    ateco: '10.89.09',
+    atecoDescrizione: 'Altri prodotti alimentari n.c.a.',
+    moltiplicatore: 0.7,
+    conIntervista: false,
+  },
+  {
+    denominazione: 'CARTIERA VALSERIANA S.R.L.',
+    partitaIva: '04801040165',
+    comune: 'Bergamo',
+    provincia: 'BG',
+    codiceCatastale: 'A794',
+    ateco: '17.12.00',
+    atecoDescrizione: 'Fabbricazione di carta e cartone',
+    moltiplicatore: 1.3,
+    conIntervista: false,
+  },
+  {
+    denominazione: 'TRASPORTI BERGAMASCHI S.R.L.',
+    partitaIva: '04801050164',
+    comune: 'Bergamo',
+    provincia: 'BG',
+    codiceCatastale: 'A794',
+    ateco: '49.41.00',
+    atecoDescrizione: 'Trasporto di merci su strada',
+    moltiplicatore: 0.9,
+    conIntervista: false,
+  },
+  {
+    denominazione: 'MECCANICHE BERGAMASCHE S.R.L.',
+    partitaIva: '04801060163',
+    comune: 'Bergamo',
+    provincia: 'BG',
+    codiceCatastale: 'A794',
+    ateco: '28.41.00',
+    atecoDescrizione: 'Fabbricazione di macchine utensili per la formatura dei metalli',
+    moltiplicatore: 1.0,
+    conIntervista: false,
+  },
 ];
 
 export class MockCompanyProvider implements CompanyDataProvider {
@@ -237,7 +313,9 @@ export class MockCompanyProvider implements CompanyDataProvider {
       return true;
     });
 
-    const lotto = Math.min(criteri.limite ?? 25, corrispondenti.length);
+    // Come il fornitore reale: salta le prime N, cioè quelle già comprate con questi filtri.
+    const rimaste = corrispondenti.slice(Math.max(0, criteri.salta ?? 0));
+    const lotto = Math.min(criteri.limite ?? 25, rimaste.length);
 
     return Promise.resolve({
       totale: corrispondenti.length,
@@ -248,7 +326,7 @@ export class MockCompanyProvider implements CompanyDataProvider {
       soloConteggio,
       aziende: soloConteggio
         ? []
-        : corrispondenti.slice(0, criteri.limite ?? 50).map((v) => ({
+        : rimaste.slice(0, criteri.limite ?? 50).map((v) => ({
             partitaIva: parsePartitaIva(v.partitaIva),
             denominazione: v.denominazione,
             comune: v.comune,

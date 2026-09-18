@@ -517,6 +517,17 @@ const DDL: readonly string[] = [
     creata_il timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS verifiche_da_valutare ON verifiche_antiriciclaggio (tenant_id, azienda_id, decisa_il)`,
+
+  // Gli elenchi già scaricati, per combinazione di filtri: da dove riparte il prossimo.
+  // Le policy di isolamento stanno nella migrazione 0014, come per le altre tabelle.
+  `CREATE TABLE IF NOT EXISTS elenchi_scaricati (
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    chiave text NOT NULL,
+    scaricate integer NOT NULL DEFAULT 0,
+    partite_iva text[] NOT NULL DEFAULT '{}',
+    aggiornato_il timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, chiave)
+  )`,
 ];
 
 /**

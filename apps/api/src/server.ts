@@ -116,6 +116,7 @@ import {
   normalizza,
 } from './store.js';
 import type { CrmStore, DossierStore, ImmaginiStore, PortafoglioStore } from './store.js';
+import { aziendeDaMostrare, chiaveElenco, cifrePartitaIva } from './elenchi-scaricati.js';
 import type { Persistenza } from './persistenza.js';
 
 export interface BuildServerOptions {
@@ -1434,7 +1435,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(400).send({ errore: 'Filtri non validi', dettagli: parsed.error.issues });
     }
 
-    const { soloConteggio, comune, ...altri } = parsed.data;
+    const { soloConteggio, comune, salta: saltaRichiesto, ...altri } = parsed.data;
     // Una città lasciata vuota non è un filtro: al fornitore non arriva niente.
     const criteri: typeof altri & { comune?: string } =
       comune === undefined || comune === '' ? altri : { ...altri, comune };
@@ -1482,8 +1483,25 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       }
     }
 
+    /*
+      Da dove riparte l'elenco (18/09/2026): «se cerco gli stessi filtri quelle aziende già
+      nel CRM non devono uscire». Con gli stessi filtri si chiedono al fornitore le aziende
+      successive a quelle già comprate, così non si pagano due volte. Se la lettura non riesce
+      si riparte dall'inizio: al peggio si ricompra qualche azienda già vista, mai si salta una
+      mai vista.
+    */
+    const crm = contestoDi(request).crm;
+    const chiave = chiaveElenco(criteri);
+    const giaScaricato = await crm.elencoScaricato(chiave).catch((errore: unknown) => {
+      request.log.error({ errore }, 'elenchi già scaricati non leggibili: si riparte dall’inizio');
+      return { scaricate: 0, partiteIva: [] as readonly string[] };
+    });
+    const salta = Math.min(saltaRichiesto ?? giaScaricato.scaricate, giaScaricato.scaricate);
+
+    // Senza niente da saltare la richiesta al fornitore resta quella di prima, parametro per
+    // parametro: stessa memoria, stesso prezzo.
     const { risultato, eventi } = await conCostiDellaRichiesta(() =>
-      provider.cercaProspect(criteri, { soloConteggio }),
+      provider.cercaProspect(salta > 0 ? { ...criteri, salta } : criteri, { soloConteggio }),
     );
 
     // Anche qui: la spesa va nel registro **subito**, non alla prossima analisi. Un
@@ -1499,11 +1517,36 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       Un salvataggio che non riesce non toglie l'elenco a chi l'ha appena pagato: lo si
       mostra comunque, e si dichiara che nel CRM non è entrato invece di lasciarlo credere.
     */
-    if (soloConteggio) return { ...risultato, provider: provider.name };
+    if (soloConteggio) {
+      return { ...risultato, provider: provider.name, giaScaricate: giaScaricato.scaricate };
+    }
+
+    /*
+      Le aziende già nel CRM non escono (vedi `aziendeDaMostrare`): si guarda il CRM PRIMA di
+      salvarci questo elenco. Se non si riesce a leggerlo si mostra tutto: un'azienda mostrata
+      due volte è un fastidio, una nascosta per errore è un'azienda pagata e persa.
+    */
+    const nelCrm = await crm
+      .elenco()
+      .then(
+        (voci) =>
+          new Set(
+            voci.flatMap((voce) => (voce.partitaIva === null ? [] : [cifrePartitaIva(voce.partitaIva)])),
+          ),
+      )
+      .catch((errore: unknown) => {
+        request.log.error({ errore }, 'CRM non leggibile: l’elenco si mostra per intero');
+        return new Set<string>();
+      });
+    const { visibili, nascoste } = aziendeDaMostrare(
+      risultato.aziende,
+      nelCrm,
+      new Set(giaScaricato.partiteIva),
+    );
 
     let salvateNelCrm = true;
     try {
-      await contestoDi(request).crm.salvaDaElenco(
+      await crm.salvaDaElenco(
         risultato.aziende.flatMap((azienda) =>
           azienda.partitaIva === null
             ? []
@@ -1523,7 +1566,32 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       salvateNelCrm = false;
     }
 
-    return { ...risultato, provider: provider.name, salvateNelCrm };
+    /*
+      Il punto di ripartenza avanza solo se le aziende sono nel CRM: se il salvataggio non è
+      riuscito, ricomprare deve riportare le stesse, che è ciò che la pagina promette.
+    */
+    if (salvateNelCrm) {
+      await crm
+        .registraElencoScaricato(
+          chiave,
+          salta + risultato.aziende.length,
+          risultato.aziende.flatMap((azienda) =>
+            azienda.partitaIva === null ? [] : [cifrePartitaIva(azienda.partitaIva)],
+          ),
+        )
+        .catch((errore: unknown) => {
+          request.log.error({ errore }, 'elenco comprato non registrato: il prossimo ripartirà da qui');
+        });
+    }
+
+    return {
+      ...risultato,
+      aziende: visibili,
+      provider: provider.name,
+      salvateNelCrm,
+      saltate: salta,
+      giaNelCrm: nascoste,
+    };
   });
 
   // ── Profilo grezzo ─────────────────────────────────────────────────────────
@@ -3031,6 +3099,12 @@ const prospezioneSchema = z.object({
   // Tetto basso e dichiarato: a cinque centesimi ad azienda, duecento record sono dieci
   // euro. Il massimo esiste per impedire che una cifra digitata male costi una giornata.
   limite: z.coerce.number().int().min(1).max(100).optional(),
+  /*
+    La posizione da cui era partito un elenco già comprato: la porta l'indirizzo della pagina
+    dell'elenco, così ricaricarla ripete la stessa richiesta — servita dalla memoria senza
+    pagare — invece di comprare le aziende successive. Mai oltre quelle già scaricate.
+  */
+  salta: z.coerce.number().int().min(0).max(100_000).optional(),
   soloConteggio: z
     .preprocess((v) => v === '1' || v === 'true' || v === true, z.boolean())
     .optional()

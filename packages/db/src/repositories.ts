@@ -1171,6 +1171,58 @@ export async function segnaAziendaDaElenco(
   return id;
 }
 
+/** Quante aziende di una combinazione di filtri sono già state comprate, e quali. */
+export interface ElencoScaricato {
+  readonly scaricate: number;
+  readonly partiteIva: readonly string[];
+}
+
+/** Nessuna riga vale «niente di scaricato»: il prossimo elenco parte dall'inizio. */
+export async function leggiElencoScaricato(
+  db: Database,
+  tenantId: string,
+  chiave: string,
+): Promise<ElencoScaricato> {
+  const righe = await db
+    .select({
+      scaricate: schema.elenchiScaricati.scaricate,
+      partiteIva: schema.elenchiScaricati.partiteIva,
+    })
+    .from(schema.elenchiScaricati)
+    .where(and(eq(schema.elenchiScaricati.tenantId, tenantId), eq(schema.elenchiScaricati.chiave, chiave)))
+    .limit(1);
+  const riga = righe[0];
+  if (riga === undefined) return { scaricate: 0, partiteIva: [] };
+  // `integer` arriva come numero, ma la conversione al confine costa niente e protegge dal
+  // giorno in cui la colonna diventasse `bigint` (CLAUDE.md, regola 2).
+  return { scaricate: Number(riga.scaricate), partiteIva: riga.partiteIva };
+}
+
+/**
+ * Registra un elenco comprato. Il contatore non torna mai indietro: un acquisto ripetuto
+ * dalla stessa posizione (una pagina ricaricata) non deve far ricomprare le successive due
+ * volte, né perderle.
+ */
+export async function registraElencoScaricato(
+  db: Database,
+  tenantId: string,
+  chiave: string,
+  scaricate: number,
+  partiteIva: readonly string[],
+): Promise<void> {
+  await db
+    .insert(schema.elenchiScaricati)
+    .values({ tenantId, chiave, scaricate, partiteIva: [...partiteIva] })
+    .onConflictDoUpdate({
+      target: [schema.elenchiScaricati.tenantId, schema.elenchiScaricati.chiave],
+      set: {
+        scaricate: sql`GREATEST(${schema.elenchiScaricati.scaricate}, excluded.scaricate)`,
+        partiteIva: sql`ARRAY(SELECT DISTINCT unnest(${schema.elenchiScaricati.partiteIva} || excluded.partite_iva))`,
+        aggiornatoIl: sql`now()`,
+      },
+    });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Audit e costi
 // ─────────────────────────────────────────────────────────────────────────────

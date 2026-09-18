@@ -23,6 +23,8 @@ import {
   aggiornaCrm,
   elencoCrm,
   segnaAziendaDaElenco,
+  leggiElencoScaricato,
+  registraElencoScaricato,
   assicuraAzienda,
   assicuraTenantPredefinito,
   cancellaImmagine,
@@ -238,6 +240,9 @@ function creaContesto(db: Database, tenantId: string, utenteId: string | null): 
       elenco: () => dentro((c) => c.crm.elenco()),
       aggiorna: (id, modifiche) => dentro((c) => c.crm.aggiorna(id, modifiche)),
       salvaDaElenco: (aziende) => dentro((c) => c.crm.salvaDaElenco(aziende)),
+      elencoScaricato: (chiave) => dentro((c) => c.crm.elencoScaricato(chiave)),
+      registraElencoScaricato: (chiave, scaricate, partiteIva) =>
+        dentro((c) => c.crm.registraElencoScaricato(chiave, scaricate, partiteIva)),
     },
     studio: {
       leggi: () => dentro((c) => c.studio.leggi()),
@@ -435,6 +440,11 @@ function creaContestoSu(db: Database, tenantId: string, utenteId: string | null)
         });
       }
     },
+
+    elencoScaricato: (chiave) => leggiElencoScaricato(db, tenantId, chiave),
+
+    registraElencoScaricato: (chiave, scaricate, partiteIva) =>
+      registraElencoScaricato(db, tenantId, chiave, scaricate, partiteIva),
   };
 
   const studio = {

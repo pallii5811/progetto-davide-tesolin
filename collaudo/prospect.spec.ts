@@ -83,7 +83,9 @@ test.describe('Ricerca Clienti', () => {
     page,
   }) => {
     // Un elenco comprato prima: il richiamo che compariva dopo è quello che va tolto.
-    await page.goto('/prospect?comune=A060&scarica=1');
+    // Dal 18/09/2026 ogni collaudo che compra usa aziende sue (Bergamo, qui gli alimentari):
+    // un'azienda già nel CRM non esce più, e le tre di sempre ci finiscono presto.
+    await page.goto('/prospect?comune=A794&ateco=1089&scarica=1');
     await expect(page.getByRole('table')).toBeVisible();
     await page.goto('/prospect');
 
@@ -245,11 +247,12 @@ test.describe('Ricerca Clienti', () => {
   });
 
   test('crea l’elenco solo su richiesta esplicita, e lo salva nel CRM', async ({ page }) => {
-    await page.goto('/prospect?comune=A060');
+    // Bergamo, strutture metalliche: un'azienda sola, e di nessun altro collaudo.
+    await page.goto('/prospect?comune=A794&ateco=2511');
     await page.getByTestId('scarica-elenco').click();
 
     await expect(page.getByRole('table')).toBeVisible();
-    // Ad Adro l'azienda dimostrativa è una sola: la frase va al singolare, non «1 aziende».
+    // Un'azienda sola: la frase va al singolare, non «1 aziende».
     await expect(page.getByText('1 azienda scaricata', { exact: false })).toBeVisible();
     // Il consuntivo di spesa accanto ai risultati: si è appena speso, e va detto.
     await expect(page.getByText(/€ spesi/i)).toBeVisible();
@@ -265,17 +268,59 @@ test.describe('Ricerca Clienti', () => {
       stato comprato. Fino al 17/09/2026 l'elenco si ritrovava con un richiamo che durava
       ventiquattro ore; da quella data le aziende vanno nel CRM e ci restano.
     */
-    await page.goto('/prospect?comune=A060&scarica=1');
+    // Bergamo, cartiere: l'azienda di questo collaudo e di nessun altro.
+    await page.goto('/prospect?comune=A794&ateco=1712&scarica=1');
     await expect(page.getByRole('table')).toBeVisible();
 
     await page.goto('/portafoglio');
-    await expect(page.locator('body')).toContainText(/MECCANICA BRESCIANA/i);
+    await expect(page.locator('body')).toContainText(/CARTIERA VALSERIANA/i);
 
     // E prima di ricomprarlo, la pagina ricorda che le aziende sono già nel CRM.
-    await page.goto('/prospect?comune=A060');
+    await page.goto('/prospect?comune=A794&ateco=1712');
     await expect(page.getByText(/Questo elenco l.hai già comprato/i)).toBeVisible();
     await page.getByRole('link', { name: 'Aprile nel CRM' }).click();
     await expect(page).toHaveURL(/\/portafoglio$/);
+  });
+
+  /*
+    Ricomprare gli stessi filtri porta le successive, e ricaricare non compra niente (18/09/2026).
+
+    Richiesta di Simone: «se cerco gli stessi filtri quelle aziende già nel CRM non devono
+    uscire». Il fornitore fa pagare ogni azienda che restituisce, quindi il secondo elenco chiede
+    le successive invece di ricomprare le prime. E la pagina dell'elenco compra quando si apre:
+    dopo l'acquisto l'indirizzo porta da dove era partito, così ricaricarla ripete la stessa
+    richiesta — la memoria la serve senza pagare — invece di comprare le successive.
+
+    A Bergamo due aziende hanno «bergamasch» nel nome: TRASPORTI prima, MECCANICHE dopo.
+  */
+  test('ricomprando gli stessi filtri arrivano le successive, e ricaricare non compra', async ({
+    page,
+  }) => {
+    const filtri = '/prospect?comune=A794&denominazione=bergamasch&limite=1';
+
+    await page.goto(`${filtri}&scarica=1`);
+    await expect(page.getByRole('table')).toContainText(/TRASPORTI BERGAMASCHI/);
+    // L'indirizzo ora dice da dove è partito l'elenco.
+    await expect(page).toHaveURL(/salta=0/);
+
+    // Ricaricata, la pagina mostra lo stesso elenco: non ha comprato il successivo.
+    await page.reload();
+    await expect(page.getByRole('table')).toContainText(/TRASPORTI BERGAMASCHI/);
+
+    // Il conteggio sa quante se ne hanno già.
+    await page.goto(filtri);
+    await expect(page.getByText(/ne hai già scaricata una, ed è nel CRM/)).toBeVisible();
+
+    // Il secondo acquisto porta la successiva, e lo dice.
+    await page.goto(`${filtri}&scarica=1`);
+    await expect(page.getByRole('table')).toContainText(/MECCANICHE BERGAMASCHE/);
+    await expect(page.getByRole('table')).not.toContainText(/TRASPORTI BERGAMASCHI/);
+    await expect(page.getByText(/ne avevi già una: l’elenco parte dalla successiva/)).toBeVisible();
+    await expect(page).toHaveURL(/salta=1/);
+
+    // E alla fine non resta niente da comprare.
+    await page.goto(filtri);
+    await expect(page.getByText(/Le hai già scaricate tutte, e sono nel CRM/)).toBeVisible();
   });
 
   test('il costo si legge prima di premere, e il valore predefinito è piccolo', async ({ page }) => {

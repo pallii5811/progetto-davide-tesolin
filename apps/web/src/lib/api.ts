@@ -1089,6 +1089,12 @@ export interface RisultatoProspezione {
   diagnosiZero?: { filtro: string; etichetta: string; totaleSenza: number }[];
   /** Solo sugli elenchi comprati: se le aziende sono entrate nel CRM (17/09/2026). */
   salvateNelCrm?: boolean;
+  /** Sul conteggio: quante aziende di questi filtri sono già state comprate (18/09/2026). */
+  giaScaricate?: number;
+  /** Sull'elenco: da quale posizione è partito, cioè quante di questi filtri si avevano già. */
+  saltate?: number;
+  /** Sull'elenco: quante aziende restituite erano già nel CRM, e non sono mostrate. */
+  giaNelCrm?: number;
 }
 
 /**
@@ -1099,13 +1105,15 @@ export interface RisultatoProspezione {
  */
 export async function cercaProspect(
   criteri: CriteriProspezione,
-  opzioni: { soloConteggio?: boolean } = {},
+  opzioni: { soloConteggio?: boolean; salta?: string } = {},
 ): Promise<RisultatoProspezione> {
   const query = new URLSearchParams();
   for (const [chiave, valore] of Object.entries(criteri) as [string, string | undefined][]) {
     if (valore !== undefined && valore.trim() !== '') query.set(chiave, valore.trim());
   }
   if (opzioni.soloConteggio === true) query.set('soloConteggio', '1');
+  // La posizione di un elenco già comprato: ripetere la stessa richiesta non compra le successive.
+  if (opzioni.salta !== undefined && /^\d+$/.test(opzioni.salta)) query.set('salta', opzioni.salta);
 
   return chiama(`/api/prospect?${query.toString()}`);
 }

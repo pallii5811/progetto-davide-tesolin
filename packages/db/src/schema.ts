@@ -824,6 +824,31 @@ export const verificheAntiriciclaggio = pgTable(
   (t) => [index('verifiche_da_valutare').on(t.tenantId, t.aziendaId, t.decisaIl)],
 );
 
+/**
+ * Gli elenchi già scaricati, per combinazione di filtri (18/09/2026, migrazione 0014).
+ *
+ * Il prossimo elenco con gli stessi filtri riparte da `scaricate`: il fornitore fa pagare ogni
+ * azienda che restituisce, e ricomprare le stesse vorrebbe dire pagarle due volte per non
+ * mostrarle. `partiteIva` sono le aziende arrivate da questa combinazione: un acquisto ripetuto
+ * (una pagina ricaricata, servita dalla memoria) le rimostra invece di nasconderle.
+ */
+export const elenchiScaricati = pgTable(
+  'elenchi_scaricati',
+  {
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    chiave: text('chiave').notNull(),
+    scaricate: integer('scaricate').notNull().default(0),
+    partiteIva: text('partite_iva')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    aggiornatoIl: timestamp('aggiornato_il', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.chiave] })],
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Relazioni
 // ─────────────────────────────────────────────────────────────────────────────

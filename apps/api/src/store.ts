@@ -165,6 +165,19 @@ export interface CrmStore {
   aggiorna(identificativo: string, modifiche: ModificheCrm): Promise<boolean>;
   /** Le aziende di un elenco comprato entrano nel CRM e ci restano. */
   salvaDaElenco(aziende: readonly AziendaDaElenco[]): Promise<void>;
+  /**
+   * Quante aziende di una combinazione di filtri sono già state comprate, e quali
+   * (18/09/2026): il prossimo elenco con gli stessi filtri riparte da lì.
+   */
+  elencoScaricato(chiave: string): Promise<ElencoScaricato>;
+  /** Il contatore non torna mai indietro, e le partite IVA si sommano. */
+  registraElencoScaricato(chiave: string, scaricate: number, partiteIva: readonly string[]): Promise<void>;
+}
+
+/** Quante posizioni di una combinazione di filtri sono già state comprate, e quali aziende. */
+export interface ElencoScaricato {
+  readonly scaricate: number;
+  readonly partiteIva: readonly string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -330,6 +343,26 @@ export class MemoryCrmStore implements CrmStore {
       // Il primo arrivo resta: ricomprare lo stesso elenco non cambia la data.
       if (!this.#daElenco.has(chiave)) this.#daElenco.set(chiave, { azienda, quando: new Date() });
     }
+    return Promise.resolve();
+  }
+
+  readonly #elenchi = new Map<string, { scaricate: number; partiteIva: ReadonlySet<string> }>();
+
+  elencoScaricato(chiave: string): Promise<ElencoScaricato> {
+    const voce = this.#elenchi.get(chiave);
+    return Promise.resolve(
+      voce === undefined
+        ? { scaricate: 0, partiteIva: [] }
+        : { scaricate: voce.scaricate, partiteIva: [...voce.partiteIva] },
+    );
+  }
+
+  registraElencoScaricato(chiave: string, scaricate: number, partiteIva: readonly string[]): Promise<void> {
+    const voce = this.#elenchi.get(chiave);
+    this.#elenchi.set(chiave, {
+      scaricate: Math.max(voce?.scaricate ?? 0, scaricate),
+      partiteIva: new Set([...(voce?.partiteIva ?? []), ...partiteIva]),
+    });
     return Promise.resolve();
   }
 }

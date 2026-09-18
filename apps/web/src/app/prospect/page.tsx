@@ -12,6 +12,7 @@ import { BottoneElenco } from './BottoneElenco';
 import { ModuloRicerca } from './ModuloRicerca';
 import { SchedaRisultato } from './SchedaRisultato';
 import { ConfrontoConElencoComprato, RicordaElenco } from './UltimoElenco';
+import { FissaIndirizzoElenco } from './FissaIndirizzoElenco';
 import { centesimiPerRiga } from '@/lib/prezzo-prospect';
 
 export const dynamic = 'force-dynamic';
@@ -150,7 +151,14 @@ export default async function PaginaProspect({
 
   if (haDescrittoUnImpresa && !cittaNonRiconosciuta) {
     try {
-      risultato = await cercaProspect(criteri, { soloConteggio: !scarica });
+      /*
+        `salta` arriva solo dall'indirizzo di un elenco già comprato (FissaIndirizzoElenco): è la
+        pagina ricaricata, e deve ripetere la stessa richiesta invece di comprare le successive.
+      */
+      risultato = await cercaProspect(criteri, {
+        soloConteggio: !scarica,
+        ...(scarica && parametri['salta'] !== undefined ? { salta: parametri['salta'] } : {}),
+      });
     } catch (e) {
       errore = e instanceof Error ? e.message : 'Errore imprevisto';
     }
@@ -502,20 +510,37 @@ export default async function PaginaProspect({
                   uno misurato e uno ricordato. Il giorno in cui il listino cambia il primo
                   si aggiorna e il secondo no, e chi legge non sa a quale credere.
                 */}
-                <p className="mt-1 text-sm">
-                  Scaricandone <strong>{risultato.lotto}</strong> si spendono{' '}
-                  <strong>{(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} €</strong>
-                  {(() => {
-                    const unitario = centesimiPerRiga(risultato.costoElencoCentesimi, risultato.lotto);
-                    if (unitario === null) return null;
-                    return (
-                      <span className="text-testo-debole">
-                        {' · '}
-                        {(unitario / 100).toFixed(2).replace('.', ',')} € ad azienda
-                      </span>
-                    );
-                  })()}
-                </p>
+                {/*
+                  Quante di queste si hanno già (18/09/2026): con gli stessi filtri l'elenco parte
+                  dalle successive, e quelle già comprate sono nel CRM.
+                */}
+                {(risultato.giaScaricate ?? 0) > 0 && (
+                  <p className="mt-1 text-sm">
+                    {risultato.lotto === 0
+                      ? risultato.totale === 1
+                        ? 'L’hai già scaricata, ed è nel CRM.'
+                        : 'Le hai già scaricate tutte, e sono nel CRM.'
+                      : risultato.giaScaricate === 1
+                        ? 'Con questi filtri ne hai già scaricata una, ed è nel CRM: l’elenco parte dalla successiva.'
+                        : `Con questi filtri ne hai già scaricate ${risultato.giaScaricate}, e sono nel CRM: l’elenco parte dalle successive.`}
+                  </p>
+                )}
+                {risultato.lotto > 0 && (
+                  <p className="mt-1 text-sm">
+                    Scaricandone <strong>{risultato.lotto}</strong> si spendono{' '}
+                    <strong>{(risultato.costoElencoCentesimi / 100).toFixed(2).replace('.', ',')} €</strong>
+                    {(() => {
+                      const unitario = centesimiPerRiga(risultato.costoElencoCentesimi, risultato.lotto);
+                      if (unitario === null) return null;
+                      return (
+                        <span className="text-testo-debole">
+                          {' · '}
+                          {(unitario / 100).toFixed(2).replace('.', ',')} € ad azienda
+                        </span>
+                      );
+                    })()}
+                  </p>
+                )}
               </div>
               <p className="text-sm text-testo-tenue">
                 L&apos;elenco si chiede con <strong>Crea Elenco</strong>, qui sopra.
@@ -532,9 +557,14 @@ export default async function PaginaProspect({
             non deve più far sparire un elenco pagato.
           */}
           <RicordaElenco
-            query={new URLSearchParams({ ...criteri, scarica: '1' }).toString()}
+            query={new URLSearchParams({
+              ...criteri,
+              scarica: '1',
+              salta: String(risultato.saltate ?? 0),
+            }).toString()}
             quante={risultato.aziende.length}
           />
+          <FissaIndirizzoElenco salta={risultato.saltate ?? 0} />
           <p className="mb-3 text-sm text-testo-tenue">
             {risultato.aziende.length}{' '}
             {risultato.aziende.length === 1 ? 'azienda scaricata' : 'aziende scaricate'} ·{' '}
@@ -550,39 +580,61 @@ export default async function PaginaProspect({
                 : 'Sono salvate nel CRM.'}{' '}
             Analizzarne una consuma credito a parte, come qualunque altra analisi.
           </p>
-          <div className="overflow-hidden rounded-lg border border-bordo">
-            <table className="w-full text-sm">
-              <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">Denominazione</th>
-                  <th className="px-4 py-2.5 font-medium">Partita IVA</th>
-                  <th className="px-4 py-2.5 font-medium">Sede</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {risultato.aziende.map((azienda) => (
-                  <tr key={azienda.providerId} className="border-t border-bordo bg-superficie">
-                    <td className="px-4 py-3 font-medium">{azienda.denominazione}</td>
-                    <td className="tabular px-4 py-3 text-testo-tenue">{azienda.partitaIva ?? '—'}</td>
-                    <td className="px-4 py-3 text-testo-tenue">
-                      {azienda.comune ?? '—'}
-                      {azienda.provincia !== null && ` (${azienda.provincia})`}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <CollegamentoAzione
-                        href={`/azienda/${azienda.providerId}`}
-                        inAttesa="Analisi in corso"
-                        className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
-                      >
-                        Analizza
-                      </CollegamentoAzione>
-                    </td>
+          {/*
+            Da dove parte l'elenco e cosa è rimasto fuori (18/09/2026): con gli stessi filtri si
+            comprano le successive, e le aziende già nel CRM non escono di nuovo.
+          */}
+          {((risultato.saltate ?? 0) > 0 || (risultato.giaNelCrm ?? 0) > 0) && (
+            <p className="mb-3 text-sm text-testo-tenue">
+              {(risultato.saltate ?? 0) > 0 &&
+                (risultato.saltate === 1
+                  ? 'Con questi filtri ne avevi già una: l’elenco parte dalla successiva. '
+                  : `Con questi filtri ne avevi già ${risultato.saltate}: l’elenco parte dalle successive. `)}
+              {(risultato.giaNelCrm ?? 0) > 0 &&
+                (risultato.giaNelCrm === 1
+                  ? 'Una era già nel CRM e non è mostrata.'
+                  : `${risultato.giaNelCrm} erano già nel CRM e non sono mostrate.`)}
+            </p>
+          )}
+          {risultato.aziende.length === 0 ? (
+            <p className="text-sm font-medium">
+              Nessuna azienda nuova: quelle di questi filtri sono già nel CRM.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-bordo">
+              <table className="w-full text-sm">
+                <thead className="bg-superficie text-left text-xs uppercase tracking-wide text-testo-debole">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Denominazione</th>
+                    <th className="px-4 py-2.5 font-medium">Partita IVA</th>
+                    <th className="px-4 py-2.5 font-medium">Sede</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {risultato.aziende.map((azienda) => (
+                    <tr key={azienda.providerId} className="border-t border-bordo bg-superficie">
+                      <td className="px-4 py-3 font-medium">{azienda.denominazione}</td>
+                      <td className="tabular px-4 py-3 text-testo-tenue">{azienda.partitaIva ?? '—'}</td>
+                      <td className="px-4 py-3 text-testo-tenue">
+                        {azienda.comune ?? '—'}
+                        {azienda.provincia !== null && ` (${azienda.provincia})`}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <CollegamentoAzione
+                          href={`/azienda/${azienda.providerId}`}
+                          inAttesa="Analisi in corso"
+                          className="rounded bg-azione px-3 py-1.5 text-xs font-medium text-azione-testo hover:opacity-90"
+                        >
+                          Analizza
+                        </CollegamentoAzione>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 

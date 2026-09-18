@@ -34,10 +34,21 @@ describe('Codici catastali delle aziende dimostrative', () => {
     for (const azienda of aziende) {
       const codice = azienda.anagrafica?.codiceCatastale ?? '';
       const trovate = await provider.cercaProspect({ comune: codice }, { soloConteggio: false });
+      /*
+        Dal 18/09/2026 a Bergamo le aziende dimostrative sono sei (servono agli elenchi dei
+        collaudi): un comune non ne ha più per forza una sola. Il controllo resta quello che
+        conta — ciascuna si trova nel suo comune, e la ricerca di un comune non porta aziende
+        che stanno altrove.
+      */
       expect(
         trovate.aziende.map((a) => a.denominazione),
         `${azienda.denominazione} (${codice})`,
-      ).toEqual([azienda.denominazione]);
+      ).toContain(azienda.denominazione);
+      for (const trovata of trovate.aziende) {
+        expect(trovata.anagrafica?.codiceCatastale, `${trovata.denominazione} cercando ${codice}`).toBe(
+          codice,
+        );
+      }
     }
   });
 });

@@ -66,6 +66,7 @@ const TABELLE_CON_TENANT: readonly string[] = [
   'eventi_monitoraggio',
   'registro_costi_dati',
   'verifiche_antiriciclaggio',
+  'elenchi_scaricati',
 ];
 
 /**

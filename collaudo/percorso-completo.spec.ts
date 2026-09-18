@@ -139,8 +139,14 @@ test.describe('Il secondo percorso: dai filtri al cliente nuovo', () => {
 
     // ── 1. Descrive l'insieme che cerca ───────────────────────────────────
     await page.goto('/prospect');
-    await page.getByRole('combobox', { name: 'Città' }).fill('Adro');
-    await page.getByRole('option', { name: 'Adro (BS)' }).click();
+    /*
+      Bergamo e la tessitura, e non Adro: dal 18/09/2026 un'azienda già nel CRM non esce più
+      negli elenchi, e MECCANICA BRESCIANA ci è entrata con il primo percorso di questo file.
+      L'elenco qui deve avere un'azienda nuova, come quello di un intermediario vero.
+    */
+    await page.getByRole('combobox', { name: 'Città' }).fill('Bergamo');
+    await page.getByRole('option', { name: 'Bergamo (BG)' }).click();
+    await page.getByPlaceholder('2562').fill('1320');
     await page.getByRole('button', { name: /Conta Aziende/i }).click();
     await expect(page.getByText(/corrispond(e|ono) ai criteri/i)).toBeVisible();
 

@@ -225,6 +225,34 @@ export class OpenApiProvider implements CompanyDataProvider {
       activityStatus: criteri.soloAttive === false ? undefined : 'ATTIVA',
     };
 
+    if (soloConteggio && (criteri.salta ?? 0) > 0) {
+      /*
+        Il conteggio quando con questi filtri qualcosa è già stato comprato (18/09/2026).
+
+        Il prossimo elenco parte dalla posizione successiva, quindi il lotto è quello che resta,
+        e il preventivo si chiede per quel numero di aziende: il prezzo è a record. Non si passa
+        la posizione al conteggio del fornitore, perché come la tratti in `dryRun` non è stato
+        verificato: si chiede il prezzo di un lotto più piccolo, che è una domanda nota. Quando non
+        resta niente non si chiede nulla, e il prezzo è zero perché non si compra niente.
+      */
+      const salta = criteri.salta ?? 0;
+      const totali = await this.#contaProspect({ ...filtri });
+      const lotto = Math.min(limite, Math.max(0, totali.count - salta));
+      const preventivo =
+        lotto === 0
+          ? { costoCentesimi: 0 }
+          : await this.#contaProspect({ ...filtri, limit: lotto, dataEnrichment: arricchimento });
+
+      return {
+        totale: totali.count,
+        costoElencoCentesimi: preventivo.costoCentesimi ?? costoLotto(lotto),
+        aziende: [],
+        soloConteggio: true,
+        lotto,
+        ...(totali.count === 0 ? { diagnosiZero: await this.#diagnosticaZero(filtri) } : {}),
+      };
+    }
+
     if (soloConteggio) {
       /*
         Due domande diverse, due conteggi — entrambi gratuiti.
