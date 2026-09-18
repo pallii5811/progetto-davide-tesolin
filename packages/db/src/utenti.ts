@@ -20,6 +20,8 @@ export interface UtenteRecord {
   readonly attivo: boolean;
   readonly tentativiFalliti: number;
   readonly bloccatoFinoA: Date | null;
+  /** Quando ha confermato l'indirizzo aprendo il collegamento ricevuto; `null` = non ancora. */
+  readonly emailVerificataIl: Date | null;
 }
 
 export async function trovaUtentePerEmail(db: Database, email: string): Promise<UtenteRecord | null> {
@@ -45,6 +47,12 @@ export async function creaUtente(
     nome: string;
     passwordHash: string;
     ruolo?: UtenteRecord['ruolo'];
+    /**
+     * `true` solo per chi si registra da solo: dovrà confermare l'indirizzo. Chi viene creato
+     * da un amministratore conta come confermato da subito — lo ha aperto qualcuno che lo
+     * conosce, com'è sempre stato e come la migrazione 0015 ha fatto per chi esisteva già.
+     */
+    emailDaConfermare?: boolean;
   },
 ): Promise<string> {
   const creati = await db
@@ -55,6 +63,7 @@ export async function creaUtente(
       nome: dati.nome,
       passwordHash: dati.passwordHash,
       ruolo: dati.ruolo ?? 'broker',
+      emailVerificataIl: dati.emailDaConfermare === true ? null : new Date(),
     })
     .returning({ id: schema.utenti.id });
 
@@ -345,8 +354,16 @@ export interface StudioElenco {
   readonly numeroRui: string | null;
   readonly gestorePiattaforma: boolean;
   readonly attivo: boolean;
+  readonly acquistiAbilitati: boolean;
+  readonly autoRegistrato: boolean;
   readonly creatoIl: Date;
   readonly utenti: number;
+  /**
+   * Chi ha aperto lo studio (il primo utente creato), con lo stato della sua email: è ciò
+   * che il gestore guarda prima di attivare gli acquisti di uno studio registrato da solo.
+   * `null` se lo studio non ha utenti.
+   */
+  readonly referente: { readonly email: string; readonly emailConfermata: boolean } | null;
 }
 
 /**
@@ -376,6 +393,8 @@ export async function elencoStudi(db: Database): Promise<readonly StudioElenco[]
       numeroRui: schema.tenants.numeroRui,
       gestorePiattaforma: schema.tenants.gestorePiattaforma,
       attivo: schema.tenants.attivo,
+      acquistiAbilitati: schema.tenants.acquistiAbilitati,
+      autoRegistrato: schema.tenants.autoRegistrato,
       creatoIl: schema.tenants.creatoIl,
       utenti: sql<string>`COUNT(${schema.utenti.id})`,
     })
@@ -384,7 +403,35 @@ export async function elencoStudi(db: Database): Promise<readonly StudioElenco[]
     .groupBy(schema.tenants.id)
     .orderBy(desc(schema.tenants.gestorePiattaforma), schema.tenants.denominazione);
 
-  return righe.map((r) => ({ ...r, utenti: Number(r.utenti) }));
+  /*
+    I referenti con una seconda lettura, non dentro la giunzione: un `array_agg` scritto in
+    `sql` grezzo emetterebbe `"email"` non qualificato, e `email` esiste sia in `utenti` sia
+    in `tenants` — la stessa trappola descritta sopra, con un errore di ambiguità al posto
+    dello zero.
+
+    Il referente è il PRIMO UTENTE creato, qualunque ruolo abbia oggi: è chi ha aperto lo
+    studio. Era «il primo amministratore attuale», e la revisione di sicurezza del 18/09/2026
+    ha mostrato perché non va: chi si registra con i dati di un broker vero poteva creare un
+    secondo amministratore, declassare il primo, e far comparire al gestore un altro
+    indirizzo come referente — proprio sulla riga che il gestore guarda prima di attivare.
+  */
+  const utentiInOrdine = await db
+    .select({
+      tenantId: schema.utenti.tenantId,
+      email: schema.utenti.email,
+      emailVerificataIl: schema.utenti.emailVerificataIl,
+    })
+    .from(schema.utenti)
+    .orderBy(schema.utenti.creatoIl, schema.utenti.id);
+
+  const referenti = new Map<string, { email: string; emailConfermata: boolean }>();
+  for (const a of utentiInOrdine) {
+    if (!referenti.has(a.tenantId)) {
+      referenti.set(a.tenantId, { email: a.email, emailConfermata: a.emailVerificataIl !== null });
+    }
+  }
+
+  return righe.map((r) => ({ ...r, utenti: Number(r.utenti), referente: referenti.get(r.id) ?? null }));
 }
 
 /**
@@ -393,10 +440,28 @@ export async function elencoStudi(db: Database): Promise<readonly StudioElenco[]
  * Nasce sempre **non gestore**: l'infrastruttura resta di chi l'ha installata, e un
  * cliente creato per errore con quel flag vedrebbe la fornitura dati di tutti gli altri.
  */
-export async function creaStudio(db: Database, denominazione: string): Promise<string> {
+export async function creaStudio(
+  db: Database,
+  denominazione: string,
+  opzioni: {
+    /** Identificativo scelto da chi chiama: serve a creare studio e primo utente nella stessa transazione. */
+    readonly id?: string;
+    readonly numeroRui?: string | null;
+    /** Registrato dal modulo pubblico: nasce senza acquisti, finché il gestore non lo attiva. */
+    readonly autoRegistrato?: boolean;
+  } = {},
+): Promise<string> {
+  const autoRegistrato = opzioni.autoRegistrato === true;
   const creati = await db
     .insert(schema.tenants)
-    .values({ denominazione, gestorePiattaforma: false })
+    .values({
+      ...(opzioni.id === undefined ? {} : { id: opzioni.id }),
+      denominazione,
+      numeroRui: opzioni.numeroRui ?? null,
+      gestorePiattaforma: false,
+      autoRegistrato,
+      acquistiAbilitati: !autoRegistrato,
+    })
     .returning({ id: schema.tenants.id });
 
   const creato = creati[0];
@@ -420,6 +485,23 @@ export async function impostaAttivitaStudio(
 }
 
 /**
+ * Attiva o blocca gli acquisti di dati di uno studio.
+ *
+ * È la leva della registrazione pubblica: uno studio registrato da solo entra e lavora, ma
+ * compra solo dopo che il gestore lo ha guardato e attivato. Non tocca gli accessi.
+ */
+export async function impostaAcquistiStudio(
+  db: Database,
+  tenantId: string,
+  abilitati: boolean,
+): Promise<void> {
+  await db
+    .update(schema.tenants)
+    .set({ acquistiAbilitati: abilitati })
+    .where(eq(schema.tenants.id, tenantId));
+}
+
+/**
  * Chi è lo studio di chi sta lavorando: se gestisce la piattaforma e se è ancora attivo.
  *
  * Le due cose si leggono insieme perché servono insieme, a ogni richiesta, e sarebbero
@@ -435,17 +517,23 @@ export async function impostaAttivitaStudio(
 export interface StatoStudio {
   readonly gestorePiattaforma: boolean;
   readonly attivo: boolean;
+  /** Se lo studio può comprare dati: falso per chi si è registrato e non è ancora stato attivato. */
+  readonly acquistiAbilitati: boolean;
 }
 
 export async function statoStudio(db: Database, tenantId: string): Promise<StatoStudio> {
   const righe = await db
-    .select({ gestorePiattaforma: schema.tenants.gestorePiattaforma, attivo: schema.tenants.attivo })
+    .select({
+      gestorePiattaforma: schema.tenants.gestorePiattaforma,
+      attivo: schema.tenants.attivo,
+      acquistiAbilitati: schema.tenants.acquistiAbilitati,
+    })
     .from(schema.tenants)
     .where(eq(schema.tenants.id, tenantId))
     .limit(1);
 
   // Uno studio che non esiste non è né gestore né attivo: negare è l'unico esito sicuro.
-  return righe[0] ?? { gestorePiattaforma: false, attivo: false };
+  return righe[0] ?? { gestorePiattaforma: false, attivo: false, acquistiAbilitati: false };
 }
 
 /**
@@ -480,4 +568,195 @@ export async function aggiornaStudio(db: Database, tenantId: string, dati: Modif
 
   if (Object.keys(modifiche).length === 0) return;
   await db.update(schema.tenants).set(modifiche).where(eq(schema.tenants.id, tenantId));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Codici mandati per email
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ScopoCodiceEmail = 'conferma-email' | 'nuova-password';
+
+/**
+ * Registra un codice appena mandato per email. Riceve l'impronta, mai il codice: il codice
+ * esiste solo nell'email e nell'indirizzo del collegamento.
+ */
+export async function creaCodiceEmail(
+  db: Database,
+  dati: {
+    readonly utenteId: string;
+    readonly tenantId: string;
+    readonly scopo: ScopoCodiceEmail;
+    readonly impronta: string;
+    readonly scadeIl: Date;
+  },
+): Promise<void> {
+  await db.insert(schema.codiciEmail).values({
+    utenteId: dati.utenteId,
+    tenantId: dati.tenantId,
+    scopo: dati.scopo,
+    impronta: dati.impronta,
+    scadeIl: dati.scadeIl,
+  });
+}
+
+/**
+ * Consuma un codice: lo segna usato e dice di chi è — oppure `null` se non esiste, è di un
+ * altro scopo, è scaduto o è già stato usato.
+ *
+ * Una sola istruzione, controllo e consumo insieme: con una lettura seguita da una scrittura,
+ * due richieste arrivate nello stesso istante con lo stesso codice passerebbero entrambe il
+ * controllo, e il codice «monouso» varrebbe due volte.
+ */
+export async function consumaCodiceEmail(
+  db: Database,
+  dati: { readonly impronta: string; readonly scopo: ScopoCodiceEmail; readonly adesso: Date },
+): Promise<{ readonly utenteId: string; readonly tenantId: string } | null> {
+  const righe = await db
+    .update(schema.codiciEmail)
+    .set({ usatoIl: dati.adesso })
+    .where(
+      and(
+        eq(schema.codiciEmail.impronta, dati.impronta),
+        eq(schema.codiciEmail.scopo, dati.scopo),
+        isNull(schema.codiciEmail.usatoIl),
+        gt(schema.codiciEmail.scadeIl, dati.adesso),
+      ),
+    )
+    .returning({ utenteId: schema.codiciEmail.utenteId, tenantId: schema.codiciEmail.tenantId });
+
+  return righe[0] ?? null;
+}
+
+/**
+ * Annulla i codici ancora validi di un utente per uno scopo: dopo una nuova password, i
+ * collegamenti precedenti per cambiarla non devono funzionare più.
+ */
+export async function annullaCodiciEmail(
+  db: Database,
+  utenteId: string,
+  scopo: ScopoCodiceEmail,
+  adesso: Date,
+): Promise<void> {
+  await db
+    .update(schema.codiciEmail)
+    .set({ usatoIl: adesso })
+    .where(
+      and(
+        eq(schema.codiciEmail.utenteId, utenteId),
+        eq(schema.codiciEmail.scopo, scopo),
+        isNull(schema.codiciEmail.usatoIl),
+      ),
+    );
+}
+
+/** Quanti codici di uno scopo sono stati mandati a un utente da una certa ora: frena gli invii ripetuti. */
+export async function contaCodiciEmailDal(
+  db: Database,
+  utenteId: string,
+  scopo: ScopoCodiceEmail,
+  dal: Date,
+): Promise<number> {
+  const righe = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.codiciEmail)
+    .where(
+      and(
+        eq(schema.codiciEmail.utenteId, utenteId),
+        eq(schema.codiciEmail.scopo, scopo),
+        gt(schema.codiciEmail.creatoIl, dal),
+      ),
+    );
+  return Number(righe[0]?.n ?? 0);
+}
+
+/**
+ * Un codice non scaduto, **anche se già usato**. Solo per la conferma dell'indirizzo, che si
+ * può ripetere senza danni: i filtri antivirus di molte caselle aprono i collegamenti prima
+ * della persona, e bruciare il codice al loro passaggio lascerebbe il titolare davanti a
+ * «collegamento non valido» al primo clic. Per la nuova password vale solo `consumaCodiceEmail`.
+ */
+export async function trovaCodiceEmailValido(
+  db: Database,
+  dati: { readonly impronta: string; readonly scopo: 'conferma-email'; readonly adesso: Date },
+): Promise<{ readonly utenteId: string; readonly tenantId: string } | null> {
+  const righe = await db
+    .select({ utenteId: schema.codiciEmail.utenteId, tenantId: schema.codiciEmail.tenantId })
+    .from(schema.codiciEmail)
+    .where(
+      and(
+        eq(schema.codiciEmail.impronta, dati.impronta),
+        eq(schema.codiciEmail.scopo, dati.scopo),
+        gt(schema.codiciEmail.scadeIl, dati.adesso),
+      ),
+    )
+    .limit(1);
+  return righe[0] ?? null;
+}
+
+/** L'utente ha aperto il collegamento: l'indirizzo è suo. La prima conferma resta, le successive non la spostano. */
+export async function segnaEmailVerificata(db: Database, utenteId: string, quando: Date): Promise<void> {
+  await db
+    .update(schema.utenti)
+    .set({ emailVerificataIl: quando })
+    .where(and(eq(schema.utenti.id, utenteId), isNull(schema.utenti.emailVerificataIl)));
+}
+
+/**
+ * Chi ha aperto lo studio — il primo utente creato — e se ha confermato l'indirizzo.
+ *
+ * È la condizione per attivare gli acquisti di uno studio registrato da solo, quando la posta
+ * funziona: prima di spendere il credito della piattaforma, chi si è registrato deve aver
+ * dimostrato di leggere la casella che ha dichiarato. Va chiamata dentro `conTenant`.
+ */
+export async function referenteDelloStudio(
+  db: Database,
+  tenantId: string,
+): Promise<{ readonly email: string; readonly emailConfermata: boolean } | null> {
+  const righe = await db
+    .select({ email: schema.utenti.email, emailVerificataIl: schema.utenti.emailVerificataIl })
+    .from(schema.utenti)
+    .where(eq(schema.utenti.tenantId, tenantId))
+    .orderBy(schema.utenti.creatoIl, schema.utenti.id)
+    .limit(1);
+  const riga = righe[0];
+  return riga === undefined
+    ? null
+    : { email: riga.email, emailConfermata: riga.emailVerificataIl !== null };
+}
+
+/**
+ * Apre una sessione solo se la password è ancora quella verificata.
+ *
+ * L'accesso legge l'impronta, la verifica (un decimo di secondo di scrypt) e poi apre la
+ * sessione. Se nel frattempo la password cambia — nuova password dal collegamento, cambio
+ * dalle impostazioni — la revoca delle sessioni avviene fra la lettura e l'apertura, e la
+ * sessione nuova nasce dopo la revoca: valida dodici ore con la password vecchia. È la corsa
+ * che la revisione di sicurezza del 18/09/2026 ha trovato.
+ *
+ * Il blocco della riga dell'utente (`FOR UPDATE`) mette in fila le due cose: se il cambio
+ * password è arrivato prima, qui si legge l'impronta nuova e non si apre niente; se arriva
+ * dopo, aspetta che questa sessione esista, e la revoca la trova. Va chiamata dentro
+ * `conTenant`, cioè dentro una transazione.
+ */
+export async function creaSessioneSePasswordInvariata(
+  db: Database,
+  dati: {
+    utenteId: string;
+    tenantId: string;
+    improntaToken: string;
+    scadeIl: Date;
+    indirizzoIp?: string | undefined;
+    userAgent?: string | undefined;
+    passwordHashAtteso: string;
+  },
+): Promise<string | null> {
+  const righe = await db
+    .select({ passwordHash: schema.utenti.passwordHash })
+    .from(schema.utenti)
+    .where(eq(schema.utenti.id, dati.utenteId))
+    .for('update')
+    .limit(1);
+  if (righe[0]?.passwordHash !== dati.passwordHashAtteso) return null;
+  const { passwordHashAtteso: _atteso, ...sessione } = dati;
+  return creaSessione(db, sessione);
 }

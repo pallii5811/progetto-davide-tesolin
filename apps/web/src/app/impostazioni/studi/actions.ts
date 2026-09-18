@@ -63,3 +63,12 @@ export async function cambiaAttivita(id: string, attivo: boolean): Promise<void>
   await chiamaApiConSessione(`/api/studi/${id}`, { metodo: 'PATCH', corpo: { attivo } });
   revalidatePath('/impostazioni/studi');
 }
+
+/** Attiva o blocca gli acquisti di dati: è così che si apre uno studio registrato da solo. */
+export async function cambiaAcquisti(id: string, acquistiAbilitati: boolean): Promise<void> {
+  await chiamaApiConSessione(`/api/studi/${encodeURIComponent(id)}`, {
+    metodo: 'PATCH',
+    corpo: { acquistiAbilitati },
+  });
+  revalidatePath('/impostazioni/studi');
+}

@@ -50,7 +50,7 @@ test.describe('Vetrina pubblica', () => {
     expect(sorveglianza.errori).toEqual([]);
   });
 
-  test('ogni collegamento porta da qualche parte: le ancore alle sezioni, il resto all’accesso', async ({
+  test('ogni collegamento porta da qualche parte: le ancore alle sezioni, il resto ad accesso o registrazione', async ({
     page,
   }) => {
     await page.goto('/');
@@ -65,7 +65,7 @@ test.describe('Vetrina pubblica', () => {
         await expect(page.locator(href), `l’ancora ${href} non ha una sezione`).toHaveCount(1);
       } else {
         // La vetrina non porta in nessuna pagina riservata, e da nessuna parte fuori dal dominio.
-        expect(href, `collegamento inatteso: ${href}`).toBe('/accedi');
+        expect(['/accedi', '/registrati'], `collegamento inatteso: ${href}`).toContain(href);
       }
     }
   });

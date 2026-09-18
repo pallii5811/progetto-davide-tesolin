@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NOME_COOKIE_SESSIONE } from './cookie-sessione';
 import { intestazioneChiaveFrontend } from './chiave-frontend';
+import { intestazioneIpCliente } from './ip-cliente';
 
 /**
  * Chiamata all'API dalle Server Action, con la sessione dell'utente collegato.
@@ -29,6 +30,7 @@ export async function chiamaApiConSessione(
       // continuare a usarla dopo che l'utente crede di essere uscito.
       ...(init.corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
       ...intestazioneChiaveFrontend(),
+      ...(await intestazioneIpCliente()),
       ...(sessione === undefined ? {} : { cookie: `${NOME_COOKIE_SESSIONE}=${sessione.value}` }),
     },
     ...(init.corpo === undefined ? {} : { body: JSON.stringify(init.corpo) }),
@@ -62,6 +64,35 @@ export async function chiamaQuestionarioPubblico(
       ...(init.corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
     ...(init.corpo === undefined ? {} : { body: JSON.stringify(init.corpo) }),
+    cache: 'no-store',
+  });
+}
+
+/**
+ * Le chiamate delle pagine pubbliche dell'accesso: registrazione, conferma dell'indirizzo,
+ * password dimenticata, nuova password (18/09/2026).
+ *
+ * Deliberatamente **senza** il cookie: chi le usa non è dentro, e chi apre il collegamento
+ * per una nuova password da un computer dove è collegato qualcun altro non deve agire con
+ * quella sessione. Portano la chiave del frontend e l'indirizzo del visitatore, che l'API
+ * usa per i suoi freni.
+ */
+export async function chiamaApiPubblica(
+  percorso:
+    | '/api/auth/registrazione'
+    | '/api/auth/conferma-email'
+    | '/api/auth/password-dimenticata'
+    | '/api/auth/nuova-password',
+  corpo: unknown,
+): Promise<Response> {
+  return fetch(`${BASE_URL}${percorso}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...intestazioneChiaveFrontend(),
+      ...(await intestazioneIpCliente()),
+    },
+    body: JSON.stringify(corpo),
     cache: 'no-store',
   });
 }

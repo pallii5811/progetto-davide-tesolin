@@ -22,6 +22,7 @@ import {
   SchemaFlusso,
 } from './illustrazioni';
 import { CollegamentoFreccia, Pulsante, Tessera } from './pezzi';
+import { SchedaRegistro } from './SchedaRegistro';
 import type { Tono } from './pezzi';
 
 /**
@@ -118,7 +119,7 @@ function Funzione({
         <Titolo2 className="mt-6">{titolo}</Titolo2>
         <Paragrafo className="mt-5 max-w-[520px]">{testo}</Paragrafo>
         <div className="mt-6">
-          <CollegamentoFreccia href="/accedi">Prova su un’azienda vera</CollegamentoFreccia>
+          <CollegamentoFreccia href="/registrati">Prova su un’azienda vera</CollegamentoFreccia>
         </div>
         <div className="max-w-[520px]">
           <Fatto {...fatto} />
@@ -130,7 +131,7 @@ function Funzione({
 }
 
 const FONTI = [
-  { nome: 'Registro Imprese', cosa: 'Dati camerali' },
+  { nome: 'Registro Imprese', cosa: 'Dati camerali e bilanci' },
   { nome: 'ISPRA IdroGEO', cosa: 'Alluvioni e frane' },
   { nome: 'Protezione Civile', cosa: 'Zone sismiche' },
   { nome: 'ISTAT', cosa: 'Comuni e codici catastali' },
@@ -241,7 +242,16 @@ export function Vetrina() {
                 </li>
               ))}
             </ul>
-            <Pulsante href="/accedi">Accedi</Pulsante>
+            {/* Come Clay: chi c’è già entra dal testo, chi arriva ora dal pulsante pieno. */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              <a
+                href="/accedi"
+                className="rounded-full px-2 py-1 text-[14.5px] font-medium text-vetrina-inchiostro transition hover:text-vetrina-grigio"
+              >
+                Accedi
+              </a>
+              <Pulsante href="/registrati">Crea un account</Pulsante>
+            </div>
           </nav>
         </div>
       </header>
@@ -267,8 +277,8 @@ export function Vetrina() {
               calamità naturali, fermo dell’attività, attacchi informatici.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-              <Pulsante href="/accedi" grande>
-                Accedi ad AEGIS
+              <Pulsante href="/registrati" grande>
+                Crea il tuo account
               </Pulsante>
               <a
                 href="#come-funziona"
@@ -307,6 +317,37 @@ export function Vetrina() {
               ))}
             </ul>
           </div>
+        </section>
+
+        {/* ── Il Registro Imprese in una scheda ──────────────────────────── */}
+        {/*
+          Richiesta di Simone del 18/09/2026: una sezione come la finestra di clay.com/signals,
+          con i dati camerali e i bilanci che mancavano. Le voci sono quelle della scheda vera
+          (vedi SchedaRegistro.tsx); i 21 indici sono quelli che il prodotto calcola.
+        */}
+        <section
+          id="registro"
+          aria-labelledby="titolo-registro"
+          className="scroll-mt-28 pb-6 pt-24 sm:pt-28"
+        >
+          <div className={`${LARGHEZZA} text-center`}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-vetrina-linea bg-white px-3 py-1 text-[13px] font-medium text-vetrina-grigio">
+              <span className="h-1.5 w-1.5 rounded-full bg-vetrina-blu" />
+              Dati camerali e bilanci
+            </span>
+            <h2
+              id="titolo-registro"
+              className="mx-auto mt-6 max-w-[900px] text-balance text-[38px] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-[54px] lg:text-[64px]"
+            >
+              Tutto il Registro Imprese, in una scheda.
+            </h2>
+            <Paragrafo className="mx-auto mt-6 max-w-[780px] text-[18px] sm:text-[19px]">
+              Il record camerale, l’ultimo bilancio depositato riclassificato con 21 indici, i soci e il
+              titolare effettivo, le sedi e le unità locali: AEGIS li legge dal Registro Imprese e li mette
+              accanto al rischio di ogni sede.
+            </Paragrafo>
+          </div>
+          <SchedaRegistro />
         </section>
 
         {/* ── Come funziona ──────────────────────────────────────────────── */}
@@ -403,8 +444,8 @@ export function Vetrina() {
                   Registro Imprese, legge il territorio di ognuna e prepara il documento per il cliente.
                 </Paragrafo>
                 <div className="mt-6">
-                  <Pulsante href="/accedi" grande>
-                    Accedi ad AEGIS
+                  <Pulsante href="/registrati" grande>
+                    Crea il tuo account
                   </Pulsante>
                 </div>
               </div>
@@ -454,8 +495,8 @@ export function Vetrina() {
                   Cercalo per città, settore e dimensione. Il conteggio è gratuito.
                 </p>
                 <div className="mt-9 flex justify-center">
-                  <Pulsante href="/accedi" variante="inverso" grande>
-                    Accedi ad AEGIS
+                  <Pulsante href="/registrati" variante="inverso" grande>
+                    Crea il tuo account
                   </Pulsante>
                 </div>
               </div>
@@ -492,6 +533,12 @@ export function Vetrina() {
               </a>
               <a href="/accedi" className="font-medium text-vetrina-inchiostro hover:underline">
                 Accedi
+              </a>
+              <a href="#conformita" className="text-vetrina-grigio hover:text-vetrina-inchiostro">
+                Conformità
+              </a>
+              <a href="/registrati" className="font-medium text-vetrina-inchiostro hover:underline">
+                Crea un account
               </a>
             </nav>
           </div>

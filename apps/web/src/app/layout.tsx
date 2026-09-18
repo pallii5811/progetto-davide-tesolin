@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import Link from 'next/link';
-import { autenticazioneRichiesta, utenteCorrente } from '@/lib/api';
-import { INTESTAZIONE_VETRINA } from '@/lib/vetrina';
+import { statoAccesso, utenteCorrente } from '@/lib/api';
+import { INTESTAZIONE_PERCORSO, INTESTAZIONE_VETRINA } from '@/lib/vetrina';
 import type { UtenteCorrente } from '@/lib/api';
 import { esci } from './accedi/actions';
 import { NavigazionePrincipale } from './NavigazionePrincipale';
+import { AvvisiAccount } from './AvvisiAccount';
 import { BottoneInvio } from '@/components/BottoneInvio';
 import './globals.css';
 
@@ -23,7 +24,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     Dalla vetrina si esce solo con collegamenti a pagina intera (app/_vetrina/pezzi.tsx): il
     layout non si conserva fra le due facce, e ogni pagina del prodotto lo riceve completo.
   */
-  if ((await headers()).get(INTESTAZIONE_VETRINA) === '1') {
+  const intestazioni = await headers();
+  if (intestazioni.get(INTESTAZIONE_VETRINA) === '1') {
     return (
       <html lang="it" style={{ colorScheme: 'light' }}>
         <body className="min-h-screen bg-vetrina-carta">{children}</body>
@@ -33,9 +35,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   // Senza autenticazione attiva (dimostrazione locale) la navigazione resta visibile e
   // non si mostra alcuna identità: non c'è nessuno da mostrare.
-  const richiesta = await autenticazioneRichiesta();
+  const stato = await statoAccesso();
+  const richiesta = stato.autenticazioneRichiesta;
   const utente: UtenteCorrente = richiesta ? await utenteCorrente() : { autenticato: true };
   const dentro = utente.autenticato;
+  // Sulla pagina che conferma l'indirizzo l'avviso «conferma il tuo indirizzo» sarebbe già vecchio.
+  const percorso = intestazioni.get(INTESTAZIONE_PERCORSO) ?? '';
 
   return (
     <html lang="it">
@@ -82,6 +87,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
         </header>
+
+        {dentro && richiesta && (
+          <AvvisiAccount
+            acquistiAbilitati={utente.acquistiAbilitati !== false}
+            emailDaConfermare={
+              stato.postaAttiva && utente.emailVerificata === false && percorso !== '/conferma-email'
+            }
+            email={utente.email}
+          />
+        )}
 
         <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
 

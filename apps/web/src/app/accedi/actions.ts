@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { chiamaApiConSessione } from '@/lib/chiamata-server';
 import { estraiTokenSessione, NOME_COOKIE_SESSIONE } from '@/lib/cookie-sessione';
+import { ritornoSicuro } from '@/lib/ritorno-sicuro';
 
 export interface EsitoAccesso {
   readonly ok: boolean;
@@ -73,7 +74,8 @@ export async function accedi(_precedente: EsitoAccesso | null, modulo: FormData)
     13/09/2026 rinvia lì: passarci dentro l'azione di accesso faceva due rinvii di fila, e il
     14/09/2026 il collaudo dell'uscita è rimasto fermo su «/» per novanta secondi.
   */
-  redirect(ritorno.startsWith('/') && !ritorno.startsWith('//') ? ritorno : '/prospect');
+  // `ritornoSicuro`: anche `/\altro-sito` e le tabulazioni, che il browser trasforma in `//`.
+  redirect(ritornoSicuro(ritorno));
 }
 
 export async function esci(): Promise<void> {

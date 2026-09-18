@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { richiediSessione } from '@/lib/sessione';
-import { elencoStudi } from '@/lib/api';
+import { elencoStudi, statoAccesso } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
+import { BottoneAcquisti } from './BottoneAcquisti';
 import { BottoneAttivita } from './BottoneAttivita';
 import { ModuloStudio } from './ModuloStudio';
 import { formattaGiorno } from '@aegis/core/tempo';
@@ -20,7 +21,7 @@ export default async function PaginaStudi() {
   const utente = await richiediSessione();
   if (utente.gestorePiattaforma !== true) redirect('/impostazioni');
 
-  const esito = await elencoStudi().catch(() => null);
+  const [esito, stato] = await Promise.all([elencoStudi().catch(() => null), statoAccesso()]);
 
   const intestazione = (
     <>
@@ -28,6 +29,13 @@ export default async function PaginaStudi() {
       <p className="mb-6 max-w-3xl text-sm leading-relaxed text-testo-tenue">
         Ogni studio lavora isolato dagli altri: CRM, clienti e analisi non attraversano il confine, in
         nessuna direzione. Qui si aprono e si sospendono gli accessi, non si guarda dentro.
+      </p>
+      <p className="-mt-3 mb-6 max-w-3xl text-sm leading-relaxed text-testo-tenue">
+        Gli studi registrati da soli entrano subito ma non comprano dati finché non attivi i loro acquisti:
+        prima controlla il numero RUI sul registro IVASS.
+        {stato.postaAttiva
+          ? ' L’attivazione si sblocca solo dopo che chi ha aperto lo studio ha confermato la sua email.'
+          : ' Le email non sono ancora attive: nessun indirizzo può essere confermato, quindi la verifica del RUI è tutto ciò che hai.'}
       </p>
     </>
   );
@@ -52,8 +60,10 @@ export default async function PaginaStudi() {
       </div>
 
       <Scheda className="overflow-x-auto p-0">
-        <table className="w-full min-w-[40rem] text-sm">
-          <caption className="sr-only">Studi ospitati, con numero di collaboratori e stato</caption>
+        <table className="w-full min-w-[48rem] text-sm">
+          <caption className="sr-only">
+            Studi ospitati, con numero di collaboratori, stato e acquisti di dati
+          </caption>
           <thead className="bg-fondo text-left text-xs uppercase tracking-wide text-testo-debole">
             <tr>
               <th scope="col" className="px-4 py-2.5 font-medium">
@@ -65,6 +75,9 @@ export default async function PaginaStudi() {
               <th scope="col" className="px-4 py-2.5 font-medium">
                 Stato
               </th>
+              <th scope="col" className="px-4 py-2.5 font-medium">
+                Acquisti
+              </th>
               <th scope="col" className="px-4 py-2.5" />
             </tr>
           </thead>
@@ -72,11 +85,25 @@ export default async function PaginaStudi() {
             {esito.studi.map((studio) => (
               <tr key={studio.id} className="border-t border-bordo align-middle">
                 <td className="px-4 py-3">
-                  <p className="font-medium">{studio.denominazione}</p>
+                  <p className="flex flex-wrap items-center gap-2 font-medium">
+                    {studio.denominazione}
+                    {studio.autoRegistrato && (
+                      <span className="rounded border border-marchio/30 bg-marchio-tenue px-1.5 py-0.5 text-xs font-normal text-marchio">
+                        registrato da sé
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-testo-debole">
                     {studio.numeroRui === null ? 'RUI non indicato' : `RUI n. ${studio.numeroRui}`} · aperto
                     il {formattaGiorno(studio.apertoIl)}
                   </p>
+                  {/* Chi ha aperto lo studio, e se la sua email è sua: ciò che si guarda prima di attivare. */}
+                  {studio.referente !== null && (
+                    <p className="text-xs text-testo-debole">
+                      {studio.referente.email} ·{' '}
+                      {studio.referente.emailConfermata ? 'email confermata' : 'email da confermare'}
+                    </p>
+                  )}
                 </td>
                 <td className="tabular px-4 py-3">{studio.utenti}</td>
                 <td className="px-4 py-3">
@@ -94,14 +121,36 @@ export default async function PaginaStudi() {
                     </span>
                   )}
                 </td>
+                <td className="px-4 py-3">
+                  {studio.acquistiAbilitati ? (
+                    <span className="text-xs text-testo-tenue">attivi</span>
+                  ) : (
+                    <span className="rounded border border-attenzione/40 bg-attenzione-fondo px-1.5 py-0.5 text-xs font-medium text-attenzione">
+                      in attesa
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-right">
-                  {/* Lo studio gestore non si sospende: si chiuderebbe fuori da solo. */}
+                  {/* Lo studio gestore non si sospende e non si blocca: si chiuderebbe fuori da solo. */}
                   {!studio.gestore && (
-                    <BottoneAttivita
-                      id={studio.id}
-                      denominazione={studio.denominazione}
-                      attivo={studio.attivo}
-                    />
+                    <span className="inline-flex flex-wrap justify-end gap-2">
+                      <BottoneAcquisti
+                        id={studio.id}
+                        denominazione={studio.denominazione}
+                        numeroRui={studio.numeroRui}
+                        abilitati={studio.acquistiAbilitati}
+                        attesaConferma={
+                          stato.postaAttiva &&
+                          studio.referente !== null &&
+                          !studio.referente.emailConfermata
+                        }
+                      />
+                      <BottoneAttivita
+                        id={studio.id}
+                        denominazione={studio.denominazione}
+                        attivo={studio.attivo}
+                      />
+                    </span>
                   )}
                 </td>
               </tr>

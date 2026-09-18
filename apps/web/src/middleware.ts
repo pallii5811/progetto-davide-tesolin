@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { INTESTAZIONE_VETRINA } from './lib/vetrina';
+import { INTESTAZIONE_PERCORSO, INTESTAZIONE_VETRINA } from './lib/vetrina';
 
 /**
  * Guardia di ingresso.
@@ -28,8 +28,19 @@ import { INTESTAZIONE_VETRINA } from './lib/vetrina';
   collegamento si genera, sembra tutto a posto, e il cliente riceve una schermata di
   accesso a un prodotto che non ha mai comprato. Nessuna prova sull'API se ne accorge,
   perché l'API funzionava.
+
+  Dal 18/09/2026 si aggiungono le porte di chi non è ancora dentro: registrazione, password
+  dimenticata, e i due collegamenti che arrivano per email (nuova password, conferma
+  dell'indirizzo). Il collegamento si apre spesso da un altro dispositivo, senza sessione.
 */
-const PUBBLICI = ['/accedi', '/questionario'];
+const PUBBLICI = [
+  '/accedi',
+  '/questionario',
+  '/registrati',
+  '/password-dimenticata',
+  '/nuova-password',
+  '/conferma-email',
+];
 
 /** Solo un nome di host con porta facoltativa: niente barre, chiocciole, spazi. */
 const HOST_LECITO = /^[A-Za-z0-9.-]+(:\d{1,5})?$/;
@@ -84,6 +95,7 @@ export function middleware(request: NextRequest): Response {
   const percorso = request.nextUrl.pathname;
   const intestazioni = new Headers(request.headers);
   intestazioni.delete(INTESTAZIONE_VETRINA);
+  intestazioni.set(INTESTAZIONE_PERCORSO, percorso);
   const prosegui = (): Response => NextResponse.next({ request: { headers: intestazioni } });
 
   if (PUBBLICI.some((p) => percorso === p || percorso.startsWith(`${p}/`))) {

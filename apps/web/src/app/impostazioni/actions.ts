@@ -92,6 +92,32 @@ export async function gestisciUtenteAzione(_precedente: Esito | null, modulo: Fo
     });
   }
 
+  /*
+    Password dimenticata, rimedio dell'amministratore (18/09/2026). L'API lo sapeva fare da
+    tempo; mancava il pulsante, e senza posta attiva era l'unica via d'uscita per chi l'ha
+    persa. La password nuova si vede una volta sola, come alla creazione.
+  */
+  if (operazione === 'reimposta') {
+    let esito: Awaited<ReturnType<typeof chiamaApi>>;
+    try {
+      esito = await chiamaApi(`/api/utenti/${encodeURIComponent(id)}/reimposta-password`, {
+        metodo: 'POST',
+      });
+    } catch {
+      return { ok: false, messaggio: 'Servizio non raggiungibile.' };
+    }
+    if (!esito.risposta.ok || esito.corpo.passwordIniziale === undefined) {
+      return { ok: false, messaggio: esito.corpo.errore ?? 'Reimpostazione non riuscita.' };
+    }
+    revalidatePath('/impostazioni/utenti');
+    return {
+      ok: true,
+      messaggio:
+        'Password reimpostata e sessioni chiuse. Consegnala a voce: al primo accesso potrà cambiarla.',
+      passwordIniziale: esito.corpo.passwordIniziale,
+    };
+  }
+
   const ruolo = campoTestuale(modulo, 'ruolo');
   const attivo = campoTestuale(modulo, 'attivo');
 

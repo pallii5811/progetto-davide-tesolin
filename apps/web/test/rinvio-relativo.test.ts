@@ -113,12 +113,20 @@ describe('Il rinvio all’accesso funziona dietro un proxy inverso', () => {
     expect(middleware(dietroProxy('/portafoglio', { sessione: true })).headers.get('location')).toBeNull();
   });
 
-  it('le due porte pubbliche restano aperte', () => {
+  it('le porte pubbliche restano aperte', () => {
     /*
       `/questionario/…` è il collegamento che l'intermediario manda al proprio cliente: chi
-      lo apre non ha, e non deve avere, un accesso alla piattaforma.
+      lo apre non ha, e non deve avere, un accesso alla piattaforma. Dal 18/09/2026 anche
+      registrazione, password dimenticata e i due collegamenti che arrivano per email.
     */
-    for (const percorso of ['/accedi', '/questionario/un-token']) {
+    for (const percorso of [
+      '/accedi',
+      '/questionario/un-token',
+      '/registrati',
+      '/password-dimenticata',
+      '/nuova-password',
+      '/conferma-email',
+    ]) {
       expect(
         middleware(dietroProxy(percorso)).headers.get('location'),
         `${percorso} deve restare accessibile senza sessione`,

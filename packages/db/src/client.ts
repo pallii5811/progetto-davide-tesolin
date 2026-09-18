@@ -226,7 +226,9 @@ const DDL: readonly string[] = [
     budget_dati_mensile_centesimi bigint,
     gestore_piattaforma boolean NOT NULL DEFAULT false,
     creato_il timestamptz NOT NULL DEFAULT now(),
-    attivo boolean NOT NULL DEFAULT true
+    attivo boolean NOT NULL DEFAULT true,
+    acquisti_abilitati boolean NOT NULL DEFAULT true,
+    auto_registrato boolean NOT NULL DEFAULT false
   )`,
 
   `CREATE TABLE IF NOT EXISTS utenti (
@@ -240,7 +242,8 @@ const DDL: readonly string[] = [
     ultimo_accesso timestamptz,
     tentativi_falliti integer NOT NULL DEFAULT 0,
     bloccato_fino_a timestamptz,
-    attivo boolean NOT NULL DEFAULT true
+    attivo boolean NOT NULL DEFAULT true,
+    email_verificata_il timestamptz
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS utenti_email_unica ON utenti (email)`,
   `CREATE INDEX IF NOT EXISTS utenti_per_tenant ON utenti (tenant_id)`,
@@ -259,6 +262,21 @@ const DDL: readonly string[] = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS sessioni_impronta_unica ON sessioni (impronta_token)`,
   `CREATE INDEX IF NOT EXISTS sessioni_per_utente ON sessioni (utente_id)`,
+
+  // I codici mandati per email (conferma dell'indirizzo, nuova password): solo l'impronta.
+  // Fuori dalle policy come le sessioni: si risolvono prima di sapere di quale studio siano.
+  `CREATE TABLE IF NOT EXISTS codici_email (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    utente_id uuid NOT NULL REFERENCES utenti(id) ON DELETE CASCADE,
+    tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    scopo text NOT NULL CHECK (scopo IN ('conferma-email', 'nuova-password')),
+    impronta text NOT NULL,
+    creato_il timestamptz NOT NULL DEFAULT now(),
+    scade_il timestamptz NOT NULL,
+    usato_il timestamptz
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS codici_email_impronta_unica ON codici_email (impronta)`,
+  `CREATE INDEX IF NOT EXISTS codici_email_per_utente ON codici_email (utente_id)`,
 
   `CREATE TABLE IF NOT EXISTS aziende (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

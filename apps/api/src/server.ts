@@ -46,7 +46,7 @@ import { CachePersistente } from './cache-persistente.js';
 import type { CompanyDataProvider, FetchLevel } from '@aegis/providers';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
@@ -63,6 +63,14 @@ import {
   verificaRequisitiPassword,
 } from './auth.js';
 import type { Sessione } from './auth.js';
+import { Limitatore, chiaveIndirizzo, limiteDaAmbiente } from './limitatore.js';
+import {
+  emailConfermaIndirizzo,
+  emailNuovaPassword,
+  emailNuovoStudioPerGestore,
+  postaDaAmbiente,
+} from './posta.js';
+import type { ServizioPosta } from './posta.js';
 import type { ContestoTenant } from './persistenza.js';
 
 declare module 'fastify' {
@@ -130,6 +138,11 @@ export interface BuildServerOptions {
    * ma i dati non sopravvivono al riavvio: modalità accettabile solo per i test.
    */
   readonly persistenza?: Persistenza | undefined;
+  /**
+   * La posta in uscita (conferma dell'indirizzo, nuova password). Se assente si legge
+   * dall'ambiente; i test passano una posta finta che raccoglie i messaggi.
+   */
+  readonly posta?: ServizioPosta | undefined;
 }
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
@@ -142,6 +155,17 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   */
   const registro = new RegistroPerRichiesta(ledger);
   const persistenza = options.persistenza;
+  const posta = options.posta ?? postaDaAmbiente();
+  /*
+    I freni delle rotte pubbliche (limitatore.ts). I valori predefiniti sono per la
+    produzione; il collaudo, che registra molti studi dallo stesso indirizzo, li alza
+    dall'ambiente invece di spegnerli.
+  */
+  const limitatore = new Limitatore();
+  const limiteRegistrazioniPerIp = limiteDaAmbiente('AEGIS_LIMITE_REGISTRAZIONI_ORA_PER_IP', 5);
+  const limiteRegistrazioniTotali = limiteDaAmbiente('AEGIS_LIMITE_REGISTRAZIONI_ORA_TOTALI', 60);
+  /** Lavori partiti dopo la risposta (l'email della password dimenticata): si aspettano alla chiusura. */
+  const lavoriInCorso = new Set<Promise<void>>();
 
   /*
     La cache dei dati comprati vive **sul database**, quando c'è.
@@ -427,12 +451,18 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    * proprio tetto, «il servizio ha raggiunto il limite» non dipende da chi legge, e
    * suggerirgli di cambiare le proprie impostazioni lo manderebbe a sbattere.
    */
-  const oltreIlTetto = async (
-    request: FastifyRequest,
-  ): Promise<{ speso: number; limite: number; ambito: 'studio' | 'piattaforma' } | null> => {
+  const oltreIlTetto = async (request: FastifyRequest): Promise<EsitoTetto | null> => {
     if (persistenza === undefined) return null;
     const sessione = request.sessione;
     if (sessione === undefined) return null;
+
+    /*
+      Lo studio registrato da solo e non ancora attivato dal gestore non compra niente
+      (decisione di Simone del 18/09/2026). Sta qui, nel punto da cui passa ogni operazione a
+      pagamento, e non nelle singole rotte: una rotta a pagamento aggiunta domani eredita il
+      blocco senza che nessuno debba ricordarsene.
+    */
+    if (!sessione.acquistiAbilitati) return { speso: 0, limite: 0, ambito: 'attivazione' };
 
     if (tettoComplessivo > 0) {
       // La spesa di TUTTI gli studi: è l'unica lettura del tetto che attraversa gli studi
@@ -477,17 +507,24 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    * farci niente se non sentirsi davanti a un attrezzo rotto. Qui si dice cosa è successo,
    * quando si riparte e a chi rivolgersi.
    */
-  const messaggioTetto = (
-    esito: { speso: number; limite: number; ambito: 'studio' | 'piattaforma' },
-    ripresa: string,
-  ): string => {
+  const messaggioTetto = (esito: EsitoTetto, ripresa: string): string => {
     const euro = (c: number): string => (c / 100).toFixed(2).replace('.', ',');
+    // Qui «domani» non c'entra: si sblocca quando il gestore attiva lo studio, e basta.
+    if (esito.ambito === 'attivazione') {
+      return (
+        'Il tuo studio è in attesa di attivazione: gli acquisti di dati si sbloccano appena la ' +
+        'piattaforma lo attiva. Il conteggio delle aziende resta disponibile e gratuito.'
+      );
+    }
     return esito.ambito === 'piattaforma'
       ? `Il servizio ha raggiunto il proprio limite di consumo giornaliero. ${ripresa} ` +
           'Se la cosa si ripete, segnalarlo all’assistenza.'
       : `Tetto di spesa giornaliero dello studio raggiunto: ${euro(esito.speso)} € su ` +
           `${euro(esito.limite)} €. ${ripresa}`;
   };
+
+  /** L'attesa di attivazione non è un «troppe richieste»: è un permesso che ancora manca. */
+  const codiceTetto = (esito: EsitoTetto): 403 | 429 => (esito.ambito === 'attivazione' ? 403 : 429);
 
   const registraSpese = async (request: FastifyRequest, eventi: readonly CostEvent[]): Promise<void> => {
     if (eventi.length === 0 || persistenza === undefined) return;
@@ -531,7 +568,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   };
 
   // ── Guardia di autenticazione ──────────────────────────────────────────────
-  const ROTTE_PUBBLICHE = new Set(['/health', '/api/auth/login', '/api/auth/stato']);
+  const ROTTE_PUBBLICHE = new Set([
+    '/health',
+    '/api/auth/login',
+    '/api/auth/stato',
+    // Registrazione e recupero (18/09/2026): chi le chiama non ha una sessione, per definizione.
+    '/api/auth/registrazione',
+    '/api/auth/conferma-email',
+    '/api/auth/password-dimenticata',
+    '/api/auth/nuova-password',
+  ]);
 
   /*
     Il questionario compilato dal cliente è l'unica famiglia di rotte pubbliche con un
@@ -557,7 +603,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    *    esiste una GET equivalente, e finché non esiste è questa la consultazione che il
    *    ruolo promette. Gli acquisti facoltativi restano fuori: li rifiuta la rotta.
    */
-  const ROTTE_LETTURA_IN_POST = new Set(['/api/auth/logout', '/api/auth/password']);
+  const ROTTE_LETTURA_IN_POST = new Set([
+    '/api/auth/logout',
+    '/api/auth/password',
+    // Riguarda il proprio indirizzo, non i dati dello studio.
+    '/api/auth/conferma-email/invia',
+  ]);
   const ANALISI_DI_UN_AZIENDA = /^\/api\/aziende\/[^/]+\/analisi$/;
 
   const consentitaInSolaLettura = (percorso: string): boolean =>
@@ -645,8 +696,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(400).send({ errore: 'Credenziali non valide' });
     }
 
-    const { statoStudio, trovaUtentePerEmail, registraTentativoAccesso, creaSessione } =
-      await import('@aegis/db');
+    const { statoStudio, trovaUtentePerEmail, registraTentativoAccesso } = await import('@aegis/db');
     // L'indirizzo è tutto ciò che si sa: lo studio lo dice la riga. È l'unica lettura di
     // `utenti` che attraversa gli studi per disegno, e lo dichiara.
     const utente = await conPiattaforma(persistenza.db, (tx) => trovaUtentePerEmail(tx, parsed.data.email));
@@ -683,25 +733,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     if (!corretta) return reply.status(401).send(rifiuto);
 
-    const token = generaTokenSessione();
-    await creaSessione(persistenza.db, {
-      utenteId: utente.id,
-      tenantId: utente.tenantId,
-      improntaToken: improntaToken(token),
-      scadeIl: new Date(Date.now() + DURATA_SESSIONE_MS),
-      indirizzoIp: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
-
-    void reply.setCookie(NOME_COOKIE_SESSIONE, token, {
-      path: '/',
-      // `httpOnly` impedisce a qualunque script della pagina di leggere il token:
-      // è la difesa che rende un eventuale XSS incapace di rubare la sessione.
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env['NODE_ENV'] === 'production',
-      maxAge: Math.floor(DURATA_SESSIONE_MS / 1_000),
-    });
+    // `httpOnly` nel cookie impedisce a qualunque script della pagina di leggere il token:
+    // è la difesa che rende un eventuale XSS incapace di rubare la sessione.
+    if (!(await rilasciaSessione(request, reply, utente, utente.passwordHash))) {
+      // La password è cambiata mentre la si verificava: quella usata non vale più.
+      return reply.status(401).send(rifiuto);
+    }
 
     return {
       email: utente.email,
@@ -730,12 +767,473 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           nome: sessione.nome,
           ruolo: sessione.ruolo,
           gestorePiattaforma: sessione.gestorePiattaforma,
+          acquistiAbilitati: sessione.acquistiAbilitati,
+          emailVerificata: sessione.emailVerificata,
         };
   });
 
   app.get('/api/auth/stato', async () => ({
     autenticazioneRichiesta,
+    // Le pagine pubbliche li usano per offrire registrazione e recupero solo quando funzionano.
+    // L'autenticazione c'è solo con l'archivio: dove c'è, la registrazione funziona.
+    registrazioneAperta: autenticazioneRichiesta,
+    postaAttiva: posta.attiva,
   }));
+
+  // ── Registrazione, conferma dell'indirizzo, password dimenticata ──────────
+  /*
+    Decisioni di Simone del 18/09/2026: chiunque può registrare il proprio studio e lavorarci
+    subito, ma compra dati solo dopo che il gestore lo ha attivato; l'indirizzo si conferma
+    con un collegamento via email, e dallo stesso canale passa la password dimenticata.
+
+    Quattro rotte pubbliche nuove, e per ciascuna il freno del limitatore: sono le sole che
+    chiunque su internet può chiamare senza sessione.
+  */
+  const ORA_MS = 60 * 60 * 1_000;
+  const DURATA_CONFERMA_MS = 48 * ORA_MS;
+  const DURATA_NUOVA_PASSWORD_MS = ORA_MS;
+
+  /**
+   * L'indirizzo di chi sta davvero facendo la richiesta.
+   *
+   * Le chiamate arrivano dal server delle pagine, non dal browser: `request.ip` è quello del
+   * server, uguale per tutti, e un freno «per indirizzo» diventerebbe un freno unico per
+   * l'intera piattaforma. Il server delle pagine inoltra l'indirizzo del visitatore in
+   * `x-aegis-ip-cliente` — e l'API gli crede **solo** se la chiave del frontend è configurata:
+   * in quel caso ogni richiesta che arriva fin qui l'ha già presentata, quindi viene dalle
+   * nostre pagine. Senza chiave chiunque potrebbe scriversi l'intestazione da solo e
+   * ricominciare da zero a ogni tentativo.
+   */
+  const IP_PLAUSIBILE = /^[0-9a-fA-F:.]{2,45}$/;
+  const ipCliente = (request: FastifyRequest): string => {
+    if (chiaveFrontend !== '') {
+      const inoltrato = request.headers['x-aegis-ip-cliente'];
+      if (typeof inoltrato === 'string' && IP_PLAUSIBILE.test(inoltrato.trim())) return inoltrato.trim();
+    }
+    return request.ip;
+  };
+
+  /** Il cookie di sessione, identico per l'accesso e per la registrazione. */
+  const rilasciaSessione = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    utente: { readonly id: string; readonly tenantId: string },
+    /**
+     * L'impronta della password appena verificata, nell'accesso. La sessione si apre solo se
+     * è ancora quella: se nel frattempo la password è cambiata, la revoca delle sessioni è
+     * già passata e questa nascerebbe dopo, valida con la password vecchia (revisione di
+     * sicurezza del 18/09/2026). Restituisce se la sessione è stata aperta.
+     */
+    passwordHashVerificato?: string,
+  ): Promise<boolean> => {
+    if (persistenza === undefined) return false;
+    const { creaSessione, creaSessioneSePasswordInvariata } = await import('@aegis/db');
+    const token = generaTokenSessione();
+    const dati = {
+      utenteId: utente.id,
+      tenantId: utente.tenantId,
+      improntaToken: improntaToken(token),
+      scadeIl: new Date(Date.now() + DURATA_SESSIONE_MS),
+      indirizzoIp: ipCliente(request),
+      userAgent: request.headers['user-agent'],
+    };
+    if (passwordHashVerificato === undefined) {
+      await creaSessione(persistenza.db, dati);
+    } else {
+      const aperta = await conTenant(persistenza.db, utente.tenantId, (tx) =>
+        creaSessioneSePasswordInvariata(tx, { ...dati, passwordHashAtteso: passwordHashVerificato }),
+      );
+      if (aperta === null) return false;
+    }
+    void reply.setCookie(NOME_COOKIE_SESSIONE, token, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env['NODE_ENV'] === 'production',
+      maxAge: Math.floor(DURATA_SESSIONE_MS / 1_000),
+    });
+    return true;
+  };
+
+  /** La chiave del visitatore per i freni: l'IPv4, oppure la rete /64 di un IPv6. */
+  const chiaveIp = (request: FastifyRequest): string => chiaveIndirizzo(ipCliente(request));
+
+  /**
+   * Crea un codice, ne conserva l'impronta e spedisce il collegamento. Restituisce se è
+   * partito: con la posta spenta non parte, e chi chiama lo dice invece di fingere.
+   */
+  const inviaCodice = async (
+    utente: { readonly id: string; readonly tenantId: string; readonly email: string },
+    scopo: 'conferma-email' | 'nuova-password',
+  ): Promise<boolean> => {
+    if (persistenza === undefined || !posta.attiva || posta.indirizzoPubblico === null) return false;
+    const { creaCodiceEmail } = await import('@aegis/db');
+    const codice = generaTokenSessione();
+    await creaCodiceEmail(persistenza.db, {
+      utenteId: utente.id,
+      tenantId: utente.tenantId,
+      scopo,
+      impronta: improntaToken(codice),
+      scadeIl: new Date(
+        Date.now() + (scopo === 'conferma-email' ? DURATA_CONFERMA_MS : DURATA_NUOVA_PASSWORD_MS),
+      ),
+    });
+    const percorso = scopo === 'conferma-email' ? '/conferma-email' : '/nuova-password';
+    const collegamento = `${posta.indirizzoPubblico}${percorso}?codice=${encodeURIComponent(codice)}`;
+    await posta.invia(
+      scopo === 'conferma-email'
+        ? emailConfermaIndirizzo({ a: utente.email, collegamento })
+        : emailNuovaPassword({ a: utente.email, collegamento }),
+    );
+    return true;
+  };
+
+  app.post('/api/auth/registrazione', async (request, reply) => {
+    if (persistenza === undefined || !autenticazioneRichiesta) {
+      return reply
+        .status(501)
+        .send({ errore: 'La registrazione non è disponibile su questa installazione.' });
+    }
+
+    const parsed = registrazioneSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      const problema = parsed.error.issues[0];
+      return reply.status(400).send({
+        errore: problema?.message ?? 'Dati non validi.',
+        campo: typeof problema?.path[0] === 'string' ? problema.path[0] : null,
+      });
+    }
+
+    /*
+      Il freno prima di ogni lavoro costoso: la derivazione della password costa un decimo di
+      secondo di processore, ed è esattamente ciò che una raffica di registrazioni userebbe
+      per rallentare tutti. Due tetti: per indirizzo, contro chi insiste da solo, e complessivo,
+      contro chi ruota gli indirizzi.
+    */
+    /*
+      I requisiti della password PRIMA del freno: un errore di battitura non deve consumare i
+      tentativi di un ufficio intero dietro lo stesso indirizzo (revisione del 18/09/2026).
+    */
+    const requisiti = verificaRequisitiPassword(parsed.data.password);
+    if (!requisiti.valida) {
+      return reply.status(400).send({ errore: requisiti.problemi.join(' '), campo: 'password' });
+    }
+
+    const ip = ipCliente(request);
+    if (!limitatore.consenti(`registrazione:${chiaveIp(request)}`, limiteRegistrazioniPerIp, ORA_MS)) {
+      return reply.status(429).send({
+        errore: 'Troppe registrazioni in poco tempo da questa rete. Riprovare fra un’ora.',
+        campo: null,
+      });
+    }
+
+    const { creaStudio, creaUtente, registraAudit, trovaUtentePerEmail } = await import('@aegis/db');
+    const email = parsed.data.email;
+    const giaRegistrato = async (): Promise<boolean> =>
+      (await conPiattaforma(persistenza.db, (tx) => trovaUtentePerEmail(tx, email))) !== null;
+
+    if (await giaRegistrato()) {
+      return reply.status(409).send({
+        errore: 'Questo indirizzo è già registrato. Accedi, oppure usa «Password dimenticata».',
+        campo: 'email',
+      });
+    }
+
+    /*
+      Il tetto complessivo conta solo le registrazioni che creano davvero uno studio: contare
+      anche quelle respinte permetteva di tenerlo pieno con richieste senza effetto, e di
+      chiudere la registrazione a tutti. La chiave «globale:» non si perde nella pulizia.
+    */
+    if (
+      !limitatore.consenti(`${Limitatore.PREFISSO_GLOBALE}registrazioni`, limiteRegistrazioniTotali, ORA_MS)
+    ) {
+      return reply.status(429).send({
+        errore:
+          'Le registrazioni sono sospese per qualche minuto: troppe richieste in poco tempo. Riprova fra un’ora.',
+        campo: null,
+      });
+    }
+
+    const passwordHash = await derivaPassword(parsed.data.password);
+    /*
+      Studio e primo amministratore nella stessa transazione, con l'identificativo scelto qui:
+      se la creazione dell'utente fallisce — due registrazioni con lo stesso indirizzo nello
+      stesso istante — non resta in archivio uno studio senza nessuno dentro.
+    */
+    const tenantId = randomUUID();
+    let utenteId: string;
+    try {
+      utenteId = await conTenant(persistenza.db, tenantId, async (tx) => {
+        await creaStudio(tx, parsed.data.denominazione, {
+          id: tenantId,
+          numeroRui: parsed.data.numeroRui,
+          autoRegistrato: true,
+        });
+        return creaUtente(tx, {
+          tenantId,
+          email,
+          nome: parsed.data.nome,
+          passwordHash,
+          ruolo: 'amministratore',
+          emailDaConfermare: true,
+        });
+      });
+    } catch (errore) {
+      if (await giaRegistrato()) {
+        return reply.status(409).send({
+          errore: 'Questo indirizzo è già registrato. Accedi, oppure usa «Password dimenticata».',
+          campo: 'email',
+        });
+      }
+      throw errore;
+    }
+
+    await registraAudit(persistenza.db, {
+      tenantId,
+      utenteId,
+      azione: 'studio.registrato',
+      entita: 'studio',
+      entitaId: tenantId,
+      dettagli: { email, numeroRui: parsed.data.numeroRui, ip },
+    });
+
+    await rilasciaSessione(request, reply, { id: utenteId, tenantId });
+
+    // L'email non ferma la registrazione: se non parte, l'account c'è comunque e il
+    // collegamento si richiede di nuovo dall'avviso dentro l'app.
+    let emailInviata = false;
+    try {
+      emailInviata = await inviaCodice({ id: utenteId, tenantId, email }, 'conferma-email');
+    } catch (errore) {
+      app.log.error({ err: errore }, 'Email di conferma non partita dopo la registrazione');
+    }
+
+    if (posta.attiva && posta.avvisiGestore !== null) {
+      const avviso = emailNuovoStudioPerGestore({
+        a: posta.avvisiGestore,
+        denominazione: parsed.data.denominazione,
+        numeroRui: parsed.data.numeroRui,
+        referente: parsed.data.nome,
+        email,
+        collegamento:
+          posta.indirizzoPubblico === null ? null : `${posta.indirizzoPubblico}/impostazioni/studi`,
+      });
+      void posta.invia(avviso).catch((errore: unknown) => {
+        app.log.error({ err: errore }, 'Avviso al gestore per il nuovo studio non partito');
+      });
+    }
+
+    return reply.status(201).send({
+      email,
+      nome: parsed.data.nome,
+      ruolo: 'amministratore',
+      emailInviata,
+    });
+  });
+
+  /**
+   * Conferma dell'indirizzo, dal collegamento ricevuto.
+   *
+   * Si può aprire più volte finché non scade: i filtri antivirus di molte caselle aprono i
+   * collegamenti prima della persona, e un codice bruciato dal filtro lascerebbe il titolare
+   * davanti a «collegamento non valido» al primo clic. Confermare due volte non fa danni.
+   */
+  app.post('/api/auth/conferma-email', async (request, reply) => {
+    if (persistenza === undefined) {
+      return reply.status(501).send({ errore: 'Conferma non disponibile su questa installazione.' });
+    }
+    if (!limitatore.consenti(`conferma:${chiaveIp(request)}`, 60, ORA_MS)) {
+      return reply.status(429).send({ errore: 'Troppi tentativi. Riprovare fra un’ora.' });
+    }
+    const parsed = codiceSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ errore: 'Il collegamento non è completo: aprilo di nuovo dall’email.' });
+    }
+
+    const { consumaCodiceEmail, segnaEmailVerificata, trovaCodiceEmailValido } = await import('@aegis/db');
+    const adesso = new Date();
+    const impronta = improntaToken(parsed.data.codice);
+    const codice =
+      (await consumaCodiceEmail(persistenza.db, { impronta, scopo: 'conferma-email', adesso })) ??
+      (await trovaCodiceEmailValido(persistenza.db, { impronta, scopo: 'conferma-email', adesso }));
+    if (codice === null) {
+      return reply.status(400).send({
+        errore:
+          'Il collegamento non è valido o è scaduto (vale 48 ore). Accedi e chiedine uno nuovo dall’avviso in alto.',
+      });
+    }
+
+    await conTenant(persistenza.db, codice.tenantId, (tx) =>
+      segnaEmailVerificata(tx, codice.utenteId, adesso),
+    );
+    return { confermata: true };
+  });
+
+  /** Un nuovo collegamento di conferma, per chi non ha ricevuto il primo. */
+  app.post('/api/auth/conferma-email/invia', async (request, reply) => {
+    const sessione = request.sessione;
+    if (persistenza === undefined || sessione === undefined) {
+      return reply.status(401).send({ errore: 'Autenticazione richiesta' });
+    }
+    if (sessione.emailVerificata) return { inviata: false, giaConfermata: true };
+    if (!posta.attiva) {
+      return reply
+        .status(503)
+        .send({ errore: 'L’invio delle email non è ancora attivo su questa installazione.' });
+    }
+
+    const { contaCodiciEmailDal } = await import('@aegis/db');
+    const recenti = await contaCodiciEmailDal(
+      persistenza.db,
+      sessione.utenteId,
+      'conferma-email',
+      new Date(Date.now() - ORA_MS),
+    );
+    if (recenti >= 3) {
+      return reply.status(429).send({
+        errore:
+          'Ti abbiamo già mandato tre email nell’ultima ora: controlla anche la posta indesiderata, o riprova più tardi.',
+      });
+    }
+    // E sei al giorno: chi ha una sessione non deve poter usare il nostro mittente come un
+    // cannone verso una casella che non conferma (revisione del 18/09/2026).
+    const oggi = await contaCodiciEmailDal(
+      persistenza.db,
+      sessione.utenteId,
+      'conferma-email',
+      new Date(Date.now() - 24 * ORA_MS),
+    );
+    if (oggi >= 6) {
+      return reply.status(429).send({
+        errore: 'Troppe email di conferma per questo account nelle ultime 24 ore. Riprova domani.',
+      });
+    }
+
+    try {
+      await inviaCodice(
+        { id: sessione.utenteId, tenantId: sessione.tenantId, email: sessione.email },
+        'conferma-email',
+      );
+    } catch (errore) {
+      app.log.error({ err: errore }, 'Email di conferma non partita');
+      return reply.status(502).send({ errore: 'Invio non riuscito. Riprovare fra qualche minuto.' });
+    }
+    return { inviata: true };
+  });
+
+  /**
+   * Password dimenticata.
+   *
+   * La risposta è **sempre la stessa**, esista o no l'indirizzo, e arriva prima del lavoro:
+   * cercare l'utente, creare il codice e spedire avviene dopo, fuori dal tempo di risposta.
+   * Rispondere «indirizzo sconosciuto», o rispondere più in fretta quando non c'è niente da
+   * spedire, direbbe a chiunque quali indirizzi sono clienti della piattaforma.
+   */
+  app.post('/api/auth/password-dimenticata', async (request, reply) => {
+    if (persistenza === undefined || !autenticazioneRichiesta) {
+      return reply.status(501).send({ errore: 'Non disponibile su questa installazione.' });
+    }
+    if (!posta.attiva) {
+      return reply.status(503).send({
+        errore:
+          'Il recupero della password via email non è ancora attivo. Chiedi all’amministratore del tuo studio di impostarne una nuova.',
+      });
+    }
+    const parsed = passwordDimenticataSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ errore: 'Indicare un indirizzo email valido.' });
+    }
+    const email = parsed.data.email;
+    if (
+      !limitatore.consenti(`password:ip:${chiaveIp(request)}`, 10, ORA_MS) ||
+      !limitatore.consenti(`password:email:${email}`, 3, ORA_MS)
+    ) {
+      return reply.status(429).send({ errore: 'Troppe richieste in poco tempo. Riprovare fra un’ora.' });
+    }
+
+    const db = persistenza.db;
+    const lavoro = (async () => {
+      try {
+        const { statoStudio, trovaUtentePerEmail } = await import('@aegis/db');
+        const utente = await conPiattaforma(db, (tx) => trovaUtentePerEmail(tx, email));
+        if (utente === null || !utente.attivo || utente.passwordHash === null) return;
+        if (!(await statoStudio(db, utente.tenantId)).attivo) return;
+        await inviaCodice(utente, 'nuova-password');
+      } catch (errore) {
+        app.log.error({ err: errore }, 'Email per la nuova password non partita');
+      }
+    })();
+    lavoriInCorso.add(lavoro);
+    void lavoro.finally(() => lavoriInCorso.delete(lavoro));
+
+    return {
+      messaggio:
+        'Se l’indirizzo è registrato, riceverai un’email con il collegamento per scegliere una nuova password. Vale 60 minuti.',
+    };
+  });
+
+  /** La nuova password, dal collegamento ricevuto: vale una volta, e chiude tutte le sessioni aperte. */
+  app.post('/api/auth/nuova-password', async (request, reply) => {
+    if (persistenza === undefined || !autenticazioneRichiesta) {
+      return reply.status(501).send({ errore: 'Non disponibile su questa installazione.' });
+    }
+    if (!limitatore.consenti(`nuova-password:${chiaveIp(request)}`, 20, ORA_MS)) {
+      return reply.status(429).send({ errore: 'Troppi tentativi. Riprovare fra un’ora.' });
+    }
+    const parsed = nuovaPasswordSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ errore: 'Il collegamento non è completo: aprilo di nuovo dall’email.' });
+    }
+
+    // I requisiti prima del codice: una password debole non deve bruciare il collegamento.
+    const requisiti = verificaRequisitiPassword(parsed.data.password);
+    if (!requisiti.valida) {
+      return reply.status(400).send({ errore: requisiti.problemi.join(' '), campo: 'password' });
+    }
+
+    const {
+      annullaCodiciEmail,
+      consumaCodiceEmail,
+      impostaPassword,
+      revocaSessioniUtente,
+      segnaEmailVerificata,
+    } = await import('@aegis/db');
+    const adesso = new Date();
+    const codice = await consumaCodiceEmail(persistenza.db, {
+      impronta: improntaToken(parsed.data.codice),
+      scopo: 'nuova-password',
+      adesso,
+    });
+    if (codice === null) {
+      return reply.status(400).send({
+        errore:
+          'Il collegamento non è più valido: è scaduto o è già stato usato. Chiedine uno nuovo da «Password dimenticata».',
+      });
+    }
+
+    const passwordHash = await derivaPassword(parsed.data.password);
+    /*
+      Una transazione sola: password, conferma, altri collegamenti annullati, sessioni chiuse.
+      Separate, un errore a metà lasciava la password cambiata e le sessioni di chi aveva la
+      vecchia ancora aperte. E la riga dell'utente resta bloccata fino alla fine: un accesso
+      con la vecchia password in volo in questo istante aspetta, poi trova l'impronta nuova e
+      non apre niente (creaSessioneSePasswordInvariata).
+    */
+    await conTenant(persistenza.db, codice.tenantId, async (tx) => {
+      await impostaPassword(tx, codice.utenteId, passwordHash);
+      // Chi ha aperto il collegamento legge quella casella: l'indirizzo è confermato.
+      await segnaEmailVerificata(tx, codice.utenteId, adesso);
+      await annullaCodiciEmail(tx, codice.utenteId, 'nuova-password', adesso);
+      // Chi aveva la vecchia password — magari proprio chi l'ha rubata — esce da ovunque.
+      await revocaSessioniUtente(tx, codice.utenteId);
+    });
+
+    return { aggiornata: true };
+  });
 
   /**
    * Cambio della propria password.
@@ -759,7 +1257,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(400).send({ errore: requisiti.problemi.join(' ') });
     }
 
-    const { trovaUtentePerId, impostaPassword, revocaSessioniUtente, creaSessione } =
+    const { annullaCodiciEmail, trovaUtentePerId, impostaPassword, revocaSessioniUtente, creaSessione } =
       await import('@aegis/db');
 
     const utente = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
@@ -774,11 +1272,14 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const nuovoHash = await derivaPassword(parsed.data.nuova);
-    await conTenant(persistenza.db, sessione.tenantId, (tx) => impostaPassword(tx, utente.id, nuovoHash));
-
     // Cambiare password deve buttare fuori chiunque altro fosse collegato con la vecchia:
-    // è la ragione principale per cui si cambia una password.
-    await revocaSessioniUtente(persistenza.db, utente.id);
+    // è la ragione principale per cui si cambia una password. Nella stessa transazione del
+    // cambio, e con i collegamenti per una nuova password ancora in giro resi inutili.
+    await conTenant(persistenza.db, sessione.tenantId, async (tx) => {
+      await impostaPassword(tx, utente.id, nuovoHash);
+      await annullaCodiciEmail(tx, utente.id, 'nuova-password', new Date());
+      await revocaSessioniUtente(tx, utente.id);
+    });
 
     const token = generaTokenSessione();
     await creaSessione(persistenza.db, {
@@ -919,6 +1420,9 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         numeroRui: s.numeroRui,
         gestore: s.gestorePiattaforma,
         attivo: s.attivo,
+        acquistiAbilitati: s.acquistiAbilitati,
+        autoRegistrato: s.autoRegistrato,
+        referente: s.referente,
         utenti: s.utenti,
         apertoIl: s.creatoIl.toISOString(),
       })),
@@ -971,7 +1475,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     return reply.status(201).send({ id: tenantId, email, passwordIniziale: password });
   });
 
-  /** Sospende o riattiva uno studio: i dati restano, gli accessi no. */
+  /**
+   * Sospende o riattiva uno studio (i dati restano, gli accessi no), oppure ne attiva o
+   * blocca gli acquisti di dati: è così che il gestore apre uno studio registrato da solo.
+   */
   app.patch<{ Params: { id: string } }>('/api/studi/:id', async (request, reply) => {
     const sessione = soloGestore(request, reply);
     if (sessione === null) return reply;
@@ -979,8 +1486,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(503).send({ errore: 'Archivio non disponibile' });
     }
 
-    const parsed = z.object({ attivo: z.boolean() }).safeParse(request.body ?? {});
-    if (!parsed.success) {
+    const parsed = z
+      .object({ attivo: z.boolean().optional(), acquistiAbilitati: z.boolean().optional() })
+      .refine((d) => d.attivo !== undefined || d.acquistiAbilitati !== undefined)
+      .safeParse(request.body ?? {});
+    if (!parsed.success || !z.string().uuid().safeParse(request.params.id).success) {
       return reply.status(400).send({ errore: 'Dati non validi' });
     }
 
@@ -990,9 +1500,41 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(409).send({ errore: 'Lo studio che gestisce la piattaforma non si sospende' });
     }
 
-    const { impostaAttivitaStudio } = await import('@aegis/db');
-    await impostaAttivitaStudio(persistenza.db, request.params.id, parsed.data.attivo);
-    return { attivo: parsed.data.attivo };
+    const { impostaAcquistiStudio, impostaAttivitaStudio, referenteDelloStudio, registraAudit } =
+      await import('@aegis/db');
+
+    /*
+      Con la posta attiva, uno studio si attiva solo se chi l'ha aperto ha confermato l'email:
+      prima di spendere il credito della piattaforma bisogna aver dimostrato di leggere la
+      casella dichiarata. Senza posta non si può confermare niente, e la decisione resta tutta
+      del gestore (la pagina lo dice).
+    */
+    if (parsed.data.acquistiAbilitati === true && posta.attiva) {
+      const referente = await conTenant(persistenza.db, request.params.id, (tx) =>
+        referenteDelloStudio(tx, request.params.id),
+      );
+      if (referente !== null && !referente.emailConfermata) {
+        return reply.status(409).send({
+          errore: `${referente.email} non ha ancora confermato l’indirizzo: l’attivazione si sblocca quando lo fa.`,
+        });
+      }
+    }
+
+    if (parsed.data.attivo !== undefined) {
+      await impostaAttivitaStudio(persistenza.db, request.params.id, parsed.data.attivo);
+    }
+    if (parsed.data.acquistiAbilitati !== undefined) {
+      await impostaAcquistiStudio(persistenza.db, request.params.id, parsed.data.acquistiAbilitati);
+    }
+    await registraAudit(persistenza.db, {
+      tenantId: request.params.id,
+      utenteId: sessione.utenteId,
+      azione: 'studio.modificato',
+      entita: 'studio',
+      entitaId: request.params.id,
+      dettagli: { ...parsed.data, da: sessione.email },
+    });
+    return parsed.data;
   });
 
   /**
@@ -1107,6 +1649,21 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   app.post('/api/utenti', async (request, reply) => {
     const sessione = soloAmministratore(request, reply);
     if (sessione === null || persistenza === undefined) return reply;
+
+    /*
+      Uno studio registrato da solo e non ancora attivato lavora da solo (revisione di
+      sicurezza del 18/09/2026). Chi si registrava con i dati di un broker vero poteva
+      aggiungere un secondo amministratore — nato con l'email «confermata» — che restava dentro
+      anche dopo che il vero titolare aveva ripreso l'account; e poteva usare questo modulo per
+      sapere quali indirizzi sono già clienti della piattaforma, senza nessun freno. Il
+      controllo sta prima di qualunque lettura, così non rivela nulla.
+    */
+    if (!sessione.acquistiAbilitati) {
+      return reply.status(403).send({
+        errore:
+          'Finché lo studio non è attivato lavori da solo: i collaboratori si aggiungono dopo l’attivazione.',
+      });
+    }
 
     const parsed = nuovoUtenteSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
@@ -1264,14 +1821,15 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    * Le sessioni aperte si chiudono tutte: se la password viene reimpostata perché si
    * sospetta un accesso altrui, lasciarle aperte vanificherebbe l'operazione.
    *
-   * Resta fuori — ed è una decisione del committente, non una dimenticanza — il recupero
-   * autonomo per posta elettronica: richiede un servizio di invio che il prodotto non ha.
+   * Dal 18/09/2026 c'è anche il recupero autonomo via email (`/api/auth/password-dimenticata`),
+   * quando la posta è configurata. Questa via resta: è l'unica finché la posta non lo è, e
+   * resta quella dell'amministratore che vuole chiudere fuori qualcuno subito.
    */
   app.post<{ Params: { id: string } }>('/api/utenti/:id/reimposta-password', async (request, reply) => {
     const sessione = soloAmministratore(request, reply);
     if (sessione === null || persistenza === undefined) return reply;
 
-    const { elencoUtenti, impostaPassword, revocaSessioniUtente, registraAudit } =
+    const { annullaCodiciEmail, elencoUtenti, impostaPassword, revocaSessioniUtente, registraAudit } =
       await import('@aegis/db');
 
     // Solo dentro il proprio studio: l'elenco è già filtrato per intermediario, e un
@@ -1286,10 +1844,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const password = generaPasswordIniziale();
     const nuovoHash = await derivaPassword(password);
-    await conTenant(persistenza.db, sessione.tenantId, (tx) =>
-      impostaPassword(tx, destinatario.id, nuovoHash),
-    );
-    await revocaSessioniUtente(persistenza.db, destinatario.id);
+    await conTenant(persistenza.db, sessione.tenantId, async (tx) => {
+      await impostaPassword(tx, destinatario.id, nuovoHash);
+      await annullaCodiciEmail(tx, destinatario.id, 'nuova-password', new Date());
+      await revocaSessioniUtente(tx, destinatario.id);
+    });
 
     await registraAudit(persistenza.db, {
       tenantId: sessione.tenantId,
@@ -1401,7 +1960,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const esitoTetto = await oltreIlTetto(request);
     if (esitoTetto !== null) {
-      return reply.status(429).send({
+      return reply.status(codiceTetto(esitoTetto)).send({
         errore: messaggioTetto(esitoTetto, 'Le ricerche riprendono domani.'),
       });
     }
@@ -1477,7 +2036,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     if (!soloConteggio) {
       const esito = await oltreIlTetto(request);
       if (esito !== null) {
-        return reply.status(429).send({
+        return reply.status(codiceTetto(esito)).send({
           errore: messaggioTetto(esito, 'Il conteggio dei risultati resta disponibile e gratuito.'),
         });
       }
@@ -1618,7 +2177,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     */
     const esitoTetto = await oltreIlTetto(request);
     if (esitoTetto !== null) {
-      return reply.status(429).send({
+      return reply.status(codiceTetto(esitoTetto)).send({
         errore: messaggioTetto(
           esitoTetto,
           'Le aziende già in archivio restano consultabili senza spendere.',
@@ -1841,8 +2400,17 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       (parsed.data.eventiNegativi === true && !gia.eventiNegativi);
 
     const esito = await oltreIlTetto(request);
-    if (esito !== null && !(await giaInArchivio(request, request.params.id))) {
-      return reply.status(429).send({
+    /*
+      L'esenzione «già in archivio» vale per chi ha raggiunto il tetto, mai per uno studio in
+      attesa di attivazione: la riga dell'azienda la crea gratis anche un dossier salvato, e da
+      lì l'analisi comprava l'anagrafica col credito della piattaforma (revisione di sicurezza
+      del 18/09/2026). Uno studio mai attivato non ha pagato niente da rileggere.
+    */
+    if (
+      esito !== null &&
+      (esito.ambito === 'attivazione' || !(await giaInArchivio(request, request.params.id)))
+    ) {
+      return reply.status(codiceTetto(esito)).send({
         errore: messaggioTetto(esito, 'Le analisi riprendono domani.'),
       });
     }
@@ -1855,7 +2423,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       chi li ha gia' pagati.
     */
     if (esito !== null && spendeDavvero) {
-      return reply.status(429).send({
+      return reply.status(codiceTetto(esito)).send({
         errore: messaggioTetto(
           esito,
           'L’azienda resta consultabile con l’analisi ordinaria, che non costa nulla perché è già in archivio.',
@@ -2151,7 +2719,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
 
     const esito = await oltreIlTetto(request);
     if (esito !== null) {
-      return reply.status(429).send({
+      return reply.status(codiceTetto(esito)).send({
         errore: messaggioTetto(
           esito,
           'L’importazione riprende domani. Le aziende già acquisite restano in portafoglio.',
@@ -2370,7 +2938,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     const esitoTetto = await oltreIlTetto(request);
     if (esitoTetto !== null) {
       return reply
-        .status(429)
+        .status(codiceTetto(esitoTetto))
         .send({ errore: messaggioTetto(esitoTetto, 'Le verifiche riprendono domani.') });
     }
 
@@ -2979,6 +3547,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     });
   }
 
+  // Le email partite dopo la risposta finiscono prima che l'archivio si chiuda: altrimenti
+  // un riavvio a metà lascerebbe un codice in tabella senza l'email che lo porta.
+  app.addHook('onClose', async () => {
+    await Promise.allSettled([...lavoriInCorso]);
+  });
+
   return app;
 }
 
@@ -3026,6 +3600,13 @@ const decisioneVerificaSchema = z.object({
   nota: z.string().trim().max(2000).optional(),
 });
 
+/** Perché un'operazione a pagamento è stata fermata: tetto dello studio, della piattaforma, o studio non ancora attivato. */
+interface EsitoTetto {
+  readonly speso: number;
+  readonly limite: number;
+  readonly ambito: 'studio' | 'piattaforma' | 'attivazione';
+}
+
 const loginSchema = z.object({
   email: z.string().trim().email().max(200),
   password: z.string().min(1).max(200),
@@ -3035,6 +3616,56 @@ const nuovoStudioSchema = z.object({
   denominazione: z.string().trim().min(2).max(200),
   nome: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(200),
+});
+
+/**
+ * Il RUI: una lettera di sezione (A agenti, B broker, C produttori diretti, D banche e
+ * intermediari finanziari, E collaboratori, F intermediari a titolo accessorio) e nove cifre.
+ * Si controlla la forma, non l'esistenza nel registro: quella la verifica il gestore prima
+ * di attivare gli acquisti.
+ */
+export const FORMA_RUI = /^[A-F]\d{9}$/;
+
+const registrazioneSchema = z.object({
+  nome: z
+    .string({ message: 'Indicare nome e cognome.' })
+    .trim()
+    .min(2, 'Indicare nome e cognome.')
+    .max(120, 'Il nome non può superare i 120 caratteri.'),
+  email: z
+    .string({ message: 'Indicare l’indirizzo email.' })
+    .trim()
+    .toLowerCase()
+    .email('L’indirizzo email non è valido.')
+    .max(200, 'L’indirizzo email è troppo lungo.'),
+  password: z
+    .string({ message: 'Scegliere una password.' })
+    .max(200, 'La password non può superare i 200 caratteri.'),
+  denominazione: z
+    .string({ message: 'Indicare il nome dello studio.' })
+    .trim()
+    .min(2, 'Indicare il nome dello studio.')
+    .max(200, 'Il nome dello studio non può superare i 200 caratteri.'),
+  numeroRui: z
+    .string({ message: 'Indicare il numero di iscrizione al RUI.' })
+    .transform((v) => v.replace(/[\s.-]/g, '').toUpperCase())
+    .pipe(
+      z
+        .string()
+        .regex(
+          FORMA_RUI,
+          'Il numero RUI è una lettera da A a F seguita da nove cifre, per esempio B000123456.',
+        ),
+    ),
+});
+
+const codiceSchema = z.object({ codice: z.string().min(20).max(200) });
+
+const passwordDimenticataSchema = z.object({ email: z.string().trim().toLowerCase().email().max(200) });
+
+const nuovaPasswordSchema = z.object({
+  codice: z.string().min(20).max(200),
+  password: z.string().min(1).max(200),
 });
 
 const cambioPasswordSchema = z.object({
@@ -3180,6 +3811,8 @@ async function risolviSessione(db: unknown, token: string): Promise<Sessione | n
     nome: utente.nome,
     ruolo: utente.ruolo,
     gestorePiattaforma: studio.gestorePiattaforma,
+    acquistiAbilitati: studio.acquistiAbilitati,
+    emailVerificata: utente.emailVerificataIl !== null,
   };
 }
 

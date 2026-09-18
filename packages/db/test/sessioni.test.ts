@@ -12,7 +12,9 @@ import {
   applicaSchemaTollerante,
   connetti,
   creaSessione,
+  creaSessioneSePasswordInvariata,
   creaUtente,
+  impostaPassword,
   purgaSessioniScadute,
   revocaSessioniUtente,
   schema,
@@ -88,5 +90,32 @@ describe('Sessioni', () => {
     expect(impronte).toContain('in-corso');
     expect(impronte).not.toContain('vecchia-1');
     expect(impronte).not.toContain('vecchia-2');
+  });
+
+  it('un accesso non apre la sessione se la password è cambiata mentre la verificava', async () => {
+    // Revisione di sicurezza del 18/09/2026: la sessione nata dopo la revoca restava valida.
+    const adesso = new Date();
+    const dati = { utenteId, tenantId, scadeIl: new Date(adesso.getTime() + ORA) };
+    await impostaPassword(connessione.db, utenteId, 'impronta-vecchia');
+
+    const riuscita = await connessione.db.transaction((tx) =>
+      creaSessioneSePasswordInvariata(tx, {
+        ...dati,
+        improntaToken: 'con-la-giusta',
+        passwordHashAtteso: 'impronta-vecchia',
+      }),
+    );
+    expect(riuscita).not.toBeNull();
+
+    await impostaPassword(connessione.db, utenteId, 'impronta-nuova');
+    const tardiva = await connessione.db.transaction((tx) =>
+      creaSessioneSePasswordInvariata(tx, {
+        ...dati,
+        improntaToken: 'con-la-vecchia',
+        passwordHashAtteso: 'impronta-vecchia',
+      }),
+    );
+    expect(tardiva).toBeNull();
+    expect(await trovaSessioneValida(connessione.db, 'con-la-vecchia', adesso)).toBeNull();
   });
 });

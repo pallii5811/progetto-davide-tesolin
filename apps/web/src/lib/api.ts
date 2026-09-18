@@ -878,6 +878,10 @@ export interface UtenteCorrente {
   ruolo?: string;
   /** Se lo studio di questo utente gestisce la piattaforma: apre le pagine di filiera. */
   gestorePiattaforma?: boolean;
+  /** Falso per uno studio registrato da solo e non ancora attivato: entra, ma non compra dati. */
+  acquistiAbilitati?: boolean;
+  /** Se l'utente ha confermato il proprio indirizzo dal collegamento ricevuto. */
+  emailVerificata?: boolean;
 }
 
 export interface CandidatoVerificaDto {
@@ -934,11 +938,43 @@ export async function utenteCorrente(): Promise<UtenteCorrente> {
 }
 
 export async function autenticazioneRichiesta(): Promise<boolean> {
+  return (await statoAccesso()).autenticazioneRichiesta;
+}
+
+export interface StatoAccesso {
+  /**
+   * Falso se l'API non ha risposto. Va tenuto distinto da «l'accesso non serve»: confonderli
+   * mandava le pagine pubbliche a Ricerca Clienti, e il middleware di nuovo all'accesso,
+   * all'infinito (revisione del 18/09/2026).
+   */
+  readonly raggiungibile: boolean;
+  readonly autenticazioneRichiesta: boolean;
+  /** Se il modulo di registrazione funziona su questa installazione. */
+  readonly registrazioneAperta: boolean;
+  /** Se partono le email (conferma dell'indirizzo, password dimenticata). */
+  readonly postaAttiva: boolean;
+}
+
+/**
+ * Cosa offrire a chi non è ancora dentro. Se l'API non risponde, niente: meglio non mostrare
+ * «Crea un account» che mostrarlo e far fallire il modulo alla fine.
+ */
+export async function statoAccesso(): Promise<StatoAccesso> {
   try {
-    const stato = await chiama<{ autenticazioneRichiesta: boolean }>('/api/auth/stato');
-    return stato.autenticazioneRichiesta;
+    const stato = await chiama<Partial<StatoAccesso>>('/api/auth/stato');
+    return {
+      raggiungibile: true,
+      autenticazioneRichiesta: stato.autenticazioneRichiesta === true,
+      registrazioneAperta: stato.registrazioneAperta === true,
+      postaAttiva: stato.postaAttiva === true,
+    };
   } catch {
-    return false;
+    return {
+      raggiungibile: false,
+      autenticazioneRichiesta: false,
+      registrazioneAperta: false,
+      postaAttiva: false,
+    };
   }
 }
 
@@ -1040,6 +1076,12 @@ export interface StudioOspitato {
   numeroRui: string | null;
   gestore: boolean;
   attivo: boolean;
+  /** Falso per chi si è registrato da solo e aspetta l'attivazione del gestore. */
+  acquistiAbilitati: boolean;
+  /** Registrato dal modulo pubblico invece che aperto dal gestore. */
+  autoRegistrato: boolean;
+  /** Il primo amministratore, con lo stato della sua email. */
+  referente: { email: string; emailConfermata: boolean } | null;
   utenti: number;
   apertoIl: string;
 }

@@ -142,6 +142,18 @@ export const tenants = pgTable('tenants', {
   gestorePiattaforma: boolean('gestore_piattaforma').notNull().default(false),
   creatoIl: timestamp('creato_il', { withTimezone: true }).notNull().defaultNow(),
   attivo: boolean('attivo').notNull().default(true),
+  /**
+   * Se lo studio può comprare dati: elenchi, analisi, ricerche, verifiche.
+   *
+   * Decisione di Simone del 18/09/2026: chi si registra da solo entra subito e vede tutto,
+   * ma spende il credito della piattaforma solo dopo che il gestore l'ha attivato. Il credito
+   * è uno, intestato al gestore: aprire gli acquisti a chiunque compili un modulo vorrebbe
+   * dire far pagare a lui le prove di uno sconosciuto. Gli studi aperti dal gestore nascono
+   * già abilitati, come prima.
+   */
+  acquistiAbilitati: boolean('acquisti_abilitati').notNull().default(true),
+  /** Lo studio si è registrato da solo dal modulo pubblico, invece di essere aperto dal gestore. */
+  autoRegistrato: boolean('auto_registrato').notNull().default(false),
 });
 
 export const utenti = pgTable(
@@ -166,6 +178,13 @@ export const utenti = pgTable(
     tentativiFalliti: integer('tentativi_falliti').notNull().default(0),
     bloccatoFinoA: timestamp('bloccato_fino_a', { withTimezone: true }),
     attivo: boolean('attivo').notNull().default(true),
+    /**
+     * Quando la persona ha dimostrato di leggere quella casella, aprendo il collegamento
+     * ricevuto. `null` = non ancora. Gli utenti creati da un amministratore prima della
+     * registrazione pubblica (migrazione 0015) contano come confermati dal giorno della
+     * creazione: li ha aperti qualcuno che li conosceva.
+     */
+    emailVerificataIl: timestamp('email_verificata_il', { withTimezone: true }),
   },
   (t) => [uniqueIndex('utenti_email_unica').on(t.email), index('utenti_per_tenant').on(t.tenantId)],
 );
@@ -203,6 +222,38 @@ export const sessioni = pgTable(
   (t) => [
     uniqueIndex('sessioni_impronta_unica').on(t.improntaToken),
     index('sessioni_per_utente').on(t.utenteId),
+  ],
+);
+
+/**
+ * I codici mandati per email: conferma dell'indirizzo e scelta di una nuova password.
+ *
+ * Stessa regola delle sessioni: si conserva l'**impronta** del codice, non il codice. Chi
+ * leggesse il database non potrebbe usarne nessuno. Ogni codice vale una volta sola
+ * (`usatoIl`) e scade (`scadeIl`): un collegamento per cambiare password rimasto in una
+ * casella vecchia non deve aprire l'account un mese dopo.
+ */
+export const codiciEmail = pgTable(
+  'codici_email',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    utenteId: uuid('utente_id')
+      .notNull()
+      .references(() => utenti.id, { onDelete: 'cascade' }),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    /** `conferma-email` oppure `nuova-password`: un codice non vale per l'altro scopo. */
+    scopo: text('scopo').notNull(),
+    /** SHA-256 del codice, in esadecimale. */
+    impronta: text('impronta').notNull(),
+    creatoIl: timestamp('creato_il', { withTimezone: true }).notNull().defaultNow(),
+    scadeIl: timestamp('scade_il', { withTimezone: true }).notNull(),
+    usatoIl: timestamp('usato_il', { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('codici_email_impronta_unica').on(t.impronta),
+    index('codici_email_per_utente').on(t.utenteId),
   ],
 );
 

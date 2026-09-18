@@ -7,3 +7,9 @@
  * cambia aspetto per un'intestazione scelta dal visitatore è una porta che non serve lasciare.
  */
 export const INTESTAZIONE_VETRINA = 'x-aegis-vetrina';
+
+/**
+ * Il percorso richiesto, scritto dal middleware (che sovrascrive quello mandato dal client):
+ * serve al layout, che in Next non conosce la pagina che sta avvolgendo.
+ */
+export const INTESTAZIONE_PERCORSO = 'x-aegis-percorso';

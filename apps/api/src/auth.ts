@@ -167,6 +167,13 @@ export interface Sessione {
    * darebbe a ogni intermediario che apre le impostazioni la vista sulla fornitura dati.
    */
   readonly gestorePiattaforma: boolean;
+  /**
+   * Se lo studio può comprare dati. Falso per chi si è registrato da solo e non è ancora
+   * stato attivato dal gestore: entra, guarda, conta — non spende il credito della piattaforma.
+   */
+  readonly acquistiAbilitati: boolean;
+  /** Se l'utente ha confermato il proprio indirizzo aprendo il collegamento ricevuto. */
+  readonly emailVerificata: boolean;
 }
 
 /** I ruoli in sola lettura non possono modificare nulla. */

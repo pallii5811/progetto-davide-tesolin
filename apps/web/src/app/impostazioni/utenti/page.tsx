@@ -27,5 +27,5 @@ export default async function PaginaUtenti() {
     );
   }
 
-  return <GestioneUtenti utenti={elenco.utenti} />;
+  return <GestioneUtenti utenti={elenco.utenti} puoAggiungere={utente.acquistiAbilitati !== false} />;
 }

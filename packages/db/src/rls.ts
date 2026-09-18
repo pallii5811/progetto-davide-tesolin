@@ -92,6 +92,10 @@ export const ESCLUSIONI_MOTIVATE: Readonly<Record<string, string>> = {
   inviti_questionario:
     'stessa ragione di `sessioni`: il collegamento che il cliente riceve si risolve senza ' +
     'autenticazione, e il tenant si scopre dalla riga.',
+  codici_email:
+    'stessa ragione di `sessioni`: il collegamento per confermare l’indirizzo o scegliere una ' +
+    'nuova password si apre senza sessione, e lo studio si scopre dalla riga. Contiene solo ' +
+    'impronte, e ogni codice vale una volta e scade.',
   audit_log:
     'registro append-only con `tenant_id` facoltativo — le azioni di piattaforma non ' +
     'appartengono a nessuno studio. È protetto da REVOKE UPDATE/DELETE, non da una policy ' +

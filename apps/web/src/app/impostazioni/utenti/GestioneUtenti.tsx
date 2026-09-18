@@ -35,7 +35,14 @@ const CAMPO =
   'w-full rounded border border-bordo-forte bg-fondo px-3 py-2 text-sm transition focus:border-marchio';
 const ETICHETTA = 'mb-1 block text-xs font-medium uppercase tracking-wide text-testo-debole';
 
-export function GestioneUtenti({ utenti }: { utenti: UtenteElencoDto[] }) {
+export function GestioneUtenti({
+  utenti,
+  puoAggiungere = true,
+}: {
+  utenti: UtenteElencoDto[];
+  /** Falso per uno studio registrato da solo e non ancora attivato: lavora da solo. */
+  puoAggiungere?: boolean;
+}) {
   const attivi = utenti.filter((u) => u.attivo).length;
 
   return (
@@ -55,7 +62,14 @@ export function GestioneUtenti({ utenti }: { utenti: UtenteElencoDto[] }) {
         </ul>
       </section>
 
-      <ModuloNuovoUtente />
+      {puoAggiungere ? (
+        <ModuloNuovoUtente />
+      ) : (
+        <Avviso tono="informativo" titolo="I collaboratori si aggiungono dopo l’attivazione">
+          Finché lo studio è in attesa di attivazione lavori da solo. Appena la piattaforma lo attiva, da
+          qui potrai aggiungere i tuoi collaboratori.
+        </Avviso>
+      )}
     </div>
   );
 }
@@ -161,14 +175,32 @@ function RigaUtente({ utente }: { utente: UtenteElencoDto }) {
                   <Azione etichetta="Chiudi sessioni" inCorso="Chiusura…" />
                 </form>
               )}
+
+              {utente.attivo && (
+                <form action={agisci}>
+                  <input type="hidden" name="id" value={utente.id} />
+                  <input type="hidden" name="operazione" value="reimposta" />
+                  <Azione etichetta="Reimposta password" inCorso="Reimpostazione…" />
+                </form>
+              )}
             </>
           )}
         </div>
       </div>
 
       <div aria-live="polite">
-        {esito !== null && (
+        {esito !== null && esito.passwordIniziale === undefined && (
           <p className={`mt-2 text-sm ${esito.ok ? 'text-basso' : 'text-critico'}`}>{esito.messaggio}</p>
+        )}
+        {esito?.passwordIniziale !== undefined && (
+          <div className="mt-3">
+            <Avviso tono="attenzione" titolo="Nuova password — visibile una sola volta">
+              <p>{esito.messaggio}</p>
+              <p className="tabular mt-2 select-all rounded border border-bordo-forte bg-fondo px-3 py-2 font-mono text-base">
+                {esito.passwordIniziale}
+              </p>
+            </Avviso>
+          </div>
         )}
       </div>
     </li>

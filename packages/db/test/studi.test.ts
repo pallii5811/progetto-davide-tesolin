@@ -26,7 +26,9 @@ import {
   creaStudio,
   creaUtente,
   elencoStudi,
+  impostaAcquistiStudio,
   impostaAttivitaStudio,
+  referenteDelloStudio,
   statoStudio,
 } from '../src/index.js';
 import type { Connessione } from '../src/index.js';
@@ -112,7 +114,71 @@ describe('Elenco degli studi', () => {
   it('uno studio che non esiste non è né gestore né attivo', async () => {
     // Negare è l'unico esito sicuro: un identificativo inventato non deve aprire nulla.
     const stato = await statoStudio(connessione.db, '00000000-0000-0000-0000-000000000000');
-    expect(stato).toEqual({ gestorePiattaforma: false, attivo: false });
+    // Né acquisti: dal 18/09/2026 lo stato dice anche se lo studio può comprare dati.
+    expect(stato).toEqual({ gestorePiattaforma: false, attivo: false, acquistiAbilitati: false });
+  }, 90_000);
+
+  /*
+    La registrazione pubblica (18/09/2026). Uno studio aperto dal gestore compra come sempre;
+    uno registrato da solo nasce senza acquisti e con il RUI dichiarato, finché il gestore non
+    lo attiva. L'elenco li distingue e porta il referente con lo stato della sua email: è ciò
+    che il gestore guarda prima di attivare.
+  */
+  it('uno studio registrato da solo nasce senza acquisti, finché il gestore non lo attiva', async () => {
+    const aperto = await creaStudio(connessione.db, 'Aperto dal gestore');
+    const registrato = await creaStudio(connessione.db, 'Registrato da solo', {
+      numeroRui: 'B000123456',
+      autoRegistrato: true,
+    });
+
+    expect((await statoStudio(connessione.db, aperto)).acquistiAbilitati).toBe(true);
+    expect((await statoStudio(connessione.db, registrato)).acquistiAbilitati).toBe(false);
+
+    await impostaAcquistiStudio(connessione.db, registrato, true);
+    expect((await statoStudio(connessione.db, registrato)).acquistiAbilitati).toBe(true);
+
+    const riga = (await elencoStudi(connessione.db)).find((s) => s.id === registrato);
+    expect(riga).toMatchObject({ numeroRui: 'B000123456', autoRegistrato: true, acquistiAbilitati: true });
+  }, 90_000);
+
+  it('il referente è chi ha aperto lo studio, con lo stato della sua email', async () => {
+    const studio = await creaStudio(connessione.db, 'Studio con referente', { autoRegistrato: true });
+    await creaUtente(connessione.db, {
+      tenantId: studio,
+      email: 'titolare@studio.it',
+      nome: 'Titolare',
+      passwordHash: 'x',
+      ruolo: 'amministratore',
+      emailDaConfermare: true,
+    });
+    await creaUtente(connessione.db, {
+      tenantId: studio,
+      email: 'secondo@studio.it',
+      nome: 'Secondo',
+      passwordHash: 'x',
+      ruolo: 'amministratore',
+    });
+
+    const riga = (await elencoStudi(connessione.db)).find((s) => s.id === studio);
+    expect(riga?.referente).toEqual({ email: 'titolare@studio.it', emailConfermata: false });
+
+    // Cambiare i ruoli non sposta il referente: resta chi ha aperto lo studio (revisione del 18/09/2026).
+    await connessione.db
+      .update(schema.utenti)
+      .set({ ruolo: 'broker' })
+      .where(eq(schema.utenti.email, 'titolare@studio.it'));
+    expect((await elencoStudi(connessione.db)).find((s) => s.id === studio)?.referente).toEqual({
+      email: 'titolare@studio.it',
+      emailConfermata: false,
+    });
+    expect(await referenteDelloStudio(connessione.db, studio)).toEqual({
+      email: 'titolare@studio.it',
+      emailConfermata: false,
+    });
+
+    const vuoto = await creaStudio(connessione.db, 'Studio senza amministratori');
+    expect((await elencoStudi(connessione.db)).find((s) => s.id === vuoto)?.referente).toBeNull();
+    expect(await referenteDelloStudio(connessione.db, vuoto)).toBeNull();
   }, 90_000);
 });
 

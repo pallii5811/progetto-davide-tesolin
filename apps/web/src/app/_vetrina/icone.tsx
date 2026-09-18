@@ -156,6 +156,20 @@ export const IconaChip = (p: Proprieta) => (
   </Svg>
 );
 
+export const IconaIngranaggio = (p: Proprieta) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2L5.5 5.5" />
+  </Svg>
+);
+
+export const IconaGrafico = (p: Proprieta) => (
+  <Svg {...p}>
+    <path d="M4 20h16" />
+    <path d="M7 16v-5M12 16V7M17 16v-8" />
+  </Svg>
+);
+
 export const IconaCrm = (p: Proprieta) => (
   <Svg {...p}>
     <rect x="3.5" y="4" width="17" height="16" rx="2.5" />
