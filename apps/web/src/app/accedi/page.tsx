@@ -5,7 +5,7 @@ import { accedi } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Accesso · Riskadvisor' };
+export const metadata = { title: 'Accesso · AEGIS' };
 
 export default async function PaginaAccesso({
   searchParams,
@@ -22,7 +22,7 @@ export default async function PaginaAccesso({
   return (
     <div className="mx-auto max-w-sm py-12">
       <div className="mb-8 text-center">
-        <p className="text-2xl font-bold tracking-tight text-marchio">Riskadvisor</p>
+        <p className="text-2xl font-bold tracking-tight text-marchio">AEGIS</p>
         <p className="mt-1 text-sm text-testo-tenue">Credit &amp; Insurance Risk Intelligence</p>
       </div>
 

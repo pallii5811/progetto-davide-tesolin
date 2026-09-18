@@ -118,7 +118,7 @@ export function computeCreditLimit(basi: BasiDelFido, score: CreditScore): Expla
       'min(20% del patrimonio netto; 10% ricavi; 3 × EBITDA) × fattore di score, ' +
         'con il fattore che modula da 0 a 1,00 e non oltre',
     )
-    .reference('Metodologia Riskadvisor · docs/DOMINIO.md §4');
+    .reference('Metodologia AEGIS · docs/DOMINIO.md §4');
 
   /*
     I tre vincoli si calcolano PRIMA di guardare il merito, perché non dipendono da lui.

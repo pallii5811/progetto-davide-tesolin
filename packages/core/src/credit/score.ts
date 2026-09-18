@@ -1,5 +1,5 @@
 /**
- * Score di credito Riskadvisor — modello additivo a fattori pesati, interamente esplicabile.
+ * Score di credito AEGIS — modello additivo a fattori pesati, interamente esplicabile.
  *
  * Scala 1–100, dove 100 è il rischio minimo (coerente con la convenzione Creditsafe,
  * per non disorientare gli operatori che già la conoscono).
@@ -255,12 +255,12 @@ export function computeCreditScore(input: CreditScoreInput): Explained<CreditSco
   );
   const base = misura.media;
 
-  const builder = explain('Score di credito Riskadvisor')
+  const builder = explain('Score di credito AEGIS')
     .formula(
       'Media pesata dei fattori valutabili, con pavimento di copertura al ' +
         `${formatPercent(PAVIMENTO_DI_COPERTURA, 0)} del peso del modello`,
     )
-    .reference('Metodologia Riskadvisor · docs/DOMINIO.md §4');
+    .reference('Metodologia AEGIS · docs/DOMINIO.md §4');
 
   if (base === null) {
     /*
@@ -1456,7 +1456,7 @@ export function probabilitaDefaultSpiegata(
           'la probabilità di default: la curva trasforma uno score in una percentuale, e qui ' +
           'non c’è uno score da trasformare.',
       )
-      .reference('Metodologia Riskadvisor · docs/DOMINIO.md §4 — curva di calibrazione score → PD')
+      .reference('Metodologia AEGIS · docs/DOMINIO.md §4 — curva di calibrazione score → PD')
       .confidence('bassa')
       .value(null);
   }
@@ -1472,7 +1472,7 @@ export function probabilitaDefaultSpiegata(
         'piattaforma: la cifra indica l’ordine di grandezza del rischio, non va letta al centesimo ' +
         'di punto.',
     )
-    .reference('Metodologia Riskadvisor · docs/DOMINIO.md §4 — curva di calibrazione score → PD')
+    .reference('Metodologia AEGIS · docs/DOMINIO.md §4 — curva di calibrazione score → PD')
     .confidence('media')
     .inheritConfidence(confidenzaScore)
     .value(pd);

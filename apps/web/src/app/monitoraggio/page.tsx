@@ -15,7 +15,7 @@ import Link from 'next/link';
  * Non porta nemmeno una data: non ce n'è una decisa, e una data inventata è una promessa
  * come le altre.
  */
-export const metadata = { title: 'Monitoraggio · Riskadvisor' };
+export const metadata = { title: 'Monitoraggio · AEGIS' };
 
 export default function PaginaMonitoraggio() {
   return (

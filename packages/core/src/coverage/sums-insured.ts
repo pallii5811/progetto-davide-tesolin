@@ -789,7 +789,7 @@ function calcolaMassimaleRct(facts: CompanyFacts): Explained<Euro> {
     .formula(
       'Benchmark per classe di fatturato, elevato di un gradino per i settori a maggiore pericolosità',
     )
-    .reference('Benchmark di mercato Riskadvisor');
+    .reference('Benchmark di mercato AEGIS');
 
   let indice = massimaleDaFatturato(facts.fatturato);
   if (settorePericoloso(facts)) {

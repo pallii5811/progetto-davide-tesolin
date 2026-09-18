@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Riskadvisor — Credit & Insurance Risk Intelligence per intermediari assicurativi",
+  "description": "AEGIS — Credit & Insurance Risk Intelligence per intermediari assicurativi",
   "workspaces": [
     "packages/*",
     "apps/*"

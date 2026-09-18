@@ -462,7 +462,7 @@ export function calcolaPropertyRisk(
       `fonti ufficiali e diventano punteggi a gradini uguali. ${SCALA_PERICOLI_NATURALI}.`,
     'Alluvione e frana sono il dato del comune, non della singola sede: la quota di imprese del comune in area a ' +
       'pericolosità secondo ISPRA IdroGEO. Dove la decisione pesa, la verifica sull’indirizzo resta necessaria. ' +
-      'Bassa, media e alta seguono le soglie di Riskadvisor sulla quota di imprese: alluvione alta dal 15% in pericolosità ' +
+      'Bassa, media e alta seguono le soglie di AEGIS sulla quota di imprese: alluvione alta dal 15% in pericolosità ' +
       'elevata o dal 40% fra elevata e media, media dal 3% o dal 15%; frana alta dal 10% in pericolosità elevata o ' +
       'molto elevata, media dal 2%.',
     'Il pericolo medio è la media dei tre pericoli, come dice la formula scritta nel foglio (l’esempio del foglio usa ' +
