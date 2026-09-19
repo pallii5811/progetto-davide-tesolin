@@ -214,6 +214,72 @@ export const IconaGrafico = (p: Proprieta) => (
   </Svg>
 );
 
+/** Un fumetto con il punto di domanda: le domande da fare al cliente. */
+export const IconaDomanda = (p: Proprieta) => (
+  <Svg {...p}>
+    <path
+      {...CORPO}
+      d="M6.5 4h11A2.5 2.5 0 0120 6.5V14a2.5 2.5 0 01-2.5 2.5H11L6.5 20v-3.5A2.5 2.5 0 014 14V6.5A2.5 2.5 0 016.5 4z"
+    />
+    <path d="M6.5 4h11A2.5 2.5 0 0120 6.5V14a2.5 2.5 0 01-2.5 2.5H11L6.5 20v-3.5A2.5 2.5 0 014 14V6.5A2.5 2.5 0 016.5 4z" />
+    <path d="M10.2 8.4a1.9 1.9 0 013.7.6c0 1.3-1.9 1.6-1.9 2.9M12 13.9h.01" />
+  </Svg>
+);
+
+/** Due anelli di catena: il collegamento che si manda al cliente. */
+export const IconaCollegamento = (p: Proprieta) => (
+  <Svg {...p}>
+    <circle {...CORPO} cx="12" cy="12" r="8.5" />
+    <path d="M10.3 13.7a3.6 3.6 0 005.1 0l2.6-2.6a3.6 3.6 0 00-5.1-5.1l-1 1" />
+    <path d="M13.7 10.3a3.6 3.6 0 00-5.1 0L6 12.9a3.6 3.6 0 005.1 5.1l1-1" />
+  </Svg>
+);
+
+/** Tre fogli uno sull'altro: i livelli di dettaglio del report. */
+export const IconaLivelli = (p: Proprieta) => (
+  <Svg {...p}>
+    <path {...CORPO} d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z" />
+    <path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z" />
+    <path d="M3.5 12l8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5" />
+  </Svg>
+);
+
+/** Un elenco con le spunte: i rischi da portare nel documento. */
+export const IconaElenco = (p: Proprieta) => (
+  <Svg {...p}>
+    <rect {...CORPO} x="3" y="3.5" width="18" height="17" rx="3" />
+    <path d="M5 7l1.5 1.5L9 6M12 7.5h7M5 12.5L6.5 14 9 11.5M12 13h7M12 18.5h7" />
+    <circle cx="7" cy="18.2" r="1.5" />
+  </Svg>
+);
+
+/** Un foglio di calcolo: il CRM esportato. */
+export const IconaTabella = (p: Proprieta) => (
+  <Svg {...p}>
+    <path {...CORPO} d="M3.5 9.5h17V7A2.5 2.5 0 0018 4.5H6A2.5 2.5 0 003.5 7z" />
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10" />
+  </Svg>
+);
+
+/** La stampante: il report stampato o salvato in PDF. */
+export const IconaStampante = (p: Proprieta) => (
+  <Svg {...p}>
+    <rect {...CORPO} x="3" y="9" width="18" height="8.5" rx="2" />
+    <path d="M7 9V4h10v5" />
+    <path d="M6.5 17.5H5a2 2 0 01-2-2V11a2 2 0 012-2h14a2 2 0 012 2v4.5a2 2 0 01-2 2h-1.5" />
+    <path d="M7 14h10v6H7z" />
+  </Svg>
+);
+
+export const IconaInfo = (p: Proprieta) => (
+  <Svg {...p}>
+    <circle {...CORPO} cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5.2M12 7.8h.01" />
+  </Svg>
+);
+
 export const IconaCrm = (p: Proprieta) => (
   <Svg {...p}>
     <path {...CORPO} d="M3.5 9h17V6.5A2.5 2.5 0 0018 4H6a2.5 2.5 0 00-2.5 2.5z" />

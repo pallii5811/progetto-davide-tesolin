@@ -1,17 +1,12 @@
 import { Geist } from 'next/font/google';
 import {
   IconaArchivio,
-  IconaCampana,
-  IconaDocumento,
   IconaFermo,
-  IconaGrafico,
-  IconaIngranaggio,
   IconaLente,
   IconaLucchetto,
   IconaLuogo,
   IconaPersone,
   IconaScudo,
-  IconaSpunta,
 } from './icone';
 import {
   IllustrazioneAnalizza,
@@ -29,6 +24,8 @@ import {
 import { CollegamentoFreccia, Pulsante, Tessera } from './pezzi';
 import { ProdottoScorrevole } from './ProdottoScorrevole';
 import { SchedaRegistro } from './SchedaRegistro';
+import { SchedeFunzioni } from './SchedeFunzioni';
+import { TessereReport } from './TessereReport';
 import type { Tono } from './pezzi';
 
 /**
@@ -183,92 +180,6 @@ const PASSI = [
     testo:
       'Sintesi per il titolare, capitali da assicurare, coperture da proporre con il loro perché, obbligo CAT NAT. Lo stampi o lo mandi in PDF, con l’intestazione della tua agenzia.',
     ancora: '#conformita',
-  },
-] as const;
-
-/*
-  I riferimenti normativi sono quelli che il report porta davvero (report/page.tsx): richieste ed
-  esigenze all'art. 58, la motivazione dell'adeguatezza, l'intestazione con il RUI. Il decreto
-  antiriciclaggio non si cita: i suoi obblighi riguardano chi lavora i rami vita, e un agente danni
-  che lo legge qui penserebbe a un errore.
-*/
-const CONFORMITA = [
-  {
-    icona: <IconaDocumento />,
-    tono: 'blu' as const,
-    titolo: 'Intestazione e RUI',
-    testo:
-      'Il report esce con il logo, il nome della tua agenzia e il numero di iscrizione al RUI. Lo stampi o lo salvi in PDF.',
-  },
-  {
-    icona: <IconaSpunta />,
-    tono: 'arancio' as const,
-    titolo: 'Richieste ed esigenze',
-    testo: 'Le esigenze del cliente e il perché di ogni copertura proposta, nero su bianco nel report.',
-  },
-  {
-    icona: <IconaPersone />,
-    tono: 'magenta' as const,
-    titolo: 'Controlli su soci e titolare effettivo',
-    testo:
-      'Titolare effettivo ricavato dai soci e controllo su sanzioni internazionali, persone politicamente esposte e notizie negative. La tua decisione resta registrata con la data.',
-  },
-  {
-    icona: <IconaGrafico />,
-    tono: 'petrolio' as const,
-    titolo: 'Ogni numero ha la sua fonte',
-    testo:
-      'Ogni punteggio mostra le voci da cui nasce, e nel report ogni capitale dice come è stato calcolato. Se il cliente o l’assuntore chiedono da dove viene, la risposta è lì.',
-  },
-] as const;
-
-/*
-  Le funzioni che non hanno un pannello loro, ognuna verificata sul prodotto: l'ordine delle
-  domande per peso (completeness.ts: superfici 10, export 9, dipendenti 8), il link revocabile del
-  questionario, la verifica a richiesta di protesti e procedure, i quattro ruoli e l'isolamento per
-  studio, la solidità delle compagnie dalla SFCR inserita a mano, l'esportazione del CRM in CSV.
-*/
-const FUNZIONI = [
-  {
-    icona: <IconaSpunta />,
-    tono: 'arancio' as const,
-    titolo: 'Cosa chiedere, in ordine di importanza',
-    testo:
-      'AEGIS mette in fila le domande da fare al cliente, a partire da quelle che spostano di più il risultato: superfici, export, numero di dipendenti.',
-  },
-  {
-    icona: <IconaDocumento />,
-    tono: 'magenta' as const,
-    titolo: 'Il questionario lo compila il cliente',
-    testo:
-      'Gli mandi un link e scorte, veicoli e lavori in cantiere li scrive lui. Le risposte finiscono nella scheda senza ricopiare niente, e il link lo disattivi quando vuoi.',
-  },
-  {
-    icona: <IconaCampana />,
-    tono: 'arancio' as const,
-    titolo: 'Protesti e procedure',
-    testo:
-      'Prima di lavorare un’azienda verifichi, a richiesta, protesti, pregiudizievoli e procedure concorsuali.',
-  },
-  {
-    icona: <IconaIngranaggio />,
-    tono: 'blu' as const,
-    titolo: 'Tutta l’agenzia sullo stesso account',
-    testo:
-      'Quattro ruoli, dal titolare a chi deve solo consultare: ognuno vede e fa quello che gli spetta. Ogni agenzia vede solo i propri clienti.',
-  },
-  {
-    icona: <IconaGrafico />,
-    tono: 'petrolio' as const,
-    titolo: 'Le compagnie a confronto',
-    testo:
-      'Riporti i dati della SFCR delle compagnie con cui lavori e ne confronti la solidità. Ti serve quando il cliente chiede perché proprio quella.',
-  },
-  {
-    icona: <IconaArchivio />,
-    tono: 'neutro' as const,
-    titolo: 'Il CRM in un file',
-    testo: 'Esporti le aziende del CRM in CSV, con il filtro che stai guardando, e lo apri in Excel.',
   },
 ] as const;
 
@@ -627,29 +538,37 @@ export function Vetrina() {
         </section>
 
         {/* ── Il report e le carte IVASS ─────────────────────────────────── */}
-        <section id="conformita" className="scroll-mt-28 py-20 sm:py-24">
+        {/*
+          Dal 19/09/2026 quattro tessere colorate con un pezzo del report ciascuna, come le tessere di
+          superhuman.com (TessereReport.tsx). I riferimenti normativi sono quelli che il report porta
+          davvero (report/page.tsx): richieste ed esigenze all'art. 58, la motivazione
+          dell'adeguatezza, l'intestazione con il RUI. Il decreto antiriciclaggio non si cita: i suoi
+          obblighi riguardano chi lavora i rami vita, e un agente danni che lo legge qui penserebbe a
+          un errore.
+        */}
+        <section
+          id="conformita"
+          aria-labelledby="titolo-conformita"
+          className="scroll-mt-28 py-20 sm:py-24"
+        >
           <div className={LARGHEZZA}>
-            <Titolo2 className="max-w-[760px]">Le carte IVASS sono già nel report.</Titolo2>
+            <Titolo2 className="max-w-[760px]">
+              <span id="titolo-conformita">Le carte IVASS sono già nel report.</span>
+            </Titolo2>
             <Paragrafo className="mt-5 max-w-[680px]">
               Intestazione con il numero RUI, richieste ed esigenze del cliente e motivazione di ogni
               copertura proposta, con i riferimenti agli articoli 58 e 59 del Regolamento IVASS n. 40/2018.
               Se arriva un’ispezione, ogni capitale dice da dove viene.
             </Paragrafo>
-            <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {CONFORMITA.map((voce) => (
-                <li key={voce.titolo} className="rounded-3xl border border-vetrina-linea bg-white p-6">
-                  <Tessera tono={voce.tono}>{voce.icona}</Tessera>
-                  <h3 className="mt-5 text-[18px] font-semibold leading-snug tracking-[-0.02em]">
-                    {voce.titolo}
-                  </h3>
-                  <p className="mt-2 text-[15px] leading-relaxed text-vetrina-grigio">{voce.testo}</p>
-                </li>
-              ))}
-            </ul>
+            <TessereReport />
           </div>
         </section>
 
         {/* ── Tutte le altre funzioni ────────────────────────────────────── */}
+        {/*
+          Dal 19/09/2026 in tre linguette con le icone grandi, come la fila di schede di
+          superhuman.com (SchedeFunzioni.tsx): con il cliente, nel report, in agenzia.
+        */}
         <section id="funzioni" aria-labelledby="titolo-funzioni" className="scroll-mt-28 pb-20 sm:pb-24">
           <div className={LARGHEZZA}>
             <h2
@@ -658,17 +577,7 @@ export function Vetrina() {
             >
               Il resto di quello che fa AEGIS.
             </h2>
-            <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {FUNZIONI.map((voce) => (
-                <li key={voce.titolo} className="rounded-3xl border border-vetrina-linea bg-white p-6">
-                  <Tessera tono={voce.tono}>{voce.icona}</Tessera>
-                  <h3 className="mt-5 text-[18px] font-semibold leading-snug tracking-[-0.02em]">
-                    {voce.titolo}
-                  </h3>
-                  <p className="mt-2 text-[15px] leading-relaxed text-vetrina-grigio">{voce.testo}</p>
-                </li>
-              ))}
-            </ul>
+            <SchedeFunzioni />
           </div>
         </section>
 

@@ -417,6 +417,30 @@ body {
   }
 }
 
+/*
+ * Le schede delle funzioni della vetrina (app/_vetrina/SchedeFunzioni.tsx): a ogni cambio di
+ * linguetta entrano salendo di poco, una dopo l'altra. Mai al caricamento, e mai per chi ha chiesto
+ * meno movimento.
+ */
+@keyframes vetrina-scheda-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.vetrina-scheda-entra {
+  animation: vetrina-scheda-entra 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vetrina-scheda-entra {
+    animation: none;
+  }
+}
+
 /* I salti alle sezioni della vetrina scorrono, ma solo per chi non ha chiesto il contrario. */
 @media (prefers-reduced-motion: no-preference) {
   html:has(.vetrina-radice) {
