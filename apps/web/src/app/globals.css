@@ -319,8 +319,8 @@ body {
  */
 .tour-schermata {
   transition:
-    opacity 380ms ease,
-    transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms ease,
+    transform 380ms cubic-bezier(0.22, 1, 0.36, 1),
     visibility 0s;
 }
 .tour-schermata[data-attivo='no'] {
@@ -328,14 +328,14 @@ body {
   transform: translateY(10px);
   visibility: hidden;
   transition:
-    opacity 200ms ease,
-    transform 200ms ease,
-    visibility 0s 200ms;
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 0s 140ms;
 }
 .tour-schermata .tour-entra {
   transition:
-    opacity 420ms ease var(--r, 0ms),
-    transform 560ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms),
+    opacity 300ms ease var(--r, 0ms),
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms),
     background-color 300ms ease var(--r, 0ms);
 }
 .tour-schermata[data-attivo='no'] .tour-entra {
@@ -345,60 +345,64 @@ body {
 }
 .tour-schermata .tour-riempie {
   width: 0;
-  transition: width 1200ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
+  transition: width 850ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
 }
 .tour-schermata[data-attivo='si'] .tour-riempie {
   width: var(--fino);
 }
 .tour-schermata .tour-anello {
   stroke-dashoffset: 100px;
-  transition: stroke-dashoffset 1100ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
+  transition: stroke-dashoffset 800ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
 }
 .tour-schermata[data-attivo='si'] .tour-anello {
   stroke-dashoffset: var(--resto);
 }
-.tour-schermata .tour-premuto,
-.tour-schermata .tour-premuto .tour-premuto-nota,
-.tour-schermata .tour-evidenzia,
-.tour-schermata .tour-scegli,
-.tour-schermata .tour-lascia {
-  transition:
-    background-color 260ms ease var(--r, 0ms),
-    color 260ms ease var(--r, 0ms),
-    border-color 260ms ease var(--r, 0ms),
-    box-shadow 260ms ease var(--r, 0ms),
-    opacity 420ms ease var(--r, 0ms),
-    transform 560ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
+/* Le colonne dei bilanci salgono dal basso quando si aprono i dati camerali. */
+.tour-schermata .tour-cresce {
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
 }
-.tour-schermata[data-attivo='si'] .tour-premuto {
-  background-color: var(--color-vetrina-inchiostro);
-  border-color: var(--color-vetrina-inchiostro);
-  color: white;
+.tour-schermata[data-attivo='si'] .tour-cresce {
+  transform: scaleY(1);
 }
-.tour-schermata[data-attivo='si'] .tour-premuto .tour-premuto-nota {
-  color: rgba(255, 255, 255, 0.8);
+/*
+ * Il cursore del film: scivola sul pulsante con una curva morbida, al clic la freccia si abbassa
+ * un attimo e lascia un'onda. I cambi dovuti al clic (il pulsante premuto, la riga scelta, il
+ * risultato che arriva) sono classi di Tailwind nelle schermate, accese dal copione.
+ */
+.tour-cursore {
+  transition: transform 550ms cubic-bezier(0.45, 0, 0.2, 1);
+  will-change: transform;
 }
-.tour-schermata[data-attivo='si'] .tour-evidenzia {
-  background-color: oklch(0.96 0.02 262);
-  box-shadow: inset 3px 0 0 var(--color-vetrina-blu);
+.tour-freccia {
+  animation: tour-premi 360ms ease-out;
+  transform-origin: 20% 15%;
 }
-.tour-schermata .tour-scegli {
-  color: var(--color-vetrina-grigio);
+.tour-clic {
+  background: radial-gradient(circle, oklch(0.42 0.15 262 / 0.35), oklch(0.42 0.15 262 / 0) 70%);
+  animation: tour-onda 620ms ease-out forwards;
 }
-.tour-schermata[data-attivo='si'] .tour-scegli {
-  background-color: var(--color-vetrina-inchiostro);
-  color: white;
-  font-weight: 500;
+@keyframes tour-premi {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.82);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
-.tour-schermata .tour-lascia {
-  background-color: var(--color-vetrina-inchiostro);
-  color: white;
-  font-weight: 500;
-}
-.tour-schermata[data-attivo='si'] .tour-lascia {
-  background-color: transparent;
-  color: var(--color-vetrina-grigio);
-  font-weight: 400;
+@keyframes tour-onda {
+  0% {
+    transform: scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
 }
 /* Meno movimento: nessuna dissolvenza e nessun ritardo, lo stato finale compare subito. */
 @media (prefers-reduced-motion: reduce) {
@@ -407,7 +411,8 @@ body {
     transition: none !important;
   }
   .tour-schermata[data-attivo='no'],
-  .tour-schermata[data-attivo='no'] .tour-entra {
+  .tour-schermata[data-attivo='no'] .tour-entra,
+  .tour-schermata .tour-cresce {
     transform: none;
   }
 }
