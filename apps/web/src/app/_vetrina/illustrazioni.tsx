@@ -1,7 +1,6 @@
 import {
   IconaArchivio,
   IconaCampana,
-  IconaCrm,
   IconaDocumento,
   IconaEuro,
   IconaFermo,
@@ -22,6 +21,7 @@ import {
   Anello,
   CartaFantasma,
   CartaSegnale,
+  Etichetta,
   OMBRA_FINESTRA,
   PUNTINI,
   Tessera,
@@ -43,66 +43,75 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /*
-  Esempi, ma coerenti con il prodotto: il Cyber è quello vero della divisione ATECO di ciascuna
-  (tabelle-veezco.ts: 25 → 3,4 · 28 → 4 · 13 → 2,8 · 52 → 5,1), e Logistica Orobia è la stessa
-  azienda delle altre illustrazioni (Property 5,17, fermo di 30 giorni 1.627.397 €).
+  La scheda di un'azienda come la mostra il prodotto (app/azienda/[id]/page.tsx): intestazione,
+  indice delle sezioni, i tre riquadri dei rischi e i cerchi del Property Risk. Fino al 19/09/2026
+  qui c'era una tabella del CRM con colonne di rischio e un ordinamento per Property che il CRM vero
+  non ha: una verifica sul codice l'ha trovata, e ora si mostra la schermata che esiste.
+
+  L'azienda è Logistica Orobia, la stessa delle altre illustrazioni, e i numeri tornano con il
+  motore: sede a Dello (BS), i cui dati danno alluvione 7, sisma 3 e frana 1, quindi calamità
+  naturali 5,34 e Property 5,17 con l'incendio a 5 del magazzinaggio; 118 addetti, media impresa,
+  termine CAT NAT 01/10/2025; fatturato 19.800.000 € / 365 = 54.246,58 € al giorno, e 30 giorni
+  = 1.627.397,40 € (il prodotto moltiplica la perdita giornaliera già arrotondata); Cyber 5,1
+  della divisione ATECO 52.
 */
-const RIGHE_ESEMPIO = [
-  {
-    nome: 'Galvanica Brembana S.r.l.',
-    sede: 'Treviolo',
-    property: 6.1,
-    fermo: '205.380 €',
-    cyber: 3.4,
-    stato: 'Contattata',
-  },
-  {
-    nome: 'Nordvalle Meccanica S.r.l.',
-    sede: 'Bergamo',
-    property: 5.42,
-    fermo: '354.411 €',
-    cyber: 4,
-    stato: 'In trattativa',
-  },
-  {
-    nome: 'Logistica Orobia S.p.A.',
-    sede: 'Dalmine',
-    property: 5.17,
-    fermo: '1.627.397 €',
-    cyber: 5.1,
-    stato: 'Da contattare',
-  },
-  {
-    nome: 'Tessiture Serio S.r.l.',
-    sede: 'Alzano Lombardo',
-    property: 4.34,
-    fermo: '118.260 €',
-    cyber: 2.8,
-    stato: 'Da contattare',
-  },
-  {
-    nome: 'Carpenterie Alte Valli S.r.l.',
-    sede: 'Seriate',
-    property: 3.84,
-    fermo: '96.820 €',
-    cyber: 3.4,
-    stato: 'Cliente',
-  },
-] as const;
 
-const STILE_STATO: Record<string, string> = {
-  'In trattativa': 'bg-vetrina-arancio/12 text-[oklch(0.45_0.14_42)]',
-  'Da contattare': 'bg-vetrina-blu/10 text-vetrina-blu',
-  Cliente: 'bg-[oklch(0.95_0.05_150)] text-[oklch(0.42_0.12_150)]',
-  Contattata: 'bg-vetrina-velo text-vetrina-grigio',
-};
-
-function Punteggio({ valore, decimali = 2 }: { valore: number; decimali?: number }) {
+/** Un riquadro dei tre rischi, come la `Metrica` della scheda: nome, valore, riga di spiegazione. */
+function RiquadroRischio({
+  titolo,
+  valore,
+  sotto,
+  segno,
+}: {
+  titolo: string;
+  valore: string;
+  sotto: string;
+  segno: React.ReactNode;
+}) {
   return (
-    <span className="inline-flex items-center gap-2 tabular-nums">
-      <span className="h-2 w-2 rounded-full" style={{ background: colorePunteggio(valore) }} />
-      {valore.toLocaleString('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali })}
-    </span>
+    <div className="rounded-2xl border border-vetrina-linea bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[12.5px] text-vetrina-grigio">{titolo}</p>
+          <p className="mt-1 text-[22px] font-semibold leading-tight tracking-[-0.03em] tabular-nums">
+            {valore}
+          </p>
+        </div>
+        {segno}
+      </div>
+      <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-vetrina-grigio">{sotto}</p>
+    </div>
+  );
+}
+
+/** Un cerchio grande della sezione Property Risk, con il suo titolo e la riga sotto. */
+function CerchioProperty({
+  titolo,
+  valore,
+  testo,
+  evidenza = false,
+  children,
+}: {
+  titolo: string;
+  valore: number;
+  testo: string;
+  evidenza?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`flex flex-col items-center rounded-2xl border bg-white px-4 pb-4 pt-3.5 ${
+        evidenza
+          ? 'border-vetrina-blu/40 shadow-[0_0_0_3px_oklch(0.42_0.15_262/0.08)]'
+          : 'border-vetrina-linea'
+      }`}
+    >
+      <p className="text-[12.5px] font-semibold">{titolo}</p>
+      <div className="mt-2">
+        <Anello valore={valore} testo={testo} dimensione={84} />
+      </div>
+      <div className="mt-2 w-full">{children}</div>
+    </div>
   );
 }
 
@@ -113,103 +122,179 @@ export function IllustrazioneTestata() {
       <div className="relative hidden h-[190px] lg:block">
         <CartaFantasma className="absolute left-[3%] top-[34px] w-[190px] opacity-50" />
         <CartaSegnale
-          className="absolute left-[16%] top-[102px] w-max max-w-[300px] animate-[vetrina-galleggia_7s_ease-in-out_infinite] vetrina-animata"
+          className="absolute left-[15%] top-[102px] w-max max-w-[330px] animate-[vetrina-galleggia_7s_ease-in-out_infinite] vetrina-animata"
           icona={<IconaFiamma />}
           tono="arancio"
-          titolo="Rischio incendio 6 su 7"
-          sotto="Prodotti in metallo · ATECO 25"
+          titolo="Rischio incendio"
+          sotto="Magazzinaggio · ATECO 52.10"
+          etichetta={{ testo: '5 su 7', tono: 'rosso' }}
         />
         <CartaSegnale
-          className="absolute left-[38%] top-[8px] w-max max-w-[320px] animate-[vetrina-galleggia_8s_ease-in-out_1s_infinite] vetrina-animata"
+          className="absolute left-[37%] top-[8px] w-max max-w-[360px] animate-[vetrina-galleggia_8s_ease-in-out_1s_infinite] vetrina-animata"
           icona={<IconaOnde />}
           tono="blu"
-          titolo="Alluvione alta"
-          sotto="28,8 % delle imprese in area elevata"
+          titolo="Alluvione"
+          sotto="28,8 % delle imprese del comune in area elevata"
+          etichetta={{ testo: 'alta', tono: 'rosso' }}
         />
         <CartaSegnale
-          className="absolute right-[17%] top-[112px] w-max max-w-[300px] animate-[vetrina-galleggia_6.5s_ease-in-out_0.5s_infinite] vetrina-animata"
+          className="absolute right-[16%] top-[112px] w-max max-w-[330px] animate-[vetrina-galleggia_6.5s_ease-in-out_0.5s_infinite] vetrina-animata"
           icona={<IconaFermo />}
           tono="petrolio"
           titolo="Fermo di 30 giorni"
-          sotto="1,63 milioni di perdita stimata"
+          sotto="Stima sul fatturato dell’ultimo bilancio"
+          etichetta={{ testo: '1,63 mln €', tono: 'ambra' }}
         />
+        {/*
+          A piena opacità: con opacity-80 l'etichetta ambra scendeva a 3,87:1 di contrasto, e axe
+          la boccia anche dentro un'illustrazione nascosta ai lettori di schermo (19/09/2026).
+        */}
         <CartaSegnale
-          className="absolute right-[2%] top-[22px] w-max max-w-[280px] opacity-80"
-          icona={<IconaPersone />}
+          className="absolute right-[1%] top-[20px] w-max max-w-[300px]"
+          icona={<IconaDocumento />}
           tono="magenta"
-          titolo="3 aziende nel CRM"
-          sotto="Arrivate dall’ultimo elenco"
+          titolo="Obbligo CAT NAT"
+          sotto="Media impresa · termine 01/10/2025"
+          etichetta={{ testo: 'soggetta', tono: 'ambra' }}
         />
       </div>
 
-      {/* La finestra di prodotto: Ricerca Clienti con le colonne che l'analisi riempie. */}
+      {/* La finestra di prodotto: la scheda dell'azienda, aperta sul Property Risk. */}
       <div
         className={`relative overflow-hidden rounded-[28px] border border-vetrina-linea bg-white ${OMBRA_FINESTRA}`}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-vetrina-linea px-5 py-4 sm:px-7">
-          <div className="flex items-center gap-3">
-            <IconaCrm className="h-5 w-5 text-vetrina-grigio" />
-            <span className="text-[16px] font-semibold tracking-[-0.01em]">Le tue aziende</span>
-            <span className="hidden text-[13px] text-vetrina-grigio sm:inline">· esempio</span>
-          </div>
-          <div className="hidden flex-wrap items-center gap-2 text-[12.5px] sm:flex">
-            {['Tutti gli stati', 'Ordinate per Property Risk'].map((filtro) => (
-              <span
-                key={filtro}
-                className="inline-flex items-center gap-1.5 rounded-full border border-vetrina-linea bg-vetrina-carta px-3 py-1 font-medium"
-              >
-                <IconaFiltro className="h-3.5 w-3.5 text-vetrina-grigio" />
-                {filtro}
-              </span>
+        {/*
+          La cornice della finestra: tre punti e il nome della pagina, così si legge come
+          un'applicazione vera e non come un disegno. Punti grigi e non colorati, per non portare il
+          segno di un sistema operativo.
+        */}
+        <div className="flex items-center gap-3 border-b border-vetrina-linea bg-vetrina-carta px-4 py-2.5 sm:px-5">
+          <span className="flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="h-2.5 w-2.5 rounded-full bg-vetrina-linea" />
             ))}
+          </span>
+          <span className="mx-auto inline-flex items-center gap-1.5 rounded-lg border border-vetrina-linea bg-white px-3 py-1 text-[11.5px] font-medium text-vetrina-grigio">
+            <IconaLucchetto className="h-3 w-3" />
+            AEGIS · Scheda azienda
+          </span>
+          <span className="w-[42px]" />
+        </div>
+
+        {/* Intestazione della scheda. */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 pb-4 pt-5 sm:px-7">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-vetrina-blu/14 to-vetrina-blu/6 text-vetrina-blu ring-1 ring-inset ring-vetrina-blu/15">
+              <IconaPalazzo className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-[18px] font-semibold tracking-[-0.025em]">
+                <span className="truncate">Logistica Orobia S.p.A.</span>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[oklch(0.95_0.05_150)] px-2 py-0.5 text-[11px] font-medium text-[oklch(0.42_0.12_150)]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.62_0.15_150)]" />
+                  attiva
+                </span>
+              </p>
+              <p className="truncate text-[12.5px] text-vetrina-grigio">
+                Dello (BS) · 52.10 Magazzinaggio e custodia · Media impresa · 118 dipendenti
+              </p>
+            </div>
+          </div>
+          <div className="hidden items-center gap-2 text-[12.5px] font-medium md:flex">
+            <span className="rounded-full border border-vetrina-linea bg-white px-3.5 py-1.5">
+              Dati di intervista
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-vetrina-inchiostro px-3.5 py-1.5 text-white">
+              <IconaDocumento className="h-3.5 w-3.5" />
+              Report per il cliente
+            </span>
           </div>
         </div>
-        <div className="overflow-hidden">
-          <table className="w-full text-left text-[13.5px]">
-            <thead>
-              <tr className="border-b border-vetrina-linea text-[12px] uppercase tracking-[0.04em] text-vetrina-grigio">
-                <th className="px-5 py-3 font-medium sm:px-7">Azienda</th>
-                <th className="hidden px-4 py-3 font-medium md:table-cell">Sede</th>
-                <th className="px-4 py-3 font-medium">Property</th>
-                <th className="hidden px-4 py-3 font-medium lg:table-cell">Fermo 30 giorni</th>
-                <th className="hidden px-4 py-3 font-medium sm:table-cell">Cyber</th>
-                <th className="hidden px-4 py-3 font-medium sm:table-cell">Stato</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RIGHE_ESEMPIO.map((riga, i) => (
-                <tr
-                  key={riga.nome}
-                  className={i < RIGHE_ESEMPIO.length - 1 ? 'border-b border-vetrina-linea' : ''}
-                >
-                  <td className="px-5 py-3.5 font-medium sm:px-7">
-                    <span className="flex items-center gap-3">
-                      <span className="hidden h-7 w-7 items-center justify-center rounded-lg bg-vetrina-velo text-vetrina-grigio sm:inline-flex">
-                        <IconaPalazzo className="h-4 w-4" />
-                      </span>
-                      <span className="truncate">{riga.nome}</span>
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-3.5 text-vetrina-grigio md:table-cell">{riga.sede}</td>
-                  <td className="px-4 py-3.5">
-                    <Punteggio valore={riga.property} />
-                  </td>
-                  <td className="hidden px-4 py-3.5 tabular-nums lg:table-cell">{riga.fermo}</td>
-                  <td className="hidden px-4 py-3.5 sm:table-cell">
-                    <Punteggio valore={riga.cyber} decimali={1} />
-                  </td>
-                  <td className="hidden px-4 py-3.5 sm:table-cell">
-                    <span
-                      className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium ${STILE_STATO[riga.stato] ?? ''}`}
-                    >
-                      {riga.stato}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        {/* L'indice delle sezioni, con la sezione che si sta leggendo in evidenza. */}
+        <div className="flex gap-1 overflow-hidden border-y border-vetrina-linea bg-vetrina-carta/70 px-5 py-2 text-[12.5px] sm:px-7">
+          {[
+            'Property Risk',
+            'Business Interruption',
+            'Cyber Risk',
+            'Eventi negativi',
+            'Profilo dell’impresa',
+          ].map((voce, i) => (
+            <span
+              key={voce}
+              className={`shrink-0 rounded-full px-3 py-1 ${
+                i === 0
+                  ? 'bg-white font-medium text-vetrina-inchiostro shadow-[0_1px_2px_rgba(16,24,40,0.06),0_0_0_1px_var(--color-vetrina-linea)]'
+                  : 'text-vetrina-grigio'
+              }`}
+            >
+              {voce}
+            </span>
+          ))}
         </div>
+
+        <div className="space-y-3 bg-vetrina-carta/50 px-5 pb-10 pt-5 sm:px-7">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <RiquadroRischio
+              titolo="Property Risk"
+              valore="5,17 su 7"
+              sotto="Ubicazione più esposta: sede legale, Dello (BS)"
+              segno={
+                <Tessera tono="blu">
+                  <IconaPalazzo />
+                </Tessera>
+              }
+            />
+            <RiquadroRischio
+              titolo="Business Interruption"
+              valore="54.246,58 € al giorno"
+              sotto="Sul fatturato annuo · 30 giorni di fermo 1.627.397,40 €"
+              segno={
+                <Tessera tono="arancio">
+                  <IconaEuro />
+                </Tessera>
+              }
+            />
+            <RiquadroRischio
+              titolo="Cyber Risk"
+              valore="5,1 su 7"
+              sotto="ATECO 52 · magazzinaggio e supporto ai trasporti"
+              segno={
+                <Tessera tono="petrolio">
+                  <IconaLucchetto />
+                </Tessera>
+              }
+            />
+          </div>
+
+          <div className="hidden gap-3 md:grid md:grid-cols-3">
+            <CerchioProperty titolo="Rischio incendio" valore={5} testo="5">
+              <p className="text-center text-[11.5px] leading-snug text-vetrina-grigio">
+                Dal tipo di attività e dal tipo di edificio
+              </p>
+            </CerchioProperty>
+            <CerchioProperty titolo="Calamità naturali" valore={5.34} testo="5,34">
+              <div className="divide-y divide-vetrina-linea text-[11.5px]">
+                {[
+                  ['Alluvione', '7/7'],
+                  ['Sisma', '3/7'],
+                  ['Frana', '1/7'],
+                ].map(([voce, valore]) => (
+                  <div key={voce} className="flex justify-between py-1">
+                    <span className="text-vetrina-grigio">{voce}</span>
+                    <span className="font-semibold tabular-nums">{valore}</span>
+                  </div>
+                ))}
+              </div>
+            </CerchioProperty>
+            <CerchioProperty titolo="Overall Risk Score" valore={5.17} testo="5,17" evidenza>
+              <p className="text-center text-[11.5px] leading-snug text-vetrina-grigio">
+                Property Risk di questa sede
+              </p>
+            </CerchioProperty>
+          </div>
+        </div>
+
         {/* La finestra sfuma verso il basso: continua, ma non serve vederla tutta. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
       </div>
@@ -303,7 +388,7 @@ export function IllustrazioneAnalizza() {
           icona={<IconaCampana />}
           tono="blu"
           titolo="Analisi pronta"
-          sotto="Logistica Orobia · sede legale a Dalmine"
+          sotto="Logistica Orobia · sede legale a Dello"
         />
       </div>
       <div className="absolute left-1/2 top-[92px] h-7 border-l border-dashed border-vetrina-grigio/40" />
@@ -364,102 +449,263 @@ const FONDI = {
   arancio: 'bg-vetrina-arancio',
   magenta: 'bg-vetrina-magenta',
   petrolio: 'bg-vetrina-petrolio',
+  viola: 'bg-vetrina-viola',
 } as const;
 
-function Pannello({ fondo, children }: { fondo: keyof typeof FONDI; children: React.ReactNode }) {
+/** Il nome di un'azienda nella tabella di un pannello: la piccola tessera e il nome. */
+function NomeAzienda({ nome }: { nome: string }) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-vetrina-velo text-vetrina-grigio ring-1 ring-inset ring-vetrina-linea">
+        <IconaPalazzo className="h-3 w-3" />
+      </span>
+      <span className="truncate font-medium text-vetrina-inchiostro">{nome}</span>
+    </span>
+  );
+}
+
+/**
+ * La tabella sotto le carte, come nella finestra del prodotto: intestazioni e righe di esempio.
+ * Prima erano quattro righe di barre grigie, e il pannello sembrava un'impaginazione non finita.
+ * `griglia` è una classe scritta per intero da chi chiama, così Tailwind la trova nei sorgenti.
+ */
+function TabellaPannello({
+  griglia,
+  colonne,
+  righe,
+}: {
+  griglia: string;
+  colonne: readonly string[];
+  righe: readonly (readonly React.ReactNode[])[];
+}) {
+  return (
+    <div className="absolute inset-x-0 bottom-0 h-[38%] overflow-hidden bg-white">
+      <div
+        className={`grid ${griglia} items-center gap-3 border-b border-vetrina-linea bg-vetrina-carta px-6 py-2 text-[10.5px] font-medium uppercase tracking-[0.06em] text-vetrina-grigio`}
+      >
+        {colonne.map((colonna) => (
+          <span key={colonna} className="truncate">
+            {colonna}
+          </span>
+        ))}
+      </div>
+      {righe.map((riga, i) => (
+        <div
+          key={i}
+          className={`grid ${griglia} items-center gap-3 border-b border-vetrina-linea/70 px-6 py-2.5 text-[12.5px] tabular-nums text-vetrina-grigio`}
+        >
+          {riga.map((cella, j) => (
+            <span key={j} className="min-w-0 truncate">
+              {cella}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Pannello({
+  fondo,
+  tabella,
+  children,
+}: {
+  fondo: keyof typeof FONDI;
+  tabella: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div
       aria-hidden="true"
-      className="relative h-[460px] overflow-hidden rounded-[32px] border border-vetrina-linea bg-white sm:h-[520px]"
+      className="relative h-[460px] overflow-hidden rounded-[32px] border border-vetrina-linea bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_30px_60px_-30px_rgba(16,24,40,0.25)] sm:h-[520px]"
     >
       <div className={`absolute inset-x-0 top-0 h-[62%] ${FONDI[fondo]}`}>
-        {/* Una luce morbida dall'alto: il colore pieno, senza, sembra una campitura di prova. */}
-        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_80%_0%,rgba(255,255,255,0.28),transparent_60%)]" />
+        {/*
+          Tre strati sul colore pieno, che da solo sembra una campitura di prova: una luce dall'alto
+          a destra, un'ombra in basso a sinistra che dà profondità, e un reticolo di puntini che
+          sfuma verso il basso, come la carta millimetrata dei pannelli di Clay.
+        */}
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_85%_0%,rgba(255,255,255,0.32),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_0%_100%,rgba(0,0,0,0.22),transparent_62%)]" />
+        <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(rgba(255,255,255,0.9)_1px,transparent_1.3px)] [background-size:18px_18px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
       </div>
-      {/* La tabella che continua sotto le carte, come in una finestra di prodotto vera. */}
-      <div className="absolute inset-x-0 bottom-0 h-[38%] bg-white">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center gap-4 border-t border-vetrina-linea px-6 py-3.5">
-            <span className="w-4 text-[12px] tabular-nums text-vetrina-grigio">{i + 1}</span>
-            <span className="h-2 w-28 rounded-full bg-vetrina-linea" />
-            <span className="h-2 w-20 rounded-full bg-vetrina-linea/70" />
-            <span className="ml-auto h-2 w-12 rounded-full bg-vetrina-linea/70" />
-          </div>
-        ))}
-      </div>
+      {tabella}
       {/* `vetrina-carte`: nella scena che scorre (ProdottoScorrevole.tsx) le carte entrano una alla volta. */}
-      <div className="vetrina-carte absolute inset-x-5 top-8 flex flex-col items-end gap-3 sm:inset-x-auto sm:right-8 sm:w-[340px]">
+      <div className="vetrina-carte absolute inset-x-5 top-8 flex flex-col items-end gap-3 sm:inset-x-auto sm:right-8 sm:w-[350px]">
         {children}
       </div>
     </div>
   );
 }
 
+/*
+  Le ubicazioni senza nome di comune: un valore di pericolosità accanto a un comune vero sarebbe
+  un'affermazione su quel comune, e questi valori sono di esempio.
+*/
 export function PannelloTerritorio() {
   return (
-    <Pannello fondo="blu">
+    <Pannello
+      fondo="blu"
+      tabella={
+        <TabellaPannello
+          griglia="grid-cols-[1.5fr_1fr_1fr_1fr]"
+          colonne={['Ubicazione', 'Alluvione', 'Sisma', 'Frana']}
+          righe={[
+            [<NomeAzienda key="n" nome="Sede legale" />, 'alta', 'zona 3', 'bassa'],
+            [<NomeAzienda key="n" nome="Magazzino A" />, 'media', 'zona 3', 'bassa'],
+            [<NomeAzienda key="n" nome="Magazzino B" />, 'media', 'zona 3', 'bassa'],
+            [<NomeAzienda key="n" nome="Uffici" />, 'bassa', 'zona 4', 'bassa'],
+          ]}
+        />
+      }
+    >
       <CartaSegnale
         className="w-full"
         icona={<IconaOnde />}
         tono="blu"
-        titolo="Alluvione · alta"
-        sotto="28,8 % delle imprese in area a pericolosità elevata"
+        titolo="Alluvione"
+        sotto="28,8 % delle imprese del comune in area a pericolosità elevata"
+        etichetta={{ testo: 'alta', tono: 'rosso' }}
       />
       <CartaSegnale
         className="w-full sm:w-[92%]"
         icona={<IconaSisma />}
         tono="petrolio"
-        titolo="Sisma · zona 3"
+        titolo="Sisma"
         sotto="Classificazione della Protezione Civile"
+        etichetta={{ testo: 'zona 3', tono: 'ambra' }}
       />
       <CartaSegnale
         className="w-full"
         icona={<IconaFrana />}
         tono="arancio"
-        titolo="Frana · bassa"
-        sotto="0 % delle imprese in area a pericolosità da frana elevata"
+        titolo="Frana"
+        sotto="0 % delle imprese in area a pericolosità elevata"
+        etichetta={{ testo: 'bassa', tono: 'verde' }}
       />
       <CartaSegnale
         className="w-full sm:w-[92%]"
         icona={<IconaScudo />}
         tono="magenta"
-        titolo="Calamità naturali 5,34 su 7"
+        titolo="Calamità naturali"
         sotto="Metà il pericolo più alto, metà la media dei tre"
+        etichetta={{ testo: '5,34 su 7', tono: 'rosso' }}
       />
     </Pannello>
   );
 }
 
+/*
+  L'obbligo catastrofale come lo scrive la scheda (packages/core/src/coverage/catnat.ts): gli
+  eventi e i beni sono quelli della norma, i termini sono quelli veri di ciascuna classe (piccole
+  31/12/2025, medie 01/10/2025), e «scaduto» è lo stato che il motore dà quando il termine è
+  passato e nel fascicolo non risulta una polizza. Il valore dei beni è di esempio, come tutti i
+  numeri delle illustrazioni; Logistica Orobia (118 addetti) è una media impresa.
+*/
+export function PannelloCatNat() {
+  return (
+    <Pannello
+      fondo="viola"
+      tabella={
+        <TabellaPannello
+          griglia="grid-cols-[1.7fr_0.9fr_1fr_0.9fr]"
+          colonne={['Azienda', 'Dimensione', 'Termine', 'Stato']}
+          righe={[
+            [<NomeAzienda key="n" nome="Galvanica Brembana" />, 'piccola', '31/12/2025', 'scaduto'],
+            [<NomeAzienda key="n" nome="Nordvalle Meccanica" />, 'media', '01/10/2025', 'scaduto'],
+            [<NomeAzienda key="n" nome="Logistica Orobia" />, 'media', '01/10/2025', 'coperta'],
+            [<NomeAzienda key="n" nome="Tessiture Serio" />, 'piccola', '31/12/2025', 'scaduto'],
+          ]}
+        />
+      }
+    >
+      <CartaSegnale
+        className="w-full"
+        icona={<IconaDocumento />}
+        tono="magenta"
+        titolo="Obbligo CAT NAT"
+        sotto="Piccola impresa · termine 31/12/2025"
+        etichetta={{ testo: 'soggetta', tono: 'ambra' }}
+      />
+      <CartaSegnale
+        className="w-full sm:w-[92%]"
+        icona={<IconaSisma />}
+        tono="petrolio"
+        titolo="Eventi da coprire"
+        sotto="Sismi, alluvioni e inondazioni, frane"
+      />
+      <CartaSegnale
+        className="w-full"
+        icona={<IconaPalazzo />}
+        tono="blu"
+        titolo="Beni da coprire"
+        sotto="Fabbricati, impianti e attrezzature · stima"
+        etichetta={{ testo: '2,41 mln €', tono: 'neutro' }}
+      />
+      <CartaSegnale
+        className="w-full sm:w-[92%]"
+        icona={<IconaCampana />}
+        tono="arancio"
+        titolo="Stato dell’obbligo"
+        sotto="Nessuna copertura catastrofale risultante"
+        etichetta={{ testo: 'scaduto', tono: 'rosso' }}
+      />
+    </Pannello>
+  );
+}
+
+/*
+  Le cifre sono quelle della testata e delle altre illustrazioni: il fermo di 30 giorni di ogni
+  azienda diviso trenta dà la perdita di un giorno (Logistica Orobia 1.627.397 € → 54.247 €).
+*/
 export function PannelloFermo() {
   return (
-    <Pannello fondo="arancio">
+    <Pannello
+      fondo="arancio"
+      tabella={
+        <TabellaPannello
+          griglia="grid-cols-[1.7fr_1fr_1fr]"
+          colonne={['Azienda', 'Un giorno', '30 giorni']}
+          righe={[
+            [<NomeAzienda key="n" nome="Logistica Orobia" />, '54.247 €', '1.627.397 €'],
+            [<NomeAzienda key="n" nome="Nordvalle Meccanica" />, '11.814 €', '354.411 €'],
+            [<NomeAzienda key="n" nome="Galvanica Brembana" />, '6.846 €', '205.380 €'],
+            [<NomeAzienda key="n" nome="Tessiture Serio" />, '3.942 €', '118.260 €'],
+          ]}
+        />
+      }
+    >
       <CartaSegnale
         className="w-full"
         icona={<IconaEuro />}
         tono="arancio"
-        titolo="Perdita giornaliera"
-        sotto="54.246,58 € sul fatturato annuo"
+        titolo="Perdita in un giorno"
+        sotto="Sul fatturato dell’ultimo bilancio"
+        etichetta={{ testo: '54.247 €', tono: 'neutro' }}
       />
       <CartaSegnale
         className="w-full sm:w-[92%]"
         icona={<IconaFermo />}
         tono="neutro"
         titolo="Fermo di 7 giorni"
-        sotto="379.726,03 €"
+        sotto="Una settimana di stop"
+        etichetta={{ testo: '379.726 €', tono: 'ambra' }}
       />
       <CartaSegnale
         className="w-full"
         icona={<IconaFermo />}
         tono="neutro"
         titolo="Fermo di 30 giorni"
-        sotto="1.627.397,26 €"
+        sotto="Un mese di stop"
+        etichetta={{ testo: '1,63 mln €', tono: 'rosso' }}
       />
       <CartaSegnale
         className="w-full sm:w-[92%]"
         icona={<IconaFermo />}
         tono="neutro"
         titolo="Fermo di 90 giorni"
-        sotto="4.882.191,78 €"
+        sotto="Tre mesi di stop"
+        etichetta={{ testo: '4,88 mln €', tono: 'rosso' }}
       />
     </Pannello>
   );
@@ -467,13 +713,28 @@ export function PannelloFermo() {
 
 export function PannelloCrm() {
   return (
-    <Pannello fondo="magenta">
+    <Pannello
+      fondo="magenta"
+      tabella={
+        <TabellaPannello
+          griglia="grid-cols-[1.6fr_1fr_1.3fr]"
+          colonne={['Azienda', 'Stato', 'Nota']}
+          righe={[
+            [<NomeAzienda key="n" nome="Nordvalle Meccanica" />, 'in trattativa', 'Sopralluogo lunedì'],
+            [<NomeAzienda key="n" nome="Galvanica Brembana" />, 'contattata', 'Richiamare a ottobre'],
+            [<NomeAzienda key="n" nome="Logistica Orobia" />, 'da contattare', '—'],
+            [<NomeAzienda key="n" nome="Carpenterie Alte Valli" />, 'cliente', 'Rinnovo a marzo'],
+          ]}
+        />
+      }
+    >
       <CartaSegnale
         className="w-full"
         icona={<IconaArchivio />}
         tono="magenta"
         titolo="Elenco salvato nel CRM"
-        sotto="5 aziende · Bergamo · ATECO 25"
+        sotto="Bergamo · ATECO 25"
+        etichetta={{ testo: '5 aziende', tono: 'neutro' }}
       />
       <CartaSegnale
         className="w-full sm:w-[92%]"
@@ -481,43 +742,58 @@ export function PannelloCrm() {
         tono="blu"
         titolo="Stessi filtri, aziende nuove"
         sotto="L’elenco parte dalle successive"
+        etichetta={{ testo: 'nuove', tono: 'verde' }}
       />
       <CartaSegnale
         className="w-full"
         icona={<IconaSpunta />}
         tono="petrolio"
-        titolo="In trattativa"
+        titolo="Nordvalle Meccanica"
         sotto="Richiamare lunedì per il sopralluogo"
+        etichetta={{ testo: 'in trattativa', tono: 'ambra' }}
       />
       <CartaSegnale
         className="w-full sm:w-[92%]"
         icona={<IconaPersone />}
         tono="neutro"
         titolo="2 già nel CRM"
-        sotto="Non escono di nuovo"
+        sotto="Non te le fa ricomprare"
       />
     </Pannello>
   );
 }
 
+/*
+  Il Cyber Risk come lo mostra la scheda (ProtezioniVeezco.tsx): il punteggio del settore e le
+  quattro voci, ciascuna da 1 a 7. I pesi esistono nel calcolo (tabelle-veezco.ts) ma la scheda non
+  li mostra, e dal 19/09/2026 non li mostra nemmeno questa illustrazione: prima c'era la formula
+  per esteso, che un cliente non avrebbe mai visto nel prodotto.
+*/
 export function PannelloCyber() {
   const voci = [
-    { nome: 'Dipendenza digitale', valore: 6, peso: 30 },
-    { nome: 'Sensibilità dei dati', valore: 4, peso: 30 },
-    { nome: 'Esposizione alle transazioni', valore: 4, peso: 15 },
-    { nome: 'Attrattività come bersaglio', valore: 6, peso: 25 },
+    { nome: 'Dipendenza digitale', valore: 6 },
+    { nome: 'Sensibilità dei dati', valore: 4 },
+    { nome: 'Esposizione alle transazioni', valore: 4 },
+    { nome: 'Attrattività come bersaglio', valore: 6 },
   ];
   return (
     <div
       aria-hidden="true"
-      className="vetrina-carte relative flex min-h-[460px] flex-col justify-between gap-4 overflow-hidden rounded-[32px] border border-vetrina-linea bg-vetrina-petrolio p-5 sm:min-h-[520px] sm:p-8"
+      className="vetrina-carte relative flex min-h-[460px] flex-col justify-between gap-4 overflow-hidden rounded-[32px] border border-vetrina-linea bg-vetrina-petrolio p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_30px_60px_-30px_rgba(16,24,40,0.25)] sm:min-h-[520px] sm:p-8"
     >
-      {/* La luce resta ferma: nella scena che scorre entrano solo le carte (`data-fondo`). */}
+      {/*
+        La luce e il reticolo restano fermi: nella scena che scorre entrano solo le carte
+        (`data-fondo`). Stessi strati degli altri pannelli.
+      */}
       <div
         data-fondo=""
-        className="absolute inset-0 bg-[radial-gradient(100%_70%_at_20%_0%,rgba(255,255,255,0.25),transparent_60%)]"
+        className="absolute inset-0 bg-[radial-gradient(100%_70%_at_20%_0%,rgba(255,255,255,0.25),transparent_60%),radial-gradient(90%_70%_at_100%_100%,rgba(0,0,0,0.2),transparent_62%)]"
       />
-      <div className="relative flex items-center gap-4 rounded-2xl border border-vetrina-linea bg-white p-5">
+      <div
+        data-fondo=""
+        className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(255,255,255,0.9)_1px,transparent_1.3px)] [background-size:18px_18px] [mask-image:linear-gradient(to_bottom,black,transparent_80%)]"
+      />
+      <div className="relative flex items-center gap-4 rounded-2xl border border-vetrina-linea bg-white p-5 shadow-[0_18px_36px_-16px_rgba(16,24,40,0.35)]">
         <Anello valore={5.1} testo="5,1" dimensione={84} />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold">Cyber Risk</p>
@@ -532,33 +808,38 @@ export function PannelloCyber() {
         </span>
       </div>
 
-      {/* Come si compone: le quattro voci per il loro peso (PESI_CYBER in tabelle-veezco.ts). */}
-      <div className="relative rounded-2xl border border-vetrina-linea bg-white p-5">
-        <p className="text-[13px] font-medium text-vetrina-grigio">Come si compone il punteggio</p>
-        <div className="mt-3 flex h-2.5 gap-1 overflow-hidden rounded-full">
+      {/* Le quattro voci a colpo d'occhio: una barra ciascuna, lunga quanto il suo valore su 7. */}
+      <div className="relative rounded-2xl border border-vetrina-linea bg-white p-5 shadow-[0_18px_36px_-16px_rgba(16,24,40,0.35)]">
+        <p className="text-[13px] font-medium text-vetrina-grigio">Le quattro voci del settore</p>
+        <div className="mt-3 space-y-2">
           {voci.map((v) => (
-            <span
-              key={v.nome}
-              className="h-full rounded-full"
-              style={{ width: `${v.peso}%`, background: colorePunteggio(v.valore) }}
-            />
+            <div key={v.nome} className="flex items-center gap-3">
+              <span className="w-[46%] truncate text-[12.5px]">{v.nome}</span>
+              <span className="h-2 flex-1 overflow-hidden rounded-full bg-vetrina-velo">
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${Math.round((v.valore / 7) * 100)}%`,
+                    background: colorePunteggio(v.valore),
+                  }}
+                />
+              </span>
+              <span className="w-8 text-right text-[12.5px] font-semibold tabular-nums">{v.valore}/7</span>
+            </div>
           ))}
         </div>
-        <p className="mt-3 text-[13px] tabular-nums text-vetrina-inchiostro">
-          6 × 30% + 4 × 30% + 4 × 15% + 6 × 25% = <span className="font-semibold">5,1</span>
-        </p>
       </div>
 
       <div className="relative grid grid-cols-2 gap-3">
         {voci.map((v) => (
           <div
             key={v.nome}
-            className="flex items-center gap-3 rounded-2xl border border-vetrina-linea bg-white p-3.5"
+            className="flex items-center gap-3 rounded-2xl border border-vetrina-linea bg-white p-3.5 shadow-[0_18px_36px_-16px_rgba(16,24,40,0.35)]"
           >
             <Anello valore={v.valore} testo={String(v.valore)} dimensione={44} />
             <span className="min-w-0 text-[13px] font-medium leading-snug">
               {v.nome}
-              <span className="block font-normal text-vetrina-grigio">peso {v.peso}%</span>
+              <span className="block font-normal text-vetrina-grigio">su 7</span>
             </span>
           </div>
         ))}
@@ -683,9 +964,98 @@ export function SchemaFlusso() {
           icona={<IconaDocumento />}
           tono="neutro"
           titolo="Report per il cliente"
-          sotto="Pronto da consegnare, con l’informativa IVASS"
+          sotto="Richieste ed esigenze e motivazione, pronto da consegnare"
         />
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parti dai clienti che hai già: due finestre piccole
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una finestrella di prodotto su fondo a puntini, per le due carte della sezione. */
+function Finestrella({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`rounded-[22px] border border-vetrina-linea bg-vetrina-velo/60 p-4 ${PUNTINI}`}
+    >
+      <div className="rounded-2xl border border-vetrina-linea bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_18px_36px_-18px_rgba(16,24,40,0.25)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/*
+  La ricerca per codice fiscale del socio (Ricerca Clienti, filtro «Codice Fiscale Socio»): il
+  codice è mascherato perché un codice fiscale plausibile potrebbe essere di qualcuno, e le società
+  sono inventate come in tutte le illustrazioni.
+*/
+export function MiniSoci() {
+  return (
+    <Finestrella>
+      <p className="text-[11.5px] font-medium text-vetrina-grigio">Codice fiscale del socio</p>
+      <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-vetrina-linea bg-vetrina-carta px-3 py-2 text-[13px] tracking-[0.12em] text-vetrina-inchiostro">
+        <IconaPersone className="h-4 w-4 text-vetrina-grigio" />
+        RSS ••• ••••• ••••X
+      </div>
+      <p className="mt-3 text-[11.5px] font-medium text-vetrina-grigio">3 società partecipate</p>
+      <div className="mt-1.5 divide-y divide-vetrina-linea rounded-xl border border-vetrina-linea">
+        {[
+          ['Galvanica Brembana S.r.l.', 'già cliente'],
+          ['Immobiliare Serio S.r.l.', 'da contattare'],
+          ['Carpenterie Alte Valli S.r.l.', 'da contattare'],
+        ].map(([nome, stato]) => (
+          <div key={nome} className="flex items-center gap-2.5 px-3 py-2 text-[12.5px]">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-vetrina-velo text-vetrina-grigio ring-1 ring-inset ring-vetrina-linea">
+              <IconaPalazzo className="h-3.5 w-3.5" />
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">{nome}</span>
+            <Etichetta tono={stato === 'già cliente' ? 'verde' : 'neutro'}>{stato}</Etichetta>
+          </div>
+        ))}
+      </div>
+    </Finestrella>
+  );
+}
+
+/*
+  Un cliente che l'agente ha già, cercato per partita IVA: la partita IVA è mascherata per la stessa
+  ragione del codice fiscale. I valori sono quelli di Nordvalle Meccanica nelle altre illustrazioni
+  (media impresa, termine 01/10/2025, fermo di 30 giorni 354.411 €).
+*/
+export function MiniPartitaIva() {
+  return (
+    <Finestrella>
+      <p className="text-[11.5px] font-medium text-vetrina-grigio">Partita IVA</p>
+      <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-vetrina-linea bg-vetrina-carta px-3 py-2 text-[13px] tracking-[0.12em] text-vetrina-inchiostro">
+        <IconaLente className="h-4 w-4 text-vetrina-grigio" />
+        IT ••••••••••4
+      </div>
+      <div className="mt-3 flex items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-b from-vetrina-blu/14 to-vetrina-blu/6 text-vetrina-blu ring-1 ring-inset ring-vetrina-blu/15">
+          <IconaPalazzo className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[13.5px] font-semibold">Nordvalle Meccanica S.r.l.</p>
+          <p className="text-[11.5px] text-vetrina-grigio">In portafoglio · polizza auto</p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {[
+          ['Property', '4,17 su 7'],
+          ['Fermo 30 gg', '354.411 €'],
+          ['CAT NAT', 'soggetta'],
+        ].map(([voce, valore]) => (
+          <div key={voce} className="rounded-xl border border-vetrina-linea bg-vetrina-carta px-2.5 py-2">
+            <p className="text-[10.5px] text-vetrina-grigio">{voce}</p>
+            <p className="mt-0.5 truncate text-[12.5px] font-semibold tabular-nums">{valore}</p>
+          </div>
+        ))}
+      </div>
+    </Finestrella>
   );
 }

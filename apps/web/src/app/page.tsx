@@ -7,9 +7,9 @@ import { Vetrina } from './_vetrina/Vetrina';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'AEGIS · Il rischio d’impresa per intermediari assicurativi',
+  title: 'AEGIS · Le aziende da assicurare, con i loro numeri',
   description:
-    'Property Risk, Business Interruption e Cyber Risk delle imprese italiane, dal Registro Imprese e dagli indicatori ISPRA, per intermediari assicurativi.',
+    'Per agenti e broker: trova le aziende da assicurare nella tua zona e conosci i loro rischi prima di chiamarle. Terremoto, alluvione e frana sede per sede, fermo dell’attività, rischio cyber del settore e obbligo CAT NAT.',
 };
 
 /**

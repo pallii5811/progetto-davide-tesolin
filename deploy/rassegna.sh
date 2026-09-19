@@ -81,7 +81,7 @@ fi
 
 echo
 echo "── La radice senza sessione è la vetrina ──────────────────────────────"
-if curl -sS "$SITO/" | grep -q "prima della prima telefonata"; then
+if curl -sS "$SITO/" | grep -q "presentati con i loro numeri"; then
   echo "  / -> vetrina"
 else
   echo "  / <<< senza sessione deve mostrare la vetrina"
