@@ -435,6 +435,34 @@ export function Vetrina() {
           </div>
         </section>
 
+        {/* ── Visura e bilancio in una scheda ────────────────────────────── */}
+        {/*
+          Richiesta di Simone del 18/09/2026: una sezione come la finestra di clay.com/signals, con i
+          dati camerali e i bilanci. Dal 19/09/2026 sta subito dopo i tre passi, su sua richiesta: la
+          scheda si vede prima di arrivare ai rischi. Le voci sono quelle della scheda vera
+          (SchedaRegistro.tsx).
+        */}
+        <section id="registro" aria-labelledby="titolo-registro" className="scroll-mt-28 pb-24 pt-2">
+          <div className={`${LARGHEZZA} text-center`}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-vetrina-linea bg-white px-3 py-1 text-[13px] font-medium text-vetrina-grigio">
+              <span className="h-1.5 w-1.5 rounded-full bg-vetrina-blu" />
+              Visura e bilancio
+            </span>
+            <h2
+              id="titolo-registro"
+              className="mx-auto mt-6 max-w-[900px] text-balance text-[38px] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-[54px] lg:text-[64px]"
+            >
+              La visura e il bilancio sono già nella scheda.
+            </h2>
+            <Paragrafo className="mx-auto mt-6 max-w-[780px] text-[18px] sm:text-[19px]">
+              Soci e titolari effettivi, addetti, fatturato e sede: quello che cercheresti nella visura
+              camerale. Poi i bilanci depositati degli ultimi anni e, con l’analisi approfondita, le unità
+              locali e gli indicatori che il Registro Imprese calcola sull’ultimo bilancio.
+            </Paragrafo>
+          </div>
+          <SchedaRegistro />
+        </section>
+
         {/* ── Le funzioni: i testi scorrono, il pannello a destra cambia ─── */}
         {/*
           Richiesta di Simone del 19/09/2026, come la sezione dei segnali di clay.com: i testi a
@@ -619,38 +647,6 @@ export function Vetrina() {
               ))}
             </ul>
           </div>
-        </section>
-
-        {/* ── Visura e bilancio in una scheda ────────────────────────────── */}
-        {/*
-          Richiesta di Simone del 18/09/2026: una sezione come la finestra di clay.com/signals, con i
-          dati camerali e i bilanci. Dopo il report e non prima: è la prova che i numeri hanno una
-          base, non la ragione per cui un agente si registra. Le voci sono quelle della scheda vera
-          (SchedaRegistro.tsx).
-        */}
-        <section
-          id="registro"
-          aria-labelledby="titolo-registro"
-          className="scroll-mt-28 pb-24 pt-10 sm:pt-12"
-        >
-          <div className={`${LARGHEZZA} text-center`}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-vetrina-linea bg-white px-3 py-1 text-[13px] font-medium text-vetrina-grigio">
-              <span className="h-1.5 w-1.5 rounded-full bg-vetrina-blu" />
-              Visura e bilancio
-            </span>
-            <h2
-              id="titolo-registro"
-              className="mx-auto mt-6 max-w-[900px] text-balance text-[38px] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-[54px] lg:text-[64px]"
-            >
-              La visura e il bilancio sono già nella scheda.
-            </h2>
-            <Paragrafo className="mx-auto mt-6 max-w-[780px] text-[18px] sm:text-[19px]">
-              Soci e titolari effettivi, addetti, fatturato e sede: quello che cercheresti nella visura
-              camerale. Poi i bilanci depositati degli ultimi anni e, con l’analisi approfondita, le unità
-              locali e gli indicatori che il Registro Imprese calcola sull’ultimo bilancio.
-            </Paragrafo>
-          </div>
-          <SchedaRegistro />
         </section>
 
         {/* ── Tutte le altre funzioni ────────────────────────────────────── */}

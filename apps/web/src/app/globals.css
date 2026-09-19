@@ -309,6 +309,109 @@ body {
   }
 }
 
+/*
+ * Il giro del prodotto in apertura (app/_vetrina/TourProdotto.tsx e schermate.tsx): cinque
+ * schermate una sopra l'altra, se ne vede una. Quando una diventa attiva i suoi pezzi entrano uno
+ * dopo l'altro, ciascuno col ritardo che porta in `--r`; poi le cose che nel prodotto succedono con
+ * un clic succedono da sole: il conteggio premuto, la barra della completezza che sale, gli anelli
+ * che si riempiono, la riga dell'azienda scelta, la risposta che passa da «Non so» a «No».
+ * Chi esce si spegne subito, così due schermate non si sovrappongono.
+ */
+.tour-schermata {
+  transition:
+    opacity 380ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+.tour-schermata[data-attivo='no'] {
+  opacity: 0;
+  transform: translateY(10px);
+  visibility: hidden;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease,
+    visibility 0s 200ms;
+}
+.tour-schermata .tour-entra {
+  transition:
+    opacity 420ms ease var(--r, 0ms),
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms),
+    background-color 300ms ease var(--r, 0ms);
+}
+.tour-schermata[data-attivo='no'] .tour-entra {
+  opacity: 0;
+  transform: translateY(8px);
+  transition-delay: 0ms;
+}
+.tour-schermata .tour-riempie {
+  width: 0;
+  transition: width 1200ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
+}
+.tour-schermata[data-attivo='si'] .tour-riempie {
+  width: var(--fino);
+}
+.tour-schermata .tour-anello {
+  stroke-dashoffset: 100px;
+  transition: stroke-dashoffset 1100ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
+}
+.tour-schermata[data-attivo='si'] .tour-anello {
+  stroke-dashoffset: var(--resto);
+}
+.tour-schermata .tour-premuto,
+.tour-schermata .tour-premuto .tour-premuto-nota,
+.tour-schermata .tour-evidenzia,
+.tour-schermata .tour-scegli,
+.tour-schermata .tour-lascia {
+  transition:
+    background-color 260ms ease var(--r, 0ms),
+    color 260ms ease var(--r, 0ms),
+    border-color 260ms ease var(--r, 0ms),
+    box-shadow 260ms ease var(--r, 0ms),
+    opacity 420ms ease var(--r, 0ms),
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1) var(--r, 0ms);
+}
+.tour-schermata[data-attivo='si'] .tour-premuto {
+  background-color: var(--color-vetrina-inchiostro);
+  border-color: var(--color-vetrina-inchiostro);
+  color: white;
+}
+.tour-schermata[data-attivo='si'] .tour-premuto .tour-premuto-nota {
+  color: rgba(255, 255, 255, 0.8);
+}
+.tour-schermata[data-attivo='si'] .tour-evidenzia {
+  background-color: oklch(0.96 0.02 262);
+  box-shadow: inset 3px 0 0 var(--color-vetrina-blu);
+}
+.tour-schermata .tour-scegli {
+  color: var(--color-vetrina-grigio);
+}
+.tour-schermata[data-attivo='si'] .tour-scegli {
+  background-color: var(--color-vetrina-inchiostro);
+  color: white;
+  font-weight: 500;
+}
+.tour-schermata .tour-lascia {
+  background-color: var(--color-vetrina-inchiostro);
+  color: white;
+  font-weight: 500;
+}
+.tour-schermata[data-attivo='si'] .tour-lascia {
+  background-color: transparent;
+  color: var(--color-vetrina-grigio);
+  font-weight: 400;
+}
+/* Meno movimento: nessuna dissolvenza e nessun ritardo, lo stato finale compare subito. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-schermata,
+  .tour-schermata * {
+    transition: none !important;
+  }
+  .tour-schermata[data-attivo='no'],
+  .tour-schermata[data-attivo='no'] .tour-entra {
+    transform: none;
+  }
+}
+
 /* I salti alle sezioni della vetrina scorrono, ma solo per chi non ha chiesto il contrario. */
 @media (prefers-reduced-motion: no-preference) {
   html:has(.vetrina-radice) {

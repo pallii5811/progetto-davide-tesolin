@@ -17,16 +17,8 @@ import {
   IconaSisma,
   IconaSpunta,
 } from './icone';
-import {
-  Anello,
-  CartaFantasma,
-  CartaSegnale,
-  Etichetta,
-  OMBRA_FINESTRA,
-  PUNTINI,
-  Tessera,
-  colorePunteggio,
-} from './pezzi';
+import { Anello, CartaFantasma, CartaSegnale, Etichetta, PUNTINI, Tessera, colorePunteggio } from './pezzi';
+import { TourProdotto } from './TourProdotto';
 
 /**
  * Le illustrazioni della vetrina: finestre del prodotto costruite con gli stessi pezzi
@@ -43,83 +35,21 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /*
-  La scheda di un'azienda come la mostra il prodotto (app/azienda/[id]/page.tsx): intestazione,
-  indice delle sezioni, i tre riquadri dei rischi e i cerchi del Property Risk. Fino al 19/09/2026
-  qui c'era una tabella del CRM con colonne di rischio e un ordinamento per Property che il CRM vero
-  non ha: una verifica sul codice l'ha trovata, e ora si mostra la schermata che esiste.
+  L'apertura: le carte che fluttuano e, sotto, la finestra del prodotto che fa da sola il giro
+  delle schermate (TourProdotto.tsx, schermate.tsx). Fino al 19/09/2026 qui c'era una tabella del CRM
+  con colonne di rischio che il CRM vero non ha; poi la sola scheda azienda; ora tutto il percorso.
 
-  L'azienda è Logistica Orobia, la stessa delle altre illustrazioni, e i numeri tornano con il
-  motore: sede a Dello (BS), i cui dati danno alluvione 7, sisma 3 e frana 1, quindi calamità
-  naturali 5,34 e Property 5,17 con l'incendio a 5 del magazzinaggio; 118 addetti, media impresa,
-  termine CAT NAT 01/10/2025; fatturato 19.800.000 € / 365 = 54.246,58 € al giorno, e 30 giorni
-  = 1.627.397,40 € (il prodotto moltiplica la perdita giornaliera già arrotondata); Cyber 5,1
-  della divisione ATECO 52.
+  Le carte parlano della stessa azienda della finestra, e i numeri tornano con il motore: Logistica
+  Orobia, sede a Dello (BS) — alluvione 7, sisma 3, frana 1, calamità naturali 5,34, Property 5,17
+  con l'incendio a 5 del magazzinaggio —, 118 addetti quindi media impresa con termine CAT NAT
+  01/10/2025, fatturato 19.800.000 € / 365 = 54.246,58 € al giorno e 30 giorni = 1.627.397,40 €.
 */
-
-/** Un riquadro dei tre rischi, come la `Metrica` della scheda: nome, valore, riga di spiegazione. */
-function RiquadroRischio({
-  titolo,
-  valore,
-  sotto,
-  segno,
-}: {
-  titolo: string;
-  valore: string;
-  sotto: string;
-  segno: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-vetrina-linea bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[12.5px] text-vetrina-grigio">{titolo}</p>
-          <p className="mt-1 text-[22px] font-semibold leading-tight tracking-[-0.03em] tabular-nums">
-            {valore}
-          </p>
-        </div>
-        {segno}
-      </div>
-      <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-vetrina-grigio">{sotto}</p>
-    </div>
-  );
-}
-
-/** Un cerchio grande della sezione Property Risk, con il suo titolo e la riga sotto. */
-function CerchioProperty({
-  titolo,
-  valore,
-  testo,
-  evidenza = false,
-  children,
-}: {
-  titolo: string;
-  valore: number;
-  testo: string;
-  evidenza?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={`flex flex-col items-center rounded-2xl border bg-white px-4 pb-4 pt-3.5 ${
-        evidenza
-          ? 'border-vetrina-blu/40 shadow-[0_0_0_3px_oklch(0.42_0.15_262/0.08)]'
-          : 'border-vetrina-linea'
-      }`}
-    >
-      <p className="text-[12.5px] font-semibold">{titolo}</p>
-      <div className="mt-2">
-        <Anello valore={valore} testo={testo} dimensione={84} />
-      </div>
-      <div className="mt-2 w-full">{children}</div>
-    </div>
-  );
-}
 
 export function IllustrazioneTestata() {
   return (
-    <div aria-hidden="true" className="relative mx-auto mt-16 max-w-[1240px] px-4 sm:px-6">
+    <div className="relative mx-auto mt-16 max-w-[1240px] px-4 sm:px-6">
       {/* Le notifiche che fluttuano sopra la finestra, solo dove c'è spazio per farle respirare. */}
-      <div className="relative hidden h-[190px] lg:block">
+      <div aria-hidden="true" className="relative hidden h-[190px] lg:block">
         <CartaFantasma className="absolute left-[3%] top-[34px] w-[190px] opacity-50" />
         <CartaSegnale
           className="absolute left-[15%] top-[102px] w-max max-w-[330px] animate-[vetrina-galleggia_7s_ease-in-out_infinite] vetrina-animata"
@@ -159,145 +89,12 @@ export function IllustrazioneTestata() {
         />
       </div>
 
-      {/* La finestra di prodotto: la scheda dell'azienda, aperta sul Property Risk. */}
-      <div
-        className={`relative overflow-hidden rounded-[28px] border border-vetrina-linea bg-white ${OMBRA_FINESTRA}`}
-      >
-        {/*
-          La cornice della finestra: tre punti e il nome della pagina, così si legge come
-          un'applicazione vera e non come un disegno. Punti grigi e non colorati, per non portare il
-          segno di un sistema operativo.
-        */}
-        <div className="flex items-center gap-3 border-b border-vetrina-linea bg-vetrina-carta px-4 py-2.5 sm:px-5">
-          <span className="flex gap-1.5">
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="h-2.5 w-2.5 rounded-full bg-vetrina-linea" />
-            ))}
-          </span>
-          <span className="mx-auto inline-flex items-center gap-1.5 rounded-lg border border-vetrina-linea bg-white px-3 py-1 text-[11.5px] font-medium text-vetrina-grigio">
-            <IconaLucchetto className="h-3 w-3" />
-            AEGIS · Scheda azienda
-          </span>
-          <span className="w-[42px]" />
-        </div>
-
-        {/* Intestazione della scheda. */}
-        <div className="flex flex-wrap items-center justify-between gap-4 px-5 pb-4 pt-5 sm:px-7">
-          <div className="flex min-w-0 items-center gap-3.5">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-vetrina-blu/14 to-vetrina-blu/6 text-vetrina-blu ring-1 ring-inset ring-vetrina-blu/15">
-              <IconaPalazzo className="h-6 w-6" />
-            </span>
-            <div className="min-w-0">
-              <p className="flex items-center gap-2 text-[18px] font-semibold tracking-[-0.025em]">
-                <span className="truncate">Logistica Orobia S.p.A.</span>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[oklch(0.95_0.05_150)] px-2 py-0.5 text-[11px] font-medium text-[oklch(0.42_0.12_150)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.62_0.15_150)]" />
-                  attiva
-                </span>
-              </p>
-              <p className="truncate text-[12.5px] text-vetrina-grigio">
-                Dello (BS) · 52.10 Magazzinaggio e custodia · Media impresa · 118 dipendenti
-              </p>
-            </div>
-          </div>
-          <div className="hidden items-center gap-2 text-[12.5px] font-medium md:flex">
-            <span className="rounded-full border border-vetrina-linea bg-white px-3.5 py-1.5">
-              Dati di intervista
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-vetrina-inchiostro px-3.5 py-1.5 text-white">
-              <IconaDocumento className="h-3.5 w-3.5" />
-              Report per il cliente
-            </span>
-          </div>
-        </div>
-
-        {/* L'indice delle sezioni, con la sezione che si sta leggendo in evidenza. */}
-        <div className="flex gap-1 overflow-hidden border-y border-vetrina-linea bg-vetrina-carta/70 px-5 py-2 text-[12.5px] sm:px-7">
-          {[
-            'Property Risk',
-            'Business Interruption',
-            'Cyber Risk',
-            'Eventi negativi',
-            'Profilo dell’impresa',
-          ].map((voce, i) => (
-            <span
-              key={voce}
-              className={`shrink-0 rounded-full px-3 py-1 ${
-                i === 0
-                  ? 'bg-white font-medium text-vetrina-inchiostro shadow-[0_1px_2px_rgba(16,24,40,0.06),0_0_0_1px_var(--color-vetrina-linea)]'
-                  : 'text-vetrina-grigio'
-              }`}
-            >
-              {voce}
-            </span>
-          ))}
-        </div>
-
-        <div className="space-y-3 bg-vetrina-carta/50 px-5 pb-10 pt-5 sm:px-7">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <RiquadroRischio
-              titolo="Property Risk"
-              valore="5,17 su 7"
-              sotto="Ubicazione più esposta: sede legale, Dello (BS)"
-              segno={
-                <Tessera tono="blu">
-                  <IconaPalazzo />
-                </Tessera>
-              }
-            />
-            <RiquadroRischio
-              titolo="Business Interruption"
-              valore="54.246,58 € al giorno"
-              sotto="Sul fatturato annuo · 30 giorni di fermo 1.627.397,40 €"
-              segno={
-                <Tessera tono="arancio">
-                  <IconaEuro />
-                </Tessera>
-              }
-            />
-            <RiquadroRischio
-              titolo="Cyber Risk"
-              valore="5,1 su 7"
-              sotto="ATECO 52 · magazzinaggio e supporto ai trasporti"
-              segno={
-                <Tessera tono="petrolio">
-                  <IconaLucchetto />
-                </Tessera>
-              }
-            />
-          </div>
-
-          <div className="hidden gap-3 md:grid md:grid-cols-3">
-            <CerchioProperty titolo="Rischio incendio" valore={5} testo="5">
-              <p className="text-center text-[11.5px] leading-snug text-vetrina-grigio">
-                Dal tipo di attività e dal tipo di edificio
-              </p>
-            </CerchioProperty>
-            <CerchioProperty titolo="Calamità naturali" valore={5.34} testo="5,34">
-              <div className="divide-y divide-vetrina-linea text-[11.5px]">
-                {[
-                  ['Alluvione', '7/7'],
-                  ['Sisma', '3/7'],
-                  ['Frana', '1/7'],
-                ].map(([voce, valore]) => (
-                  <div key={voce} className="flex justify-between py-1">
-                    <span className="text-vetrina-grigio">{voce}</span>
-                    <span className="font-semibold tabular-nums">{valore}</span>
-                  </div>
-                ))}
-              </div>
-            </CerchioProperty>
-            <CerchioProperty titolo="Overall Risk Score" valore={5.17} testo="5,17" evidenza>
-              <p className="text-center text-[11.5px] leading-snug text-vetrina-grigio">
-                Property Risk di questa sede
-              </p>
-            </CerchioProperty>
-          </div>
-        </div>
-
-        {/* La finestra sfuma verso il basso: continua, ma non serve vederla tutta. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
-      </div>
+      {/*
+        La finestra del prodotto, animata: il giro delle cinque schermate che un agente usa, dalla
+        ricerca al report (TourProdotto.tsx). Fuori da questo contenitore nascosto, perché i passi
+        sopra la finestra sono comandi veri.
+      */}
+      <TourProdotto />
     </div>
   );
 }
