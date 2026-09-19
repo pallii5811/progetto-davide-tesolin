@@ -1494,6 +1494,26 @@ export async function spesaOdierna(db: Database, tenantId: string, adesso = new 
 }
 
 /**
+ * Quanto ha speso uno studio **da sempre**, senza le risposte servite dalla cache.
+ *
+ * È la misura del tetto di spesa complessivo degli account di prova: il giornaliero si azzera
+ * ogni notte, questo no.
+ */
+export async function spesaTotaleStudio(db: Database, tenantId: string): Promise<number> {
+  const righe = await db
+    .select({ totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)` })
+    .from(schema.registroCostiDati)
+    .where(
+      and(
+        eq(schema.registroCostiDati.tenantId, tenantId),
+        eq(schema.registroCostiDati.servitoDaCache, false),
+      ),
+    );
+
+  return centesimi(righe[0]?.totale ?? 0);
+}
+
+/**
  * Quanto hanno speso oggi **tutti** gli studi insieme.
  *
  * Il tetto per studio non basta quando il contratto con gli archivi è uno solo e il

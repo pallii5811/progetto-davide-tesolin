@@ -882,6 +882,11 @@ export interface UtenteCorrente {
   acquistiAbilitati?: boolean;
   /** Se l'utente ha confermato il proprio indirizzo dal collegamento ricevuto. */
   emailVerificata?: boolean;
+  /**
+   * Solo per gli studi con un tetto di spesa complessivo (gli account di prova): quanto
+   * credito hanno e quanto ne hanno usato, in centesimi. `null` per tutti gli altri.
+   */
+  creditoProva?: { limiteCentesimi: number; spesoCentesimi: number } | null;
 }
 
 export interface CandidatoVerificaDto {
@@ -1083,6 +1088,10 @@ export interface StudioOspitato {
   /** Il primo amministratore, con lo stato della sua email. */
   referente: { email: string; emailConfermata: boolean } | null;
   utenti: number;
+  /** Il tetto di spesa complessivo in centesimi, o `null` se lo studio non ne ha. */
+  tettoSpesaTotaleCentesimi: number | null;
+  /** Quanto lo studio ha speso in dati da sempre, in centesimi. */
+  spesaTotaleCentesimi: number;
   apertoIl: string;
 }
 

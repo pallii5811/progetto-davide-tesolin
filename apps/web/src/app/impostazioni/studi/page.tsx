@@ -3,6 +3,7 @@ import { richiediSessione } from '@/lib/sessione';
 import { elencoStudi, statoAccesso } from '@/lib/api';
 import { Avviso, Scheda } from '@/components/ui';
 import { BottoneAcquisti } from './BottoneAcquisti';
+import { TettoTotale } from './TettoTotale';
 import { BottoneAttivita } from './BottoneAttivita';
 import { ModuloStudio } from './ModuloStudio';
 import { formattaGiorno } from '@aegis/core/tempo';
@@ -60,9 +61,9 @@ export default async function PaginaStudi() {
       </div>
 
       <Scheda className="overflow-x-auto p-0">
-        <table className="w-full min-w-[48rem] text-sm">
+        <table className="w-full min-w-[58rem] text-sm">
           <caption className="sr-only">
-            Studi ospitati, con numero di collaboratori, stato e acquisti di dati
+            Studi ospitati, con numero di collaboratori, stato, acquisti e spesa di dati
           </caption>
           <thead className="bg-fondo text-left text-xs uppercase tracking-wide text-testo-debole">
             <tr>
@@ -77,6 +78,9 @@ export default async function PaginaStudi() {
               </th>
               <th scope="col" className="px-4 py-2.5 font-medium">
                 Acquisti
+              </th>
+              <th scope="col" className="px-4 py-2.5 font-medium">
+                Spesa dati
               </th>
               <th scope="col" className="px-4 py-2.5" />
             </tr>
@@ -125,9 +129,27 @@ export default async function PaginaStudi() {
                   {studio.acquistiAbilitati ? (
                     <span className="text-xs text-testo-tenue">attivi</span>
                   ) : (
-                    <span className="rounded-full border border-attenzione/40 bg-attenzione-fondo px-2 py-0.5 text-xs font-medium text-attenzione">
+                    <span className="whitespace-nowrap rounded-full border border-attenzione/40 bg-attenzione-fondo px-2 py-0.5 text-xs font-medium text-attenzione">
                       in attesa
                     </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 align-top">
+                  {/*
+                    Il tetto complessivo si imposta sugli studi clienti (gli account di prova). Il
+                    gestore paga la fornitura: per lui la spesa si legge e basta.
+                  */}
+                  {studio.gestore ? (
+                    <span className="tabular text-xs text-testo-tenue">
+                      {(studio.spesaTotaleCentesimi / 100).toFixed(2).replace('.', ',')} € spesi
+                    </span>
+                  ) : (
+                    <TettoTotale
+                      id={studio.id}
+                      denominazione={studio.denominazione}
+                      tettoCentesimi={studio.tettoSpesaTotaleCentesimi}
+                      spesoCentesimi={studio.spesaTotaleCentesimi}
+                    />
                   )}
                 </td>
                 <td className="px-4 py-3 text-right">

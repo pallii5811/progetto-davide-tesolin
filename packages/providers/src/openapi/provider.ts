@@ -96,6 +96,15 @@ function costoLotto(record: number): number {
   return record * 5;
 }
 
+/**
+ * Quanto può costare al massimo l'acquisto di un elenco di `limite` aziende: la stessa stima
+ * prudenziale che `cercaProspect` dichiara prima della chiamata. Serve a chi deve decidere
+ * PRIMA se un acquisto sta sotto un tetto (il tetto complessivo degli account di prova).
+ */
+export function costoMassimoElencoCentesimi(limite?: number): number {
+  return costoLotto(limite ?? LOTTO_PREDEFINITO);
+}
+
 export interface OpenApiProviderOptions {
   readonly token: string;
   /**

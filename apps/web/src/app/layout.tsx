@@ -135,6 +135,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         stato.postaAttiva && utente.emailVerificata === false && percorso !== '/conferma-email'
       }
       email={utente.email}
+      creditoProva={utente.creditoProva ?? null}
     />
   );
 

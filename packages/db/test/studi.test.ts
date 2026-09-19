@@ -115,7 +115,13 @@ describe('Elenco degli studi', () => {
     // Negare è l'unico esito sicuro: un identificativo inventato non deve aprire nulla.
     const stato = await statoStudio(connessione.db, '00000000-0000-0000-0000-000000000000');
     // Né acquisti: dal 18/09/2026 lo stato dice anche se lo studio può comprare dati.
-    expect(stato).toEqual({ gestorePiattaforma: false, attivo: false, acquistiAbilitati: false });
+    // E credito zero, dal 19/09/2026: un tetto «nessuno» (null) vorrebbe dire spesa libera.
+    expect(stato).toEqual({
+      gestorePiattaforma: false,
+      attivo: false,
+      acquistiAbilitati: false,
+      tettoSpesaTotaleCentesimi: 0,
+    });
   }, 90_000);
 
   /*

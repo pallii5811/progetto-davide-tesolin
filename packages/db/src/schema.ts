@@ -128,6 +128,15 @@ export const tenants = pgTable('tenants', {
   /** Tetto di spesa mensile sui dati, in centesimi. Oltre, l'acquisizione si blocca. */
   budgetDatiMensileCentesimi: denaro('budget_dati_mensile_centesimi'),
   /**
+   * Tetto di spesa **complessivo** dello studio, in centesimi: quanto può spendere in dati da
+   * sempre, non al giorno. `null` vuol dire nessun tetto complessivo.
+   *
+   * Nasce per gli account di prova (19/09/2026: «in totale può usare massimo 5 euro»): il tetto
+   * giornaliero si azzera ogni notte e non dice «cinque euro e basta». Si controlla prima di ogni
+   * acquisto, con il costo massimo dell'operazione (`oltreIlTetto` in apps/api).
+   */
+  tettoSpesaTotaleCentesimi: denaro('tetto_spesa_totale_centesimi'),
+  /**
    * Distingue chi **gestisce** la piattaforma da chi la **usa**.
    *
    * Gli archivi dati si pagano con un contratto unico, intestato al gestore, e gli studi

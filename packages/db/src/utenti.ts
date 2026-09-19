@@ -364,6 +364,10 @@ export interface StudioElenco {
    * `null` se lo studio non ha utenti.
    */
   readonly referente: { readonly email: string; readonly emailConfermata: boolean } | null;
+  /** Il tetto di spesa complessivo, in centesimi; `null` se lo studio non ne ha. */
+  readonly tettoSpesaTotaleCentesimi: number | null;
+  /** Quanto lo studio ha speso in dati da sempre, senza le risposte servite dalla cache. */
+  readonly spesaTotaleCentesimi: number;
 }
 
 /**
@@ -395,6 +399,7 @@ export async function elencoStudi(db: Database): Promise<readonly StudioElenco[]
       attivo: schema.tenants.attivo,
       acquistiAbilitati: schema.tenants.acquistiAbilitati,
       autoRegistrato: schema.tenants.autoRegistrato,
+      tettoSpesaTotaleCentesimi: schema.tenants.tettoSpesaTotaleCentesimi,
       creatoIl: schema.tenants.creatoIl,
       utenti: sql<string>`COUNT(${schema.utenti.id})`,
     })
@@ -431,7 +436,26 @@ export async function elencoStudi(db: Database): Promise<readonly StudioElenco[]
     }
   }
 
-  return righe.map((r) => ({ ...r, utenti: Number(r.utenti), referente: referenti.get(r.id) ?? null }));
+  /*
+    La spesa di ciascuno, da sempre: una lettura raggruppata a parte, per la stessa ragione dei
+    referenti. Le risposte servite dalla cache non si contano: non sono state pagate.
+  */
+  const spese = await db
+    .select({
+      tenantId: schema.registroCostiDati.tenantId,
+      totale: sql<string>`COALESCE(SUM(${schema.registroCostiDati.costoCentesimi}), 0)`,
+    })
+    .from(schema.registroCostiDati)
+    .where(eq(schema.registroCostiDati.servitoDaCache, false))
+    .groupBy(schema.registroCostiDati.tenantId);
+  const spesa = new Map(spese.map((s) => [s.tenantId, Number(s.totale)]));
+
+  return righe.map((r) => ({
+    ...r,
+    utenti: Number(r.utenti),
+    referente: referenti.get(r.id) ?? null,
+    spesaTotaleCentesimi: spesa.get(r.id) ?? 0,
+  }));
 }
 
 /**
@@ -449,6 +473,8 @@ export async function creaStudio(
     readonly numeroRui?: string | null;
     /** Registrato dal modulo pubblico: nasce senza acquisti, finché il gestore non lo attiva. */
     readonly autoRegistrato?: boolean;
+    /** Tetto di spesa complessivo, in centesimi (account di prova). Assente o `null`: nessuno. */
+    readonly tettoSpesaTotaleCentesimi?: number | null;
   } = {},
 ): Promise<string> {
   const autoRegistrato = opzioni.autoRegistrato === true;
@@ -461,6 +487,7 @@ export async function creaStudio(
       gestorePiattaforma: false,
       autoRegistrato,
       acquistiAbilitati: !autoRegistrato,
+      tettoSpesaTotaleCentesimi: opzioni.tettoSpesaTotaleCentesimi ?? null,
     })
     .returning({ id: schema.tenants.id });
 
@@ -502,6 +529,23 @@ export async function impostaAcquistiStudio(
 }
 
 /**
+ * Imposta il tetto di spesa complessivo di uno studio, o lo toglie con `null`.
+ *
+ * È la leva degli account di prova: lo studio lavora come gli altri, ma in tutto può spendere
+ * quella cifra. Non tocca gli accessi, e la spesa già fatta resta quella che è.
+ */
+export async function impostaTettoTotaleStudio(
+  db: Database,
+  tenantId: string,
+  centesimi: number | null,
+): Promise<void> {
+  await db
+    .update(schema.tenants)
+    .set({ tettoSpesaTotaleCentesimi: centesimi })
+    .where(eq(schema.tenants.id, tenantId));
+}
+
+/**
  * Chi è lo studio di chi sta lavorando: se gestisce la piattaforma e se è ancora attivo.
  *
  * Le due cose si leggono insieme perché servono insieme, a ogni richiesta, e sarebbero
@@ -519,6 +563,8 @@ export interface StatoStudio {
   readonly attivo: boolean;
   /** Se lo studio può comprare dati: falso per chi si è registrato e non è ancora stato attivato. */
   readonly acquistiAbilitati: boolean;
+  /** Il tetto di spesa complessivo in centesimi, o `null` se lo studio non ne ha. */
+  readonly tettoSpesaTotaleCentesimi: number | null;
 }
 
 export async function statoStudio(db: Database, tenantId: string): Promise<StatoStudio> {
@@ -527,13 +573,22 @@ export async function statoStudio(db: Database, tenantId: string): Promise<Stato
       gestorePiattaforma: schema.tenants.gestorePiattaforma,
       attivo: schema.tenants.attivo,
       acquistiAbilitati: schema.tenants.acquistiAbilitati,
+      tettoSpesaTotaleCentesimi: schema.tenants.tettoSpesaTotaleCentesimi,
     })
     .from(schema.tenants)
     .where(eq(schema.tenants.id, tenantId))
     .limit(1);
 
-  // Uno studio che non esiste non è né gestore né attivo: negare è l'unico esito sicuro.
-  return righe[0] ?? { gestorePiattaforma: false, attivo: false, acquistiAbilitati: false };
+  // Uno studio che non esiste non è né gestore né attivo: negare è l'unico esito sicuro. E il
+  // tetto è zero, non «nessuno»: chi non esiste non spende.
+  return (
+    righe[0] ?? {
+      gestorePiattaforma: false,
+      attivo: false,
+      acquistiAbilitati: false,
+      tettoSpesaTotaleCentesimi: 0,
+    }
+  );
 }
 
 /**

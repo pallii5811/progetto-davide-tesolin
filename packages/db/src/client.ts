@@ -224,6 +224,7 @@ const DDL: readonly string[] = [
     telefono text,
     logo text,
     budget_dati_mensile_centesimi bigint,
+    tetto_spesa_totale_centesimi bigint CHECK (tetto_spesa_totale_centesimi IS NULL OR tetto_spesa_totale_centesimi >= 0),
     gestore_piattaforma boolean NOT NULL DEFAULT false,
     creato_il timestamptz NOT NULL DEFAULT now(),
     attivo boolean NOT NULL DEFAULT true,

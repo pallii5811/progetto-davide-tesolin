@@ -35,6 +35,7 @@ import {
   conPrezzi,
   costoAnalisi,
   costoEventiNegativi,
+  costoMassimoElencoCentesimi,
   createCompanyProvider,
   prezziDaConfigurazione,
   verificaAutorizzazioni,
@@ -113,6 +114,7 @@ import {
   spesaComplessiva,
   spesaOdierna,
   spesaOdiernaComplessiva,
+  spesaTotaleStudio,
   trovaAziendaPerChiave,
   verifichePerAzienda,
 } from '@aegis/db';
@@ -451,7 +453,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
    * proprio tetto, «il servizio ha raggiunto il limite» non dipende da chi legge, e
    * suggerirgli di cambiare le proprie impostazioni lo manderebbe a sbattere.
    */
-  const oltreIlTetto = async (request: FastifyRequest): Promise<EsitoTetto | null> => {
+  const oltreIlTetto = async (request: FastifyRequest, previsto = 0): Promise<EsitoTetto | null> => {
     if (persistenza === undefined) return null;
     const sessione = request.sessione;
     if (sessione === undefined) return null;
@@ -463,6 +465,28 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       blocco senza che nessuno debba ricordarsene.
     */
     if (!sessione.acquistiAbilitati) return { speso: 0, limite: 0, ambito: 'attivazione' };
+
+    /*
+      Il tetto complessivo dello studio: quanto può spendere in dati da sempre (account di prova,
+      19/09/2026: «in totale può usare massimo 5 euro»).
+
+      Si confronta la spesa di sempre PIÙ il costo massimo dell'operazione che sta per partire
+      (`previsto`, che ogni rotta a pagamento calcola dal listino). Con la sola spesa fatta, chi
+      ha ancora venti centesimi comprerebbe un elenco da cinque euro e il tetto diventerebbe un
+      rendiconto. Dove il costo non si sa prima, `previsto` è zero e si ferma solo a tetto pieno.
+
+      Resta uno sforamento possibile, dichiarato: due acquisti lanciati nello stesso istante
+      leggono la stessa spesa e passano entrambi. Il giornaliero ha lo stesso limite.
+    */
+    const tettoTotale = sessione.tettoSpesaTotaleCentesimi;
+    if (tettoTotale !== null) {
+      const spesoTotale = await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+        spesaTotaleStudio(tx, sessione.tenantId),
+      );
+      if (spesoTotale >= tettoTotale || spesoTotale + previsto > tettoTotale) {
+        return { speso: spesoTotale, limite: tettoTotale, ambito: 'credito', previsto };
+      }
+    }
 
     if (tettoComplessivo > 0) {
       // La spesa di TUTTI gli studi: è l'unica lettura del tetto che attraversa gli studi
@@ -516,6 +540,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         'piattaforma lo attiva. Il conteggio delle aziende resta disponibile e gratuito.'
       );
     }
+    // Nemmeno qui «domani»: il credito di prova non si ricarica da solo.
+    if (esito.ambito === 'credito') {
+      const resta = Math.max(0, esito.limite - esito.speso);
+      const previsto = esito.previsto ?? 0;
+      return resta > 0 && previsto > resta
+        ? `Credito di prova insufficiente per questa operazione: restano ${euro(resta)} € dei ` +
+            `${euro(esito.limite)} € a disposizione, e può costarne fino a ${euro(previsto)} €. ` +
+            'Un’operazione più piccola può ancora passare; per un credito più alto scrivi a chi ti ' +
+            'ha dato l’accesso.'
+        : `Credito di prova esaurito: hai usato ${euro(esito.speso)} € dei ${euro(esito.limite)} € ` +
+            'a disposizione. Le aziende già analizzate restano consultabili; per un credito più alto ' +
+            'scrivi a chi ti ha dato l’accesso.';
+    }
     return esito.ambito === 'piattaforma'
       ? `Il servizio ha raggiunto il proprio limite di consumo giornaliero. ${ripresa} ` +
           'Se la cosa si ripete, segnalarlo all’assistenza.'
@@ -523,8 +560,12 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           `${euro(esito.limite)} €. ${ripresa}`;
   };
 
-  /** L'attesa di attivazione non è un «troppe richieste»: è un permesso che ancora manca. */
-  const codiceTetto = (esito: EsitoTetto): 403 | 429 => (esito.ambito === 'attivazione' ? 403 : 429);
+  /*
+    L'attesa di attivazione non è un «troppe richieste»: è un permesso che ancora manca. E il
+    credito di prova finito nemmeno: riprovare più tardi non cambia niente.
+  */
+  const codiceTetto = (esito: EsitoTetto): 403 | 429 =>
+    esito.ambito === 'attivazione' || esito.ambito === 'credito' ? 403 : 429;
 
   const registraSpese = async (request: FastifyRequest, eventi: readonly CostEvent[]): Promise<void> => {
     if (eventi.length === 0 || persistenza === undefined) return;
@@ -769,6 +810,16 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
           gestorePiattaforma: sessione.gestorePiattaforma,
           acquistiAbilitati: sessione.acquistiAbilitati,
           emailVerificata: sessione.emailVerificata,
+          // Solo per gli studi con un tetto complessivo: quanto hanno usato del credito di prova.
+          creditoProva:
+            sessione.tettoSpesaTotaleCentesimi === null || persistenza === undefined
+              ? null
+              : {
+                  limiteCentesimi: sessione.tettoSpesaTotaleCentesimi,
+                  spesoCentesimi: await conTenant(persistenza.db, sessione.tenantId, (tx) =>
+                    spesaTotaleStudio(tx, sessione.tenantId),
+                  ),
+                },
         };
   });
 
@@ -1424,6 +1475,8 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
         autoRegistrato: s.autoRegistrato,
         referente: s.referente,
         utenti: s.utenti,
+        tettoSpesaTotaleCentesimi: s.tettoSpesaTotaleCentesimi,
+        spesaTotaleCentesimi: s.spesaTotaleCentesimi,
         apertoIl: s.creatoIl.toISOString(),
       })),
     };
@@ -1487,8 +1540,19 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
 
     const parsed = z
-      .object({ attivo: z.boolean().optional(), acquistiAbilitati: z.boolean().optional() })
-      .refine((d) => d.attivo !== undefined || d.acquistiAbilitati !== undefined)
+      .object({
+        attivo: z.boolean().optional(),
+        acquistiAbilitati: z.boolean().optional(),
+        // Il tetto complessivo in centesimi; `null` lo toglie. Un milione di euro come massimo:
+        // una cifra digitata male non deve diventare un tetto che non ferma niente.
+        tettoSpesaTotaleCentesimi: z.number().int().min(0).max(100_000_000).nullable().optional(),
+      })
+      .refine(
+        (d) =>
+          d.attivo !== undefined ||
+          d.acquistiAbilitati !== undefined ||
+          d.tettoSpesaTotaleCentesimi !== undefined,
+      )
       .safeParse(request.body ?? {});
     if (!parsed.success || !z.string().uuid().safeParse(request.params.id).success) {
       return reply.status(400).send({ errore: 'Dati non validi' });
@@ -1500,8 +1564,13 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       return reply.status(409).send({ errore: 'Lo studio che gestisce la piattaforma non si sospende' });
     }
 
-    const { impostaAcquistiStudio, impostaAttivitaStudio, referenteDelloStudio, registraAudit } =
-      await import('@aegis/db');
+    const {
+      impostaAcquistiStudio,
+      impostaAttivitaStudio,
+      impostaTettoTotaleStudio,
+      referenteDelloStudio,
+      registraAudit,
+    } = await import('@aegis/db');
 
     /*
       Con la posta attiva, uno studio si attiva solo se chi l'ha aperto ha confermato l'email:
@@ -1525,6 +1594,13 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     }
     if (parsed.data.acquistiAbilitati !== undefined) {
       await impostaAcquistiStudio(persistenza.db, request.params.id, parsed.data.acquistiAbilitati);
+    }
+    if (parsed.data.tettoSpesaTotaleCentesimi !== undefined) {
+      await impostaTettoTotaleStudio(
+        persistenza.db,
+        request.params.id,
+        parsed.data.tettoSpesaTotaleCentesimi,
+      );
     }
     await registraAudit(persistenza.db, {
       tenantId: request.params.id,
@@ -1958,7 +2034,11 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       };
     }
 
-    const esitoTetto = await oltreIlTetto(request);
+    // Una partita IVA compra l'anagrafica estesa, un nome la ricerca: dieci centesimi l'una e l'altra.
+    const esitoTetto = await oltreIlTetto(
+      request,
+      Math.max(listino.services.ricerca.costoCentesimi, listino.services.anagraficaEstesa.costoCentesimi),
+    );
     if (esitoTetto !== null) {
       return reply.status(codiceTetto(esitoTetto)).send({
         errore: messaggioTetto(esitoTetto, 'Le ricerche riprendono domani.'),
@@ -2034,7 +2114,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     // Il conteggio è gratuito e non tocca il tetto: bloccarlo impedirebbe di capire
     // quanto costerebbe una ricerca proprio a chi sta già attento alla spesa.
     if (!soloConteggio) {
-      const esito = await oltreIlTetto(request);
+      const esito = await oltreIlTetto(request, costoMassimoElencoCentesimi(criteri.limite));
       if (esito !== null) {
         return reply.status(codiceTetto(esito)).send({
           errore: messaggioTetto(esito, 'Il conteggio dei risultati resta disponibile e gratuito.'),
@@ -2175,7 +2255,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       Non la tolgo: cancellare una rotta pubblica è una decisione di prodotto e non mia.
       La porto dentro i controlli, che è ciò che serviva.
     */
-    const esitoTetto = await oltreIlTetto(request);
+    const esitoTetto = await oltreIlTetto(request, costoAnalisi(livello, listino));
     if (esitoTetto !== null) {
       return reply.status(codiceTetto(esitoTetto)).send({
         errore: messaggioTetto(
@@ -2399,17 +2479,27 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       (parsed.data.approfondita === true && !gia.approfondimento) ||
       (parsed.data.eventiNegativi === true && !gia.eventiNegativi);
 
-    const esito = await oltreIlTetto(request);
+    /*
+      Quanto può costare al massimo questa analisi: l'anagrafica se l'azienda non è ancora in
+      archivio, più gli acquisti facoltativi chiesti e non già in casa. Serve al tetto
+      complessivo degli account di prova, che guarda anche l'operazione e non solo il passato.
+    */
+    const inArchivio = await giaInArchivio(request, request.params.id);
+    const previstoAnalisi =
+      (inArchivio ? 0 : costoAnalisi('completo', listino)) +
+      (parsed.data.approfondita === true && !gia.approfondimento
+        ? costoAnalisi('profondito', listino) - costoAnalisi('completo', listino)
+        : 0) +
+      (parsed.data.eventiNegativi === true && !gia.eventiNegativi ? costoEventiNegativi(listino) : 0);
+
+    const esito = await oltreIlTetto(request, previstoAnalisi);
     /*
       L'esenzione «già in archivio» vale per chi ha raggiunto il tetto, mai per uno studio in
       attesa di attivazione: la riga dell'azienda la crea gratis anche un dossier salvato, e da
       lì l'analisi comprava l'anagrafica col credito della piattaforma (revisione di sicurezza
       del 18/09/2026). Uno studio mai attivato non ha pagato niente da rileggere.
     */
-    if (
-      esito !== null &&
-      (esito.ambito === 'attivazione' || !(await giaInArchivio(request, request.params.id)))
-    ) {
+    if (esito !== null && (esito.ambito === 'attivazione' || !inArchivio)) {
       return reply.status(codiceTetto(esito)).send({
         errore: messaggioTetto(esito, 'Le analisi riprendono domani.'),
       });
@@ -2717,7 +2807,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const esito = await oltreIlTetto(request);
+    const esito = await oltreIlTetto(request, costoAnalisi('completo', listino));
     if (esito !== null) {
       return reply.status(codiceTetto(esito)).send({
         errore: messaggioTetto(
@@ -2747,7 +2837,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       legge. Lo sforamento residuo è quello di **una** azienda, non quello di un file.
     */
     for (const riga of anteprima.daAcquisire) {
-      const oltre = await oltreIlTetto(request);
+      const oltre = await oltreIlTetto(request, costoAnalisi('completo', listino));
       if (oltre !== null) {
         interrottaPerTetto = true;
         // Ciò che resta fuori si dichiara riga per riga: un elenco che si accorcia in
@@ -2935,7 +3025,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       });
     }
 
-    const esitoTetto = await oltreIlTetto(request);
+    const esitoTetto = await oltreIlTetto(request, costoScreening * parsed.data.persone.length);
     if (esitoTetto !== null) {
       return reply
         .status(codiceTetto(esitoTetto))
@@ -3604,7 +3694,9 @@ const decisioneVerificaSchema = z.object({
 interface EsitoTetto {
   readonly speso: number;
   readonly limite: number;
-  readonly ambito: 'studio' | 'piattaforma' | 'attivazione';
+  readonly ambito: 'studio' | 'piattaforma' | 'attivazione' | 'credito';
+  /** Solo per `credito`: quanto poteva costare al massimo l'operazione rifiutata, in centesimi. */
+  readonly previsto?: number;
 }
 
 const loginSchema = z.object({
@@ -3812,6 +3904,7 @@ async function risolviSessione(db: unknown, token: string): Promise<Sessione | n
     ruolo: utente.ruolo,
     gestorePiattaforma: studio.gestorePiattaforma,
     acquistiAbilitati: studio.acquistiAbilitati,
+    tettoSpesaTotaleCentesimi: studio.tettoSpesaTotaleCentesimi,
     emailVerificata: utente.emailVerificataIl !== null,
   };
 }

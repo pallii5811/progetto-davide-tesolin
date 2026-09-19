@@ -72,3 +72,22 @@ export async function cambiaAcquisti(id: string, acquistiAbilitati: boolean): Pr
   });
   revalidatePath('/impostazioni/studi');
 }
+
+/**
+ * Imposta il tetto di spesa complessivo di uno studio, in centesimi; `null` lo toglie.
+ * Dice se è stato salvato: un tetto che il gestore crede impostato e non lo è lascerebbe
+ * l'account di prova libero di spendere.
+ */
+export async function cambiaTettoTotale(id: string, centesimi: number | null): Promise<boolean> {
+  try {
+    const risposta = await chiamaApiConSessione(`/api/studi/${encodeURIComponent(id)}`, {
+      metodo: 'PATCH',
+      corpo: { tettoSpesaTotaleCentesimi: centesimi },
+    });
+    if (!risposta.ok) return false;
+  } catch {
+    return false;
+  }
+  revalidatePath('/impostazioni/studi');
+  return true;
+}

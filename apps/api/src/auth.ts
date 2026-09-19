@@ -172,6 +172,11 @@ export interface Sessione {
    * stato attivato dal gestore: entra, guarda, conta — non spende il credito della piattaforma.
    */
   readonly acquistiAbilitati: boolean;
+  /**
+   * Il tetto di spesa complessivo dello studio, in centesimi, o `null` se non ne ha: quanto può
+   * spendere in dati da sempre. È degli account di prova (19/09/2026).
+   */
+  readonly tettoSpesaTotaleCentesimi: number | null;
   /** Se l'utente ha confermato il proprio indirizzo aprendo il collegamento ricevuto. */
   readonly emailVerificata: boolean;
 }
