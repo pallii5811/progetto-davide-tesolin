@@ -9,7 +9,7 @@ import { esci } from './accedi/actions';
 import { NavigazionePrincipale } from './NavigazionePrincipale';
 import { AvvisiAccount } from './AvvisiAccount';
 import { BottoneInvio } from '@/components/BottoneInvio';
-import { IconaScudo } from './_vetrina/icone';
+import { SegnoAegis } from '@/components/MarchioAegis';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -30,7 +30,7 @@ function Marchio({ conMotto = true }: { conMotto?: boolean }) {
   return (
     <Link href="/prospect" className="flex items-center gap-2.5 rounded-lg">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-azione text-azione-testo">
-        <IconaScudo className="h-[18px] w-[18px]" />
+        <SegnoAegis className="h-[19px] w-[19px]" />
       </span>
       <span className="min-w-0 leading-tight">
         <span className="block text-[17px] font-semibold tracking-[-0.03em] text-testo">AEGIS</span>

@@ -19,6 +19,7 @@ import {
   PannelloTerritorio,
 } from './illustrazioni';
 import { CollegamentoFreccia, Pulsante, Tessera } from './pezzi';
+import { SegnoAegis } from '@/components/MarchioAegis';
 import { FlussoTrePassi } from './FlussoTrePassi';
 import { ProdottoScorrevole } from './ProdottoScorrevole';
 import { SchedaRegistro } from './SchedaRegistro';
@@ -69,7 +70,7 @@ function Marchio() {
   return (
     <span className="flex items-center gap-2.5">
       <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-vetrina-inchiostro text-white">
-        <IconaScudo className="h-[18px] w-[18px]" />
+        <SegnoAegis className="h-[19px] w-[19px]" />
       </span>
       <span className="text-[19px] font-semibold tracking-[-0.03em]">AEGIS</span>
     </span>
@@ -183,25 +184,11 @@ export function Vetrina() {
     <div
       className={`${geist.className} vetrina-radice min-h-screen bg-vetrina-carta text-vetrina-inchiostro antialiased`}
     >
-      {/* ── Novità ───────────────────────────────────────────────────────── */}
-      <div className="bg-vetrina-viola text-white">
-        <div
-          className={`${LARGHEZZA} flex min-h-11 flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2.5 text-center text-[13.5px]`}
-        >
-          <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11.5px] font-semibold uppercase tracking-[0.06em]">
-            Novità
-          </span>
-          <span className="sm:hidden">Ricerche ripetute, senza doppioni.</span>
-          <span className="hidden sm:inline">
-            Rifai la stessa ricerca: l’elenco riparte dalle aziende successive, e chi è già nel CRM non
-            ricompare.
-          </span>
-          <a href="#crm" className="font-semibold underline-offset-4 hover:underline">
-            Come funziona →
-          </a>
-        </div>
-      </div>
-
+      {/*
+        La fascia «Novità» c'era e non c'è più (Simone, 20/09/2026): la prima riga della pagina
+        annunciava una rifinitura degli elenchi a chi ancora non sa che cosa fa il prodotto, e
+        rubava il posto al titolo. Quella funzione resta raccontata dove serve, nella sezione CRM.
+      */}
       {/* ── Menu ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 pt-3">
         <div className={LARGHEZZA}>
@@ -260,16 +247,16 @@ export function Vetrina() {
             className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(60%_60%_at_50%_0%,oklch(0.93_0.03_262/0.6),transparent_70%)]"
           />
           <div className={`${LARGHEZZA} relative text-center`}>
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-vetrina-linea bg-white text-vetrina-blu shadow-[0_10px_30px_-15px_rgba(16,24,40,0.35)]">
-              <IconaScudo className="h-7 w-7" />
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-vetrina-inchiostro text-white shadow-[0_12px_30px_-12px_rgba(16,24,40,0.55)]">
+              <SegnoAegis className="h-8 w-8" />
             </span>
-            <h1 className="mx-auto mt-8 max-w-[1060px] text-balance text-[44px] font-semibold leading-[0.98] tracking-[-0.05em] sm:text-[64px] lg:text-[80px]">
-              Trova le aziende da assicurare e presentati con i loro numeri.
+            <h1 className="mx-auto mt-8 max-w-[1060px] text-balance text-[40px] font-semibold leading-[1] tracking-[-0.045em] sm:text-[60px] sm:leading-[0.98] lg:text-[76px]">
+              Trova nuove aziende, misura i loro rischi, consegna il report con il tuo nome.
             </h1>
             <p className="mx-auto mt-7 max-w-[780px] text-pretty text-[18px] leading-[1.55] text-vetrina-grigio sm:text-[20px]">
-              AEGIS ti trova le aziende della tua zona e, dai dati ufficiali dell’impresa e del suo comune,
-              ti dice quanto rischiano le loro sedi, quanto perdono in un giorno di fermo e se sono
-              obbligate alla polizza CAT NAT. Al cliente lasci un report con il nome della tua agenzia.
+              Dai dati ufficiali dell’impresa e del suo comune, AEGIS ti dice quanto rischiano le sedi di
+              un’azienda, quanto perde in un giorno di fermo e se è obbligata alla polizza CAT NAT. Il
+              report esce con l’intestazione della tua agenzia, pronto da consegnare.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Pulsante href="/registrati" grande>

@@ -28,7 +28,7 @@ test.describe('Vetrina pubblica', () => {
     await expect(page).toHaveTitle(/AEGIS/);
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-      'Trova le aziende da assicurare e presentati con i loro numeri.',
+      'Trova nuove aziende, misura i loro rischi, consegna il report con il tuo nome.',
     );
 
     // Il menu è quello della vetrina; quello del prodotto non c'è.

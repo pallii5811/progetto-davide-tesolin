@@ -81,7 +81,7 @@ fi
 
 echo
 echo "── La radice senza sessione è la vetrina ──────────────────────────────"
-if curl -sS "$SITO/" | grep -q "presentati con i loro numeri"; then
+if curl -sS "$SITO/" | grep -q "consegna il report con il tuo nome"; then
   echo "  / -> vetrina"
 else
   echo "  / <<< senza sessione deve mostrare la vetrina"
