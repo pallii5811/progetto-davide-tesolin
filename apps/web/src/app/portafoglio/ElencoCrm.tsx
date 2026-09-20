@@ -188,7 +188,7 @@ function Punteggi({ azienda }: { azienda: VoceCrmDto }) {
   if (voci.every((v) => v.valore === null)) {
     return (
       <p className="text-xs leading-snug text-testo-debole">
-        Analisi di prima del 19/09/2026: i punteggi compaiono riaprendo la scheda.
+        Non in archivio: si ricalcolano riaprendo la scheda.
       </p>
     );
   }

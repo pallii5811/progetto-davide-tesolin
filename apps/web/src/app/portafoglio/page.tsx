@@ -148,8 +148,9 @@ export default async function PaginaCrm({ searchParams }: { searchParams: Promis
       {analizzate > 0 && (
         <p className="mt-4 max-w-3xl text-xs leading-relaxed text-testo-debole">
           I punteggi sono quelli dell&apos;ultima analisi: Property Risk e Cyber Risk da 1 a 7 come nella
-          scheda, e per la Business Interruption anche quanto costa un giorno di fermo. Un&apos;azienda
-          analizzata prima del 19/09/2026 li mostra appena la sua scheda viene riaperta.
+          scheda, e per la Business Interruption anche quanto costa un giorno di fermo. Dove non ci sono, si
+          ricalcolano riaprendo la scheda dell&apos;azienda: per un&apos;azienda già analizzata non costa
+          nulla.
         </p>
       )}
     </>
