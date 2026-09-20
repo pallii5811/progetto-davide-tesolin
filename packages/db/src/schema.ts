@@ -668,6 +668,14 @@ export const analisi = pgTable(
     rischiCritici: smallint('rischi_critici'),
     coperturaAssente: smallint('copertura_assente'),
     statoCatNat: statoCatNat('stato_cat_nat'),
+    /**
+     * Le tre protezioni del foglio Veezco (migrazione 0017, 19/09/2026): il CRM le mostra per
+     * ogni azienda. `null` quando non calcolabili, e sulle analisi salvate prima.
+     */
+    propertyRisk: numeric('property_risk', { precision: 4, scale: 2 }),
+    biPunteggio: numeric('bi_punteggio', { precision: 4, scale: 2 }),
+    biPerditaGiornalieraCentesimi: denaro('bi_perdita_giornaliera_centesimi'),
+    cyberRisk: numeric('cyber_risk', { precision: 3, scale: 1 }),
 
     /** Analisi completa serializzata. */
     risultato: jsonb('risultato').notNull(),

@@ -11,6 +11,11 @@ export default function Caricamento() {
         ))}
       </div>
       <div className="overflow-hidden rounded-2xl border border-bordo bg-superficie shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        {/* La barra di ricerca, dov'è nella pagina vera: le righe sotto non si spostano quando arriva. */}
+        <div className="flex items-center justify-between gap-3 border-b border-bordo px-3 py-3 sm:px-4">
+          <Blocco className="h-9 w-full max-w-sm rounded-full" />
+          <Blocco className="hidden h-3 w-20 sm:block" />
+        </div>
         {[0, 1, 2, 3, 4, 5].map((n) => (
           <div key={n} className="flex items-center gap-4 border-b border-bordo px-5 py-4 last:border-b-0">
             <div className="min-w-0 flex-1 space-y-2">

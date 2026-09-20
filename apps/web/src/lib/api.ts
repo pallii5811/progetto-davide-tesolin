@@ -1280,6 +1280,11 @@ export interface VoceCrmDto {
   /** `null` per le imprese il cui merito non è determinabile, o mai analizzate. */
   scoreCredito: number | null;
   classeCredito: string | null;
+  /** Le tre protezioni dell'ultima analisi, da 1 a 7; `null` se non calcolabili o mai salvate. */
+  propertyRisk: number | null;
+  biPunteggio: number | null;
+  biPerditaGiornalieraCentesimi: number | null;
+  cyberRisk: number | null;
   analizzataIl: string | null;
   daElencoIl: string | null;
   statoAggiornatoIl: string | null;

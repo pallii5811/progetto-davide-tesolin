@@ -394,6 +394,10 @@ function creaContestoSu(db: Database, tenantId: string, utenteId: string | null)
           nota: r.notaCrm,
           scoreCredito: r.scoreCredito,
           classeCredito: r.classeCredito,
+          propertyRisk: r.propertyRisk,
+          biPunteggio: r.biPunteggio,
+          biPerditaGiornalieraCentesimi: r.biPerditaGiornalieraCentesimi,
+          cyberRisk: r.cyberRisk,
           analizzataIl: r.analizzataIl,
           daElencoIl: r.daElencoIl,
           statoAggiornatoIl: r.crmAggiornatoIl,
@@ -584,6 +588,10 @@ function creaContestoSu(db: Database, tenantId: string, utenteId: string | null)
         rischiCritici: analisi.sintesi.rischiCritici,
         coperturaAssente: analisi.sintesi.coperturaAssente,
         statoCatNat: analisi.catNat.value.status,
+        propertyRisk: analisi.protezioni.property.punteggio,
+        biPunteggio: analisi.protezioni.businessInterruption.punteggioFisico,
+        biPerditaGiornalieraCentesimi: analisi.protezioni.businessInterruption.perditaGiornaliera,
+        cyberRisk: analisi.protezioni.cyber.punteggio,
         risultato: JSON.parse(JSON.stringify(analisi.sintesi)) as unknown,
         // Le polizze si ricavano dai gap: sono le stesse con cui l'analisi è stata
         // calcolata, e prenderle da lì evita che le due cose possano divergere.

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { chiamaApiConSessione } from '@/lib/chiamata-server';
+import type { StatoCrm } from '@aegis/core/crm';
 
 export interface EsitoCrm {
   ok: boolean;
@@ -9,37 +10,32 @@ export interface EsitoCrm {
 }
 
 /**
- * Salva lo stato e la nota di un'azienda del CRM.
+ * Stato e nota di un'azienda del CRM, salvati separatamente.
  *
- * Passa dal server di Next come ogni altra modifica: l'indirizzo dell'API e le credenziali non
- * finiscono nel bundle. Stato e nota viaggiano insieme perché stanno nello stesso modulo, e
- * una nota lasciata vuota è «nessuna nota»: l'API la salva così.
+ * Fino al 19/09/2026 erano un modulo solo con il pulsante «Salva»: per cambiare uno stato dopo
+ * una telefonata servivano due gesti, moltiplicati per ogni riga. Ora lo stato si salva al
+ * cambio — è una scelta fra cinque, non un testo da comporre — e la nota resta con il suo
+ * pulsante, perché mentre si scrive un salvataggio automatico sarebbe un salvataggio a metà.
+ *
+ * Entrambe passano dal server di Next: l'indirizzo dell'API e le credenziali non finiscono nel
+ * bundle. L'API accetta un campo alla volta e non tocca l'altro, quindi cambiare stato non
+ * cancella la nota.
  */
-export async function salvaCrm(
-  identificativo: string,
-  _precedente: EsitoCrm | null,
-  dati: FormData,
-): Promise<EsitoCrm> {
-  const stato = dati.get('stato');
-  const nota = dati.get('nota');
-
+async function patchCrm(identificativo: string, corpo: Record<string, unknown>): Promise<EsitoCrm> {
   try {
     const risposta = await chiamaApiConSessione(`/api/crm/${encodeURIComponent(identificativo)}`, {
       metodo: 'PATCH',
-      corpo: {
-        stato: typeof stato === 'string' ? stato : undefined,
-        nota: typeof nota === 'string' ? nota : null,
-      },
+      corpo,
     });
 
     if (!risposta.ok) {
-      const corpo = (await risposta.json().catch(() => ({}))) as { errore?: string };
+      const dettagli = (await risposta.json().catch(() => ({}))) as { errore?: string };
       return {
         ok: false,
         messaggio:
           risposta.status === 403
             ? 'Il ruolo in sola lettura non consente modifiche.'
-            : (corpo.errore ?? `Salvataggio non riuscito (errore ${risposta.status}).`),
+            : (dettagli.errore ?? `Salvataggio non riuscito (errore ${risposta.status}).`),
       };
     }
 
@@ -48,4 +44,13 @@ export async function salvaCrm(
   } catch {
     return { ok: false, messaggio: 'Servizio non raggiungibile: la modifica non è stata salvata.' };
   }
+}
+
+export async function cambiaStatoCrm(identificativo: string, stato: StatoCrm): Promise<EsitoCrm> {
+  return patchCrm(identificativo, { stato });
+}
+
+/** Una nota svuotata è «nessuna nota»: l'API la salva così. */
+export async function salvaNotaCrm(identificativo: string, nota: string): Promise<EsitoCrm> {
+  return patchCrm(identificativo, { nota });
 }

@@ -38,25 +38,39 @@ test.describe('CRM', () => {
     }
   });
 
-  test('stato e nota si salvano, restano dopo il ricaricamento, e i filtri li contano', async ({
-    page,
-  }) => {
+  /*
+    Rifatto il 19/09/2026 («il crm è brutto… rendilo molto più user friendly»): lo stato si salva
+    al cambio, senza pulsante, e la nota si apre solo quando serve. Qui si prova che i due gesti
+    bastano, che restano dopo il ricaricamento e che i filtri li contano.
+  */
+  test('lo stato si salva al cambio, la nota si apre e resta dopo il ricaricamento', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/portafoglio');
 
     const riga = page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i });
     const nota = `Richiamare lunedì ${Date.now()}`;
+
+    // Lo stato: nessun «Salva» da premere, l'esito compare accanto alla pastiglia.
     await riga.getByLabel(/^Stato di /).selectOption('in-trattativa');
+    await expect(riga.getByRole('status')).toHaveText('Salvato.', { timeout: 30_000 });
+
+    // La nota: si apre, si scrive, si salva, e sulla riga resta il testo.
+    await riga.getByRole('button', { name: /Aggiungi una nota/ }).click();
     await riga.getByLabel(/^Nota su /).fill(nota);
     await riga.getByRole('button', { name: 'Salva' }).click();
-    await expect(riga.getByRole('status')).toHaveText('Salvato.');
+    await expect(riga.getByText(nota)).toBeVisible({ timeout: 30_000 });
 
     await page.reload();
     const dopo = page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i });
     await expect(dopo.getByLabel(/^Stato di /)).toHaveValue('in-trattativa');
+    await expect(dopo.getByText(nota)).toBeVisible();
+    // L'area di testo non è lì ad aspettare: si riapre solo se serve.
+    await expect(dopo.getByLabel(/^Nota su /)).toHaveCount(0);
+    await dopo.getByRole('button', { name: /Modifica la nota/ }).click();
     await expect(dopo.getByLabel(/^Nota su /)).toHaveValue(nota);
 
     // Il filtro per stato mostra la riga, e un altro stato no.
+    await page.goto('/portafoglio');
     await page.getByRole('link', { name: /^In trattativa \(\d+\)$/ }).click();
     await expect(page).toHaveURL(/filtro=in-trattativa/);
     await expect(page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i })).toHaveCount(1);
@@ -65,14 +79,45 @@ test.describe('CRM', () => {
     await expect(page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i })).toHaveCount(0);
   });
 
-  test('un’azienda analizzata porta i contatti e si apre senza rifare l’analisi', async ({ page }) => {
+  test('un’azienda analizzata porta contatti e punteggi, e si apre senza rifare l’analisi', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/portafoglio');
 
     const riga = page.locator('tbody tr').filter({ hasText: /MECCANICA BRESCIANA/i });
     await expect(riga.getByRole('link', { name: /@/ })).toHaveAttribute('href', /^mailto:/);
+    // Il telefono, chiesto il 19/09/2026: è un collegamento che il telefono compone.
+    await expect(riga.getByRole('link', { name: /^\+?[\d ]+$/ })).toHaveAttribute('href', /^tel:\+?\d+$/);
     await expect(riga.getByText(/analizzata il \d{2}\/\d{2}\/\d{4}/)).toBeVisible();
     await expect(riga.getByRole('link', { name: 'Apri' })).toBeVisible();
+
+    /*
+      I tre punteggi del foglio Veezco, per ogni azienda analizzata. L'etichetta del cerchio è
+      quella che legge un lettore di schermo: «Property: 5,17 su 7».
+    */
+    for (const rischio of ['Property', 'Interruzione', 'Cyber']) {
+      await expect(
+        riga.getByRole('img', { name: new RegExp(`^${rischio}: (\\d+(,\\d+)? su 7|non calcolabile)$`) }),
+        rischio,
+      ).toBeVisible();
+    }
+  });
+
+  test('la ricerca trova una riga e lo dichiara, senza toccare il filtro', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/portafoglio');
+
+    const cerca = page.getByRole('searchbox', { name: /Cerca fra le aziende/i });
+    await cerca.fill('meccanica');
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('tbody tr').first()).toContainText(/MECCANICA BRESCIANA/i);
+
+    await cerca.fill('azienda che non esiste');
+    await expect(page.getByText(/Nessuna azienda corrisponde/)).toBeVisible();
+
+    await cerca.fill('');
+    await expect(page.locator('tbody tr').first()).toBeVisible();
   });
 
   test('su schermo stretto resta usabile: stato, nota e comando visibili', async ({ page }) => {
@@ -84,8 +129,12 @@ test.describe('CRM', () => {
       .filter({ hasText: /MECCANICA BRESCIANA/i })
       .first();
     await expect(scheda.getByLabel(/^Stato di /)).toBeVisible();
-    await expect(scheda.getByLabel(/^Nota su /)).toBeVisible();
+    await expect(scheda.getByRole('button', { name: /Aggiungi una nota|Modifica la nota/ })).toBeVisible();
     await expect(scheda.getByRole('link', { name: /^(Apri|Analizza)$/ })).toBeVisible();
+
+    // La pagina non scorre di lato: l'elenco su telefono è fatto di schede, non di tabella.
+    const eccedenza = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(eccedenza, `la pagina sborda di ${eccedenza}px`).toBeLessThanOrEqual(0);
   });
 
   test('l’elenco si scarica in CSV, con le colonne del CRM', async ({ page }) => {

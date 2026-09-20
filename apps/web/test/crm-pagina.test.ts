@@ -49,13 +49,32 @@ describe('La pagina CRM', () => {
     }
   });
 
-  it('legge il CRM, con stato, nota, contatti e filtri per stato', () => {
+  it('legge il CRM e ne disegna i filtri per stato', () => {
     expect(pagina).toContain('leggiCrm()');
-    expect(pagina).toContain('<ModificaCrm');
     expect(pagina).toContain('STATI_CRM.map(');
-    expect(pagina).toContain('<Contatti azienda={azienda} />');
+    expect(pagina).toContain('<ElencoCrm');
+  });
+
+  /*
+    Dal 19/09/2026 le righe stanno in un componente di client (la ricerca filtra senza andare al
+    server). Le promesse restano le stesse, e si misurano dov'è finito il codice.
+  */
+  it('l’elenco porta contatti, stato, nota e i tre punteggi', () => {
+    const elenco = senzaCommenti(leggi('app/portafoglio/ElencoCrm.tsx'));
+
+    expect(elenco).toContain('<ModificaCrm');
+    expect(elenco).toContain('<Contatti azienda={azienda} />');
+    expect(elenco).toContain('<Punteggi azienda={azienda} />');
     // Aprire un'azienda mai analizzata spende: il pulsante lo dice con il suo nome.
-    expect(pagina).toContain("{analizzata ? 'Apri' : 'Analizza'}");
+    expect(elenco).toContain("{analizzata ? 'Apri' : 'Analizza'}");
+
+    // Il telefono chiesto il 19/09/2026, come collegamento che il telefono compone.
+    expect(elenco, 'il telefono non è un collegamento tel:').toContain('tel:');
+    // I punteggi sono gli stessi cerchi della scheda, non un secondo disegno.
+    expect(elenco).toContain("from '../azienda/[id]/Cerchio'");
+    for (const campo of ['propertyRisk', 'biPunteggio', 'biPerditaGiornalieraCentesimi', 'cyberRisk']) {
+      expect(elenco, campo).toContain(`azienda.${campo}`);
+    }
   });
 
   it('il file esportato viene dal CRM, non dal portafoglio assicurativo', () => {
@@ -74,6 +93,14 @@ describe('La pagina CRM', () => {
     const modulo = senzaCommenti(leggi('app/portafoglio/ModificaCrm.tsx'));
     // Il menu degli stati viene dal dominio, non da un elenco scritto qui.
     expect(modulo).toContain("from '@aegis/core/crm'");
+    /*
+      Le etichette AVVOLGONO il campo invece di agganciarlo per identificativo: la pagina disegna
+      ogni azienda due volte — riga e scheda da telefono — e due identificativi uguali facevano
+      puntare l'etichetta al campo nascosto, che nessuno può usare.
+    */
+    expect(modulo, 'un’etichetta agganciata per id: su due copie punta a quella nascosta').not.toMatch(
+      /htmlFor=/,
+    );
     expect(modulo).toContain('<span className="sr-only">Stato di {denominazione}</span>');
     expect(modulo).toContain('<span className="sr-only">Nota su {denominazione}</span>');
     expect(modulo).toContain('role="status"');
@@ -82,7 +109,11 @@ describe('La pagina CRM', () => {
   it('i componenti di client importano il CRM dal sottopercorso, non l’intero motore', () => {
     // `@aegis/core` porta con sé archivi di migliaia di comuni: in un componente di client
     // finirebbero nel pacchetto che il browser scarica.
-    for (const file of ['app/portafoglio/ModificaCrm.tsx', 'app/portafoglio/page.tsx']) {
+    for (const file of [
+      'app/portafoglio/ModificaCrm.tsx',
+      'app/portafoglio/ElencoCrm.tsx',
+      'app/portafoglio/page.tsx',
+    ]) {
       expect(leggi(file), file).not.toMatch(/from '@aegis\/core'/);
     }
   });

@@ -9,10 +9,7 @@ import {
   IconaScudo,
 } from './icone';
 import {
-  IllustrazioneAnalizza,
-  IllustrazioneProponi,
   IllustrazioneTestata,
-  IllustrazioneTrova,
   MiniPartitaIva,
   MiniSoci,
   PannelloCatNat,
@@ -22,6 +19,7 @@ import {
   PannelloTerritorio,
 } from './illustrazioni';
 import { CollegamentoFreccia, Pulsante, Tessera } from './pezzi';
+import { FlussoTrePassi } from './FlussoTrePassi';
 import { ProdottoScorrevole } from './ProdottoScorrevole';
 import { SchedaRegistro } from './SchedaRegistro';
 import { SchedeFunzioni } from './SchedeFunzioni';
@@ -159,7 +157,6 @@ const FONTI = [
 const PASSI = [
   {
     id: 'trova',
-    illustrazione: <IllustrazioneTrova />,
     titolo: 'Trova le aziende da chiamare.',
     testo:
       'Filtra per città, codice ATECO, dipendenti, fatturato e forma giuridica. Sapere quante sono è gratis. Quando il filtro ti convince crei l’elenco, e le aziende entrano nel tuo CRM.',
@@ -167,7 +164,6 @@ const PASSI = [
   },
   {
     id: 'analizza',
-    illustrazione: <IllustrazioneAnalizza />,
     titolo: 'Vedi quanto rischiano.',
     testo:
       'Tre punteggi da 1 a 7, dove 7 è il rischio più alto: danni ai beni sede per sede (Property), fermo dell’attività (Business Interruption) e cyber del settore. In più l’obbligo CAT NAT, con la sua scadenza.',
@@ -175,7 +171,6 @@ const PASSI = [
   },
   {
     id: 'proponi',
-    illustrazione: <IllustrazioneProponi />,
     titolo: 'Consegna il report.',
     testo:
       'Sintesi per il titolare, capitali da assicurare, coperture da proporre con il loro perché, obbligo CAT NAT. Lo stampi o lo mandi in PDF, con l’intestazione della tua agenzia.',
@@ -320,6 +315,11 @@ export function Vetrina() {
         </section>
 
         {/* ── Come funziona ──────────────────────────────────────────────── */}
+        {/*
+          Dal 19/09/2026 lo schema a flusso di clay.com/signals (FlussoTrePassi.tsx): a sinistra la
+          catena dei tre passi con i filtri e le fonti veri, a destra dove finisce ogni passo. I
+          testi dei tre passi restano sotto lo schema, che è decorativo.
+        */}
         <section id="come-funziona" className="scroll-mt-28 py-24 sm:py-28">
           <div className={LARGHEZZA}>
             <div className="grid items-end gap-6 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
@@ -329,11 +329,21 @@ export function Vetrina() {
                 rischio, un foglio di calcolo e un documento da impaginare. In AEGIS è un percorso solo.
               </Paragrafo>
             </div>
+
+            <div className="mt-12">
+              <FlussoTrePassi />
+            </div>
+
             <div className="mt-12 grid gap-10 lg:grid-cols-3 lg:gap-8">
-              {PASSI.map((passo) => (
+              {PASSI.map((passo, i) => (
                 <article key={passo.id}>
-                  {passo.illustrazione}
-                  <h3 className="mt-7 text-balance text-[24px] font-semibold leading-[1.15] tracking-[-0.03em]">
+                  <p className="flex items-center gap-2.5 text-[13px] font-medium uppercase tracking-[0.08em] text-vetrina-grigio">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-vetrina-inchiostro text-[12px] font-semibold text-white">
+                      {i + 1}
+                    </span>
+                    Passo {i + 1}
+                  </p>
+                  <h3 className="mt-4 text-balance text-[24px] font-semibold leading-[1.15] tracking-[-0.03em]">
                     {passo.titolo}
                   </h3>
                   <Paragrafo className="mt-3 text-[16px]">{passo.testo}</Paragrafo>

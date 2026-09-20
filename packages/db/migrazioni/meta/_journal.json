@@ -120,6 +120,13 @@
       "when": 1789862400000,
       "tag": "0016_tetto_totale",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789948800000,
+      "tag": "0017_punteggi_crm",
+      "breakpoints": true
     }
   ]
 }

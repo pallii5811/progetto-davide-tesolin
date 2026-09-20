@@ -43,12 +43,18 @@ export function Cerchio({
   valore,
   etichetta,
   grande = false,
+  piccolo = false,
   decimali,
 }: {
   valore: number | null;
   /** Il nome del rischio: lo legge chi usa un lettore di schermo, insieme al punteggio. */
   etichetta: string;
   grande?: boolean;
+  /**
+   * La misura da elenco, per il CRM (19/09/2026): il numero resta leggibile, «su 7» sparisce —
+   * in una riga con tre cerchi affiancati la scala la dice l'intestazione della colonna.
+   */
+  piccolo?: boolean;
   decimali?: number;
 }) {
   const limitato = valore === null ? null : Math.min(7, Math.max(0, valore));
@@ -63,16 +69,23 @@ export function Cerchio({
           ? `${etichetta}: non calcolabile`
           : `${etichetta}: ${punteggioIt(valore, decimali)} su 7`
       }
-      className={grande ? 'h-36 w-36 shrink-0' : 'h-20 w-20 shrink-0'}
+      className={grande ? 'h-36 w-36 shrink-0' : piccolo ? 'h-12 w-12 shrink-0' : 'h-20 w-20 shrink-0'}
     >
-      <circle cx="64" cy="64" r={RAGGIO} fill="none" strokeWidth="12" className="stroke-bordo" />
+      <circle
+        cx="64"
+        cy="64"
+        r={RAGGIO}
+        fill="none"
+        strokeWidth={piccolo ? 14 : 12}
+        className="stroke-bordo"
+      />
       {limitato !== null && (
         <circle
           cx="64"
           cy="64"
           r={RAGGIO}
           fill="none"
-          strokeWidth="12"
+          strokeWidth={piccolo ? 14 : 12}
           strokeLinecap="round"
           strokeDasharray={`${pieno} ${CIRCONFERENZA}`}
           transform="rotate(-90 64 64)"
@@ -81,13 +94,13 @@ export function Cerchio({
       )}
       <text
         x="64"
-        y={valore === null ? 70 : 68}
+        y={piccolo ? 78 : valore === null ? 70 : 68}
         textAnchor="middle"
-        className={`fill-testo font-semibold ${grande ? 'text-[30px]' : 'text-[32px]'}`}
+        className={`fill-testo font-semibold ${grande ? 'text-[30px]' : piccolo ? 'text-[42px]' : 'text-[32px]'}`}
       >
         {valore === null ? 'n.d.' : punteggioIt(valore, decimali)}
       </text>
-      {valore !== null && (
+      {valore !== null && !piccolo && (
         <text x="64" y="90" textAnchor="middle" className="fill-testo-tenue text-[14px]">
           su 7
         </text>

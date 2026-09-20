@@ -653,20 +653,34 @@ describe('23 · un servizio giù non è un collegamento revocato', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('24 · il portafoglio non emette un verdetto che non può sostenere', () => {
-  it('lo score in elenco non viene colorato come se fosse verificato', () => {
-    const portafoglio = leggi('app/portafoglio/page.tsx');
-    const funzione = portafoglio.slice(portafoglio.indexOf('function PunteggioCredito'));
-    const corpo = funzione.slice(0, funzione.indexOf('\nfunction '));
+  /*
+    Lo score di credito in elenco non c'è più.
 
-    expect(
-      corpo,
-      'la proiezione di portafoglio non porta la confidenza del credito: colorare di verde ' +
-        'uno score che la scheda della stessa azienda dichiara «provvisorio» è un verdetto senza misura',
-    ).not.toMatch(/text-basso|text-critico|text-rilevante/);
+    Era il difetto originale: un numero colorato di verde che la scheda della stessa azienda
+    dichiarava «provvisorio» finché protesti e procedure non erano verificati. Il 19/09/2026 il
+    merito creditizio è uscito dal CRM — come era già uscito dalla scheda — e la promessa
+    diventa più semplice da mantenere: quel numero non si mostra affatto.
+  */
+  it('il CRM non mostra il merito creditizio', () => {
+    for (const file of ['app/portafoglio/page.tsx', 'app/portafoglio/ElencoCrm.tsx']) {
+      const sorgente = senzaCommenti(leggi(file));
+      expect(sorgente, `${file}: lo score di credito è tornato in elenco`).not.toMatch(
+        /scoreCredito|classeCredito/,
+      );
+    }
   });
 
-  it('e l’elenco dichiara dove sta il verdetto', () => {
-    expect(leggi('app/portafoglio/page.tsx')).toMatch(/provvisor/i);
+  /*
+    I punteggi che il CRM mostra adesso sono altri — Property, Business Interruption, Cyber — e
+    sono quelli salvati con l'analisi. Un'azienda mai analizzata non ne ha, e la pagina non deve
+    disegnare tre cerchi vuoti: un cerchio a zero si legge «rischio minimo», che è
+    un'affermazione, non un'assenza.
+  */
+  it('e per un’azienda mai analizzata non disegna punteggi', () => {
+    const elenco = senzaCommenti(leggi('app/portafoglio/ElencoCrm.tsx')).replace(/\s+/g, ' ');
+    expect(elenco, 'i punteggi non sono protetti dal caso «mai analizzata»').toMatch(
+      /function Punteggi\([^)]*\) \{ if \(azienda\.analizzataIl === null\)/,
+    );
   });
 });
 

@@ -37,6 +37,10 @@ function voce(parziale: Partial<VoceCrm> & Pick<VoceCrm, 'identificativo'>): Voc
     nota: null,
     scoreCredito: null,
     classeCredito: null,
+    propertyRisk: null,
+    biPunteggio: null,
+    biPerditaGiornalieraCentesimi: null,
+    cyberRisk: null,
     analizzataIl: null,
     daElencoIl: null,
     statoAggiornatoIl: null,
@@ -136,6 +140,10 @@ describe('Il file del CRM', () => {
       nota: 'Richiamare lunedì; vuole il preventivo',
       scoreCredito: 62,
       classeCredito: 'C',
+      propertyRisk: 5.17,
+      biPunteggio: 5.17,
+      biPerditaGiornalieraCentesimi: 5424658,
+      cyberRisk: 5.1,
       analizzataIl: new Date('2026-09-12T08:00:00Z'),
       aggiuntaIl: new Date('2026-09-12T08:00:00Z'),
     }),
@@ -160,6 +168,9 @@ describe('Il file del CRM', () => {
         'Sito web',
         'Score di credito',
         'Classe',
+        'Property Risk',
+        'Business Interruption al giorno',
+        'Cyber Risk',
         'Analizzata il',
         'Nel CRM dal',
         'Identificativo',
@@ -167,6 +178,12 @@ describe('Il file del CRM', () => {
         .map((c) => `"${c}"`)
         .join(';'),
     );
+  });
+
+  it('porta i punteggi delle protezioni con la virgola, come la scheda (19/09/2026)', () => {
+    expect(righe[1]).toContain('"5,17";"54246,58";"5,1"');
+    // Mai analizzata: tre celle vuote, non zeri.
+    expect(righe[2]).not.toMatch(/"0,00"|"0,0"/);
   });
 
   it('porta stato e nota come l’intermediario li ha scritti, e le date in italiano', () => {

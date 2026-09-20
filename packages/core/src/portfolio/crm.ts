@@ -74,6 +74,16 @@ export interface VoceCrm {
   /** `null` se l'azienda non è stata analizzata, o se il merito non era determinabile. */
   readonly scoreCredito: number | null;
   readonly classeCredito: string | null;
+  /**
+   * Le tre protezioni dell'ultima analisi, da 1 a 7 (dal 19/09/2026). `null` quando non
+   * calcolabili, per le aziende mai analizzate e per le analisi salvate prima di allora.
+   */
+  readonly propertyRisk: number | null;
+  /** Il punteggio fisico della Business Interruption: per il foglio Veezco è il Property Risk. */
+  readonly biPunteggio: number | null;
+  /** Quanto perde l'azienda in un giorno di fermo, in centesimi. */
+  readonly biPerditaGiornalieraCentesimi: number | null;
+  readonly cyberRisk: number | null;
   /** Data dell'ultima analisi; `null` per le aziende arrivate solo da un elenco. */
   readonly analizzataIl: Date | null;
   /** Quando è arrivata da un elenco comprato; `null` se non ci è mai arrivata. */
@@ -137,6 +147,16 @@ const COLONNE: readonly { readonly intestazione: string; readonly valore: (v: Vo
     valore: (v) => (v.scoreCredito === null ? '' : String(v.scoreCredito)),
   },
   { intestazione: 'Classe', valore: (v) => v.classeCredito ?? '' },
+  // I punteggi come nella scheda, con la virgola: cella vuota se non calcolabili.
+  { intestazione: 'Property Risk', valore: (v) => punteggioCsv(v.propertyRisk, 2) },
+  {
+    intestazione: 'Business Interruption al giorno',
+    valore: (v) =>
+      v.biPerditaGiornalieraCentesimi === null
+        ? ''
+        : (v.biPerditaGiornalieraCentesimi / 100).toFixed(2).replace('.', ','),
+  },
+  { intestazione: 'Cyber Risk', valore: (v) => punteggioCsv(v.cyberRisk, 1) },
   {
     intestazione: 'Analizzata il',
     valore: (v) => (v.analizzataIl === null ? '' : dataCsv(v.analizzataIl)),
@@ -145,6 +165,11 @@ const COLONNE: readonly { readonly intestazione: string; readonly valore: (v: Vo
   // L'identificativo in coda: non serve a chi legge, serve a riconciliare il file.
   { intestazione: 'Identificativo', valore: (v) => v.identificativo },
 ];
+
+/** Un punteggio da 1 a 7 con la virgola, come nella scheda; vuoto se non c'è. */
+function punteggioCsv(valore: number | null, cifre: number): string {
+  return valore === null ? '' : valore.toFixed(cifre).replace('.', ',');
+}
 
 /** Lo stesso formato del portafoglio: punto e virgola, BOM, CRLF, celle protette. */
 export function esportaCrmCsv(voci: readonly VoceCrm[]): string {

@@ -108,6 +108,11 @@ export interface VoceportafoglioAzienda {
   readonly esposizioneNonAssicurataCentesimi: number;
   readonly completezza: number;
   readonly azionePrioritaria: string | null;
+  /** Le tre protezioni, per il CRM in memoria: facoltative, come per chi registra senza. */
+  readonly propertyRisk?: number | null | undefined;
+  readonly biPunteggio?: number | null | undefined;
+  readonly biPerditaGiornalieraCentesimi?: number | null | undefined;
+  readonly cyberRisk?: number | null | undefined;
   readonly analizzataIl: Date;
 }
 
@@ -316,6 +321,10 @@ export class MemoryCrmStore implements CrmStore {
         nota: modifica?.nota ?? null,
         scoreCredito: analisi?.scoreCredito ?? null,
         classeCredito: analisi?.classeCredito ?? null,
+        propertyRisk: analisi?.propertyRisk ?? null,
+        biPunteggio: analisi?.biPunteggio ?? null,
+        biPerditaGiornalieraCentesimi: analisi?.biPerditaGiornalieraCentesimi ?? null,
+        cyberRisk: analisi?.cyberRisk ?? null,
         analizzataIl: analisi?.analizzataIl ?? null,
         daElencoIl: elenco?.quando ?? null,
         statoAggiornatoIl: modifica?.quando ?? null,

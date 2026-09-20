@@ -815,6 +815,11 @@ export interface DatiAnalisi {
   readonly rischiCritici: number;
   readonly coperturaAssente: number;
   readonly statoCatNat: 'non-soggetta' | 'in-scadenza' | 'inadempiente' | 'adempiente';
+  /** Le tre protezioni del foglio Veezco, per il CRM: `null` quando non calcolabili. */
+  readonly propertyRisk?: number | null | undefined;
+  readonly biPunteggio?: number | null | undefined;
+  readonly biPerditaGiornalieraCentesimi?: number | null | undefined;
+  readonly cyberRisk?: number | null | undefined;
   readonly risultato: unknown;
   /** Fotografia dei fatti sorvegliati: alimenta il monitoraggio. */
   readonly statoSorvegliato?: unknown;
@@ -841,6 +846,11 @@ export interface RigaGap {
   readonly motivazioneAdeguatezza: string;
 }
 
+/** Un punteggio verso una colonna `numeric`: stringa arrotondata, e l'assenza resta assenza. */
+function decimale(valore: number | null | undefined, cifre: number): string | null {
+  return valore === null || valore === undefined ? null : valore.toFixed(cifre);
+}
+
 export async function salvaAnalisi(db: Database, dati: DatiAnalisi): Promise<string> {
   return db.transaction(async (tx) => {
     const creati = await tx
@@ -859,6 +869,10 @@ export async function salvaAnalisi(db: Database, dati: DatiAnalisi): Promise<str
         rischiCritici: dati.rischiCritici,
         coperturaAssente: dati.coperturaAssente,
         statoCatNat: dati.statoCatNat,
+        propertyRisk: decimale(dati.propertyRisk, 2),
+        biPunteggio: decimale(dati.biPunteggio, 2),
+        biPerditaGiornalieraCentesimi: dati.biPerditaGiornalieraCentesimi ?? null,
+        cyberRisk: decimale(dati.cyberRisk, 1),
         risultato: dati.risultato,
         statoSorvegliato: dati.statoSorvegliato ?? null,
         versioneCore: dati.versioneCore,
@@ -1041,10 +1055,24 @@ export interface RigaCrm {
   readonly notaCrm: string | null;
   readonly scoreCredito: number | null;
   readonly classeCredito: string | null;
+  readonly propertyRisk: number | null;
+  readonly biPunteggio: number | null;
+  readonly biPerditaGiornalieraCentesimi: number | null;
+  readonly cyberRisk: number | null;
   readonly analizzataIl: Date | null;
   readonly daElencoIl: Date | null;
   readonly crmAggiornatoIl: Date | null;
   readonly aggiuntaIl: Date;
+}
+
+/**
+ * Un `numeric` o un `bigint` letto da una query grezza arriva come STRINGA (CLAUDE.md, regola 2):
+ * si converte qui, al confine, e l'assenza resta `null`, mai zero.
+ */
+function numero(valore: string | number | null): number | null {
+  if (valore === null) return null;
+  const n = Number(valore);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Un istante letto da una query grezza: stringa su postgres.js, `Date` su PGlite. */
@@ -1059,6 +1087,10 @@ function istante(valore: string | Date | null): Date | null {
  * con l'ultima analisi, non da colonne copiate: la scheda e il CRM dicono la stessa cosa
  * perché leggono lo stesso dato. Per le aziende mai analizzate i contatti non ci sono, e il
  * comune viene dall'elenco.
+ *
+ * Telefono e sito, se l'anagrafica non li ha, dalle qualifiche del profilo completo: la scheda li
+ * mostra da lì (IndicatoriArchivio), e il CRM li taceva (19/09/2026, «oltre la pec metti anche il
+ * numero se c'è»). I punteggi delle protezioni sono quelli salvati con l'ultima analisi (0017).
  */
 export async function elencoCrm(db: Database, tenantId: string): Promise<readonly RigaCrm[]> {
   interface RigaGrezza {
@@ -1075,6 +1107,10 @@ export async function elencoCrm(db: Database, tenantId: string): Promise<readonl
     creata_il: string | Date;
     score_credito: number | null;
     classe_credito: string | null;
+    property_risk: string | number | null;
+    bi_punteggio: string | number | null;
+    bi_perdita_giornaliera_centesimi: string | number | null;
+    cyber_risk: string | number | null;
     analizzata_il: string | Date | null;
     telefono: string | null;
     pec: string | null;
@@ -1086,13 +1122,21 @@ export async function elencoCrm(db: Database, tenantId: string): Promise<readonl
       a.partita_iva, a.denominazione, a.provincia, a.comune, a.ateco_primario,
       a.stato_crm, a.nota_crm, a.crm_aggiornato_il, a.da_elenco_il, a.creata_il,
       n.score_credito, n.classe_credito, n.creata_il AS analizzata_il,
-      s.profilo -> 'anagrafica' -> 'value' ->> 'telefono' AS telefono,
+      n.property_risk, n.bi_punteggio, n.bi_perdita_giornaliera_centesimi, n.cyber_risk,
+      COALESCE(
+        NULLIF(btrim(s.profilo -> 'anagrafica' -> 'value' ->> 'telefono'), ''),
+        NULLIF(btrim(s.profilo -> 'indicatoriFornitore' -> 'qualifiche' ->> 'telefono'), '')
+      ) AS telefono,
       s.profilo -> 'anagrafica' -> 'value' ->> 'pec' AS pec,
-      s.profilo -> 'anagrafica' -> 'value' ->> 'sitoWeb' AS sito_web,
+      COALESCE(
+        NULLIF(btrim(s.profilo -> 'anagrafica' -> 'value' ->> 'sitoWeb'), ''),
+        NULLIF(btrim(s.profilo -> 'indicatoriFornitore' -> 'qualifiche' ->> 'sitoWeb'), '')
+      ) AS sito_web,
       s.profilo -> 'anagrafica' -> 'value' -> 'sedeLegale' ->> 'comune' AS comune_sede
     FROM aziende a
     LEFT JOIN LATERAL (
-      SELECT score_credito, classe_credito, creata_il, snapshot_id
+      SELECT score_credito, classe_credito, creata_il, snapshot_id,
+        property_risk, bi_punteggio, bi_perdita_giornaliera_centesimi, cyber_risk
       FROM analisi
       WHERE analisi.azienda_id = a.id
       ORDER BY creata_il DESC
@@ -1116,6 +1160,10 @@ export async function elencoCrm(db: Database, tenantId: string): Promise<readonl
     notaCrm: r.nota_crm,
     scoreCredito: r.score_credito,
     classeCredito: r.classe_credito,
+    propertyRisk: numero(r.property_risk),
+    biPunteggio: numero(r.bi_punteggio),
+    biPerditaGiornalieraCentesimi: numero(r.bi_perdita_giornaliera_centesimi),
+    cyberRisk: numero(r.cyber_risk),
     analizzataIl: istante(r.analizzata_il),
     daElencoIl: istante(r.da_elenco_il),
     crmAggiornatoIl: istante(r.crm_aggiornato_il),

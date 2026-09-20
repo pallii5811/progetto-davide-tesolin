@@ -2400,6 +2400,10 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
       esposizioneNonAssicurataCentesimi: analisi.sintesi.esposizioneNonAssicurata,
       completezza: analisi.completezza.percentuale,
       azionePrioritaria: analisi.sintesi.azioniPrioritarie[0] ?? null,
+      propertyRisk: analisi.protezioni.property.punteggio,
+      biPunteggio: analisi.protezioni.businessInterruption.punteggioFisico,
+      biPerditaGiornalieraCentesimi: analisi.protezioni.businessInterruption.perditaGiornaliera,
+      cyberRisk: analisi.protezioni.cyber.punteggio,
       analizzataIl: new Date(),
     });
 

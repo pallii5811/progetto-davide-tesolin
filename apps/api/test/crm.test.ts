@@ -25,6 +25,10 @@ interface VoceDto {
   sitoWeb: string | null;
   stato: string;
   nota: string | null;
+  propertyRisk: number | null;
+  biPunteggio: number | null;
+  biPerditaGiornalieraCentesimi: number | null;
+  cyberRisk: number | null;
   analizzataIl: string | null;
   daElencoIl: string | null;
 }
@@ -214,6 +218,54 @@ describe('CRM su database', () => {
 
     const meccanica = aziende.find((a) => a.identificativo === MECCANICA);
     expect(meccanica?.pec).not.toBe(adriatica?.pec);
+  });
+
+  /*
+    I punteggi del CRM sono quelli della scheda, non un secondo calcolo.
+
+    Richiesta di Simone del 19/09/2026: Property, Business Interruption e Cyber per ogni azienda
+    del CRM. Sono salvati con l'analisi (migrazione 0017) proprio perché ricalcolarli qui vorrebbe
+    dire rispondere due volte alla stessa domanda, e un giorno rispondere diverso.
+  */
+  it('i punteggi delle protezioni sono quelli dell\u2019analisi, e chi non \u00e8 stata analizzata non ne ha', async () => {
+    const analisi = await app.inject({
+      method: 'POST',
+      url: `/api/aziende/${ADRIATICA}/analisi`,
+      headers: { cookie },
+      payload: {},
+    });
+    const { protezioni } = analisi.json<{
+      protezioni: {
+        property: { punteggio: number | null };
+        businessInterruption: {
+          punteggioFisico: number | null;
+          perditaGiornaliera: { centesimi: number } | null;
+        };
+        cyber: { punteggio: number | null };
+      };
+    }>();
+    expect(protezioni.property.punteggio).not.toBeNull();
+    expect(protezioni.cyber.punteggio).not.toBeNull();
+
+    const aziende = await leggi();
+    const adriatica = aziende.find((a) => a.identificativo === ADRIATICA);
+    expect(adriatica?.propertyRisk).toBe(protezioni.property.punteggio);
+    expect(adriatica?.biPunteggio).toBe(protezioni.businessInterruption.punteggioFisico);
+    expect(adriatica?.biPerditaGiornalieraCentesimi).toBe(
+      protezioni.businessInterruption.perditaGiornaliera?.centesimi ?? null,
+    );
+    expect(adriatica?.cyberRisk).toBe(protezioni.cyber.punteggio);
+
+    // Arrivata da un elenco e mai analizzata: nessun punteggio inventato, e nessuno zero.
+    const meccanicaOra = aziende.find((a) => a.identificativo === MECCANICA);
+    expect(meccanicaOra?.analizzataIl).toBeNull();
+    expect(meccanicaOra?.propertyRisk).toBeNull();
+    expect(meccanicaOra?.cyberRisk).toBeNull();
+    expect(meccanicaOra?.biPerditaGiornalieraCentesimi).toBeNull();
+
+    // E nel file esportato ci sono le colonne, con la virgola decimale.
+    const csv = await app.inject({ method: 'GET', url: '/api/crm/esporta', headers: { cookie } });
+    expect(csv.body).toContain('"Property Risk";"Business Interruption al giorno";"Cyber Risk"');
   });
 
   it('un altro studio non vede il CRM, e non può cambiarne una riga', async () => {
