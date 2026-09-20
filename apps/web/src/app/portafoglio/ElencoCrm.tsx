@@ -161,47 +161,52 @@ function Contatti({ azienda }: { azienda: VoceCrmDto }) {
 
 /**
  * I tre punteggi del foglio Veezco, come li mostra la scheda: stessi cerchi, stessa scala da 1 a
- * 7, stessi colori. Sotto la Business Interruption c'è quanto costa un giorno di fermo, che è il
- * numero con cui si apre la telefonata.
+ * 7, stessi colori. Sotto, quanto costa un giorno di fermo: è il numero con cui si apre la
+ * telefonata.
  *
  * Un'azienda mai analizzata non ha punteggi e lo dice: tre cerchi grigi sembrerebbero un rischio
- * minimo, che è un'affermazione, non un'assenza.
+ * minimo, che è un'affermazione, non un'assenza. Lo stesso vale per un'analisi salvata prima che i
+ * punteggi si conservassero (migrazione 0017): niente tre «n.d.» in fila, ma una riga che dice
+ * perché mancano e come tornano.
  */
 function Punteggi({ azienda }: { azienda: VoceCrmDto }) {
   if (azienda.analizzataIl === null) {
-    return <p className="text-xs text-testo-debole">Con l’analisi.</p>;
+    return <p className="text-xs leading-snug text-testo-debole">Con l’analisi.</p>;
   }
 
+  /*
+    Il nome per esteso lo sente chi usa un lettore di schermo — «Business Interruption: 5,17 su 7»,
+    come nella scheda — e sotto il cerchio ne sta una parola sola: in una colonna di elenco
+    «Interruzione» finiva tagliata a metà.
+  */
   const voci = [
-    { etichetta: 'Property', valore: azienda.propertyRisk, decimali: 2, sotto: null },
-    {
-      etichetta: 'Interruzione',
-      valore: azienda.biPunteggio,
-      decimali: 2,
-      sotto:
-        azienda.biPerditaGiornalieraCentesimi === null
-          ? null
-          : `${euroAlGiorno(azienda.biPerditaGiornalieraCentesimi)} al giorno`,
-    },
-    { etichetta: 'Cyber', valore: azienda.cyberRisk, decimali: 1, sotto: null },
+    { etichetta: 'Property Risk', corta: 'Property', valore: azienda.propertyRisk, decimali: 2 },
+    { etichetta: 'Business Interruption', corta: 'Fermo', valore: azienda.biPunteggio, decimali: 2 },
+    { etichetta: 'Cyber Risk', corta: 'Cyber', valore: azienda.cyberRisk, decimali: 1 },
   ] as const;
 
-  const nessuno = voci.every((v) => v.valore === null);
+  if (voci.every((v) => v.valore === null)) {
+    return (
+      <p className="text-xs leading-snug text-testo-debole">
+        Analisi di prima del 19/09/2026: i punteggi compaiono riaprendo la scheda.
+      </p>
+    );
+  }
 
   return (
-    <div className="flex items-start gap-3">
-      {voci.map((v) => (
-        <div key={v.etichetta} className="flex w-[4.75rem] flex-col items-center gap-1 text-center">
-          <Cerchio valore={v.valore} etichetta={v.etichetta} piccolo decimali={v.decimali} />
-          <span className="text-[10.5px] leading-tight text-testo-debole">{v.etichetta}</span>
-          {v.sotto !== null && (
-            <span className="tabular text-[10.5px] leading-tight text-testo-tenue">{v.sotto}</span>
-          )}
-        </div>
-      ))}
-      {nessuno && (
-        <p className="max-w-[10rem] text-[11px] leading-snug text-testo-debole">
-          I punteggi si scrivono alla prossima apertura della scheda.
+    <div className="min-w-0">
+      <div className="flex items-start gap-1.5">
+        {voci.map((v) => (
+          <div key={v.etichetta} className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+            <Cerchio valore={v.valore} etichetta={v.etichetta} piccolo decimali={v.decimali} />
+            <span className="w-full truncate text-[10.5px] leading-tight text-testo-debole">{v.corta}</span>
+          </div>
+        ))}
+      </div>
+      {azienda.biPerditaGiornalieraCentesimi !== null && (
+        <p className="mt-1.5 text-center text-[11px] leading-snug text-testo-tenue">
+          Un giorno di fermo:{' '}
+          <span className="tabular">{euroAlGiorno(azienda.biPerditaGiornalieraCentesimi)}</span>
         </p>
       )}
     </div>

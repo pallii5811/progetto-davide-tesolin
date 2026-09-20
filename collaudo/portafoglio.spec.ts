@@ -96,7 +96,7 @@ test.describe('CRM', () => {
       I tre punteggi del foglio Veezco, per ogni azienda analizzata. L'etichetta del cerchio è
       quella che legge un lettore di schermo: «Property: 5,17 su 7».
     */
-    for (const rischio of ['Property', 'Interruzione', 'Cyber']) {
+    for (const rischio of ['Property Risk', 'Business Interruption', 'Cyber Risk']) {
       await expect(
         riga.getByRole('img', { name: new RegExp(`^${rischio}: (\\d+(,\\d+)? su 7|non calcolabile)$`) }),
         rischio,
@@ -118,6 +118,48 @@ test.describe('CRM', () => {
 
     await cerca.fill('');
     await expect(page.locator('tbody tr').first()).toBeVisible();
+  });
+
+  /*
+    Niente testo di una colonna sopra quella accanto.
+
+    Il 20/09/2026 i tre cerchi dei punteggi erano più larghi della loro cella e finivano sopra il
+    menu dello stato: «il tasto da contattare copre i testi». A occhio, sulla pagina di prova con
+    due aziende, non si vedeva. Qui si misura: per ogni riga si confronta il rettangolo di ogni
+    scritta con il bordo della colonna successiva.
+  */
+  test('nessuna colonna del CRM sborda su quella accanto', async ({ page }) => {
+    for (const [larghezza, altezza] of [
+      [1440, 900],
+      [1024, 800],
+    ] as const) {
+      await page.setViewportSize({ width: larghezza, height: altezza });
+      await page.goto('/portafoglio');
+      await expect(page.locator('tbody tr').first()).toBeVisible();
+
+      const sbordano = await page.evaluate(() => {
+        const esiti: string[] = [];
+        // `Array.from` e non lo spread: il progetto del lint non carica DOM.Iterable, e un
+        // NodeList percorso con for...of diventa `any` — cioè un controllo che non controlla.
+        for (const riga of Array.from(document.querySelectorAll('tbody tr'))) {
+          const celle = Array.from(riga.querySelectorAll('td'));
+          for (const [i, cella] of celle.entries()) {
+            const dopo = celle[i + 1]?.getBoundingClientRect();
+            if (dopo === undefined) continue;
+            for (const figlio of Array.from(cella.querySelectorAll('*'))) {
+              const r = figlio.getBoundingClientRect();
+              if (r.width > 0 && r.right > dopo.left + 1) {
+                esiti.push(`«${figlio.textContent.trim().slice(0, 30)}» esce dalla sua colonna`);
+                break;
+              }
+            }
+          }
+        }
+        return [...new Set(esiti)];
+      });
+
+      expect(sbordano, `a ${larghezza}px: ${sbordano.join(' · ')}`).toEqual([]);
+    }
   });
 
   test('su schermo stretto resta usabile: stato, nota e comando visibili', async ({ page }) => {
